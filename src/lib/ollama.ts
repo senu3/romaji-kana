@@ -1,31 +1,32 @@
-import { generateText } from "ai";
-import { createOllama } from "ollama-ai-provider-v2";
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
 import { defaultConversionPrompt } from "./prompts";
+import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 
 export async function convertRomajiToJapanese(
   input: string,
   settings: AppSettings,
+  transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
   const normalized = normalizeInputForPrompt(input, settings);
-  const ollama = createOllama({
-    baseURL: normalizeOllamaBaseUrl(settings.ollamaApiUrl),
-  });
-
-  const result = await generateText({
-    model: ollama(settings.modelName),
-    system: settings.conversionPrompt.trim() || defaultConversionPrompt,
-    prompt: normalized,
-    temperature: 0.1,
-    providerOptions: {
-      ollama: {
-        think: settings.think,
+  const result = await transport.generate(
+    settings.ollamaApiUrl,
+    {
+      model: settings.modelName,
+      system: settings.conversionPrompt.trim() || defaultConversionPrompt,
+      prompt: normalized,
+      stream: false,
+      think: settings.think,
+      options: {
+        temperature: 0.1,
       },
+      keep_alive: "5m",
     },
-  });
+    30_000,
+  );
 
-  const text = stripThinkBlock(result.text).trim();
+  const rawText = result.response ?? result.message?.content ?? "";
+  const text = stripThinkBlock(rawText).trim();
   if (!text) {
     throw new Error("Ollama returned an empty conversion.");
   }

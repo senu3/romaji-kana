@@ -1,13 +1,6 @@
 import { normalizeOllamaBaseUrl } from "./ollama";
+import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings, OllamaModel } from "./types";
-
-interface OllamaTagsResponse {
-  models?: Array<{
-    name?: string;
-    modified_at?: string;
-    size?: number;
-  }>;
-}
 
 export interface OllamaConnectionResult {
   models: OllamaModel[];
@@ -17,7 +10,7 @@ export interface OllamaConnectionResult {
 }
 
 interface CheckOptions {
-  fetchFn?: typeof fetch;
+  transport?: OllamaTransport;
   timeoutMs?: number;
 }
 
@@ -25,10 +18,10 @@ export async function checkOllamaConnection(
   settings: AppSettings,
   options: CheckOptions = {},
 ): Promise<OllamaConnectionResult> {
-  const fetchFn = options.fetchFn ?? fetch;
+  const transport = options.transport ?? defaultOllamaTransport;
   const timeoutMs = options.timeoutMs ?? 12_000;
   const baseUrl = normalizeOllamaBaseUrl(settings.ollamaApiUrl);
-  const models = await fetchOllamaModels(baseUrl, fetchFn, timeoutMs);
+  const models = await fetchOllamaModels(baseUrl, transport, timeoutMs);
   const modelName = settings.modelName.trim();
 
   if (!modelName) {
@@ -50,7 +43,7 @@ export async function checkOllamaConnection(
     };
   }
 
-  await warmOllamaModel(baseUrl, modelName, fetchFn, timeoutMs);
+  await warmOllamaModel(baseUrl, modelName, transport, timeoutMs);
 
   return {
     models,
@@ -62,15 +55,10 @@ export async function checkOllamaConnection(
 
 async function fetchOllamaModels(
   baseUrl: string,
-  fetchFn: typeof fetch,
+  transport: OllamaTransport,
   timeoutMs: number,
 ): Promise<OllamaModel[]> {
-  const response = await fetchWithTimeout(`${baseUrl}/tags`, { method: "GET" }, fetchFn, timeoutMs);
-  if (!response.ok) {
-    throw new Error(`Ollama tags request failed with HTTP ${response.status}.`);
-  }
-
-  const data = (await response.json()) as OllamaTagsResponse;
+  const data = await transport.tags(baseUrl, timeoutMs);
   return (data.models ?? [])
     .filter((model) => Boolean(model.name))
     .map((model) => ({
@@ -84,51 +72,21 @@ async function fetchOllamaModels(
 async function warmOllamaModel(
   baseUrl: string,
   modelName: string,
-  fetchFn: typeof fetch,
+  transport: OllamaTransport,
   timeoutMs: number,
 ): Promise<void> {
-  const response = await fetchWithTimeout(
-    `${baseUrl}/generate`,
+  await transport.generate(
+    baseUrl,
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: modelName,
-        prompt: "",
-        stream: false,
-        keep_alive: "5m",
-      }),
+      model: modelName,
+      prompt: "",
+      stream: false,
+      keep_alive: "5m",
     },
-    fetchFn,
     timeoutMs,
   );
-
-  if (!response.ok) {
-    throw new Error(`Ollama model load failed with HTTP ${response.status}.`);
-  }
 }
 
 function matchesOllamaModel(availableName: string, selectedName: string): boolean {
   return availableName === selectedName || availableName === `${selectedName}:latest`;
-}
-
-async function fetchWithTimeout(
-  input: RequestInfo | URL,
-  init: RequestInit,
-  fetchFn: typeof fetch,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetchFn(input, {
-      ...init,
-      signal: controller.signal,
-    });
-  } finally {
-    globalThis.clearTimeout(timeout);
-  }
 }
