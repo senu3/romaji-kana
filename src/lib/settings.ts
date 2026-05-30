@@ -1,4 +1,5 @@
 import type { AppSettings } from "./types";
+import { defaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
 
@@ -17,6 +18,7 @@ export const defaultSettings: AppSettings = {
     periodToJapanese: true,
     commaToJapanese: true,
   },
+  conversionPrompt: defaultConversionPrompt,
   think: false,
 };
 

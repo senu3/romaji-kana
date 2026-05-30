@@ -4,7 +4,7 @@ import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { Search, WandSparkles } from "lucide-react";
+import { History, MessageSquareText } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import {
   extractConversionRange,
@@ -16,8 +16,11 @@ import type { AppSettings, ConversionRange, ConversionTrigger, PendingConversion
 interface MarkdownEditorProps {
   settings: AppSettings;
   pending: PendingConversion[];
+  historyCount: number;
   onConvert: (range: ConversionRange) => void;
   onDocumentChanged: () => void;
+  onOpenHistory: () => void;
+  onOpenPrompt: () => void;
   registerView: (view: EditorView | null) => void;
 }
 
@@ -113,8 +116,11 @@ const highlightStyle = HighlightStyle.define([
 export function MarkdownEditor({
   settings,
   pending,
+  historyCount,
   onConvert,
   onDocumentChanged,
+  onOpenHistory,
+  onOpenPrompt,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -243,15 +249,15 @@ export function MarkdownEditor({
           <p className="eyebrow">Markdown</p>
           <h1>Romaji Kana</h1>
         </div>
-        <div className="editor-actions" aria-label="Editor status">
-          <span className="pill">
-            <WandSparkles size={15} aria-hidden="true" />
-            {pending.length} converting
-          </span>
-          <span className="pill">
-            <Search size={15} aria-hidden="true" />
-            Plain text
-          </span>
+        <div className="editor-actions" aria-label="Editor actions">
+          <button className="pill pill-action" type="button" onClick={onOpenHistory}>
+            <History size={15} aria-hidden="true" />
+            {pending.length > 0 ? `${pending.length} converting` : `${historyCount} History`}
+          </button>
+          <button className="pill pill-action" type="button" onClick={onOpenPrompt}>
+            <MessageSquareText size={15} aria-hidden="true" />
+            Prompt
+          </button>
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />

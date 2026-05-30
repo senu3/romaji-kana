@@ -2,14 +2,7 @@ import { generateText } from "ai";
 import { createOllama } from "ollama-ai-provider-v2";
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
-
-const SYSTEM_PROMPT = [
-  "You convert rough romaji Japanese input into natural Japanese.",
-  "Correct typos, missing characters, extra characters, and inconsistent spelling.",
-  "Return only the converted Japanese text.",
-  "Do not explain.",
-  "Preserve Markdown syntax when present.",
-].join("\n");
+import { defaultConversionPrompt } from "./prompts";
 
 export async function convertRomajiToJapanese(
   input: string,
@@ -22,7 +15,7 @@ export async function convertRomajiToJapanese(
 
   const result = await generateText({
     model: ollama(settings.modelName),
-    system: SYSTEM_PROMPT,
+    system: settings.conversionPrompt.trim() || defaultConversionPrompt,
     prompt: normalized,
     temperature: 0.1,
     providerOptions: {
