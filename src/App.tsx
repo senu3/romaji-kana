@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
@@ -10,7 +10,15 @@ import {
 import { SettingsPanel } from "./components/SettingsPanel";
 import { convertRomajiToJapanese } from "./lib/ollama";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
-import type { AppSettings, ConversionRange, ConversionStatus, PendingConversion } from "./lib/types";
+import type {
+  AppSettings,
+  ConversionHistoryItem,
+  ConversionRange,
+  ConversionStatus,
+  PendingConversion,
+} from "./lib/types";
+
+type ActivePanel = "history" | "prompt" | null;
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -20,6 +28,8 @@ function App() {
     return loadSettings();
   });
   const [pending, setPending] = useState<PendingConversion[]>([]);
+  const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "Ready. Type romaji and finish with punctuation, or press Ctrl+Enter.",
@@ -40,6 +50,32 @@ function App() {
 
   const handleDocumentChanged = useCallback(() => {
     docVersionRef.current += 1;
+  }, []);
+
+  const closeActivePanel = useCallback(() => {
+    if (activePanel === "history") {
+      setHistory([]);
+    }
+    setActivePanel(null);
+  }, [activePanel]);
+
+  const toggleHistoryPanel = useCallback(() => {
+    setActivePanel((panel) => {
+      if (panel === "history") {
+        setHistory([]);
+        return null;
+      }
+      return "history";
+    });
+  }, []);
+
+  const togglePromptPanel = useCallback(() => {
+    setActivePanel((panel) => {
+      if (panel === "history") {
+        setHistory([]);
+      }
+      return panel === "prompt" ? null : "prompt";
+    });
   }, []);
 
   const handleConvert = useCallback((range: ConversionRange) => {
@@ -91,6 +127,16 @@ function App() {
           effects: removeLoadingDecoration.of(request.id),
           userEvent: "input.convert",
         });
+        setHistory((items) => [
+          {
+            id: request.id,
+            input: request.originalText,
+            output: converted,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+          },
+          ...items,
+        ]);
         setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
       })
       .catch((error: unknown) => {
@@ -115,10 +161,23 @@ function App() {
       <MarkdownEditor
         settings={settings}
         pending={pending}
+        historyCount={history.length}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
+        onOpenHistory={toggleHistoryPanel}
+        onOpenPrompt={togglePromptPanel}
         registerView={registerView}
       />
+      {activePanel === "history" ? (
+        <HistoryPanel history={history} onClose={closeActivePanel} />
+      ) : null}
+      {activePanel === "prompt" ? (
+        <PromptPanel
+          prompt={settings.conversionPrompt}
+          onChange={(conversionPrompt) => setSettings((value) => ({ ...value, conversionPrompt }))}
+          onClose={closeActivePanel}
+        />
+      ) : null}
       <SettingsPanel
         settings={settings}
         collapsed={settingsCollapsed}
@@ -127,6 +186,88 @@ function App() {
       />
       <StatusBar status={status} pendingCount={pending.length} />
     </main>
+  );
+}
+
+function HistoryPanel({
+  history,
+  onClose,
+}: {
+  history: ConversionHistoryItem[];
+  onClose: () => void;
+}) {
+  return (
+    <section className="floating-panel history-panel" aria-label="history">
+      <div className="floating-panel-header">
+        <div>
+          <p className="eyebrow">Conversion log</p>
+          <h2>History</h2>
+        </div>
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Close history">
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+
+      {history.length === 0 ? (
+        <p className="empty-state">No conversions in this open history panel yet.</p>
+      ) : (
+        <div className="history-list">
+          {history.map((item) => (
+            <article className="history-item" key={item.id}>
+              <div className="history-meta">
+                <span>{new Date(item.createdAt).toLocaleTimeString()}</span>
+                <span>{item.modelName}</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Romaji</dt>
+                  <dd>{item.input}</dd>
+                </div>
+                <div>
+                  <dt>Japanese</dt>
+                  <dd>{item.output}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PromptPanel({
+  prompt,
+  onChange,
+  onClose,
+}: {
+  prompt: string;
+  onChange: (prompt: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <section className="floating-panel prompt-panel" aria-label="Conversion prompt editor">
+      <div className="floating-panel-header">
+        <div>
+          <p className="eyebrow">System prompt</p>
+          <h2>Prompt</h2>
+        </div>
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Close prompt">
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <label className="prompt-editor">
+        <span>Japanese conversion instructions</span>
+        <textarea
+          value={prompt}
+          onChange={(event) => onChange(event.currentTarget.value)}
+          spellCheck={false}
+        />
+      </label>
+      <p className="panel-note">
+        This prompt is saved locally and used for the next Ollama conversion.
+      </p>
+    </section>
   );
 }
 

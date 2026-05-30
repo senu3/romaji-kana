@@ -20,6 +20,7 @@ export interface AppSettings {
     periodToJapanese: boolean;
     commaToJapanese: boolean;
   };
+  conversionPrompt: string;
   think: boolean;
 }
 
@@ -36,6 +37,14 @@ export interface PendingConversion {
   originalText: string;
   createdAt: number;
   docVersion: number;
+}
+
+export interface ConversionHistoryItem {
+  id: string;
+  input: string;
+  output: string;
+  modelName: string;
+  createdAt: number;
 }
 
 export type ConversionStatus =
