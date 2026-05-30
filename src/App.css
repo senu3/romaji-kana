@@ -22,7 +22,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -31,9 +33,16 @@ button {
 }
 
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #5eead4;
   outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .app-shell {
@@ -231,6 +240,165 @@ h3 {
 
 .field input:hover {
   border-color: #0d9488;
+}
+
+.model-field {
+  position: relative;
+}
+
+.model-combobox {
+  position: relative;
+}
+
+.model-combobox input {
+  padding-right: 42px;
+}
+
+.model-list-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-left: 1px solid #d5e8e5;
+  border-radius: 0 6px 6px 0;
+  background: #ffffff;
+  color: #0f766e;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.model-list-toggle:hover {
+  background: #ecfeff;
+  color: #115e59;
+}
+
+.model-list-toggle svg {
+  transform: rotate(90deg);
+}
+
+.model-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 7;
+  display: grid;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(19, 78, 74, 0.16);
+  padding: 6px;
+}
+
+.model-options button {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 9px;
+  background: transparent;
+  color: #134e4a;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.model-options button:hover,
+.model-options button.selected {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.model-options p {
+  margin: 0;
+  padding: 9px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.connection-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d5e8e5;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.connection-card strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #134e4a;
+  font-size: 13px;
+}
+
+.connection-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.connection-card span {
+  display: inline-block;
+  margin-top: 7px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.connection-card.connected {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.connection-card.warning {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.connection-card.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.connection-card.checking {
+  border-color: #99f6e4;
+  background: #ecfeff;
+}
+
+.secondary-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #ffffff;
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 750;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: #0d9488;
+  background: #ecfeff;
 }
 
 .settings-group {

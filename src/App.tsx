@@ -8,13 +8,17 @@ import {
   removeLoadingDecoration,
 } from "./components/MarkdownEditor";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { loadDocument, saveDocument } from "./lib/documentStore";
 import { convertRomajiToJapanese } from "./lib/ollama";
+import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import type {
   AppSettings,
   ConversionHistoryItem,
   ConversionRange,
   ConversionStatus,
+  OllamaConnectionStatus,
+  OllamaModel,
   PendingConversion,
 } from "./lib/types";
 
@@ -30,6 +34,17 @@ function App() {
   const [pending, setPending] = useState<PendingConversion[]>([]);
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
+    kind: "idle",
+    message: "Ollama has not been checked yet.",
+  });
+  const [initialDocument] = useState(() => {
+    if (typeof localStorage === "undefined") {
+      return "";
+    }
+    return loadDocument();
+  });
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "Ready. Type romaji and finish with punctuation, or press Ctrl+Enter.",
@@ -38,19 +53,94 @@ function App() {
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
   const docVersionRef = useRef(0);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectionCheckIdRef = useRef(0);
+  const startupCheckStartedRef = useRef(false);
 
   useEffect(() => {
     settingsRef.current = settings;
     saveSettings(settings);
   }, [settings]);
 
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
+
   const registerView = useCallback((view: EditorView | null) => {
     editorViewRef.current = view;
   }, []);
 
-  const handleDocumentChanged = useCallback(() => {
+  const handleDocumentChanged = useCallback((documentText: string) => {
     docVersionRef.current += 1;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveDocument(documentText);
+      saveTimerRef.current = null;
+    }, 250);
   }, []);
+
+  const handleCheckOllama = useCallback(async () => {
+    const checkId = connectionCheckIdRef.current + 1;
+    connectionCheckIdRef.current = checkId;
+    const modelName = settingsRef.current.modelName.trim() || "the selected model";
+
+    setOllamaConnection({
+      kind: "checking",
+      message: `Checking Ollama and loading ${modelName}...`,
+    });
+    setStatus({
+      kind: "loading",
+      message: `Checking Ollama and loading ${modelName}...`,
+    });
+
+    try {
+      const result = await checkOllamaConnection(settingsRef.current);
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      setOllamaModels(result.models);
+      setOllamaConnection({
+        kind: result.kind,
+        message: result.message,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: result.kind === "connected" ? "success" : "warning",
+        message: result.message,
+      });
+    } catch (error: unknown) {
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      const message = formatOllamaConnectionError(error);
+      setOllamaModels([]);
+      setOllamaConnection({
+        kind: "error",
+        message,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: "error",
+        message,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (startupCheckStartedRef.current) {
+      return;
+    }
+    startupCheckStartedRef.current = true;
+    void handleCheckOllama();
+  }, [handleCheckOllama]);
 
   const closeActivePanel = useCallback(() => {
     if (activePanel === "history") {
@@ -127,6 +217,7 @@ function App() {
           effects: removeLoadingDecoration.of(request.id),
           userEvent: "input.convert",
         });
+        saveDocument(currentView.state.doc.toString());
         setHistory((items) => [
           {
             id: request.id,
@@ -162,6 +253,7 @@ function App() {
         settings={settings}
         pending={pending}
         historyCount={history.length}
+        initialDocument={initialDocument}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
         onOpenHistory={toggleHistoryPanel}
@@ -180,9 +272,12 @@ function App() {
       ) : null}
       <SettingsPanel
         settings={settings}
+        ollamaModels={ollamaModels}
+        ollamaConnection={ollamaConnection}
         collapsed={settingsCollapsed}
         onToggleCollapsed={() => setSettingsCollapsed((value) => !value)}
         onChange={setSettings}
+        onCheckOllama={handleCheckOllama}
       />
       <StatusBar status={status} pendingCount={pending.length} />
     </main>
@@ -296,6 +391,17 @@ function formatConversionError(error: unknown): string {
     return "Could not reach Ollama. Confirm it is running at the configured URL.";
   }
   return message || "Conversion failed.";
+}
+
+function formatOllamaConnectionError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/abort/i.test(message)) {
+    return "Ollama connection check timed out. Confirm Ollama is running and the selected model can load.";
+  }
+  if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
+    return "Could not reach Ollama. Confirm it is running at the configured URL.";
+  }
+  return message || "Ollama connection check failed.";
 }
 
 export default App;

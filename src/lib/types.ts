@@ -47,6 +47,19 @@ export interface ConversionHistoryItem {
   createdAt: number;
 }
 
+export interface OllamaModel {
+  name: string;
+  modifiedAt?: string;
+  size?: number;
+}
+
+export type OllamaConnectionStatus =
+  | { kind: "idle"; message: string }
+  | { kind: "checking"; message: string }
+  | { kind: "connected"; message: string; checkedAt: number }
+  | { kind: "warning"; message: string; checkedAt: number }
+  | { kind: "error"; message: string; checkedAt: number };
+
 export type ConversionStatus =
   | { kind: "idle"; message: string }
   | { kind: "loading"; message: string }

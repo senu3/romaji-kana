@@ -17,8 +17,9 @@ interface MarkdownEditorProps {
   settings: AppSettings;
   pending: PendingConversion[];
   historyCount: number;
+  initialDocument: string;
   onConvert: (range: ConversionRange) => void;
-  onDocumentChanged: () => void;
+  onDocumentChanged: (documentText: string) => void;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
   registerView: (view: EditorView | null) => void;
@@ -117,6 +118,7 @@ export function MarkdownEditor({
   settings,
   pending,
   historyCount,
+  initialDocument,
   onConvert,
   onDocumentChanged,
   onOpenHistory,
@@ -127,6 +129,7 @@ export function MarkdownEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onConvertRef = useRef(onConvert);
   const onDocumentChangedRef = useRef(onDocumentChanged);
+  const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
 
   const updateListener = useMemo(() => {
@@ -135,7 +138,7 @@ export function MarkdownEditor({
         return;
       }
 
-      onDocumentChangedRef.current();
+      onDocumentChangedRef.current(update.state.doc.toString());
       if (!settingsRef.current.autoConvert) {
         return;
       }
@@ -177,7 +180,7 @@ export function MarkdownEditor({
     };
 
     const state = EditorState.create({
-      doc: "anatahadonnakotogasukidesuka.\n\n## memo\n- kyouhayoi tenkidesu.",
+      doc: initialDocumentRef.current,
       extensions: [
         history(),
         markdown(),
