@@ -9,6 +9,7 @@ import {
 } from "./components/MarkdownEditor";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
+import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { convertRomajiToJapanese } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { defaultConversionPrompt } from "./lib/prompts";
@@ -37,6 +38,8 @@ function App() {
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
@@ -60,6 +63,7 @@ function App() {
   const connectionCheckIdRef = useRef(0);
   const startupCheckStartedRef = useRef(false);
   const canceledRequestsRef = useRef(new Set<string>());
+  const suppressNextDirtyRef = useRef(false);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -89,6 +93,12 @@ function App() {
 
   const handleDocumentChanged = useCallback((documentText: string) => {
     docVersionRef.current += 1;
+    if (suppressNextDirtyRef.current) {
+      suppressNextDirtyRef.current = false;
+    } else {
+      setIsDirty(true);
+    }
+
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
@@ -180,6 +190,75 @@ function App() {
       return panel === "prompt" ? null : "prompt";
     });
   }, []);
+
+  const getEditorDocument = useCallback(() => {
+    return editorViewRef.current?.state.doc.toString() ?? "";
+  }, []);
+
+  const replaceEditorDocument = useCallback((content: string) => {
+    const view = editorViewRef.current;
+    if (!view) {
+      return;
+    }
+
+    suppressNextDirtyRef.current = true;
+    view.dispatch({
+      changes: {
+        from: 0,
+        to: view.state.doc.length,
+        insert: content,
+      },
+      selection: { anchor: 0 },
+      userEvent: "document.open",
+    });
+  }, []);
+
+  const handleOpenFile = useCallback(async () => {
+    try {
+      const file = await openMarkdownFile();
+      if (!file) {
+        return;
+      }
+
+      replaceEditorDocument(file.content);
+      setCurrentFilePath(file.path);
+      setIsDirty(false);
+      saveDocument(file.content);
+      setStatus({ kind: "success", message: `Opened ${basename(file.path)}.` });
+    } catch (error: unknown) {
+      setStatus({ kind: "error", message: formatFileError(error) });
+    }
+  }, [replaceEditorDocument]);
+
+  const handleSaveFile = useCallback(async () => {
+    try {
+      const savedPath = await saveMarkdownFile(getEditorDocument(), currentFilePath);
+      if (!savedPath) {
+        return;
+      }
+
+      setCurrentFilePath(savedPath);
+      setIsDirty(false);
+      setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
+    } catch (error: unknown) {
+      setStatus({ kind: "error", message: formatFileError(error) });
+    }
+  }, [currentFilePath, getEditorDocument]);
+
+  const handleSaveFileAs = useCallback(async () => {
+    try {
+      const savedPath = await saveMarkdownFile(getEditorDocument(), null);
+      if (!savedPath) {
+        return;
+      }
+
+      setCurrentFilePath(savedPath);
+      setIsDirty(false);
+      setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
+    } catch (error: unknown) {
+      setStatus({ kind: "error", message: formatFileError(error) });
+    }
+  }, [getEditorDocument]);
 
   const cancelConversion = useCallback((request: PendingConversion) => {
     canceledRequestsRef.current.add(request.id);
@@ -386,8 +465,13 @@ function App() {
         pending={pending}
         historyCount={history.length}
         initialDocument={initialDocument}
+        fileName={currentFilePath ? basename(currentFilePath) : "Unsaved draft"}
+        isDirty={isDirty}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
+        onOpenFile={handleOpenFile}
+        onSaveFile={handleSaveFile}
+        onSaveFileAs={handleSaveFileAs}
         onOpenHistory={toggleHistoryPanel}
         onOpenPrompt={togglePromptPanel}
         registerView={registerView}
@@ -612,6 +696,10 @@ function formatOllamaConnectionError(error: unknown): string {
     return "Could not reach Ollama. Confirm it is running at the configured URL.";
   }
   return message || "Ollama connection check failed.";
+}
+
+function formatFileError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || "File operation failed.");
 }
 
 export default App;
