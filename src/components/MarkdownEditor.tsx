@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, redo, undo } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { Compartment, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
@@ -11,7 +11,16 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { ChevronDown, FileText, FolderOpen, History, MessageSquareText, Save } from "lucide-react";
+import {
+  ChevronDown,
+  FileText,
+  FolderOpen,
+  History,
+  MessageSquareText,
+  Redo2,
+  Save,
+  Undo2,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   extractConversionRange,
@@ -490,18 +499,21 @@ export function MarkdownEditor({
     action();
   };
 
+  const runEditorCommand = (command: (view: EditorView) => boolean) => {
+    const view = viewRef.current;
+    if (view) {
+      command(view);
+      view.focus();
+    }
+  };
+
   return (
     <section className="editor-shell" aria-label="Markdown editor">
       <div className="editor-toolbar">
         <div className="editor-title-block">
           <p className="eyebrow">Markdown</p>
           <h1>Romaji Kana</h1>
-          <div className="file-row">
-            <p className="file-label" title={fileName}>
-              {fileName}
-            </p>
-            {isDirty ? <span className="dirty-chip">Unsaved</span> : null}
-          </div>
+
         </div>
         <div className="editor-actions" aria-label="Editor actions">
           <div className="toolbar-menu" ref={fileMenuRef}>
@@ -542,6 +554,33 @@ export function MarkdownEditor({
             Prompt
           </button>
         </div>
+      </div>
+      <div className="editor-filebar" aria-label="Editor document bar">
+        <div className="editor-filebar-side">
+          <button
+            className="editor-chrome-button"
+            type="button"
+            onClick={() => runEditorCommand(undo)}
+            aria-label="Undo"
+            title="Undo"
+          >
+            <Undo2 size={16} aria-hidden="true" />
+          </button>
+          <button
+            className="editor-chrome-button"
+            type="button"
+            onClick={() => runEditorCommand(redo)}
+            aria-label="Redo"
+            title="Redo"
+          >
+            <Redo2 size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="editor-filebar-title" title={fileName}>
+          <span>{fileName}</span>
+          {isDirty ? <span className="dirty-chip">Unsaved</span> : null}
+        </div>
+        <div className="editor-filebar-side editor-filebar-side-right" aria-hidden="true" />
       </div>
       <div className="editor-host" ref={hostRef} />
     </section>
