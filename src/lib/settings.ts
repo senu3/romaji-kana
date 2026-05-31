@@ -7,6 +7,7 @@ export const defaultSettings: AppSettings = {
   ollamaApiUrl: "http://localhost:11434",
   modelName: "gemma3",
   autoConvert: true,
+  conversionMode: "replace",
   triggers: {
     period: true,
     comma: true,

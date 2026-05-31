@@ -501,6 +501,46 @@ h3 {
   accent-color: #0d9488;
 }
 
+.mode-field {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d5e8e5;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  color: #134e4a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.segmented-control button {
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.segmented-control button + button {
+  border-left: 1px solid #b5d7d1;
+}
+
+.segmented-control button:hover,
+.segmented-control button.selected {
+  background: #dbfcfc;
+  color: #115e59;
+}
+
 .shortcut-field {
   display: grid;
   gap: 9px;

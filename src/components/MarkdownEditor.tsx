@@ -2,7 +2,14 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { Compartment, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
-import { Decoration, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
+import {
+  Decoration,
+  EditorView,
+  WidgetType,
+  keymap,
+  placeholder,
+  type DecorationSet,
+} from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { ChevronDown, FileText, FolderOpen, History, MessageSquareText, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +18,13 @@ import {
   isTriggerEnabled,
   triggerFromCharacter,
 } from "../lib/conversion";
-import type { AppSettings, ConversionRange, ConversionTrigger, PendingConversion } from "../lib/types";
+import type {
+  AppSettings,
+  ConversionRange,
+  ConversionTrigger,
+  GhostConversionSuggestion,
+  PendingConversion,
+} from "../lib/types";
 
 interface MarkdownEditorProps {
   settings: AppSettings;
@@ -27,11 +40,14 @@ interface MarkdownEditorProps {
   onSaveFileAs: () => void;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
+  onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   registerView: (view: EditorView | null) => void;
 }
 
 export const addLoadingDecoration = StateEffect.define<{ id: string; from: number; to: number }>();
 export const removeLoadingDecoration = StateEffect.define<string>();
+export const showGhostSuggestion = StateEffect.define<GhostConversionSuggestion>();
+export const clearGhostSuggestion = StateEffect.define<string | null>();
 
 const loadingDecorations = StateField.define<DecorationSet>({
   create() {
@@ -63,6 +79,78 @@ const loadingDecorations = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+interface GhostState {
+  suggestion: GhostConversionSuggestion | null;
+  decorations: DecorationSet;
+}
+
+class GhostTextWidget extends WidgetType {
+  constructor(private readonly text: string) {
+    super();
+  }
+
+  toDOM() {
+    const element = document.createElement("span");
+    element.className = "cm-ghost-text";
+    element.textContent = `  ⇥ ${this.text}`;
+    element.title = "Press Tab to accept";
+    return element;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+export const ghostSuggestionField = StateField.define<GhostState>({
+  create() {
+    return { suggestion: null, decorations: Decoration.none };
+  },
+  update(value, transaction) {
+    let suggestion = value.suggestion;
+
+    if (suggestion && transaction.docChanged) {
+      const from = transaction.changes.mapPos(suggestion.from, 1);
+      const to = transaction.changes.mapPos(suggestion.to, -1);
+      const mapped = { ...suggestion, from, to };
+      const currentText = transaction.state.doc.sliceString(from, to);
+      suggestion = currentText === mapped.originalText ? mapped : null;
+    }
+
+    for (const effect of transaction.effects) {
+      if (effect.is(showGhostSuggestion)) {
+        suggestion = effect.value;
+      }
+
+      if (effect.is(clearGhostSuggestion)) {
+        if (!effect.value || suggestion?.id === effect.value) {
+          suggestion = null;
+        }
+      }
+    }
+
+    return {
+      suggestion,
+      decorations: buildGhostDecorations(suggestion),
+    };
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+});
+
+function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): DecorationSet {
+  if (!suggestion) {
+    return Decoration.none;
+  }
+
+  return Decoration.set([
+    Decoration.mark({ class: "cm-ghost-source" }).range(suggestion.from, suggestion.to),
+    Decoration.widget({
+      widget: new GhostTextWidget(suggestion.convertedText),
+      side: 1,
+    }).range(suggestion.to),
+  ]);
+}
 
 const theme = EditorView.theme({
   "&": {
@@ -109,6 +197,17 @@ const theme = EditorView.theme({
     borderBottom: "2px solid #0d9488",
     borderRadius: "3px",
   },
+  ".cm-ghost-source": {
+    backgroundColor: "#f8fafc",
+    borderBottom: "1px dashed #0d9488",
+    borderRadius: "3px",
+  },
+  ".cm-ghost-text": {
+    color: "#0f766e",
+    opacity: "0.58",
+    fontStyle: "italic",
+    whiteSpace: "pre-wrap",
+  },
 });
 
 const highlightStyle = HighlightStyle.define([
@@ -133,6 +232,7 @@ export function MarkdownEditor({
   onSaveFileAs,
   onOpenHistory,
   onOpenPrompt,
+  onAcceptGhost,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -140,6 +240,7 @@ export function MarkdownEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onConvertRef = useRef(onConvert);
   const onDocumentChangedRef = useRef(onDocumentChanged);
+  const onAcceptGhostRef = useRef(onAcceptGhost);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
@@ -155,6 +256,13 @@ export function MarkdownEditor({
         .map((transaction) => transaction.annotation(Transaction.userEvent))
         .find(Boolean);
       if (userEvent?.startsWith("document.")) {
+        return;
+      }
+      if (
+        userEvent === "input.convert" ||
+        userEvent === "input.historyApply" ||
+        userEvent === "input.ghostAccept"
+      ) {
         return;
       }
 
@@ -181,8 +289,9 @@ export function MarkdownEditor({
   useEffect(() => {
     onConvertRef.current = onConvert;
     onDocumentChangedRef.current = onDocumentChanged;
+    onAcceptGhostRef.current = onAcceptGhost;
     settingsRef.current = settings;
-  }, [onConvert, onDocumentChanged, settings]);
+  }, [onAcceptGhost, onConvert, onDocumentChanged, settings]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -204,12 +313,17 @@ export function MarkdownEditor({
         history(),
         markdown(),
         loadingDecorations,
+        ghostSuggestionField,
         theme,
         syntaxHighlighting(highlightStyle),
         placeholder("Romaji de nihongo wo kaitte kudasai..."),
         updateListener,
         shortcutCompartment.of(
           keymap.of([
+            {
+              key: "Tab",
+              run: acceptGhostSuggestion,
+            },
             {
               key: settingsRef.current.triggers.manualShortcut,
               run: (view) => manualConvert(view, "shortcut"),
@@ -285,10 +399,41 @@ export function MarkdownEditor({
               return true;
             },
           },
+          {
+            key: "Tab",
+            run: acceptGhostSuggestion,
+          },
         ]),
       ),
     });
   }, [settings.triggers.manualShortcut, shortcutCompartment]);
+
+  function acceptGhostSuggestion(view: EditorView) {
+    const state = view.state.field(ghostSuggestionField);
+    const suggestion = state.suggestion;
+    if (!suggestion) {
+      return false;
+    }
+
+    const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
+    if (currentText !== suggestion.originalText) {
+      view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+      return true;
+    }
+
+    view.dispatch({
+      changes: {
+        from: suggestion.from,
+        to: suggestion.to,
+        insert: suggestion.convertedText,
+      },
+      selection: { anchor: suggestion.from + suggestion.convertedText.length },
+      effects: clearGhostSuggestion.of(suggestion.id),
+      userEvent: "input.ghostAccept",
+    });
+    onAcceptGhostRef.current(suggestion);
+    return true;
+  }
 
   const runFileAction = (action: () => void) => {
     setFileMenuOpen(false);

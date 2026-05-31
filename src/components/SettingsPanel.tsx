@@ -239,6 +239,25 @@ export function SettingsPanel({
               checked={settings.think}
               onChange={(checked) => update({ think: checked })}
             />
+            <div className="mode-field">
+              <span>Conversion mode</span>
+              <div className="segmented-control" role="group" aria-label="Conversion mode">
+                <button
+                  className={settings.conversionMode === "replace" ? "selected" : ""}
+                  type="button"
+                  onClick={() => update({ conversionMode: "replace" })}
+                >
+                  Auto replace
+                </button>
+                <button
+                  className={settings.conversionMode === "ghost" ? "selected" : ""}
+                  type="button"
+                  onClick={() => update({ conversionMode: "ghost" })}
+                >
+                  Ghost + Tab
+                </button>
+              </div>
+            </div>
             <div className="shortcut-field">
               <div>
                 <span>Manual shortcut</span>
