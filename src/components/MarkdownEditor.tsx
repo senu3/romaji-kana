@@ -93,8 +93,17 @@ class GhostTextWidget extends WidgetType {
   toDOM() {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
-    element.textContent = `  ⇥ ${this.text}`;
-    element.title = "Press Tab to accept";
+    element.title = "Press Tab to accept, Esc to dismiss";
+
+    const suggestion = document.createElement("span");
+    suggestion.className = "cm-ghost-text-suggestion";
+    suggestion.textContent = `  ${this.text}`;
+
+    const hint = document.createElement("span");
+    hint.className = "cm-ghost-text-hint";
+    hint.textContent = "Tab accept / Esc dismiss";
+
+    element.append(suggestion, hint);
     return element;
   }
 
@@ -203,10 +212,32 @@ const theme = EditorView.theme({
     borderRadius: "3px",
   },
   ".cm-ghost-text": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
     color: "#0f766e",
-    opacity: "0.58",
     fontStyle: "italic",
     whiteSpace: "pre-wrap",
+  },
+  ".cm-ghost-text-suggestion": {
+    opacity: "0.58",
+  },
+  ".cm-ghost-text-hint": {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "20px",
+    border: "1px solid #b5d7d1",
+    borderRadius: "999px",
+    padding: "1px 7px",
+    backgroundColor: "#f8fffd",
+    color: "#0f766e",
+    fontFamily: '"Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif',
+    fontSize: "11px",
+    fontStyle: "normal",
+    fontWeight: "750",
+    opacity: "0.86",
+    verticalAlign: "middle",
+    whiteSpace: "nowrap",
   },
 });
 
@@ -325,6 +356,10 @@ export function MarkdownEditor({
               run: acceptGhostSuggestion,
             },
             {
+              key: "Escape",
+              run: dismissGhostSuggestion,
+            },
+            {
               key: settingsRef.current.triggers.manualShortcut,
               run: (view) => manualConvert(view, "shortcut"),
             },
@@ -403,6 +438,10 @@ export function MarkdownEditor({
             key: "Tab",
             run: acceptGhostSuggestion,
           },
+          {
+            key: "Escape",
+            run: dismissGhostSuggestion,
+          },
         ]),
       ),
     });
@@ -432,6 +471,17 @@ export function MarkdownEditor({
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);
+    return true;
+  }
+
+  function dismissGhostSuggestion(view: EditorView) {
+    const state = view.state.field(ghostSuggestionField);
+    const suggestion = state.suggestion;
+    if (!suggestion) {
+      return false;
+    }
+
+    view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
     return true;
   }
 
