@@ -1,5 +1,5 @@
 import type { AppSettings } from "./types";
-import { defaultConversionPrompt } from "./prompts";
+import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
 
@@ -40,9 +40,15 @@ export function saveSettings(settings: AppSettings): void {
 }
 
 function mergeSettings(settings: Partial<AppSettings>): AppSettings {
+  const conversionPrompt =
+    !settings.conversionPrompt || settings.conversionPrompt === legacyDefaultConversionPrompt
+      ? defaultConversionPrompt
+      : settings.conversionPrompt;
+
   return {
     ...defaultSettings,
     ...settings,
+    conversionPrompt,
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,

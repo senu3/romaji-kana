@@ -1,6 +1,6 @@
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
-import { defaultConversionPrompt } from "./prompts";
+import { buildConversionSystemPrompt } from "./prompts";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 
 export async function convertRomajiToJapanese(
@@ -13,7 +13,7 @@ export async function convertRomajiToJapanese(
     settings.ollamaApiUrl,
     {
       model: settings.modelName,
-      system: settings.conversionPrompt.trim() || defaultConversionPrompt,
+      system: buildConversionSystemPrompt(settings.conversionPrompt),
       prompt: normalized,
       stream: false,
       think: settings.think,
