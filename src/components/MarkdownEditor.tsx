@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
 import { Decoration, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { History, MessageSquareText } from "lucide-react";
@@ -18,8 +18,13 @@ interface MarkdownEditorProps {
   pending: PendingConversion[];
   historyCount: number;
   initialDocument: string;
+  fileName: string;
+  isDirty: boolean;
   onConvert: (range: ConversionRange) => void;
   onDocumentChanged: (documentText: string) => void;
+  onOpenFile: () => void;
+  onSaveFile: () => void;
+  onSaveFileAs: () => void;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
   registerView: (view: EditorView | null) => void;
@@ -119,8 +124,13 @@ export function MarkdownEditor({
   pending,
   historyCount,
   initialDocument,
+  fileName,
+  isDirty,
   onConvert,
   onDocumentChanged,
+  onOpenFile,
+  onSaveFile,
+  onSaveFileAs,
   onOpenHistory,
   onOpenPrompt,
   registerView,
@@ -139,6 +149,13 @@ export function MarkdownEditor({
       }
 
       onDocumentChangedRef.current(update.state.doc.toString());
+      const userEvent = update.transactions
+        .map((transaction) => transaction.annotation(Transaction.userEvent))
+        .find(Boolean);
+      if (userEvent?.startsWith("document.")) {
+        return;
+      }
+
       if (!settingsRef.current.autoConvert) {
         return;
       }
@@ -251,8 +268,21 @@ export function MarkdownEditor({
         <div>
           <p className="eyebrow">Markdown</p>
           <h1>Romaji Kana</h1>
+          <p className="file-label" title={fileName}>
+            {fileName}
+            {isDirty ? " *" : ""}
+          </p>
         </div>
         <div className="editor-actions" aria-label="Editor actions">
+          <button className="pill pill-action" type="button" onClick={onOpenFile}>
+            Open
+          </button>
+          <button className="pill pill-action" type="button" onClick={onSaveFile}>
+            Save
+          </button>
+          <button className="pill pill-action" type="button" onClick={onSaveFileAs}>
+            Save As
+          </button>
           <button className="pill pill-action" type="button" onClick={onOpenHistory}>
             <History size={15} aria-hidden="true" />
             {pending.length > 0 ? `${pending.length} converting` : `${historyCount} History`}

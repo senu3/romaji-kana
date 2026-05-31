@@ -94,6 +94,17 @@ h1 {
   line-height: 1.25;
 }
 
+.file-label {
+  margin: 4px 0 0;
+  max-width: 420px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 h2 {
   font-size: 18px;
 }

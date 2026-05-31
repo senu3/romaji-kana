@@ -1,5 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::PathBuf;
 use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
@@ -17,6 +18,13 @@ struct OllamaGenerateRequest {
     timeout_ms: Option<u64>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenFileResult {
+    path: String,
+    content: String,
+}
+
 #[tauri::command]
 async fn ollama_tags(request: OllamaRequest) -> Result<Value, String> {
     get_json(&request.base_url, "tags", request.timeout_ms).await
@@ -25,6 +33,53 @@ async fn ollama_tags(request: OllamaRequest) -> Result<Value, String> {
 #[tauri::command]
 async fn ollama_generate(request: OllamaGenerateRequest) -> Result<Value, String> {
     post_json(&request.base_url, "generate", request.body, request.timeout_ms).await
+}
+
+#[tauri::command]
+async fn open_markdown_file() -> Result<Option<OpenFileResult>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Markdown", &["md", "markdown", "mdown", "mkd"])
+            .add_filter("Text", &["txt"])
+            .pick_file()
+        else {
+            return Ok(None);
+        };
+
+        let content = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Failed to read file: {error}"))?;
+
+        Ok(Some(OpenFileResult {
+            path: path_to_string(path)?,
+            content,
+        }))
+    })
+    .await
+    .map_err(|error| format!("File open task failed: {error}"))?
+}
+
+#[tauri::command]
+async fn save_markdown_file(path: Option<String>, content: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = match path {
+            Some(path) if !path.trim().is_empty() => PathBuf::from(path),
+            _ => {
+                let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Markdown", &["md"])
+                    .set_file_name("untitled.md")
+                    .save_file()
+                else {
+                    return Ok(None);
+                };
+                path
+            }
+        };
+
+        std::fs::write(&path, content).map_err(|error| format!("Failed to save file: {error}"))?;
+        Ok(Some(path_to_string(path)?))
+    })
+    .await
+    .map_err(|error| format!("File save task failed: {error}"))?
 }
 
 async fn get_json(base_url: &str, path: &str, timeout_ms: Option<u64>) -> Result<Value, String> {
@@ -95,11 +150,22 @@ fn error_message(error: reqwest::Error) -> String {
     error.to_string()
 }
 
+fn path_to_string(path: PathBuf) -> Result<String, String> {
+    path.into_os_string()
+        .into_string()
+        .map_err(|_| "File path contains invalid Unicode.".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ollama_tags, ollama_generate])
+        .invoke_handler(tauri::generate_handler![
+            ollama_tags,
+            ollama_generate,
+            open_markdown_file,
+            save_markdown_file
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
