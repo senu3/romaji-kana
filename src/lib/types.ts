@@ -9,6 +9,7 @@ export interface AppSettings {
   ollamaApiUrl: string;
   modelName: string;
   autoConvert: boolean;
+  conversionMode: "replace" | "ghost";
   triggers: {
     period: boolean;
     comma: boolean;
@@ -73,6 +74,16 @@ export interface ConversionAnchor {
   originalText: string;
   appliedText?: string;
   docVersion: number;
+}
+
+export interface GhostConversionSuggestion {
+  id: string;
+  from: number;
+  to: number;
+  originalText: string;
+  convertedText: string;
+  inputText: string;
+  source: "editor" | "history";
 }
 
 export interface PendingConversion {

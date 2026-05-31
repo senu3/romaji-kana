@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
   addLoadingDecoration,
+  clearGhostSuggestion,
   MarkdownEditor,
   removeLoadingDecoration,
+  showGhostSuggestion,
 } from "./components/MarkdownEditor";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
@@ -21,6 +23,7 @@ import type {
   ConversionHistoryItem,
   ConversionRange,
   ConversionStatus,
+  GhostConversionSuggestion,
   OllamaConnectionStatus,
   OllamaModel,
   PendingConversion,
@@ -286,6 +289,73 @@ function App() {
     }
   }, []);
 
+  const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
+    const view = editorViewRef.current;
+    const nextAnchor: ConversionAnchor = {
+      from: suggestion.from,
+      to: suggestion.from + suggestion.convertedText.length,
+      originalText: suggestion.inputText,
+      appliedText: suggestion.convertedText,
+      docVersion: docVersionRef.current,
+    };
+
+    if (view) {
+      saveDocument(view.state.doc.toString());
+    }
+
+    setHistory((items) => [
+      {
+        id: suggestion.id,
+        status: "success",
+        input: suggestion.inputText,
+        output: suggestion.convertedText,
+        modelName: settingsRef.current.modelName,
+        createdAt: Date.now(),
+        source: suggestion.source,
+        anchor: nextAnchor,
+      },
+      ...items,
+    ]);
+    setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
+  }, []);
+
+  const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
+    if (!item.output || !item.anchor) {
+      return;
+    }
+
+    const view = editorViewRef.current;
+    if (!view) {
+      return;
+    }
+
+    const resolved = resolveConversionAnchor(view.state.doc.toString(), item.anchor);
+    if (!resolved) {
+      return;
+    }
+
+    view.dispatch({
+      effects: showGhostSuggestion.of({
+        id: `history-preview-${item.id}`,
+        from: resolved.from,
+        to: resolved.to,
+        originalText: resolved.matchedText,
+        convertedText: item.output,
+        inputText: item.input,
+        source: "history",
+      }),
+    });
+  }, []);
+
+  const clearHistoryGhost = useCallback((item: ConversionHistoryItem) => {
+    const view = editorViewRef.current;
+    if (!view) {
+      return;
+    }
+
+    view.dispatch({ effects: clearGhostSuggestion.of(`history-preview-${item.id}`) });
+  }, []);
+
   const handleRerunHistory = useCallback((item: ConversionHistoryItem) => {
     const request: PendingConversion = {
       id: crypto.randomUUID(),
@@ -345,6 +415,22 @@ function App() {
             kind: "warning",
             message: "History conversion was not applied because the anchor could not be resolved.",
           });
+          return;
+        }
+
+        if (settingsRef.current.conversionMode === "ghost") {
+          currentView.dispatch({
+            effects: showGhostSuggestion.of({
+              id: request.id,
+              from: resolved.from,
+              to: resolved.to,
+              originalText: resolved.matchedText,
+              convertedText: converted,
+              inputText: item.input,
+              source: "history",
+            }),
+          });
+          setStatus({ kind: "success", message: "History suggestion ready. Press Tab to apply." });
           return;
         }
 
@@ -478,6 +564,25 @@ function App() {
           return;
         }
 
+        if (settingsRef.current.conversionMode === "ghost") {
+          currentView.dispatch({
+            effects: [
+              removeLoadingDecoration.of(request.id),
+              showGhostSuggestion.of({
+                id: request.id,
+                from: range.from,
+                to: range.to,
+                originalText: request.originalText,
+                convertedText: converted,
+                inputText: request.originalText,
+                source: "editor",
+              }),
+            ],
+          });
+          setStatus({ kind: "success", message: "Ghost suggestion ready. Press Tab to accept." });
+          return;
+        }
+
         currentView.dispatch({
           changes: {
             from: range.from,
@@ -564,6 +669,7 @@ function App() {
         onSaveFileAs={handleSaveFileAs}
         onOpenHistory={toggleHistoryPanel}
         onOpenPrompt={togglePromptPanel}
+        onAcceptGhost={handleAcceptGhost}
         registerView={registerView}
       />
       {activePanel === "history" ? (
@@ -572,6 +678,8 @@ function App() {
           pending={delayedPending}
           onCancel={cancelConversion}
           onRerun={handleRerunHistory}
+          onPreview={previewHistoryGhost}
+          onPreviewEnd={clearHistoryGhost}
           onClose={closeActivePanel}
         />
       ) : null}
@@ -609,12 +717,16 @@ function HistoryPanel({
   pending,
   onCancel,
   onRerun,
+  onPreview,
+  onPreviewEnd,
   onClose,
 }: {
   history: ConversionHistoryItem[];
   pending: PendingConversion[];
   onCancel: (request: PendingConversion) => void;
   onRerun: (item: ConversionHistoryItem) => void;
+  onPreview: (item: ConversionHistoryItem) => void;
+  onPreviewEnd: (item: ConversionHistoryItem) => void;
   onClose: () => void;
 }) {
   return (
@@ -654,7 +766,15 @@ function HistoryPanel({
               className={`history-item ${item.status}`}
               type="button"
               key={item.id}
-              onClick={() => onRerun(item)}
+              onClick={() => {
+                onPreviewEnd(item);
+                onRerun(item);
+                onClose();
+              }}
+              onBlur={() => onPreviewEnd(item)}
+              onFocus={() => onPreview(item)}
+              onMouseEnter={() => onPreview(item)}
+              onMouseLeave={() => onPreviewEnd(item)}
               title={
                 item.anchor
                   ? "Click to re-convert and apply this item"
