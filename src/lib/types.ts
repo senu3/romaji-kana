@@ -33,18 +33,24 @@ export interface ConversionRange {
 
 export interface PendingConversion {
   id: string;
-  range: ConversionRange;
+  range?: ConversionRange;
   originalText: string;
   createdAt: number;
-  docVersion: number;
+  docVersion?: number;
+  source: "editor" | "history";
 }
+
+export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
 
 export interface ConversionHistoryItem {
   id: string;
+  status: ConversionHistoryStatus;
   input: string;
-  output: string;
+  output?: string;
+  error?: string;
   modelName: string;
   createdAt: number;
+  source: "editor" | "history";
 }
 
 export interface OllamaModel {

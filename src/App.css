@@ -497,22 +497,113 @@ h3 {
   padding: 14px;
 }
 
+.pending-list {
+  display: grid;
+  gap: 10px;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 12px 14px;
+  background: #f8fffd;
+}
+
+.pending-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ecfeff;
+}
+
+.pending-item strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #0f766e;
+  font-size: 12px;
+}
+
+.pending-item p {
+  margin: 0;
+  color: #134e4a;
+  font-family:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .history-item {
+  display: block;
+  width: 100%;
   border: 1px solid #d5e8e5;
   border-radius: 8px;
   background: #ffffff;
+  color: inherit;
   padding: 12px;
+  text-align: left;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.history-item:hover {
+  border-color: #0d9488;
+  background: #f8fffd;
+}
+
+.history-item.success {
+  border-left: 4px solid #22c55e;
+}
+
+.history-item.error {
+  border-left: 4px solid #ef4444;
+}
+
+.history-item.skipped {
+  border-left: 4px solid #f97316;
+}
+
+.history-item.canceled {
+  border-left: 4px solid #94a3b8;
 }
 
 .history-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
+  align-items: center;
   gap: 10px;
   margin-bottom: 10px;
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.status-chip {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.status-chip.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-chip.error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-chip.skipped {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.status-chip.canceled {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .history-item dl {
@@ -538,6 +629,25 @@ h3 {
   font-size: 13px;
   line-height: 1.55;
   overflow-wrap: anywhere;
+}
+
+.rerun-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rerun-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .prompt-panel {
@@ -601,6 +711,26 @@ h3 {
 .status-bar strong {
   margin-left: auto;
   color: #0f766e;
+}
+
+.status-cancel {
+  margin-left: auto;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: #ffffff;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.status-cancel:hover {
+  border-color: #0d9488;
+  background: #ecfeff;
+}
+
+.status-cancel + strong {
+  margin-left: 0;
 }
 
 .status-bar.loading {

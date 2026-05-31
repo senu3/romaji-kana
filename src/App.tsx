@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
@@ -24,6 +24,7 @@ import type {
 } from "./lib/types";
 
 type ActivePanel = "history" | "prompt" | null;
+const CANCEL_UI_DELAY_MS = 1_200;
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -35,6 +36,7 @@ function App() {
   const [pending, setPending] = useState<PendingConversion[]>([]);
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
@@ -57,6 +59,7 @@ function App() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionCheckIdRef = useRef(0);
   const startupCheckStartedRef = useRef(false);
+  const canceledRequestsRef = useRef(new Set<string>());
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -70,6 +73,15 @@ function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (pending.length === 0) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, [pending.length]);
 
   const registerView = useCallback((view: EditorView | null) => {
     editorViewRef.current = view;
@@ -169,6 +181,86 @@ function App() {
     });
   }, []);
 
+  const cancelConversion = useCallback((request: PendingConversion) => {
+    canceledRequestsRef.current.add(request.id);
+    setPending((items) => items.filter((item) => item.id !== request.id));
+    setHistory((items) => [
+      {
+        id: request.id,
+        status: "canceled",
+        input: request.originalText,
+        error: "Canceled by user.",
+        modelName: settingsRef.current.modelName,
+        createdAt: Date.now(),
+        source: request.source,
+      },
+      ...items,
+    ]);
+    setStatus({ kind: "warning", message: "Conversion canceled." });
+
+    const view = editorViewRef.current;
+    if (view) {
+      view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+    }
+  }, []);
+
+  const handleRerunHistory = useCallback((item: ConversionHistoryItem) => {
+    const request: PendingConversion = {
+      id: crypto.randomUUID(),
+      originalText: item.input,
+      createdAt: Date.now(),
+      source: "history",
+    };
+
+    setPending((items) => [...items, request]);
+    setStatus({ kind: "loading", message: `Re-running "${item.input}"` });
+
+    convertRomajiToJapanese(item.input, settingsRef.current)
+      .then((converted) => {
+        if (canceledRequestsRef.current.has(request.id)) {
+          return;
+        }
+
+        setHistory((items) => [
+          {
+            id: request.id,
+            status: "success",
+            input: request.originalText,
+            output: converted,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+            source: "history",
+          },
+          ...items,
+        ]);
+        setStatus({ kind: "success", message: "History conversion re-run." });
+      })
+      .catch((error: unknown) => {
+        if (canceledRequestsRef.current.has(request.id)) {
+          return;
+        }
+
+        const message = formatConversionError(error);
+        setHistory((items) => [
+          {
+            id: request.id,
+            status: "error",
+            input: request.originalText,
+            error: message,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+            source: "history",
+          },
+          ...items,
+        ]);
+        setStatus({ kind: "error", message });
+      })
+      .finally(() => {
+        canceledRequestsRef.current.delete(request.id);
+        setPending((items) => items.filter((pendingItem) => pendingItem.id !== request.id));
+      });
+  }, []);
+
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
     if (!view) {
@@ -181,6 +273,7 @@ function App() {
       originalText: range.text,
       createdAt: Date.now(),
       docVersion: docVersionRef.current,
+      source: "editor",
     };
 
     setPending((items) => [...items, request]);
@@ -195,6 +288,10 @@ function App() {
 
     convertRomajiToJapanese(range.text, settingsRef.current)
       .then((converted) => {
+        if (canceledRequestsRef.current.has(request.id)) {
+          return;
+        }
+
         const currentView = editorViewRef.current;
         if (!currentView) {
           return;
@@ -202,6 +299,18 @@ function App() {
 
         const currentText = currentView.state.doc.sliceString(range.from, range.to);
         if (currentText !== request.originalText) {
+          setHistory((items) => [
+            {
+              id: request.id,
+              status: "skipped",
+              input: request.originalText,
+              error: "Skipped because the source text changed before Ollama responded.",
+              modelName: settingsRef.current.modelName,
+              createdAt: Date.now(),
+              source: "editor",
+            },
+            ...items,
+          ]);
           setStatus({
             kind: "warning",
             message: "Skipped an older conversion because the text changed.",
@@ -222,22 +331,42 @@ function App() {
         setHistory((items) => [
           {
             id: request.id,
+            status: "success",
             input: request.originalText,
             output: converted,
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
+            source: "editor",
           },
           ...items,
         ]);
         setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
       })
       .catch((error: unknown) => {
+        if (canceledRequestsRef.current.has(request.id)) {
+          return;
+        }
+
+        const message = formatConversionError(error);
+        setHistory((items) => [
+          {
+            id: request.id,
+            status: "error",
+            input: request.originalText,
+            error: message,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+            source: "editor",
+          },
+          ...items,
+        ]);
         setStatus({
           kind: "error",
-          message: formatConversionError(error),
+          message,
         });
       })
       .finally(() => {
+        canceledRequestsRef.current.delete(request.id);
         const currentView = editorViewRef.current;
         if (currentView) {
           currentView.dispatch({
@@ -247,6 +376,8 @@ function App() {
         setPending((items) => items.filter((item) => item.id !== request.id));
       });
   }, []);
+
+  const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
 
   return (
     <main className="app-shell">
@@ -262,7 +393,13 @@ function App() {
         registerView={registerView}
       />
       {activePanel === "history" ? (
-        <HistoryPanel history={history} onClose={closeActivePanel} />
+        <HistoryPanel
+          history={history}
+          pending={delayedPending}
+          onCancel={cancelConversion}
+          onRerun={handleRerunHistory}
+          onClose={closeActivePanel}
+        />
       ) : null}
       {activePanel === "prompt" ? (
         <PromptPanel
@@ -283,16 +420,27 @@ function App() {
         onChange={setSettings}
         onCheckOllama={handleCheckOllama}
       />
-      <StatusBar status={status} pendingCount={pending.length} />
+      <StatusBar
+        status={status}
+        pending={delayedPending}
+        pendingCount={pending.length}
+        onCancel={cancelConversion}
+      />
     </main>
   );
 }
 
 function HistoryPanel({
   history,
+  pending,
+  onCancel,
+  onRerun,
   onClose,
 }: {
   history: ConversionHistoryItem[];
+  pending: PendingConversion[];
+  onCancel: (request: PendingConversion) => void;
+  onRerun: (item: ConversionHistoryItem) => void;
   onClose: () => void;
 }) {
   return (
@@ -307,15 +455,37 @@ function HistoryPanel({
         </button>
       </div>
 
+      {pending.length > 0 ? (
+        <div className="pending-list" aria-label="Slow conversions">
+          {pending.map((request) => (
+            <article className="pending-item" key={request.id}>
+              <div>
+                <strong>{request.source === "history" ? "Re-running" : "Converting"}</strong>
+                <p>{request.originalText}</p>
+              </div>
+              <button className="secondary-button" type="button" onClick={() => onCancel(request)}>
+                Cancel
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       {history.length === 0 ? (
         <p className="empty-state">No conversions in this open history panel yet.</p>
       ) : (
         <div className="history-list">
           {history.map((item) => (
-            <article className="history-item" key={item.id}>
+            <button
+              className={`history-item ${item.status}`}
+              type="button"
+              key={item.id}
+              onClick={() => onRerun(item)}
+              title="Click to re-run this conversion"
+            >
               <div className="history-meta">
+                <span className={`status-chip ${item.status}`}>{historyStatusLabel(item.status)}</span>
                 <span>{new Date(item.createdAt).toLocaleTimeString()}</span>
-                <span>{item.modelName}</span>
               </div>
               <dl>
                 <div>
@@ -323,16 +493,36 @@ function HistoryPanel({
                   <dd>{item.input}</dd>
                 </div>
                 <div>
-                  <dt>Japanese</dt>
-                  <dd>{item.output}</dd>
+                  <dt>{item.status === "success" ? "Japanese" : "Result"}</dt>
+                  <dd>{item.output ?? item.error ?? "No output."}</dd>
                 </div>
               </dl>
-            </article>
+              <div className="rerun-meta">
+                <span>{item.modelName}</span>
+                <span className="rerun-hint">
+                  <RotateCcw size={13} aria-hidden="true" />
+                  Re-run
+                </span>
+              </div>
+            </button>
           ))}
         </div>
       )}
     </section>
   );
+}
+
+function historyStatusLabel(status: ConversionHistoryItem["status"]): string {
+  if (status === "success") {
+    return "Success";
+  }
+  if (status === "error") {
+    return "Failed";
+  }
+  if (status === "skipped") {
+    return "Skipped";
+  }
+  return "Canceled";
 }
 
 function PromptPanel({
@@ -379,10 +569,14 @@ function PromptPanel({
 
 function StatusBar({
   status,
+  pending,
   pendingCount,
+  onCancel,
 }: {
   status: ConversionStatus;
+  pending: PendingConversion[];
   pendingCount: number;
+  onCancel: (request: PendingConversion) => void;
 }) {
   const Icon =
     status.kind === "loading" ? Loader2 : status.kind === "error" ? AlertCircle : CheckCircle2;
@@ -391,6 +585,11 @@ function StatusBar({
     <div className={`status-bar ${status.kind}`} role="status" aria-live="polite">
       <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
       <span>{status.message}</span>
+      {pending[0] ? (
+        <button className="status-cancel" type="button" onClick={() => onCancel(pending[0])}>
+          Cancel slow conversion
+        </button>
+      ) : null}
       {pendingCount > 0 ? <strong>{pendingCount} pending</strong> : null}
     </div>
   );
