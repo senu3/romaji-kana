@@ -73,6 +73,10 @@ button:disabled {
   background: rgba(255, 255, 255, 0.86);
 }
 
+.editor-title-block {
+  min-width: 0;
+}
+
 .eyebrow {
   margin: 0 0 2px;
   color: #0d9488;
@@ -94,6 +98,13 @@ h1 {
   line-height: 1.25;
 }
 
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .file-label {
   margin: 4px 0 0;
   max-width: 420px;
@@ -103,6 +114,19 @@ h1 {
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dirty-chip {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border: 1px solid #f6c453;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
 }
 
 h2 {
@@ -118,6 +142,7 @@ h3 {
 .editor-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -148,6 +173,44 @@ h3 {
   border-color: #0d9488;
   background: #ecfeff;
   color: #115e59;
+}
+
+.toolbar-menu {
+  position: relative;
+}
+
+.toolbar-menu-items {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: 188px;
+  padding: 6px;
+  border: 1px solid #b5d7d1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 118, 110, 0.16);
+}
+
+.toolbar-menu-items button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #134e4a;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.toolbar-menu-items button:hover {
+  background: #ecfeff;
+  color: #0f766e;
 }
 
 .editor-host {
@@ -438,14 +501,149 @@ h3 {
   accent-color: #0d9488;
 }
 
-.shortcut-note {
-  margin: 0;
+.shortcut-field {
+  display: grid;
+  gap: 9px;
+  border: 1px solid #d5e8e5;
   border-radius: 8px;
   padding: 10px;
-  background: #ecfeff;
+  background: #ffffff;
+}
+
+.shortcut-field > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #134e4a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.shortcut-field small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shortcut-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.shortcut-recorder,
+.shortcut-reset {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  background: #ffffff;
   color: #0f766e;
   font-size: 13px;
-  line-height: 1.5;
+  font-weight: 750;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.shortcut-recorder {
+  padding: 7px 10px;
+}
+
+.shortcut-reset {
+  width: 38px;
+  padding: 0;
+}
+
+.shortcut-recorder:hover,
+.shortcut-reset:hover {
+  border-color: #0d9488;
+  background: #ecfeff;
+}
+
+.shortcut-recorder.recording {
+  border-color: #0d9488;
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.shortcut-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shortcut-help.error {
+  color: #b45309;
+}
+
+.settings-accordion {
+  overflow: hidden;
+  border: 1px solid #d5e8e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.accordion-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  padding: 10px;
+  background: transparent;
+  color: #134e4a;
+  text-align: left;
+}
+
+.accordion-trigger span {
+  display: grid;
+  gap: 2px;
+}
+
+.accordion-trigger strong {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.accordion-trigger small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.accordion-trigger svg {
+  flex: 0 0 auto;
+  color: #0f766e;
+  transition: transform 160ms ease;
+}
+
+.accordion-trigger:hover {
+  background: #ecfeff;
+}
+
+.settings-accordion.open .accordion-trigger {
+  border-bottom: 1px solid #d5e8e5;
+}
+
+.settings-accordion.open .accordion-trigger svg {
+  transform: rotate(180deg);
+}
+
+.accordion-content {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: #f8fffd;
 }
 
 .floating-panel {
