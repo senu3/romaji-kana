@@ -566,10 +566,16 @@ h3 {
     monospace;
 }
 
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 0 12px 16px 0;
+}
+
 .panel-note {
   margin: 0;
-  border-top: 1px solid #d5e8e5;
-  padding: 12px 16px 16px;
+  padding: 16px;
   color: #64748b;
   font-size: 13px;
   line-height: 1.5;

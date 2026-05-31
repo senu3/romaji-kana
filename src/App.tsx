@@ -11,6 +11,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
 import { convertRomajiToJapanese } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
+import { defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import type {
   AppSettings,
@@ -267,6 +268,9 @@ function App() {
         <PromptPanel
           prompt={settings.conversionPrompt}
           onChange={(conversionPrompt) => setSettings((value) => ({ ...value, conversionPrompt }))}
+          onReset={() =>
+            setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
+          }
           onClose={closeActivePanel}
         />
       ) : null}
@@ -334,10 +338,12 @@ function HistoryPanel({
 function PromptPanel({
   prompt,
   onChange,
+  onReset,
   onClose,
 }: {
   prompt: string;
   onChange: (prompt: string) => void;
+  onReset: () => void;
   onClose: () => void;
 }) {
   return (
@@ -359,8 +365,13 @@ function PromptPanel({
           spellCheck={false}
         />
       </label>
+      <div className="panel-actions">
+        <button className="secondary-button" type="button" onClick={onReset}>
+          Reset to default
+        </button>
+      </div>
       <p className="panel-note">
-        This prompt is saved locally and used for the next Ollama conversion.
+        This prompt is saved locally. Romaji table and few-shots are auto-appended.
       </p>
     </section>
   );
