@@ -10,12 +10,14 @@ import {
 import { SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
 import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
+import { resolveConversionAnchor } from "./lib/historyAnchor";
 import { convertRomajiToJapanese } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import type {
   AppSettings,
+  ConversionAnchor,
   ConversionHistoryItem,
   ConversionRange,
   ConversionStatus,
@@ -272,6 +274,7 @@ function App() {
         modelName: settingsRef.current.modelName,
         createdAt: Date.now(),
         source: request.source,
+        anchor: request.anchor,
       },
       ...items,
     ]);
@@ -286,19 +289,82 @@ function App() {
   const handleRerunHistory = useCallback((item: ConversionHistoryItem) => {
     const request: PendingConversion = {
       id: crypto.randomUUID(),
+      anchor: item.anchor,
       originalText: item.input,
       createdAt: Date.now(),
       source: "history",
     };
 
     setPending((items) => [...items, request]);
-    setStatus({ kind: "loading", message: `Re-running "${item.input}"` });
+    setStatus({ kind: "loading", message: `Re-converting "${item.input}"` });
 
     convertRomajiToJapanese(item.input, settingsRef.current)
       .then((converted) => {
         if (canceledRequestsRef.current.has(request.id)) {
           return;
         }
+
+        const currentView = editorViewRef.current;
+        if (!currentView || !item.anchor) {
+          setHistory((items) => [
+            {
+              id: request.id,
+              status: "success",
+              input: request.originalText,
+              output: converted,
+              modelName: settingsRef.current.modelName,
+              createdAt: Date.now(),
+              source: "history",
+              anchor: item.anchor,
+            },
+            ...items,
+          ]);
+          setStatus({
+            kind: "success",
+            message: "History conversion re-run. No editor anchor was available to apply.",
+          });
+          return;
+        }
+
+        const resolved = resolveConversionAnchor(currentView.state.doc.toString(), item.anchor);
+        if (!resolved) {
+          setHistory((items) => [
+            {
+              id: request.id,
+              status: "skipped",
+              input: request.originalText,
+              error: "Not applied because the original location changed or became ambiguous.",
+              modelName: settingsRef.current.modelName,
+              createdAt: Date.now(),
+              source: "history",
+              anchor: item.anchor,
+            },
+            ...items,
+          ]);
+          setStatus({
+            kind: "warning",
+            message: "History conversion was not applied because the anchor could not be resolved.",
+          });
+          return;
+        }
+
+        currentView.dispatch({
+          changes: {
+            from: resolved.from,
+            to: resolved.to,
+            insert: converted,
+          },
+          userEvent: "input.historyApply",
+        });
+        saveDocument(currentView.state.doc.toString());
+
+        const nextAnchor: ConversionAnchor = {
+          from: resolved.from,
+          to: resolved.from + converted.length,
+          originalText: item.input,
+          appliedText: converted,
+          docVersion: docVersionRef.current,
+        };
 
         setHistory((items) => [
           {
@@ -309,10 +375,17 @@ function App() {
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
             source: "history",
+            anchor: nextAnchor,
           },
           ...items,
         ]);
-        setStatus({ kind: "success", message: "History conversion re-run." });
+        setStatus({
+          kind: "success",
+          message:
+            resolved.matchedBy === "nearby"
+              ? "History conversion applied at a nearby matching anchor."
+              : "History conversion applied.",
+        });
       })
       .catch((error: unknown) => {
         if (canceledRequestsRef.current.has(request.id)) {
@@ -329,6 +402,7 @@ function App() {
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
             source: "history",
+            anchor: item.anchor,
           },
           ...items,
         ]);
@@ -349,6 +423,12 @@ function App() {
     const request: PendingConversion = {
       id: crypto.randomUUID(),
       range,
+      anchor: {
+        from: range.from,
+        to: range.to,
+        originalText: range.text,
+        docVersion: docVersionRef.current,
+      },
       originalText: range.text,
       createdAt: Date.now(),
       docVersion: docVersionRef.current,
@@ -387,6 +467,7 @@ function App() {
               modelName: settingsRef.current.modelName,
               createdAt: Date.now(),
               source: "editor",
+              anchor: request.anchor,
             },
             ...items,
           ]);
@@ -407,6 +488,13 @@ function App() {
           userEvent: "input.convert",
         });
         saveDocument(currentView.state.doc.toString());
+        const nextAnchor: ConversionAnchor = {
+          from: range.from,
+          to: range.from + converted.length,
+          originalText: request.originalText,
+          appliedText: converted,
+          docVersion: docVersionRef.current,
+        };
         setHistory((items) => [
           {
             id: request.id,
@@ -416,6 +504,7 @@ function App() {
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
             source: "editor",
+            anchor: nextAnchor,
           },
           ...items,
         ]);
@@ -436,6 +525,7 @@ function App() {
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
             source: "editor",
+            anchor: request.anchor,
           },
           ...items,
         ]);
@@ -544,7 +634,7 @@ function HistoryPanel({
           {pending.map((request) => (
             <article className="pending-item" key={request.id}>
               <div>
-                <strong>{request.source === "history" ? "Re-running" : "Converting"}</strong>
+                <strong>{request.source === "history" ? "Re-applying" : "Converting"}</strong>
                 <p>{request.originalText}</p>
               </div>
               <button className="secondary-button" type="button" onClick={() => onCancel(request)}>
@@ -565,7 +655,11 @@ function HistoryPanel({
               type="button"
               key={item.id}
               onClick={() => onRerun(item)}
-              title="Click to re-run this conversion"
+              title={
+                item.anchor
+                  ? "Click to re-convert and apply this item"
+                  : "Click to re-run this conversion"
+              }
             >
               <div className="history-meta">
                 <span className={`status-chip ${item.status}`}>{historyStatusLabel(item.status)}</span>
@@ -585,7 +679,7 @@ function HistoryPanel({
                 <span>{item.modelName}</span>
                 <span className="rerun-hint">
                   <RotateCcw size={13} aria-hidden="true" />
-                  Re-run
+                  {item.anchor ? "Apply again" : "Re-run"}
                 </span>
               </div>
             </button>
