@@ -57,7 +57,7 @@ button:disabled {
 
 .editor-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
   min-height: 100vh;
   padding-bottom: 44px;
@@ -98,27 +98,9 @@ h1 {
   line-height: 1.25;
 }
 
-.file-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.file-label {
-  margin: 4px 0 0;
-  max-width: 420px;
-  overflow: hidden;
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .dirty-chip {
   flex: 0 0 auto;
-  margin-top: 4px;
   padding: 2px 7px;
   border: 1px solid #f6c453;
   border-radius: 999px;
@@ -211,6 +193,68 @@ h3 {
 .toolbar-menu-items button:hover {
   background: #ecfeff;
   color: #0f766e;
+}
+
+.editor-filebar {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(0, auto) minmax(92px, 1fr);
+  align-items: center;
+  min-height: 42px;
+  border-right: 1px solid #cbdedb;
+  background: #ffffff;
+}
+
+.editor-filebar-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 18px;
+}
+
+.editor-filebar-side-right {
+  justify-content: flex-end;
+}
+
+.editor-chrome-button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.editor-chrome-button:hover {
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.editor-filebar-title {
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(520px, 48vw);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.editor-filebar-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-host {
