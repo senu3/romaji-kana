@@ -1,5 +1,21 @@
-import { ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Keyboard,
+  RefreshCw,
+  RotateCcw,
+  SlidersHorizontal,
+} from "lucide-react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { defaultSettings } from "../lib/settings";
+import { formatShortcutLabel, shortcutFromKeyboardEvent } from "../lib/shortcuts";
 import type { AppSettings, OllamaConnectionStatus, OllamaModel } from "../lib/types";
 
 interface SettingsPanelProps {
@@ -22,6 +38,12 @@ export function SettingsPanel({
   onCheckOllama,
 }: SettingsPanelProps) {
   const [modelListOpen, setModelListOpen] = useState(false);
+  const [capturingShortcut, setCapturingShortcut] = useState(false);
+  const [shortcutError, setShortcutError] = useState("");
+  const [openAccordions, setOpenAccordions] = useState({
+    triggers: false,
+    punctuation: false,
+  });
   const modelInputRef = useRef<HTMLInputElement | null>(null);
   const sortedModelNames = useMemo(
     () => ollamaModels.map((model) => model.name).sort((a, b) => a.localeCompare(b)),
@@ -44,6 +66,49 @@ export function SettingsPanel({
       },
     });
   };
+
+  const handleShortcutKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!capturingShortcut) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.key === "Escape") {
+      setCapturingShortcut(false);
+      setShortcutError("");
+      return;
+    }
+
+    const nextShortcut = shortcutFromKeyboardEvent(event.nativeEvent);
+    if (!nextShortcut) {
+      setShortcutError("Use Ctrl/Cmd, Alt, Shift with a key, or a function key.");
+      return;
+    }
+
+    updateTriggers({ manualShortcut: nextShortcut });
+    setCapturingShortcut(false);
+    setShortcutError("");
+  };
+
+  const toggleAccordion = (section: keyof typeof openAccordions) => {
+    setOpenAccordions((current) => ({
+      ...current,
+      [section]: !current[section],
+    }));
+  };
+
+  const enabledTriggerCount = [
+    settings.triggers.period,
+    settings.triggers.comma,
+    settings.triggers.japanesePeriod,
+    settings.triggers.japaneseComma,
+  ].filter(Boolean).length;
+  const punctuationCount = [
+    settings.punctuationConversion.periodToJapanese,
+    settings.punctuationConversion.commaToJapanese,
+  ].filter(Boolean).length;
 
   return (
     <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
@@ -174,10 +239,51 @@ export function SettingsPanel({
               checked={settings.think}
               onChange={(checked) => update({ think: checked })}
             />
+            <div className="shortcut-field">
+              <div>
+                <span>Manual shortcut</span>
+                <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
+              </div>
+              <div className="shortcut-controls">
+                <button
+                  className={`shortcut-recorder ${capturingShortcut ? "recording" : ""}`}
+                  type="button"
+                  onClick={() => {
+                    setCapturingShortcut(true);
+                    setShortcutError("");
+                  }}
+                  onKeyDown={handleShortcutKeyDown}
+                  onBlur={() => setCapturingShortcut(false)}
+                >
+                  <Keyboard size={15} aria-hidden="true" />
+                  {capturingShortcut
+                    ? "Press shortcut..."
+                    : formatShortcutLabel(settings.triggers.manualShortcut)}
+                </button>
+                <button
+                  className="shortcut-reset"
+                  type="button"
+                  onClick={() =>
+                    updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
+                  }
+                  aria-label="Reset manual shortcut"
+                  title="Reset manual shortcut"
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                </button>
+              </div>
+              <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
+                {shortcutError || "Click the shortcut button, then press the keys to register."}
+              </p>
+            </div>
           </div>
 
-          <div className="settings-group">
-            <h3>Triggers</h3>
+          <AccordionSection
+            title="Triggers"
+            summary={`${enabledTriggerCount}/4 enabled`}
+            open={openAccordions.triggers}
+            onToggle={() => toggleAccordion("triggers")}
+          >
             <CheckRow
               label="Period ."
               checked={settings.triggers.period}
@@ -198,10 +304,14 @@ export function SettingsPanel({
               checked={settings.triggers.japaneseComma}
               onChange={(checked) => updateTriggers({ japaneseComma: checked })}
             />
-          </div>
+          </AccordionSection>
 
-          <div className="settings-group">
-            <h3>Punctuation</h3>
+          <AccordionSection
+            title="Punctuation"
+            summary={`${punctuationCount}/2 enabled`}
+            open={openAccordions.punctuation}
+            onToggle={() => toggleAccordion("punctuation")}
+          >
             <CheckRow
               label=". to 。"
               checked={settings.punctuationConversion.periodToJapanese}
@@ -212,9 +322,7 @@ export function SettingsPanel({
               checked={settings.punctuationConversion.commaToJapanese}
               onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
             />
-          </div>
-
-          <p className="shortcut-note">Manual conversion: Ctrl+Enter / Cmd+Enter</p>
+          </AccordionSection>
         </div>
       )}
     </aside>
@@ -235,6 +343,38 @@ function connectionTitle(kind: OllamaConnectionStatus["kind"]): string {
     return "Unavailable";
   }
   return "Not checked";
+}
+
+function AccordionSection({
+  title,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`settings-accordion ${open ? "open" : ""}`}>
+      <button
+        className="accordion-trigger"
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
+      {open ? <div className="accordion-content">{children}</div> : null}
+    </section>
+  );
 }
 
 function CheckRow({

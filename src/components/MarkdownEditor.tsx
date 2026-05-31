@@ -4,8 +4,8 @@ import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { Compartment, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
 import { Decoration, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { History, MessageSquareText } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { ChevronDown, FileText, FolderOpen, History, MessageSquareText, Save } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   extractConversionRange,
   isTriggerEnabled,
@@ -136,11 +136,13 @@ export function MarkdownEditor({
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const fileMenuRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onConvertRef = useRef(onConvert);
   const onDocumentChangedRef = useRef(onDocumentChanged);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
@@ -235,6 +237,32 @@ export function MarkdownEditor({
   }, [registerView, shortcutCompartment, updateListener]);
 
   useEffect(() => {
+    if (!fileMenuOpen) {
+      return;
+    }
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!fileMenuRef.current?.contains(event.target as Node)) {
+        setFileMenuOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [fileMenuOpen]);
+
+  useEffect(() => {
     const view = viewRef.current;
     if (!view) {
       return;
@@ -262,27 +290,54 @@ export function MarkdownEditor({
     });
   }, [settings.triggers.manualShortcut, shortcutCompartment]);
 
+  const runFileAction = (action: () => void) => {
+    setFileMenuOpen(false);
+    action();
+  };
+
   return (
     <section className="editor-shell" aria-label="Markdown editor">
       <div className="editor-toolbar">
-        <div>
+        <div className="editor-title-block">
           <p className="eyebrow">Markdown</p>
           <h1>Romaji Kana</h1>
-          <p className="file-label" title={fileName}>
-            {fileName}
-            {isDirty ? " *" : ""}
-          </p>
+          <div className="file-row">
+            <p className="file-label" title={fileName}>
+              {fileName}
+            </p>
+            {isDirty ? <span className="dirty-chip">Unsaved</span> : null}
+          </div>
         </div>
         <div className="editor-actions" aria-label="Editor actions">
-          <button className="pill pill-action" type="button" onClick={onOpenFile}>
-            Open
-          </button>
-          <button className="pill pill-action" type="button" onClick={onSaveFile}>
-            Save
-          </button>
-          <button className="pill pill-action" type="button" onClick={onSaveFileAs}>
-            Save As
-          </button>
+          <div className="toolbar-menu" ref={fileMenuRef}>
+            <button
+              aria-expanded={fileMenuOpen}
+              aria-haspopup="menu"
+              className="pill pill-action"
+              type="button"
+              onClick={() => setFileMenuOpen((open) => !open)}
+            >
+              <FileText size={15} aria-hidden="true" />
+              File
+              <ChevronDown size={14} aria-hidden="true" />
+            </button>
+            {fileMenuOpen ? (
+              <div className="toolbar-menu-items" role="menu" aria-label="File actions">
+                <button type="button" role="menuitem" onClick={() => runFileAction(onOpenFile)}>
+                  <FolderOpen size={15} aria-hidden="true" />
+                  Open Markdown...
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFile)}>
+                  <Save size={15} aria-hidden="true" />
+                  Save
+                </button>
+                <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFileAs)}>
+                  <Save size={15} aria-hidden="true" />
+                  Save As...
+                </button>
+              </div>
+            ) : null}
+          </div>
           <button className="pill pill-action" type="button" onClick={onOpenHistory}>
             <History size={15} aria-hidden="true" />
             {pending.length > 0 ? `${pending.length} converting` : `${historyCount} History`}
