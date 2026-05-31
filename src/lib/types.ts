@@ -31,9 +31,54 @@ export interface ConversionRange {
   trigger: ConversionTrigger;
 }
 
+export type RomajiKanaTokenKind =
+  | "exact"
+  | "sokuon"
+  | "n"
+  | "punctuation"
+  | "unknown"
+  | "repaired";
+
+export interface RomajiKanaToken {
+  romaji: string;
+  kana: string;
+  inputFrom: number;
+  inputTo: number;
+  kanaFrom: number;
+  kanaTo: number;
+  confidence: number;
+  kind: RomajiKanaTokenKind;
+}
+
+export interface RomajiKanaSpan {
+  romaji: string;
+  kana: string;
+  inputFrom: number;
+  inputTo: number;
+  kanaFrom: number;
+  kanaTo: number;
+  contextKana: string;
+  sourceRomaji: string;
+}
+
+export interface RomajiKanaResult {
+  kana: string;
+  tokens: RomajiKanaToken[];
+  lowConfidenceSpans: RomajiKanaSpan[];
+}
+
+export interface ConversionAnchor {
+  from: number;
+  to: number;
+  originalText: string;
+  appliedText?: string;
+  docVersion: number;
+}
+
 export interface PendingConversion {
   id: string;
   range?: ConversionRange;
+  anchor?: ConversionAnchor;
   originalText: string;
   createdAt: number;
   docVersion?: number;
@@ -51,6 +96,7 @@ export interface ConversionHistoryItem {
   modelName: string;
   createdAt: number;
   source: "editor" | "history";
+  anchor?: ConversionAnchor;
 }
 
 export interface OllamaModel {

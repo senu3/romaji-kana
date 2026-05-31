@@ -92,3 +92,31 @@ export function buildConversionSystemPrompt(userPrompt: string): string {
     conversionFewShotExamples,
   ].join("\n");
 }
+
+export function buildKanaRepairSystemPrompt(): string {
+  return [
+    "You repair only the uncertain kana fragment in a mechanical romaji-to-kana conversion.",
+    "Return only the kana that should replace the uncertain fragment.",
+    "Do not rewrite trusted surrounding kana.",
+    "Do not explain.",
+    "Prefer the closest phonetic repair over a semantic paraphrase.",
+  ].join("\n");
+}
+
+export function buildKanaKanjiSystemPrompt(userPrompt: string): string {
+  const prompt = userPrompt.trim() || defaultConversionPrompt;
+
+  return [
+    "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
+    "Highest priority rules:",
+    "1. Preserve the phonetic reading of the input kana.",
+    "2. Do not replace words with semantically plausible alternatives if their reading differs.",
+    "3. Do not paraphrase.",
+    "4. Use kanji only when it is common and the reading is clear.",
+    "5. Keep hiragana when kanji conversion is uncertain.",
+    "6. Return only the converted Japanese text. Do not explain.",
+    "",
+    "Additional user preference:",
+    prompt,
+  ].join("\n");
+}
