@@ -202,6 +202,11 @@ export function SettingsPanel({
                 </div>
               ) : null}
             </div>
+            <CheckRow
+              label="Think mode"
+              checked={settings.think}
+              onChange={(checked) => update({ think: checked })}
+            />
           </div>
 
           <div className={`connection-card ${ollamaConnection.kind}`}>
@@ -229,16 +234,6 @@ export function SettingsPanel({
 
           <div className="settings-group">
             <h3>Conversion</h3>
-            <CheckRow
-              label="Auto convert"
-              checked={settings.autoConvert}
-              onChange={(checked) => update({ autoConvert: checked })}
-            />
-            <CheckRow
-              label="Think mode"
-              checked={settings.think}
-              onChange={(checked) => update({ think: checked })}
-            />
             <div className="mode-field">
               <span>Conversion mode</span>
               <div className="segmented-control" role="group" aria-label="Conversion mode">
@@ -257,6 +252,45 @@ export function SettingsPanel({
                   Ghost + Tab
                 </button>
               </div>
+            </div>
+          </div>
+
+          <AccordionSection
+            title="Triggers"
+            summary={settings.autoConvert ? `${enabledTriggerCount}/4 enabled` : "Auto off"}
+            open={openAccordions.triggers}
+            onToggle={() => toggleAccordion("triggers")}
+          >
+            <CheckRow
+              label="Auto convert"
+              checked={settings.autoConvert}
+              onChange={(checked) => update({ autoConvert: checked })}
+            />
+            <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
+              <CheckRow
+                label="Period ."
+                checked={settings.triggers.period}
+                disabled={!settings.autoConvert}
+                onChange={(checked) => updateTriggers({ period: checked })}
+              />
+              <CheckRow
+                label="Comma ,"
+                checked={settings.triggers.comma}
+                disabled={!settings.autoConvert}
+                onChange={(checked) => updateTriggers({ comma: checked })}
+              />
+              <CheckRow
+                label="Japanese period 。"
+                checked={settings.triggers.japanesePeriod}
+                disabled={!settings.autoConvert}
+                onChange={(checked) => updateTriggers({ japanesePeriod: checked })}
+              />
+              <CheckRow
+                label="Japanese comma 、"
+                checked={settings.triggers.japaneseComma}
+                disabled={!settings.autoConvert}
+                onChange={(checked) => updateTriggers({ japaneseComma: checked })}
+              />
             </div>
             <div className="shortcut-field">
               <div>
@@ -292,37 +326,10 @@ export function SettingsPanel({
                 </button>
               </div>
               <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
-                {shortcutError || "Click the shortcut button, then press the keys to register."}
+                {shortcutError ||
+                  "Manual conversion is available even when auto convert is off."}
               </p>
             </div>
-          </div>
-
-          <AccordionSection
-            title="Triggers"
-            summary={`${enabledTriggerCount}/4 enabled`}
-            open={openAccordions.triggers}
-            onToggle={() => toggleAccordion("triggers")}
-          >
-            <CheckRow
-              label="Period ."
-              checked={settings.triggers.period}
-              onChange={(checked) => updateTriggers({ period: checked })}
-            />
-            <CheckRow
-              label="Comma ,"
-              checked={settings.triggers.comma}
-              onChange={(checked) => updateTriggers({ comma: checked })}
-            />
-            <CheckRow
-              label="Japanese period 。"
-              checked={settings.triggers.japanesePeriod}
-              onChange={(checked) => updateTriggers({ japanesePeriod: checked })}
-            />
-            <CheckRow
-              label="Japanese comma 、"
-              checked={settings.triggers.japaneseComma}
-              onChange={(checked) => updateTriggers({ japaneseComma: checked })}
-            />
           </AccordionSection>
 
           <AccordionSection
@@ -399,18 +406,21 @@ function AccordionSection({
 function CheckRow({
   label,
   checked,
+  disabled = false,
   onChange,
 }: {
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="check-row">
+    <label className={`check-row ${disabled ? "disabled" : ""}`}>
       <span>{label}</span>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
     </label>

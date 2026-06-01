@@ -344,7 +344,8 @@ h3 {
   font-weight: 700;
 }
 
-.field input {
+.field > input,
+.model-combobox input {
   width: 100%;
   min-height: 40px;
   border: 1px solid #b5d7d1;
@@ -356,7 +357,8 @@ h3 {
   transition: border-color 160ms ease;
 }
 
-.field input:hover {
+.field > input:hover,
+.model-combobox input:hover {
   border-color: #0d9488;
 }
 
@@ -545,6 +547,27 @@ h3 {
   accent-color: #0d9488;
 }
 
+.check-row.disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.check-row.disabled input {
+  accent-color: #94a3b8;
+}
+
+.trigger-options {
+  display: grid;
+  gap: 8px;
+  border-left: 2px solid #b5d7d1;
+  padding-left: 8px;
+}
+
+.trigger-options.disabled {
+  border-left-color: #cbd5e1;
+  opacity: 0.78;
+}
+
 .mode-field {
   display: grid;
   gap: 8px;
@@ -581,7 +604,7 @@ h3 {
 
 .segmented-control button:hover,
 .segmented-control button.selected {
-  background: #dbfcfc;
+  background: #ecfeff;
   color: #115e59;
 }
 
