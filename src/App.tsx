@@ -31,6 +31,7 @@ import type {
 
 type ActivePanel = "history" | "prompt" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
+const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -67,6 +68,7 @@ function App() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionCheckIdRef = useRef(0);
   const startupCheckStartedRef = useRef(false);
+  const previousModelProviderRef = useRef(settings.modelProvider);
   const canceledRequestsRef = useRef(new Set<string>());
   const suppressNextDirtyRef = useRef(false);
 
@@ -164,12 +166,30 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (startupCheckStartedRef.current) {
-      return;
+    const providerChanged = previousModelProviderRef.current !== settings.modelProvider;
+    previousModelProviderRef.current = settings.modelProvider;
+
+    if (providerChanged) {
+      setOllamaModels([]);
     }
+
+    if (startupCheckStartedRef.current) {
+      const timeout = window.setTimeout(
+        () => void handleCheckOllama(),
+        providerChanged ? 0 : AUTO_CONNECTION_CHECK_DELAY_MS,
+      );
+      return () => window.clearTimeout(timeout);
+    }
+
     startupCheckStartedRef.current = true;
     void handleCheckOllama();
-  }, [handleCheckOllama]);
+  }, [
+    settings.modelProvider,
+    settings.modelName,
+    settings.ollamaApiUrl,
+    settings.lmStudioApiUrl,
+    handleCheckOllama,
+  ]);
 
   const closeActivePanel = useCallback(() => {
     if (activePanel === "history") {

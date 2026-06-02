@@ -101,7 +101,7 @@ async function warmLocalModel(
       system: "You are a local model warm-up request. Return nothing.",
       prompt: "",
       stream: false,
-      thinkingMode: settings.thinkingMode,
+      think: settings.think,
       keep_alive: "5m",
     },
     timeoutMs,

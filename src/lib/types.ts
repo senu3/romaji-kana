@@ -6,7 +6,6 @@ export type ConversionTrigger =
   | "shortcut";
 
 export type ModelProvider = "ollama" | "lmstudio";
-export type ThinkingMode = "auto" | "on" | "off";
 
 export interface AppSettings {
   modelProvider: ModelProvider;
@@ -27,7 +26,7 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
-  thinkingMode: ThinkingMode;
+  think: boolean;
 }
 
 export interface ConversionRange {

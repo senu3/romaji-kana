@@ -22,7 +22,7 @@ export const defaultSettings: AppSettings = {
     commaToJapanese: true,
   },
   conversionPrompt: defaultConversionPrompt,
-  thinkingMode: "auto",
+  think: false,
 };
 
 export function loadSettings(): AppSettings {
@@ -43,24 +43,22 @@ export function saveSettings(settings: AppSettings): void {
 }
 
 type LegacySettings = Partial<AppSettings> & {
-  think?: boolean;
+  thinkingMode?: "auto" | "on" | "off";
 };
 
 function mergeSettings(settings: LegacySettings): AppSettings {
-  const { think, ...currentSettings } = settings;
+  const { thinkingMode, ...currentSettings } = settings;
   const conversionPrompt =
     !settings.conversionPrompt || settings.conversionPrompt === legacyDefaultConversionPrompt
       ? defaultConversionPrompt
       : settings.conversionPrompt;
-  const thinkingMode =
-    settings.thinkingMode ??
-    (think === undefined ? defaultSettings.thinkingMode : think ? "on" : "off");
+  const think = settings.think ?? thinkingMode === "on";
 
   return {
     ...defaultSettings,
     ...currentSettings,
     conversionPrompt,
-    thinkingMode,
+    think,
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,

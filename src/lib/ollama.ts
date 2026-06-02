@@ -58,7 +58,7 @@ export async function kanjiizeKana(
       system: buildKanaKanjiSystemPrompt(settings.conversionPrompt),
       prompt: kana,
       stream: false,
-      thinkingMode: settings.thinkingMode,
+      think: settings.think,
       options: {
         temperature: 0.1,
       },
@@ -95,7 +95,7 @@ async function repairKanaSpan(
         `機械変換全文: ${mechanicalKana}`,
       ].join("\n"),
       stream: false,
-      thinkingMode: settings.thinkingMode,
+      think: settings.think,
       options: {
         temperature: 0,
       },
