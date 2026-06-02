@@ -28,7 +28,7 @@ describe("checkOllamaConnection", () => {
     expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
-      expect.objectContaining({ model: "gemma3", stream: false, thinkingMode: "auto" }),
+      expect.objectContaining({ model: "gemma3", stream: false, think: false }),
       100,
     );
   });
@@ -49,7 +49,7 @@ describe("checkOllamaConnection", () => {
         modelProvider: "lmstudio",
         lmStudioApiUrl: "http://localhost:1234",
         modelName: "qwen/qwen3-8b",
-        thinkingMode: "on",
+        think: true,
       },
       {
         transport,
@@ -68,7 +68,7 @@ describe("checkOllamaConnection", () => {
       expect.objectContaining({
         model: "qwen/qwen3-8b",
         stream: false,
-        thinkingMode: "on",
+        think: true,
       }),
       100,
     );

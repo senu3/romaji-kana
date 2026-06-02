@@ -58,7 +58,7 @@ export interface LocalGenerateBody {
   system: string;
   prompt: string;
   stream: false;
-  thinkingMode: "auto" | "on" | "off";
+  think: boolean;
   options?: {
     temperature?: number;
   };
@@ -117,26 +117,7 @@ export const defaultOllamaTransport: OllamaTransport = {
       return generateLmStudioChat(baseUrl, body, timeoutMs);
     }
 
-    const ollamaBody = toOllamaGenerateBody(body);
-    if (isTauri()) {
-      return invoke<OllamaGenerateResponse>("ollama_generate", {
-        request: { baseUrl, body: ollamaBody, timeoutMs },
-      });
-    }
-
-    return fetchLocalJson<OllamaGenerateResponse>(
-      normalizeOllamaBaseUrl(baseUrl),
-      "generate",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(ollamaBody),
-      },
-      timeoutMs,
-      "Ollama",
-    );
+    return generateOllama(baseUrl, body, timeoutMs);
   },
 };
 
@@ -146,18 +127,64 @@ function toOllamaGenerateBody(body: LocalGenerateBody): Record<string, unknown> 
     system: body.system,
     prompt: body.prompt,
     stream: body.stream,
+    think: body.think,
     options: body.options,
     keep_alive: body.keep_alive,
   };
 
-  if (body.thinkingMode !== "auto") {
-    nextBody.think = body.thinkingMode === "on";
-  }
-
   return nextBody;
 }
 
-function toLmStudioChatBody(body: LocalGenerateBody): Record<string, unknown> {
+async function generateOllama(
+  baseUrl: string,
+  body: LocalGenerateBody,
+  timeoutMs: number,
+): Promise<OllamaGenerateResponse> {
+  try {
+    return await requestOllamaGenerate(baseUrl, toOllamaGenerateBody(body), timeoutMs);
+  } catch (error) {
+    if (!body.think || !isReasoningOptionError(error)) {
+      throw error;
+    }
+
+    return requestOllamaGenerate(
+      baseUrl,
+      toOllamaGenerateBody({ ...body, think: false }),
+      timeoutMs,
+    );
+  }
+}
+
+async function requestOllamaGenerate(
+  baseUrl: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<OllamaGenerateResponse> {
+  if (isTauri()) {
+    return invoke<OllamaGenerateResponse>("ollama_generate", {
+      request: { baseUrl, body, timeoutMs },
+    });
+  }
+
+  return fetchLocalJson<OllamaGenerateResponse>(
+    normalizeOllamaBaseUrl(baseUrl),
+    "generate",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+    timeoutMs,
+    "Ollama",
+  );
+}
+
+function toLmStudioChatBody(
+  body: LocalGenerateBody,
+  includeThinkingControls = true,
+): Record<string, unknown> {
   const nextBody: Record<string, unknown> = {
     model: body.model,
     messages: [
@@ -168,10 +195,14 @@ function toLmStudioChatBody(body: LocalGenerateBody): Record<string, unknown> {
     temperature: body.options?.temperature,
   };
 
-  if (body.thinkingMode === "on") {
+  if (!includeThinkingControls) {
+    return nextBody;
+  }
+
+  if (body.think) {
     nextBody.reasoning_effort = "medium";
     nextBody.enable_thinking = true;
-  } else if (body.thinkingMode === "off") {
+  } else {
     nextBody.reasoning_effort = "none";
     nextBody.enable_thinking = false;
   }
@@ -187,15 +218,27 @@ async function generateLmStudioChat(
   try {
     return await requestLmStudioChat(baseUrl, toLmStudioChatBody(body), timeoutMs);
   } catch (error) {
-    if (body.thinkingMode === "auto" || !isReasoningOptionError(error)) {
+    if (!isReasoningOptionError(error)) {
       throw error;
     }
 
-    return requestLmStudioChat(
-      baseUrl,
-      toLmStudioChatBody({ ...body, thinkingMode: "auto" }),
-      timeoutMs,
-    );
+    if (!body.think) {
+      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs);
+    }
+
+    try {
+      return await requestLmStudioChat(
+        baseUrl,
+        toLmStudioChatBody({ ...body, think: false }),
+        timeoutMs,
+      );
+    } catch (retryError) {
+      if (!isReasoningOptionError(retryError)) {
+        throw retryError;
+      }
+
+      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs);
+    }
   }
 }
 

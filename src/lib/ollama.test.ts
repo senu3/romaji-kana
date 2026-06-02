@@ -22,7 +22,7 @@ describe("convertRomajiToJapanese", () => {
         prompt: "あなたはだれですか。",
         stream: false,
         keep_alive: "5m",
-        thinkingMode: "auto",
+        think: false,
       }),
       30_000,
     );
@@ -102,7 +102,7 @@ describe("convertRomajiToJapanese", () => {
       modelProvider: "lmstudio" as const,
       lmStudioApiUrl: "http://localhost:1234",
       modelName: "local-model",
-      thinkingMode: "off" as const,
+      think: true,
     };
 
     const result = await convertRomajiToJapanese(
@@ -117,7 +117,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:1234",
       expect.objectContaining({
         model: "local-model",
-        thinkingMode: "off",
+        think: true,
       }),
       30_000,
     );

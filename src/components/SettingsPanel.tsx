@@ -21,7 +21,6 @@ import type {
   ModelProvider,
   OllamaConnectionStatus,
   OllamaModel,
-  ThinkingMode,
 } from "../lib/types";
 
 interface SettingsPanelProps {
@@ -247,21 +246,11 @@ export function SettingsPanel({
                 </div>
               ) : null}
             </div>
-            <div className="mode-field compact-mode-field">
-              <span>Thinking</span>
-              <div className="segmented-control" role="group" aria-label="Thinking mode">
-                {(["auto", "on", "off"] as ThinkingMode[]).map((thinkingMode) => (
-                  <button
-                    className={settings.thinkingMode === thinkingMode ? "selected" : ""}
-                    type="button"
-                    key={thinkingMode}
-                    onClick={() => update({ thinkingMode })}
-                  >
-                    {thinkingModeLabel(thinkingMode)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CheckRow
+              label="Think mode"
+              checked={settings.think}
+              onChange={(checked) => update({ think: checked })}
+            />
           </div>
 
           <div className={`connection-card ${ollamaConnection.kind}`}>
@@ -428,16 +417,6 @@ function connectionTitle(kind: OllamaConnectionStatus["kind"]): string {
 
 function providerLabel(provider: ModelProvider): string {
   return provider === "lmstudio" ? "LM Studio" : "Ollama";
-}
-
-function thinkingModeLabel(mode: ThinkingMode): string {
-  if (mode === "on") {
-    return "On";
-  }
-  if (mode === "off") {
-    return "Off";
-  }
-  return "Auto";
 }
 
 function AccordionSection({
