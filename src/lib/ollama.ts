@@ -1,7 +1,13 @@
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
 import { buildKanaKanjiSystemPrompt, buildKanaRepairSystemPrompt } from "./prompts";
-import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
+import {
+  defaultOllamaTransport,
+  normalizeLmStudioBaseUrl,
+  normalizeOllamaBaseUrl as normalizeOllamaBaseUrlFromProxy,
+  type LocalGenerateResponse,
+  type OllamaTransport,
+} from "./ollamaProxy";
 import { rebuildRomajiKanaResult, romajiToKana } from "./romajiKana";
 import type { RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 
@@ -45,13 +51,14 @@ export async function kanjiizeKana(
   transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
   const result = await transport.generate(
-    settings.ollamaApiUrl,
+    settings.modelProvider,
+    currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
       system: buildKanaKanjiSystemPrompt(settings.conversionPrompt),
       prompt: kana,
       stream: false,
-      think: settings.think,
+      thinkingMode: settings.thinkingMode,
       options: {
         temperature: 0.1,
       },
@@ -60,10 +67,10 @@ export async function kanjiizeKana(
     30_000,
   );
 
-  const rawText = result.response ?? result.message?.content ?? "";
+  const rawText = generatedText(result);
   const text = stripThinkBlock(rawText).trim();
   if (!text) {
-    throw new Error("Ollama returned an empty conversion.");
+    throw new Error(`${providerLabel(settings)} returned an empty conversion.`);
   }
 
   return text;
@@ -76,7 +83,8 @@ async function repairKanaSpan(
   transport: OllamaTransport,
 ): Promise<string> {
   const result = await transport.generate(
-    settings.ollamaApiUrl,
+    settings.modelProvider,
+    currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
       system: buildKanaRepairSystemPrompt(),
@@ -87,7 +95,7 @@ async function repairKanaSpan(
         `機械変換全文: ${mechanicalKana}`,
       ].join("\n"),
       stream: false,
-      think: settings.think,
+      thinkingMode: settings.thinkingMode,
       options: {
         temperature: 0,
       },
@@ -96,7 +104,7 @@ async function repairKanaSpan(
     30_000,
   );
 
-  return cleanKanaFragment(result.response ?? result.message?.content ?? "");
+  return cleanKanaFragment(generatedText(result));
 }
 
 function replaceSpanWithRepair(
@@ -134,11 +142,41 @@ function cleanKanaFragment(text: string): string {
 }
 
 export function normalizeOllamaBaseUrl(url: string): string {
-  const trimmed = url.trim().replace(/\/+$/, "");
-  if (!trimmed) {
-    return "http://localhost:11434/api";
+  return normalizeOllamaBaseUrlFromProxy(url);
+}
+
+export function currentProviderBaseUrl(settings: AppSettings): string {
+  if (settings.modelProvider === "lmstudio") {
+    return settings.lmStudioApiUrl;
   }
-  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+
+  return settings.ollamaApiUrl;
+}
+
+export function currentProviderApiBaseUrl(settings: AppSettings): string {
+  if (settings.modelProvider === "lmstudio") {
+    return normalizeLmStudioBaseUrl(settings.lmStudioApiUrl);
+  }
+
+  return normalizeOllamaBaseUrl(settings.ollamaApiUrl);
+}
+
+export function providerLabel(settings: AppSettings): string {
+  return settings.modelProvider === "lmstudio" ? "LM Studio" : "Ollama";
+}
+
+function generatedText(result: LocalGenerateResponse): string {
+  if ("response" in result && result.response) {
+    return result.response;
+  }
+  if ("message" in result && result.message?.content) {
+    return result.message.content;
+  }
+  if ("choices" in result) {
+    return result.choices?.[0]?.message?.content ?? "";
+  }
+
+  return "";
 }
 
 function stripThinkBlock(text: string): string {

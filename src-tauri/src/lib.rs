@@ -36,6 +36,22 @@ async fn ollama_generate(request: OllamaGenerateRequest) -> Result<Value, String
 }
 
 #[tauri::command]
+async fn lmstudio_models(request: OllamaRequest) -> Result<Value, String> {
+    get_openai_json(&request.base_url, "models", request.timeout_ms).await
+}
+
+#[tauri::command]
+async fn lmstudio_chat_completions(request: OllamaGenerateRequest) -> Result<Value, String> {
+    post_openai_json(
+        &request.base_url,
+        "chat/completions",
+        request.body,
+        request.timeout_ms,
+    )
+    .await
+}
+
+#[tauri::command]
 async fn open_markdown_file() -> Result<Option<OpenFileResult>, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let Some(path) = rfd::FileDialog::new()
@@ -86,7 +102,18 @@ async fn get_json(base_url: &str, path: &str, timeout_ms: Option<u64>) -> Result
     let client = build_client(timeout_ms)?;
     let url = ollama_url(base_url, path)?;
     let response = client.get(url).send().await.map_err(error_message)?;
-    read_json_response(response).await
+    read_json_response(response, "Ollama").await
+}
+
+async fn get_openai_json(
+    base_url: &str,
+    path: &str,
+    timeout_ms: Option<u64>,
+) -> Result<Value, String> {
+    let client = build_client(timeout_ms)?;
+    let url = openai_url(base_url, path, "LM Studio")?;
+    let response = client.get(url).send().await.map_err(error_message)?;
+    read_json_response(response, "LM Studio").await
 }
 
 async fn post_json(
@@ -103,7 +130,24 @@ async fn post_json(
         .send()
         .await
         .map_err(error_message)?;
-    read_json_response(response).await
+    read_json_response(response, "Ollama").await
+}
+
+async fn post_openai_json(
+    base_url: &str,
+    path: &str,
+    body: Value,
+    timeout_ms: Option<u64>,
+) -> Result<Value, String> {
+    let client = build_client(timeout_ms)?;
+    let url = openai_url(base_url, path, "LM Studio")?;
+    let response = client
+        .post(url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(error_message)?;
+    read_json_response(response, "LM Studio").await
 }
 
 fn build_client(timeout_ms: Option<u64>) -> Result<reqwest::Client, String> {
@@ -132,12 +176,36 @@ fn ollama_url(base_url: &str, path: &str) -> Result<String, String> {
     Ok(format!("{api_base}/{}", path.trim_start_matches('/')))
 }
 
-async fn read_json_response(response: reqwest::Response) -> Result<Value, String> {
+fn openai_url(base_url: &str, path: &str, provider_label: &str) -> Result<String, String> {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Err(format!("{provider_label} API URL is empty."));
+    }
+
+    if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
+        return Err(format!(
+            "{provider_label} API URL must start with http:// or https://."
+        ));
+    }
+
+    let api_base = if trimmed.ends_with("/v1") {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}/v1")
+    };
+
+    Ok(format!("{api_base}/{}", path.trim_start_matches('/')))
+}
+
+async fn read_json_response(
+    response: reqwest::Response,
+    provider_label: &str,
+) -> Result<Value, String> {
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
         return Err(format!(
-            "Ollama request failed with HTTP {}. {}",
+            "{provider_label} request failed with HTTP {}. {}",
             status.as_u16(),
             body
         ));
@@ -163,6 +231,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             ollama_tags,
             ollama_generate,
+            lmstudio_models,
+            lmstudio_chat_completions,
             open_markdown_file,
             save_markdown_file
         ])
