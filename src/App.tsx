@@ -13,7 +13,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
 import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
-import { convertRomajiToJapanese } from "./lib/ollama";
+import { convertRomajiToJapanese, providerLabel } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
@@ -48,7 +48,7 @@ function App() {
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
-    message: "Ollama has not been checked yet.",
+    message: "Local model provider has not been checked yet.",
   });
   const [initialDocument] = useState(() => {
     if (typeof localStorage === "undefined") {
@@ -117,14 +117,15 @@ function App() {
     const checkId = connectionCheckIdRef.current + 1;
     connectionCheckIdRef.current = checkId;
     const modelName = settingsRef.current.modelName.trim() || "the selected model";
+    const label = providerLabel(settingsRef.current);
 
     setOllamaConnection({
       kind: "checking",
-      message: `Checking Ollama and loading ${modelName}...`,
+      message: `Checking ${label} and loading ${modelName}...`,
     });
     setStatus({
       kind: "loading",
-      message: `Checking Ollama and loading ${modelName}...`,
+      message: `Checking ${label} and loading ${modelName}...`,
     });
 
     try {
@@ -148,7 +149,7 @@ function App() {
         return;
       }
 
-      const message = formatOllamaConnectionError(error);
+      const message = formatOllamaConnectionError(error, providerLabel(settingsRef.current));
       setOllamaModels([]);
       setOllamaConnection({
         kind: "error",
@@ -549,7 +550,7 @@ function App() {
               id: request.id,
               status: "skipped",
               input: request.originalText,
-              error: "Skipped because the source text changed before Ollama responded.",
+              error: "Skipped because the source text changed before the provider responded.",
               modelName: settingsRef.current.modelName,
               createdAt: Date.now(),
               source: "editor",
@@ -896,20 +897,20 @@ function StatusBar({
 function formatConversionError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
-    return "Could not reach Ollama. Confirm it is running at the configured URL.";
+    return "Could not reach the selected local model provider. Confirm it is running at the configured URL.";
   }
   return message || "Conversion failed.";
 }
 
-function formatOllamaConnectionError(error: unknown): string {
+function formatOllamaConnectionError(error: unknown, label: string): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/abort/i.test(message)) {
-    return "Ollama connection check timed out. Confirm Ollama is running and the selected model can load.";
+    return `${label} connection check timed out. Confirm ${label} is running and the selected model can load.`;
   }
   if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
-    return "Could not reach Ollama. Confirm it is running at the configured URL.";
+    return `Could not reach ${label}. Confirm it is running at the configured URL.`;
   }
-  return message || "Ollama connection check failed.";
+  return message || `${label} connection check failed.`;
 }
 
 function formatFileError(error: unknown): string {

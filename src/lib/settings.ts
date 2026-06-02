@@ -4,7 +4,9 @@ import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompt
 const STORAGE_KEY = "romaji-kana-settings";
 
 export const defaultSettings: AppSettings = {
+  modelProvider: "ollama",
   ollamaApiUrl: "http://localhost:11434",
+  lmStudioApiUrl: "http://localhost:1234",
   modelName: "gemma3",
   autoConvert: true,
   conversionMode: "replace",
@@ -20,7 +22,7 @@ export const defaultSettings: AppSettings = {
     commaToJapanese: true,
   },
   conversionPrompt: defaultConversionPrompt,
-  think: false,
+  thinkingMode: "auto",
 };
 
 export function loadSettings(): AppSettings {
@@ -40,16 +42,25 @@ export function saveSettings(settings: AppSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
-function mergeSettings(settings: Partial<AppSettings>): AppSettings {
+type LegacySettings = Partial<AppSettings> & {
+  think?: boolean;
+};
+
+function mergeSettings(settings: LegacySettings): AppSettings {
+  const { think, ...currentSettings } = settings;
   const conversionPrompt =
     !settings.conversionPrompt || settings.conversionPrompt === legacyDefaultConversionPrompt
       ? defaultConversionPrompt
       : settings.conversionPrompt;
+  const thinkingMode =
+    settings.thinkingMode ??
+    (think === undefined ? defaultSettings.thinkingMode : think ? "on" : "off");
 
   return {
     ...defaultSettings,
-    ...settings,
+    ...currentSettings,
     conversionPrompt,
+    thinkingMode,
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,

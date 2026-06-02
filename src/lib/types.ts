@@ -5,8 +5,13 @@ export type ConversionTrigger =
   | "japaneseComma"
   | "shortcut";
 
+export type ModelProvider = "ollama" | "lmstudio";
+export type ThinkingMode = "auto" | "on" | "off";
+
 export interface AppSettings {
+  modelProvider: ModelProvider;
   ollamaApiUrl: string;
+  lmStudioApiUrl: string;
   modelName: string;
   autoConvert: boolean;
   conversionMode: "replace" | "ghost";
@@ -22,7 +27,7 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
-  think: boolean;
+  thinkingMode: ThinkingMode;
 }
 
 export interface ConversionRange {
@@ -110,18 +115,22 @@ export interface ConversionHistoryItem {
   anchor?: ConversionAnchor;
 }
 
-export interface OllamaModel {
+export interface LocalModel {
   name: string;
   modifiedAt?: string;
   size?: number;
 }
 
-export type OllamaConnectionStatus =
+export type OllamaModel = LocalModel;
+
+export type LocalModelConnectionStatus =
   | { kind: "idle"; message: string }
   | { kind: "checking"; message: string }
   | { kind: "connected"; message: string; checkedAt: number }
   | { kind: "warning"; message: string; checkedAt: number }
   | { kind: "error"; message: string; checkedAt: number };
+
+export type OllamaConnectionStatus = LocalModelConnectionStatus;
 
 export type ConversionStatus =
   | { kind: "idle"; message: string }

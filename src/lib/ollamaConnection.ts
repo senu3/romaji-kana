@@ -1,4 +1,4 @@
-import { normalizeOllamaBaseUrl } from "./ollama";
+import { currentProviderApiBaseUrl, currentProviderBaseUrl, providerLabel } from "./ollama";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings, OllamaModel } from "./types";
 
@@ -20,8 +20,8 @@ export async function checkOllamaConnection(
 ): Promise<OllamaConnectionResult> {
   const transport = options.transport ?? defaultOllamaTransport;
   const timeoutMs = options.timeoutMs ?? 12_000;
-  const baseUrl = normalizeOllamaBaseUrl(settings.ollamaApiUrl);
-  const models = await fetchOllamaModels(baseUrl, transport, timeoutMs);
+  const label = providerLabel(settings);
+  const models = await fetchLocalModels(settings, transport, timeoutMs);
   const modelName = settings.modelName.trim();
 
   if (!modelName) {
@@ -29,36 +29,54 @@ export async function checkOllamaConnection(
       models,
       modelLoaded: false,
       kind: "warning",
-      message: `Connected to Ollama. ${models.length} model(s) found, but no model is selected.`,
+      message: `Connected to ${label}. ${models.length} model(s) found, but no model is selected.`,
     };
   }
 
-  const knownModel = models.some((model) => matchesOllamaModel(model.name, modelName));
+  const knownModel = models.some((model) => matchesLocalModel(model.name, modelName));
   if (!knownModel) {
     return {
       models,
       modelLoaded: false,
       kind: "warning",
-      message: `Connected to Ollama, but "${modelName}" was not found in local models.`,
+      message: `Connected to ${label}, but "${modelName}" was not found in local models.`,
     };
   }
 
-  await warmOllamaModel(baseUrl, modelName, transport, timeoutMs);
+  await warmLocalModel(settings, modelName, transport, timeoutMs);
 
   return {
     models,
     modelLoaded: true,
     kind: "connected",
-    message: `Connected to Ollama. Loaded "${modelName}". ${models.length} model(s) available.`,
+    message: `Connected to ${label}. Loaded "${modelName}". ${models.length} model(s) available.`,
   };
 }
 
-async function fetchOllamaModels(
-  baseUrl: string,
+async function fetchLocalModels(
+  settings: AppSettings,
   transport: OllamaTransport,
   timeoutMs: number,
 ): Promise<OllamaModel[]> {
-  const data = await transport.tags(baseUrl, timeoutMs);
+  const data = await transport.models(
+    settings.modelProvider,
+    currentProviderApiBaseUrl(settings),
+    timeoutMs,
+  );
+  if ("data" in data && Array.isArray(data.data)) {
+    return (data.data ?? [])
+      .filter((model) => Boolean(model.id))
+      .map((model) => ({
+        name: model.id ?? "",
+        modifiedAt: model.created ? new Date(model.created * 1000).toISOString() : undefined,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  if (!("models" in data)) {
+    return [];
+  }
+
   return (data.models ?? [])
     .filter((model) => Boolean(model.name))
     .map((model) => ({
@@ -69,24 +87,27 @@ async function fetchOllamaModels(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function warmOllamaModel(
-  baseUrl: string,
+async function warmLocalModel(
+  settings: AppSettings,
   modelName: string,
   transport: OllamaTransport,
   timeoutMs: number,
 ): Promise<void> {
   await transport.generate(
-    baseUrl,
+    settings.modelProvider,
+    currentProviderBaseUrl(settings),
     {
       model: modelName,
+      system: "You are a local model warm-up request. Return nothing.",
       prompt: "",
       stream: false,
+      thinkingMode: settings.thinkingMode,
       keep_alive: "5m",
     },
     timeoutMs,
   );
 }
 
-function matchesOllamaModel(availableName: string, selectedName: string): boolean {
+function matchesLocalModel(availableName: string, selectedName: string): boolean {
   return availableName === selectedName || availableName === `${selectedName}:latest`;
 }

@@ -16,7 +16,13 @@ import {
 } from "react";
 import { defaultSettings } from "../lib/settings";
 import { formatShortcutLabel, shortcutFromKeyboardEvent } from "../lib/shortcuts";
-import type { AppSettings, OllamaConnectionStatus, OllamaModel } from "../lib/types";
+import type {
+  AppSettings,
+  ModelProvider,
+  OllamaConnectionStatus,
+  OllamaModel,
+  ThinkingMode,
+} from "../lib/types";
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -66,6 +72,18 @@ export function SettingsPanel({
       },
     });
   };
+  const updateProvider = (modelProvider: ModelProvider) => {
+    update({ modelProvider });
+    setModelListOpen(false);
+  };
+  const updateCurrentApiUrl = (apiUrl: string) => {
+    if (settings.modelProvider === "lmstudio") {
+      update({ lmStudioApiUrl: apiUrl });
+      return;
+    }
+
+    update({ ollamaApiUrl: apiUrl });
+  };
 
   const handleShortcutKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!capturingShortcut) {
@@ -109,6 +127,9 @@ export function SettingsPanel({
     settings.punctuationConversion.periodToJapanese,
     settings.punctuationConversion.commaToJapanese,
   ].filter(Boolean).length;
+  const providerName = providerLabel(settings.modelProvider);
+  const currentApiUrl =
+    settings.modelProvider === "lmstudio" ? settings.lmStudioApiUrl : settings.ollamaApiUrl;
 
   return (
     <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
@@ -136,12 +157,36 @@ export function SettingsPanel({
             </div>
           </div>
 
+          <div className="field">
+            <span>Provider</span>
+            <div className="segmented-control provider-control" role="group" aria-label="Model provider">
+              <button
+                className={settings.modelProvider === "ollama" ? "selected" : ""}
+                type="button"
+                onClick={() => updateProvider("ollama")}
+              >
+                Ollama
+              </button>
+              <button
+                className={settings.modelProvider === "lmstudio" ? "selected" : ""}
+                type="button"
+                onClick={() => updateProvider("lmstudio")}
+              >
+                LM Studio
+              </button>
+            </div>
+          </div>
+
           <label className="field">
-            <span>Ollama API URL</span>
+            <span>{providerName} API URL</span>
             <input
-              value={settings.ollamaApiUrl}
-              onChange={(event) => update({ ollamaApiUrl: event.currentTarget.value })}
-              placeholder="http://localhost:11434"
+              value={currentApiUrl}
+              onChange={(event) => updateCurrentApiUrl(event.currentTarget.value)}
+              placeholder={
+                settings.modelProvider === "lmstudio"
+                  ? "http://localhost:1234"
+                  : "http://localhost:11434"
+              }
             />
           </label>
 
@@ -161,7 +206,7 @@ export function SettingsPanel({
                 placeholder="gemma3"
                 role="combobox"
                 aria-expanded={modelListOpen}
-                aria-controls="ollama-model-options"
+                aria-controls="local-model-options"
                 aria-autocomplete="list"
               />
               <button
@@ -177,9 +222,9 @@ export function SettingsPanel({
                 <ChevronRight size={16} aria-hidden="true" />
               </button>
               {modelListOpen ? (
-                <div className="model-options" id="ollama-model-options" role="listbox">
+                <div className="model-options" id="local-model-options" role="listbox">
                   {sortedModelNames.length === 0 ? (
-                    <p>No models loaded. Run Check to refresh Ollama models.</p>
+                    <p>No models loaded. Run Check to refresh {providerName} models.</p>
                   ) : (
                     sortedModelNames.map((modelName) => (
                       <button
@@ -202,11 +247,21 @@ export function SettingsPanel({
                 </div>
               ) : null}
             </div>
-            <CheckRow
-              label="Think mode"
-              checked={settings.think}
-              onChange={(checked) => update({ think: checked })}
-            />
+            <div className="mode-field compact-mode-field">
+              <span>Thinking</span>
+              <div className="segmented-control" role="group" aria-label="Thinking mode">
+                {(["auto", "on", "off"] as ThinkingMode[]).map((thinkingMode) => (
+                  <button
+                    className={settings.thinkingMode === thinkingMode ? "selected" : ""}
+                    type="button"
+                    key={thinkingMode}
+                    onClick={() => update({ thinkingMode })}
+                  >
+                    {thinkingModeLabel(thinkingMode)}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className={`connection-card ${ollamaConnection.kind}`}>
@@ -369,6 +424,20 @@ function connectionTitle(kind: OllamaConnectionStatus["kind"]): string {
     return "Unavailable";
   }
   return "Not checked";
+}
+
+function providerLabel(provider: ModelProvider): string {
+  return provider === "lmstudio" ? "LM Studio" : "Ollama";
+}
+
+function thinkingModeLabel(mode: ThinkingMode): string {
+  if (mode === "on") {
+    return "On";
+  }
+  if (mode === "off") {
+    return "Off";
+  }
+  return "Auto";
 }
 
 function AccordionSection({

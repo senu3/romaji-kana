@@ -580,6 +580,10 @@ h3 {
   font-weight: 700;
 }
 
+.compact-mode-field {
+  margin-top: 2px;
+}
+
 .segmented-control {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -606,6 +610,10 @@ h3 {
 .segmented-control button.selected {
   background: #ecfeff;
   color: #115e59;
+}
+
+.compact-mode-field .segmented-control {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .shortcut-field {
