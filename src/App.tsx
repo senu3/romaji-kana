@@ -137,6 +137,28 @@ function App() {
       }
 
       setOllamaModels(result.models);
+      const currentModelName = settingsRef.current.modelName.trim();
+      const shouldAutoSelectModel =
+        Boolean(result.suggestedModelName) &&
+        result.kind === "warning" &&
+        (!currentModelName || currentModelName === defaultSettings.modelName);
+
+      if (shouldAutoSelectModel) {
+        setSettings((value) => ({
+          ...value,
+          modelName: result.suggestedModelName ?? value.modelName,
+        }));
+        setOllamaConnection({
+          kind: "checking",
+          message: `Selected "${result.suggestedModelName}". Checking model availability...`,
+        });
+        setStatus({
+          kind: "loading",
+          message: `Selected "${result.suggestedModelName}". Checking model availability...`,
+        });
+        return;
+      }
+
       setOllamaConnection({
         kind: result.kind,
         message: result.message,

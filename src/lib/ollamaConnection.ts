@@ -7,6 +7,7 @@ export interface OllamaConnectionResult {
   modelLoaded: boolean;
   kind: "connected" | "warning";
   message: string;
+  suggestedModelName?: string;
 }
 
 interface CheckOptions {
@@ -23,13 +24,17 @@ export async function checkOllamaConnection(
   const label = providerLabel(settings);
   const models = await fetchLocalModels(settings, transport, timeoutMs);
   const modelName = settings.modelName.trim();
+  const suggestedModelName = models[0]?.name;
 
   if (!modelName) {
     return {
       models,
       modelLoaded: false,
       kind: "warning",
-      message: `Connected to ${label}. ${models.length} model(s) found, but no model is selected.`,
+      suggestedModelName,
+      message: suggestedModelName
+        ? `Connected to ${label}. Select a model to start converting. Suggested: "${suggestedModelName}".`
+        : `Connected to ${label}, but no local models were found.`,
     };
   }
 
@@ -39,7 +44,10 @@ export async function checkOllamaConnection(
       models,
       modelLoaded: false,
       kind: "warning",
-      message: `Connected to ${label}, but "${modelName}" was not found in local models.`,
+      suggestedModelName,
+      message: suggestedModelName
+        ? `Connected to ${label}, but "${modelName}" was not found. Suggested: "${suggestedModelName}".`
+        : `Connected to ${label}, but "${modelName}" was not found and no local models are available.`,
     };
   }
 
