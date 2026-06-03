@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertRomajiToJapanese } from "./ollama";
-import { buildConversionSystemPrompt, defaultConversionPrompt } from "./prompts";
+import {
+  buildConversionSystemPrompt,
+  buildKanaKanjiSystemPrompt,
+  defaultConversionPrompt,
+} from "./prompts";
 import { defaultSettings } from "./settings";
 
 describe("convertRomajiToJapanese", () => {
@@ -130,5 +134,13 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("shi/si=し");
     expect(prompt).toContain("anatahayokuwaraujhitoda");
     expect(prompt).toContain("あなたはよく笑う人だ");
+  });
+
+  it("adds business email preset instructions without allowing over-polite rewrites", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "businessEmail");
+
+    expect(prompt).toContain("Purpose preset: business email or work message.");
+    expect(prompt).toContain("When the input is よろしくおねがいします, prefer よろしくお願いします.");
+    expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
   });
 });

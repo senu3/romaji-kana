@@ -6,6 +6,7 @@ export type ConversionTrigger =
   | "shortcut";
 
 export type ModelProvider = "ollama" | "lmstudio";
+export type ConversionPreset = "none" | "conversation" | "businessEmail";
 
 export interface AppSettings {
   modelProvider: ModelProvider;
@@ -26,6 +27,7 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
+  conversionPreset: ConversionPreset;
   think: boolean;
 }
 

@@ -22,6 +22,7 @@ export const defaultSettings: AppSettings = {
     commaToJapanese: true,
   },
   conversionPrompt: defaultConversionPrompt,
+  conversionPreset: "none",
   think: false,
 };
 

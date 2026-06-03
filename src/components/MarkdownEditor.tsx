@@ -551,7 +551,7 @@ export function MarkdownEditor({
           </button>
           <button className="pill pill-action" type="button" onClick={onOpenPrompt}>
             <MessageSquareText size={15} aria-hidden="true" />
-            Prompt
+            Style
           </button>
         </div>
       </div>

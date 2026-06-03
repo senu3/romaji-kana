@@ -56,15 +56,17 @@ try {
   await page.getByRole("button", { name: "Show local models" }).click();
   await page.getByRole("option", { name: "qwen3.5:0.8b" }).waitFor();
 
-  await page.getByRole("button", { name: "Prompt" }).click();
+  await page.getByRole("button", { name: "Style" }).click();
   await page.getByRole("region", { name: "Conversion prompt editor" }).waitFor();
+  await page.getByRole("button", { name: "ビジネスメール" }).click();
+  await page.getByText("Work messages and email drafts.").waitFor();
   await page.getByRole("button", { name: "Close prompt" }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await assertVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
   assert.ok(
-    await page.getByRole("button", { name: "Prompt" }).isVisible(),
-    "Prompt action should remain visible on a narrow viewport.",
+    await page.getByRole("button", { name: "Style" }).isVisible(),
+    "Style action should remain visible on a narrow viewport.",
   );
 } finally {
   await browser?.close();
