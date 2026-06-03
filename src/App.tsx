@@ -15,12 +15,13 @@ import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
 import { convertRomajiToJapanese, providerLabel } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
-import { defaultConversionPrompt } from "./lib/prompts";
+import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import type {
   AppSettings,
   ConversionAnchor,
   ConversionHistoryItem,
+  ConversionPreset,
   ConversionRange,
   ConversionStatus,
   GhostConversionSuggestion,
@@ -32,6 +33,7 @@ import type {
 type ActivePanel = "history" | "prompt" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
+const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -729,6 +731,10 @@ function App() {
       {activePanel === "prompt" ? (
         <PromptPanel
           prompt={settings.conversionPrompt}
+          preset={settings.conversionPreset}
+          onPresetChange={(conversionPreset) =>
+            setSettings((value) => ({ ...value, conversionPreset }))
+          }
           onChange={(conversionPrompt) => setSettings((value) => ({ ...value, conversionPrompt }))}
           onReset={() =>
             setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
@@ -868,11 +874,15 @@ function historyStatusLabel(status: ConversionHistoryItem["status"]): string {
 
 function PromptPanel({
   prompt,
+  preset,
+  onPresetChange,
   onChange,
   onReset,
   onClose,
 }: {
   prompt: string;
+  preset: ConversionPreset;
+  onPresetChange: (preset: ConversionPreset) => void;
   onChange: (prompt: string) => void;
   onReset: () => void;
   onClose: () => void;
@@ -881,31 +891,60 @@ function PromptPanel({
     <section className="floating-panel prompt-panel" aria-label="Conversion prompt editor">
       <div className="floating-panel-header">
         <div>
-          <p className="eyebrow">System prompt</p>
-          <h2>Prompt</h2>
+          <p className="eyebrow">Conversion style</p>
+          <h2>Preset</h2>
         </div>
         <button className="icon-button" type="button" onClick={onClose} aria-label="Close prompt">
           <X size={18} aria-hidden="true" />
         </button>
       </div>
-      <label className="prompt-editor">
-        <span>Japanese conversion instructions</span>
-        <textarea
-          value={prompt}
-          onChange={(event) => onChange(event.currentTarget.value)}
-          spellCheck={false}
-        />
-      </label>
-      <div className="panel-actions">
-        <button className="secondary-button" type="button" onClick={onReset}>
-          Reset to default
-        </button>
+      <div className="preset-panel-content">
+        <div className="preset-control" role="group" aria-label="Conversion preset">
+          {CONVERSION_PRESET_OPTIONS.map((option) => (
+            <button
+              className={preset === option ? "selected" : ""}
+              type="button"
+              key={option}
+              onClick={() => onPresetChange(option)}
+            >
+              {conversionPresetLabels[option]}
+            </button>
+          ))}
+        </div>
+        <p className="preset-summary">{presetDescription(preset)}</p>
+
+        <details className="advanced-prompt">
+          <summary>Advanced prompt</summary>
+          <label className="prompt-editor">
+            <span>Japanese conversion instructions</span>
+            <textarea
+              value={prompt}
+              onChange={(event) => onChange(event.currentTarget.value)}
+              spellCheck={false}
+            />
+          </label>
+          <div className="panel-actions">
+            <button className="secondary-button" type="button" onClick={onReset}>
+              Reset to default
+            </button>
+          </div>
+          <p className="panel-note">
+            This prompt is saved locally. Romaji table and few-shots are auto-appended.
+          </p>
+        </details>
       </div>
-      <p className="panel-note">
-        This prompt is saved locally. Romaji table and few-shots are auto-appended.
-      </p>
     </section>
   );
+}
+
+function presetDescription(preset: ConversionPreset): string {
+  if (preset === "conversation") {
+    return "Chat and spoken notes. Keeps wording natural without forcing business politeness.";
+  }
+  if (preset === "businessEmail") {
+    return "Work messages and email drafts. Prefers clear, polite wording with standard business kanji.";
+  }
+  return "General conversion. Prioritizes the reading and common written Japanese.";
 }
 
 function StatusBar({

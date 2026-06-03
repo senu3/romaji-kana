@@ -1,3 +1,5 @@
+import type { ConversionPreset } from "./types";
+
 export const legacyDefaultConversionPrompt = [
   "You convert rough romaji Japanese input into natural Japanese.",
   "Correct typos, missing characters, extra characters, and inconsistent spelling.",
@@ -79,6 +81,33 @@ export const conversionFewShotExamples = [
   "私は日本語を勉強しています",
 ].join("\n");
 
+export const conversionPresetLabels: Record<ConversionPreset, string> = {
+  none: "指定なし",
+  conversation: "会話",
+  businessEmail: "ビジネスメール",
+};
+
+const conversionPresetInstructions: Record<ConversionPreset, string> = {
+  none: [
+    "Purpose preset: none.",
+    "Prefer the most common written Japanese for the kana input.",
+    "Do not add casualness or politeness that is not already present in the reading.",
+  ].join("\n"),
+  conversation: [
+    "Purpose preset: conversation or chat.",
+    "Prefer natural conversational notation, common everyday kanji, and readable hiragana.",
+    "Do not force slang, do not add new meaning, and preserve the input reading.",
+  ].join("\n"),
+  businessEmail: [
+    "Purpose preset: business email or work message.",
+    "Prefer stable business notation, common kanji, and standard work-message expressions when the reading supports them.",
+    "Preserve the kana reading strictly. Do not add, remove, or change readings to make the sentence more polite.",
+    "Do not rewrite します or しました to いたします or いたしました unless いた is present in the input.",
+    "Do not rewrite お願いします to お願いいたします unless いたします is present in the input.",
+    "When the input is よろしくおねがいします, prefer よろしくお願いします.",
+  ].join("\n"),
+};
+
 export function buildConversionSystemPrompt(userPrompt: string): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
 
@@ -103,7 +132,10 @@ export function buildKanaRepairSystemPrompt(): string {
   ].join("\n");
 }
 
-export function buildKanaKanjiSystemPrompt(userPrompt: string): string {
+export function buildKanaKanjiSystemPrompt(
+  userPrompt: string,
+  preset: ConversionPreset = "none",
+): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
 
   return [
@@ -115,6 +147,9 @@ export function buildKanaKanjiSystemPrompt(userPrompt: string): string {
     "4. Use kanji only when it is common and the reading is clear.",
     "5. Keep hiragana when kanji conversion is uncertain.",
     "6. Return only the converted Japanese text. Do not explain.",
+    "",
+    "Purpose preset:",
+    conversionPresetInstructions[preset],
     "",
     "Additional user preference:",
     prompt,

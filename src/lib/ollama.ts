@@ -55,7 +55,7 @@ export async function kanjiizeKana(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildKanaKanjiSystemPrompt(settings.conversionPrompt),
+      system: buildKanaKanjiSystemPrompt(settings.conversionPrompt, settings.conversionPreset),
       prompt: kana,
       stream: false,
       think: settings.think,
