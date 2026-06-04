@@ -44,11 +44,14 @@ try {
 
   await page.goto(appUrl);
   await page.getByRole("heading", { name: "Romaji Kana" }).waitFor();
+  await page.getByRole("dialog", { name: "Set up your local model" }).waitFor();
   await assertVisibleText(page, "anatahadonnakotogasukidesuka.");
   await assertVisibleText(page, "Settings");
 
   await waitForVisibleText(page, 'Selected "gemma4:latest". Checking model availability...');
   await waitForVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
+  await page.getByRole("button", { name: "Start writing" }).click();
+  await page.getByRole("dialog", { name: "Set up your local model" }).waitFor({ state: "hidden" });
 
   const modelInput = page.getByRole("combobox");
   await assertLocatorValue(modelInput, "gemma4:latest");
@@ -64,6 +67,10 @@ try {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await assertVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
+  await page.getByRole("button", { name: "Open settings" }).click();
+  await page.getByRole("dialog", { name: "Settings" }).waitFor();
+  await assertVisibleText(page, "Connected");
+  await page.getByRole("button", { name: "Close settings" }).click();
   assert.ok(
     await page.getByRole("button", { name: "Style" }).isVisible(),
     "Style action should remain visible on a narrow viewport.",
@@ -74,7 +81,13 @@ try {
 }
 
 async function assertVisibleText(page, text) {
-  assert.ok(await page.getByText(text).first().isVisible(), `Expected visible text: ${text}`);
+  const matches = await page.getByText(text).all();
+  for (const match of matches) {
+    if (await match.isVisible()) {
+      return;
+    }
+  }
+  assert.fail(`Expected visible text: ${text}`);
 }
 
 async function assertLocatorValue(locator, expectedValue) {

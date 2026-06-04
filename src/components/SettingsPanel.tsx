@@ -10,6 +10,7 @@ import {
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -33,6 +34,15 @@ interface SettingsPanelProps {
   onCheckOllama: () => void;
 }
 
+export interface SettingsContentProps {
+  settings: AppSettings;
+  ollamaModels: OllamaModel[];
+  ollamaConnection: OllamaConnectionStatus;
+  onChange: (settings: AppSettings) => void;
+  onCheckOllama: () => void;
+  headingId?: string;
+}
+
 export function SettingsPanel({
   settings,
   ollamaModels,
@@ -42,6 +52,43 @@ export function SettingsPanel({
   onChange,
   onCheckOllama,
 }: SettingsPanelProps) {
+  return (
+    <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
+      <button
+        className="panel-toggle"
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-label={collapsed ? "Open settings" : "Close settings"}
+      >
+        {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+      </button>
+
+      {collapsed ? (
+        <div className="collapsed-mark" aria-hidden="true">
+          <SlidersHorizontal size={19} />
+          <span>Settings</span>
+        </div>
+      ) : (
+        <SettingsContent
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          onChange={onChange}
+          onCheckOllama={onCheckOllama}
+        />
+      )}
+    </aside>
+  );
+}
+
+export function SettingsContent({
+  settings,
+  ollamaModels,
+  ollamaConnection,
+  onChange,
+  onCheckOllama,
+  headingId,
+}: SettingsContentProps) {
   const [modelListOpen, setModelListOpen] = useState(false);
   const [capturingShortcut, setCapturingShortcut] = useState(false);
   const [shortcutError, setShortcutError] = useState("");
@@ -49,6 +96,7 @@ export function SettingsPanel({
     triggers: false,
     punctuation: false,
   });
+  const modelOptionsId = useId();
   const modelInputRef = useRef<HTMLInputElement | null>(null);
   const sortedModelNames = useMemo(
     () => ollamaModels.map((model) => model.name).sort((a, b) => a.localeCompare(b)),
@@ -131,28 +179,12 @@ export function SettingsPanel({
     settings.modelProvider === "lmstudio" ? settings.lmStudioApiUrl : settings.ollamaApiUrl;
 
   return (
-    <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
-      <button
-        className="panel-toggle"
-        type="button"
-        onClick={onToggleCollapsed}
-        aria-label={collapsed ? "Open settings" : "Close settings"}
-      >
-        {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-      </button>
-
-      {collapsed ? (
-        <div className="collapsed-mark" aria-hidden="true">
-          <SlidersHorizontal size={19} />
-          <span>Settings</span>
-        </div>
-      ) : (
-        <div className="settings-content">
+    <div className="settings-content">
           <div className="settings-heading">
             <SlidersHorizontal size={20} aria-hidden="true" />
             <div>
               <p className="eyebrow">Local AI</p>
-              <h2>Settings</h2>
+              <h2 id={headingId}>Settings</h2>
             </div>
           </div>
 
@@ -205,7 +237,7 @@ export function SettingsPanel({
                 placeholder="gemma3"
                 role="combobox"
                 aria-expanded={modelListOpen}
-                aria-controls="local-model-options"
+                aria-controls={modelOptionsId}
                 aria-autocomplete="list"
               />
               <button
@@ -221,7 +253,7 @@ export function SettingsPanel({
                 <ChevronRight size={16} aria-hidden="true" />
               </button>
               {modelListOpen ? (
-                <div className="model-options" id="local-model-options" role="listbox">
+                <div className="model-options" id={modelOptionsId} role="listbox">
                   {sortedModelNames.length === 0 ? (
                     <p>No models loaded. Run Check to refresh {providerName} models.</p>
                   ) : (
@@ -394,8 +426,6 @@ export function SettingsPanel({
             />
           </AccordionSection>
         </div>
-      )}
-    </aside>
   );
 }
 

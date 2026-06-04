@@ -805,6 +805,130 @@ h3 {
   background: #ecfeff;
 }
 
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.drawer-overlay {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.settings-drawer {
+  position: relative;
+  width: min(360px, calc(100vw - 24px));
+  height: 100vh;
+  overflow: auto;
+  border-left: 1px solid #b5d7d1;
+  background: #f8fffd;
+  box-shadow: -18px 0 44px rgba(19, 78, 74, 0.18);
+}
+
+.drawer-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
+.floating-settings-button {
+  position: fixed;
+  right: 16px;
+  bottom: 60px;
+  z-index: 8;
+  display: none;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 12px 32px rgba(19, 78, 74, 0.16);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.floating-settings-button.attention {
+  border-color: #f59e0b;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.setup-overlay {
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.setup-modal {
+  display: grid;
+  width: min(720px, 100%);
+  max-height: min(860px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid #b5d7d1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(19, 78, 74, 0.22);
+}
+
+.setup-intro {
+  display: grid;
+  gap: 6px;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 18px 20px;
+  background: #f8fffd;
+}
+
+.setup-intro p:last-child {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.setup-modal .settings-content {
+  padding: 18px 20px;
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #d5e8e5;
+  padding: 14px 20px;
+  background: #ffffff;
+}
+
+.primary-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #0d9488;
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: #115e59;
+  background: #115e59;
+}
+
 .empty-state {
   margin: 0;
   padding: 18px 16px;
@@ -1118,6 +1242,26 @@ h3 {
   background: #ecfeff;
 }
 
+.status-settings {
+  margin-left: auto;
+  border: 1px solid #8bc7bf;
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: #ffffff;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.status-settings:hover {
+  border-color: #0d9488;
+  background: #ecfeff;
+}
+
+.status-settings + .status-cancel {
+  margin-left: 0;
+}
+
 .status-cancel + strong {
   margin-left: 0;
 }
@@ -1148,27 +1292,13 @@ h3 {
   }
 }
 
-@media (max-width: 820px) {
+@media (max-width: 960px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-panel {
-    width: 100%;
-    min-height: auto;
-    border-top: 1px solid #cbdedb;
-    border-left: 0;
-  }
-
-  .settings-panel.collapsed {
-    width: 100%;
-    min-height: 56px;
-  }
-
-  .panel-toggle {
-    top: 12px;
-    right: 16px;
-    left: auto;
+    display: none;
   }
 
   .floating-panel {
@@ -1183,15 +1313,21 @@ h3 {
     width: auto;
   }
 
-  .collapsed-mark {
-    min-height: 56px;
-    flex-direction: row;
-    writing-mode: horizontal-tb;
+  .floating-settings-button {
+    display: inline-flex;
   }
 
   .editor-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .setup-overlay {
+    padding: 12px;
+  }
+
+  .setup-modal {
+    max-height: calc(100vh - 24px);
   }
 }
 

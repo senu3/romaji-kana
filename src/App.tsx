@@ -1,5 +1,12 @@
 import type { EditorView } from "@codemirror/view";
-import { AlertCircle, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
@@ -9,7 +16,7 @@ import {
   removeLoadingDecoration,
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
-import { SettingsPanel } from "./components/SettingsPanel";
+import { SettingsContent, SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
 import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
@@ -34,6 +41,7 @@ type ActivePanel = "history" | "prompt" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
+const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -64,6 +72,13 @@ function App() {
     message: "Ready. Type romaji and finish with punctuation, or press Ctrl+Enter.",
   });
   const [settingsCollapsed, setSettingsCollapsed] = useState(false);
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [setupComplete, setSetupComplete] = useState(() => {
+    if (typeof localStorage === "undefined") {
+      return true;
+    }
+    return localStorage.getItem(SETUP_COMPLETE_STORAGE_KEY) === "true";
+  });
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
   const docVersionRef = useRef(0);
@@ -96,8 +111,30 @@ function App() {
     return () => window.clearInterval(interval);
   }, [pending.length]);
 
+  useEffect(() => {
+    if (!settingsDrawerOpen) {
+      return;
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSettingsDrawerOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [settingsDrawerOpen]);
+
   const registerView = useCallback((view: EditorView | null) => {
     editorViewRef.current = view;
+  }, []);
+
+  const completeSetup = useCallback(() => {
+    setSetupComplete(true);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(SETUP_COMPLETE_STORAGE_KEY, "true");
+    }
   }, []);
 
   const handleDocumentChanged = useCallback((documentText: string) => {
@@ -697,6 +734,8 @@ function App() {
   }, []);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
+  const settingsAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
+  const canStartWriting = ollamaConnection.kind === "connected";
 
   return (
     <main className="app-shell">
@@ -751,13 +790,142 @@ function App() {
         onChange={setSettings}
         onCheckOllama={handleCheckOllama}
       />
+      <button
+        className={`floating-settings-button ${settingsAttention ? "attention" : ""}`}
+        type="button"
+        onClick={() => setSettingsDrawerOpen(true)}
+        aria-label="Open settings"
+      >
+        <SlidersHorizontal size={17} aria-hidden="true" />
+        Settings
+      </button>
+      {settingsDrawerOpen ? (
+        <SettingsDrawer
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          onChange={setSettings}
+          onCheckOllama={handleCheckOllama}
+          onClose={() => setSettingsDrawerOpen(false)}
+        />
+      ) : null}
+      {!setupComplete ? (
+        <SetupModal
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          canStartWriting={canStartWriting}
+          onChange={setSettings}
+          onCheckOllama={handleCheckOllama}
+          onComplete={completeSetup}
+        />
+      ) : null}
       <StatusBar
         status={status}
         pending={delayedPending}
         pendingCount={pending.length}
         onCancel={cancelConversion}
+        onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
     </main>
+  );
+}
+
+function SettingsDrawer({
+  settings,
+  ollamaModels,
+  ollamaConnection,
+  onChange,
+  onCheckOllama,
+  onClose,
+}: {
+  settings: AppSettings;
+  ollamaModels: OllamaModel[];
+  ollamaConnection: OllamaConnectionStatus;
+  onChange: (settings: AppSettings) => void;
+  onCheckOllama: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="settings-overlay drawer-overlay" onMouseDown={onClose}>
+      <aside
+        className="settings-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-drawer-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button className="icon-button drawer-close" type="button" onClick={onClose} aria-label="Close settings">
+          <X size={18} aria-hidden="true" />
+        </button>
+        <SettingsContent
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          onChange={onChange}
+          onCheckOllama={onCheckOllama}
+          headingId="settings-drawer-title"
+        />
+      </aside>
+    </div>
+  );
+}
+
+function SetupModal({
+  settings,
+  ollamaModels,
+  ollamaConnection,
+  canStartWriting,
+  onChange,
+  onCheckOllama,
+  onComplete,
+}: {
+  settings: AppSettings;
+  ollamaModels: OllamaModel[];
+  ollamaConnection: OllamaConnectionStatus;
+  canStartWriting: boolean;
+  onChange: (settings: AppSettings) => void;
+  onCheckOllama: () => void;
+  onComplete: () => void;
+}) {
+  return (
+    <div className="settings-overlay setup-overlay">
+      <section
+        className="setup-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="setup-modal-title"
+      >
+        <div className="setup-intro">
+          <p className="eyebrow">First run</p>
+          <h2 id="setup-modal-title">Set up your local model</h2>
+          <p>
+            Choose a provider, confirm the API URL, and select a model before using romaji
+            conversion.
+          </p>
+        </div>
+        <SettingsContent
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          onChange={onChange}
+          onCheckOllama={onCheckOllama}
+        />
+        <div className="setup-actions">
+          <button className="secondary-button" type="button" onClick={onComplete}>
+            Skip for now
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={!canStartWriting}
+            onClick={onComplete}
+          >
+            Start writing
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -952,19 +1120,27 @@ function StatusBar({
   pending,
   pendingCount,
   onCancel,
+  onOpenSettings,
 }: {
   status: ConversionStatus;
   pending: PendingConversion[];
   pendingCount: number;
   onCancel: (request: PendingConversion) => void;
+  onOpenSettings: () => void;
 }) {
   const Icon =
     status.kind === "loading" ? Loader2 : status.kind === "error" ? AlertCircle : CheckCircle2;
+  const canOpenSettings = status.kind === "warning" || status.kind === "error";
 
   return (
     <div className={`status-bar ${status.kind}`} role="status" aria-live="polite">
       <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
       <span>{status.message}</span>
+      {canOpenSettings ? (
+        <button className="status-settings" type="button" onClick={onOpenSettings}>
+          Open settings
+        </button>
+      ) : null}
       {pending[0] ? (
         <button className="status-cancel" type="button" onClick={() => onCancel(pending[0])}>
           Cancel slow conversion
