@@ -258,6 +258,8 @@ const highlightStyle = HighlightStyle.define([
   { tag: tags.monospace, color: "#9a3412", backgroundColor: "#fff7ed" },
 ]);
 
+const COMPOSITION_END_GRACE_MS = 120;
+
 export function MarkdownEditor({
   settings,
   pending,
@@ -283,6 +285,8 @@ export function MarkdownEditor({
   const onAcceptGhostRef = useRef(onAcceptGhost);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
+  const composingRef = useRef(false);
+  const lastCompositionEndAtRef = useRef(0);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
 
   const updateListener = useMemo(() => {
@@ -325,6 +329,41 @@ export function MarkdownEditor({
   }, []);
 
   const shortcutCompartment = useMemo(() => new Compartment(), []);
+  const enterTriggerHandler = useMemo(() => {
+    return EditorView.domEventHandlers({
+      compositionstart() {
+        composingRef.current = true;
+      },
+      compositionend() {
+        composingRef.current = false;
+        lastCompositionEndAtRef.current = Date.now();
+      },
+      keydown(event, view) {
+        if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+          return false;
+        }
+        if (!settingsRef.current.autoConvert || !settingsRef.current.triggers.enter) {
+          return false;
+        }
+        if (
+          event.isComposing ||
+          composingRef.current ||
+          Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS
+        ) {
+          return false;
+        }
+
+        const cursor = view.state.selection.main.head;
+        const range = extractConversionRange(view.state.doc.toString(), cursor, "enter");
+        if (!range) {
+          return false;
+        }
+
+        onConvertRef.current(range);
+        return true;
+      },
+    });
+  }, []);
 
   useEffect(() => {
     onConvertRef.current = onConvert;
@@ -358,6 +397,7 @@ export function MarkdownEditor({
         syntaxHighlighting(highlightStyle),
         placeholder("Romaji de nihongo wo kaitte kudasai..."),
         updateListener,
+        enterTriggerHandler,
         shortcutCompartment.of(
           keymap.of([
             {
@@ -392,7 +432,7 @@ export function MarkdownEditor({
       view.destroy();
       viewRef.current = null;
     };
-  }, [registerView, shortcutCompartment, updateListener]);
+  }, [enterTriggerHandler, registerView, shortcutCompartment, updateListener]);
 
   useEffect(() => {
     if (!fileMenuOpen) {

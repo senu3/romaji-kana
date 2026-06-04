@@ -169,6 +169,7 @@ export function SettingsContent({
     settings.triggers.comma,
     settings.triggers.japanesePeriod,
     settings.triggers.japaneseComma,
+    settings.triggers.enter,
   ].filter(Boolean).length;
   const punctuationCount = [
     settings.punctuationConversion.periodToJapanese,
@@ -333,7 +334,7 @@ export function SettingsContent({
 
           <AccordionSection
             title="Triggers"
-            summary={settings.autoConvert ? `${enabledTriggerCount}/4 enabled` : "Auto off"}
+            summary={settings.autoConvert ? `${enabledTriggerCount}/5 enabled` : "Auto off"}
             open={openAccordions.triggers}
             onToggle={() => toggleAccordion("triggers")}
           >
@@ -366,6 +367,12 @@ export function SettingsContent({
                 checked={settings.triggers.japaneseComma}
                 disabled={!settings.autoConvert}
                 onChange={(checked) => updateTriggers({ japaneseComma: checked })}
+              />
+              <CheckRow
+                label="Enter (IME composing ignored)"
+                checked={settings.triggers.enter}
+                disabled={!settings.autoConvert}
+                onChange={(checked) => updateTriggers({ enter: checked })}
               />
             </div>
             <div className="shortcut-field">

@@ -3,6 +3,7 @@ export type ConversionTrigger =
   | "comma"
   | "japanesePeriod"
   | "japaneseComma"
+  | "enter"
   | "shortcut";
 
 export type ModelProvider = "ollama" | "lmstudio";
@@ -20,6 +21,7 @@ export interface AppSettings {
     comma: boolean;
     japanesePeriod: boolean;
     japaneseComma: boolean;
+    enter: boolean;
     manualShortcut: string;
   };
   punctuationConversion: {

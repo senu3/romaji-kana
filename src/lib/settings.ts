@@ -15,6 +15,7 @@ export const defaultSettings: AppSettings = {
     comma: true,
     japanesePeriod: true,
     japaneseComma: true,
+    enter: false,
     manualShortcut: "Mod-Enter",
   },
   punctuationConversion: {
