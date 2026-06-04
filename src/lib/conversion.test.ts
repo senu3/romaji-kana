@@ -31,6 +31,13 @@ describe("extractConversionRange", () => {
     expect(range?.text).toBe("tsuginobun.");
   });
 
+  it("extracts the current line before an enter trigger", () => {
+    const doc = "maenobun.\ntsuginobun";
+    const range = extractConversionRange(doc, doc.length, "enter");
+    expect(range?.text).toBe("tsuginobun");
+    expect(range?.trigger).toBe("enter");
+  });
+
   it("does not include markdown heading markers", () => {
     const doc = "## kyouhayoi tenkidesu.";
     const range = extractConversionRange(doc, doc.length, "period");
