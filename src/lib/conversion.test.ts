@@ -54,7 +54,7 @@ describe("extractConversionRange", () => {
 
   it("skips Japanese-dominant text", () => {
     const doc = "今日はいい天気です。";
-    expect(extractConversionRange(doc, doc.length, "japanesePeriod")).toBeNull();
+    expect(extractConversionRange(doc, doc.length, "enter")).toBeNull();
   });
 });
 

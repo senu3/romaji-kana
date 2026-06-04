@@ -167,8 +167,6 @@ export function SettingsContent({
   const enabledTriggerCount = [
     settings.triggers.period,
     settings.triggers.comma,
-    settings.triggers.japanesePeriod,
-    settings.triggers.japaneseComma,
     settings.triggers.enter,
   ].filter(Boolean).length;
   const punctuationCount = [
@@ -334,7 +332,7 @@ export function SettingsContent({
 
           <AccordionSection
             title="Triggers"
-            summary={settings.autoConvert ? `${enabledTriggerCount}/5 enabled` : "Auto off"}
+            summary={settings.autoConvert ? `${enabledTriggerCount}/3 enabled` : "Auto off"}
             open={openAccordions.triggers}
             onToggle={() => toggleAccordion("triggers")}
           >
@@ -355,18 +353,6 @@ export function SettingsContent({
                 checked={settings.triggers.comma}
                 disabled={!settings.autoConvert}
                 onChange={(checked) => updateTriggers({ comma: checked })}
-              />
-              <CheckRow
-                label="Japanese period 。"
-                checked={settings.triggers.japanesePeriod}
-                disabled={!settings.autoConvert}
-                onChange={(checked) => updateTriggers({ japanesePeriod: checked })}
-              />
-              <CheckRow
-                label="Japanese comma 、"
-                checked={settings.triggers.japaneseComma}
-                disabled={!settings.autoConvert}
-                onChange={(checked) => updateTriggers({ japaneseComma: checked })}
               />
               <CheckRow
                 label="Enter (IME composing ignored)"

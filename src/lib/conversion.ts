@@ -12,12 +12,6 @@ export function triggerFromCharacter(
   if (character === ",") {
     return "comma";
   }
-  if (character === "。") {
-    return "japanesePeriod";
-  }
-  if (character === "、") {
-    return "japaneseComma";
-  }
   return null;
 }
 
