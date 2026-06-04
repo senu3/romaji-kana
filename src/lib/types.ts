@@ -1,8 +1,6 @@
 export type ConversionTrigger =
   | "period"
   | "comma"
-  | "japanesePeriod"
-  | "japaneseComma"
   | "enter"
   | "shortcut";
 
@@ -19,8 +17,6 @@ export interface AppSettings {
   triggers: {
     period: boolean;
     comma: boolean;
-    japanesePeriod: boolean;
-    japaneseComma: boolean;
     enter: boolean;
     manualShortcut: string;
   };

@@ -13,8 +13,6 @@ export const defaultSettings: AppSettings = {
   triggers: {
     period: true,
     comma: true,
-    japanesePeriod: true,
-    japaneseComma: true,
     enter: false,
     manualShortcut: "Mod-Enter",
   },
