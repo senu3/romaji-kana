@@ -1212,9 +1212,9 @@ function DictionaryModal({
 
         <form className="dictionary-add-form" onSubmit={addEntry}>
           <label className="field">
-            <span>Reading</span>
+            <span>Romaji reading</span>
             <input
-              aria-label="Reading"
+              aria-label="Romaji reading"
               value={draft.reading}
               maxLength={80}
               placeholder="openai"

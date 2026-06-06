@@ -127,6 +127,171 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("excludes dictionary terms from LLM conversion and joins converted text segments", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "の" })
+        .mockResolvedValueOnce({ response: "を確認します。" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userDictionary: [
+        {
+          id: "openai",
+          reading: "openai",
+          output: "OpenAI",
+          note: "company name",
+          enabled: true,
+        },
+        {
+          id: "api",
+          reading: "api",
+          output: "API",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    const result = await convertRomajiToJapanese("openai no api wo kakunin.", settings, transport);
+
+    expect(result).toBe("OpenAIのAPIを確認します。");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("openai"),
+        prompt: " の ",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("api"),
+        prompt: " を かくにん。",
+      }),
+      30_000,
+    );
+  });
+
+  it("matches long dictionary terms in connected romaji without sending them to the LLM", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "今日は" })
+        .mockResolvedValueOnce({ response: "について確認します。" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userDictionary: [
+        {
+          id: "openai",
+          reading: "openai",
+          output: "OpenAI",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    const result = await convertRomajiToJapanese(
+      "kyouhaopenainitsuitekakunin.",
+      settings,
+      transport,
+    );
+
+    expect(result).toBe("今日はOpenAIについて確認します。");
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "きょうは",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "についてかくにん。",
+      }),
+      30_000,
+    );
+  });
+
+  it("keeps short dictionary terms boundary-only and avoids prefix false positives", async () => {
+    const settings = {
+      ...defaultSettings,
+      userDictionary: [
+        {
+          id: "nasa",
+          reading: "nasa",
+          output: "NASA",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+    const matchedTransport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+    };
+    const unmatchedTransport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "皆さんは来ます。" }),
+    };
+    const connectedTransport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "ナサに行く。" }),
+    };
+
+    const matched = await convertRomajiToJapanese("nasa ni iku.", settings, matchedTransport);
+    const unmatched = await convertRomajiToJapanese(
+      "minasanhakimasu.",
+      settings,
+      unmatchedTransport,
+    );
+    const connected = await convertRomajiToJapanese("nasaniiku.", settings, connectedTransport);
+
+    expect(matched).toBe("NASAに行く。");
+    expect(matchedTransport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: " に いく。",
+      }),
+      30_000,
+    );
+    expect(unmatched).toBe("皆さんは来ます。");
+    expect(unmatchedTransport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "みなさんはきます。",
+      }),
+      30_000,
+    );
+    expect(connected).toBe("ナサに行く。");
+    expect(connectedTransport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "なさにいく。",
+      }),
+      30_000,
+    );
+  });
+
   it("adds the fixed romaji reference and few-shot examples to the editable prompt", () => {
     const prompt = buildConversionSystemPrompt(defaultConversionPrompt);
 
@@ -144,27 +309,10 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
   });
 
-  it("adds enabled user dictionary entries as strong kana-kanji hints", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", [
-      {
-        id: "enabled",
-        reading: "おーぷんえーあい",
-        output: "OpenAI",
-        note: "company name",
-        enabled: true,
-      },
-      {
-        id: "disabled",
-        reading: "てすと",
-        output: "TEST",
-        note: "",
-        enabled: false,
-      },
-    ]);
+  it("keeps kana-kanji prompts independent from user dictionary entries", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
-    expect(prompt).toContain("User dictionary:");
-    expect(prompt).toContain("These entries are strong hints.");
-    expect(prompt).toContain("- おーぷんえーあい => OpenAI (company name)");
-    expect(prompt).not.toContain("TEST");
+    expect(prompt).not.toContain("User dictionary:");
+    expect(prompt).not.toContain("Protected dictionary placeholders");
   });
 });

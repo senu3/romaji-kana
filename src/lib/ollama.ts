@@ -9,7 +9,29 @@ import {
   type OllamaTransport,
 } from "./ollamaProxy";
 import { rebuildRomajiKanaResult, romajiToKana } from "./romajiKana";
-import type { RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
+import type {
+  RomajiKanaResult,
+  RomajiKanaSpan,
+  RomajiKanaToken,
+  UserDictionaryEntry,
+} from "./types";
+
+interface DictionaryTextPart {
+  type: "text";
+  value: string;
+}
+
+interface DictionaryEntryPart {
+  type: "dictionary";
+  output: string;
+}
+
+type DictionarySplitPart = DictionaryTextPart | DictionaryEntryPart;
+
+interface DictionaryCandidate {
+  normalizedReading: string;
+  output: string;
+}
 
 export async function convertRomajiToJapanese(
   input: string,
@@ -17,9 +39,26 @@ export async function convertRomajiToJapanese(
   transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
   const normalized = normalizeInputForPrompt(input, settings);
-  const kanaResult = romajiToKana(normalized);
-  const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
-  return kanjiizeKana(repaired.kana, settings, transport);
+  const parts = splitInputByDictionary(normalized, settings.userDictionary);
+  const convertedParts: string[] = [];
+
+  for (const part of parts) {
+    if (part.type === "dictionary") {
+      convertedParts.push(part.output);
+      continue;
+    }
+
+    if (!hasConvertibleRomaji(part.value)) {
+      convertedParts.push(part.value);
+      continue;
+    }
+
+    const kanaResult = romajiToKana(part.value);
+    const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
+    convertedParts.push(await kanjiizeKana(repaired.kana, settings, transport));
+  }
+
+  return convertedParts.join("");
 }
 
 export async function repairLowConfidenceKana(
@@ -55,11 +94,7 @@ export async function kanjiizeKana(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildKanaKanjiSystemPrompt(
-        settings.conversionPrompt,
-        settings.conversionPreset,
-        settings.userDictionary,
-      ),
+      system: buildKanaKanjiSystemPrompt(settings.conversionPrompt, settings.conversionPreset),
       prompt: kana,
       stream: false,
       think: settings.think,
@@ -79,6 +114,131 @@ export async function kanjiizeKana(
 
   return text;
 }
+
+function splitInputByDictionary(
+  input: string,
+  entries: UserDictionaryEntry[],
+): DictionarySplitPart[] {
+  const candidates = buildDictionaryCandidates(entries);
+
+  if (candidates.length === 0) {
+    return [{ type: "text", value: input }];
+  }
+
+  const lowerInput = input.toLowerCase();
+  const parts: DictionarySplitPart[] = [];
+  let index = 0;
+  let lastCopiedIndex = 0;
+
+  while (index < input.length) {
+    const match = candidates.find(
+      (candidate) =>
+        lowerInput.startsWith(candidate.normalizedReading, index) &&
+        canMatchDictionaryCandidate(lowerInput, index, candidate),
+    );
+
+    if (!match) {
+      index += 1;
+      continue;
+    }
+
+    if (lastCopiedIndex < index) {
+      parts.push({ type: "text", value: input.slice(lastCopiedIndex, index) });
+    }
+    parts.push({ type: "dictionary", output: match.output });
+    index += match.normalizedReading.length;
+    lastCopiedIndex = index;
+  }
+
+  if (parts.length === 0) {
+    return [{ type: "text", value: input }];
+  }
+
+  if (lastCopiedIndex < input.length) {
+    parts.push({ type: "text", value: input.slice(lastCopiedIndex) });
+  }
+  return parts;
+}
+
+function buildDictionaryCandidates(entries: UserDictionaryEntry[]): DictionaryCandidate[] {
+  return entries
+    .map((entry) => ({
+      normalizedReading: normalizeDictionaryReading(entry.reading),
+      output: entry.output.trim(),
+      enabled: entry.enabled,
+    }))
+    .filter(
+      (entry) =>
+        entry.enabled &&
+        entry.normalizedReading.length > 0 &&
+        entry.output.length > 0 &&
+        isRomajiDictionaryReading(entry.normalizedReading),
+    )
+    .sort((a, b) => b.normalizedReading.length - a.normalizedReading.length);
+}
+
+function normalizeDictionaryReading(reading: string): string {
+  return reading.toLowerCase().replace(/[\s'-]+/g, "");
+}
+
+function canMatchDictionaryCandidate(
+  input: string,
+  start: number,
+  candidate: DictionaryCandidate,
+): boolean {
+  const length = candidate.normalizedReading.length;
+  if (length <= 4) {
+    return hasDictionaryWordBoundary(input, start, length);
+  }
+
+  return hasAllowedLongDictionarySuffix(input, start + length);
+}
+
+function isRomajiDictionaryReading(reading: string): boolean {
+  return /^[a-z0-9][a-z0-9' -]*[a-z0-9]$/i.test(reading) || /^[a-z0-9]$/i.test(reading);
+}
+
+function hasDictionaryWordBoundary(input: string, start: number, length: number): boolean {
+  const before = input[start - 1] ?? "";
+  const after = input[start + length] ?? "";
+  return !isAsciiWordCharacter(before) && !isAsciiWordCharacter(after);
+}
+
+function hasAllowedLongDictionarySuffix(input: string, suffixStart: number): boolean {
+  const next = input[suffixStart] ?? "";
+  if (!isAsciiWordCharacter(next)) {
+    return true;
+  }
+
+  return ROMAJI_DICTIONARY_SUFFIXES.some((suffix) => input.startsWith(suffix, suffixStart));
+}
+
+function isAsciiWordCharacter(character: string): boolean {
+  return /[a-z0-9]/i.test(character);
+}
+
+function hasConvertibleRomaji(value: string): boolean {
+  return /[a-z]/i.test(value);
+}
+
+const ROMAJI_DICTIONARY_SUFFIXES = [
+  "nitsuite",
+  "ni",
+  "de",
+  "no",
+  "wo",
+  "o",
+  "ha",
+  "wa",
+  "ga",
+  "to",
+  "e",
+  "he",
+  "mo",
+  "kara",
+  "made",
+  "yori",
+];
 
 async function repairKanaSpan(
   span: RomajiKanaSpan,

@@ -325,7 +325,10 @@ function isStandaloneN(input: string, index: number): boolean {
   if (next === "n") {
     return true;
   }
-  return !next || (!"aiueoy".includes(next) && /[a-z]/.test(next));
+  if (!next || !/[a-z]/.test(next)) {
+    return true;
+  }
+  return !"aiueoy".includes(next);
 }
 
 function getStandaloneNLength(input: string, index: number): number {
