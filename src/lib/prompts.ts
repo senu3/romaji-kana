@@ -1,4 +1,4 @@
-import type { ConversionPreset } from "./types";
+import type { ConversionPreset, UserDictionaryEntry } from "./types";
 
 export const legacyDefaultConversionPrompt = [
   "You convert rough romaji Japanese input into natural Japanese.",
@@ -135,8 +135,10 @@ export function buildKanaRepairSystemPrompt(): string {
 export function buildKanaKanjiSystemPrompt(
   userPrompt: string,
   preset: ConversionPreset = "none",
+  userDictionary: UserDictionaryEntry[] = [],
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
+  const dictionaryBlock = buildUserDictionaryPromptBlock(userDictionary);
 
   return [
     "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
@@ -151,7 +153,34 @@ export function buildKanaKanjiSystemPrompt(
     "Purpose preset:",
     conversionPresetInstructions[preset],
     "",
+    ...dictionaryBlock,
+    ...(dictionaryBlock.length > 0 ? [""] : []),
     "Additional user preference:",
     prompt,
   ].join("\n");
+}
+
+function buildUserDictionaryPromptBlock(entries: UserDictionaryEntry[]): string[] {
+  const enabledEntries = entries
+    .filter((entry) => entry.enabled && entry.reading.trim() && entry.output.trim())
+    .slice(0, 50);
+
+  if (enabledEntries.length === 0) {
+    return [];
+  }
+
+  return [
+    "User dictionary:",
+    "These entries are strong hints. When the input reading clearly matches an entry, prefer the registered spelling.",
+    "Do not force an entry when the reading or surrounding context does not support it.",
+    ...enabledEntries.map((entry) => {
+      const note = compactDictionaryText(entry.note);
+      const suffix = note ? ` (${note})` : "";
+      return `- ${compactDictionaryText(entry.reading)} => ${compactDictionaryText(entry.output)}${suffix}`;
+    }),
+  ];
+}
+
+function compactDictionaryText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }

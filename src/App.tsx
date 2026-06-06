@@ -3,11 +3,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Plus,
   RotateCcw,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
   addLoadingDecoration,
@@ -35,6 +37,7 @@ import type {
   OllamaConnectionStatus,
   OllamaModel,
   PendingConversion,
+  UserDictionaryEntry,
 } from "./lib/types";
 
 type ActivePanel = "history" | "prompt" | null;
@@ -42,6 +45,7 @@ const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
+const MAX_USER_DICTIONARY_ENTRIES = 50;
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -53,6 +57,7 @@ function App() {
   const [pending, setPending] = useState<PendingConversion[]>([]);
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -277,6 +282,14 @@ function App() {
       return panel === "prompt" ? null : "prompt";
     });
   }, []);
+
+  const openDictionaryPanel = useCallback(() => {
+    if (activePanel === "history") {
+      setHistory([]);
+    }
+    setActivePanel(null);
+    setDictionaryPanelOpen(true);
+  }, [activePanel]);
 
   const getEditorDocument = useCallback(() => {
     return editorViewRef.current?.state.doc.toString() ?? "";
@@ -736,6 +749,9 @@ function App() {
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
   const settingsAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
   const canStartWriting = ollamaConnection.kind === "connected";
+  const enabledDictionaryCount = settings.userDictionary.filter(
+    (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
+  ).length;
 
   return (
     <main className="app-shell">
@@ -743,6 +759,7 @@ function App() {
         settings={settings}
         pending={pending}
         historyCount={history.length}
+        dictionaryCount={enabledDictionaryCount}
         initialDocument={initialDocument}
         fileName={currentFilePath ? basename(currentFilePath) : "Unsaved draft"}
         isDirty={isDirty}
@@ -753,6 +770,7 @@ function App() {
         onSaveFileAs={handleSaveFileAs}
         onOpenHistory={toggleHistoryPanel}
         onOpenPrompt={togglePromptPanel}
+        onOpenDictionary={openDictionaryPanel}
         onAcceptGhost={handleAcceptGhost}
         registerView={registerView}
       />
@@ -779,6 +797,13 @@ function App() {
             setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
           }
           onClose={closeActivePanel}
+        />
+      ) : null}
+      {dictionaryPanelOpen ? (
+        <DictionaryModal
+          entries={settings.userDictionary}
+          onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
+          onClose={() => setDictionaryPanelOpen(false)}
         />
       ) : null}
       <SettingsPanel
@@ -1113,6 +1138,193 @@ function presetDescription(preset: ConversionPreset): string {
     return "Work messages and email drafts. Prefers clear, polite wording with standard business kanji.";
   }
   return "General conversion. Prioritizes the reading and common written Japanese.";
+}
+
+function DictionaryModal({
+  entries,
+  onChange,
+  onClose,
+}: {
+  entries: UserDictionaryEntry[];
+  onChange: (entries: UserDictionaryEntry[]) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
+  const canAdd =
+    draft.reading.trim().length > 0 &&
+    draft.output.trim().length > 0 &&
+    entries.length < MAX_USER_DICTIONARY_ENTRIES;
+
+  const addEntry = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canAdd) {
+      return;
+    }
+
+    onChange([
+      ...entries,
+      {
+        id: createDictionaryEntryId(),
+        reading: draft.reading.trim(),
+        output: draft.output.trim(),
+        note: draft.note.trim(),
+        enabled: true,
+      },
+    ]);
+    setDraft({ reading: "", output: "", note: "" });
+  };
+
+  const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
+    onChange(
+      entries.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              ...patch,
+            }
+          : entry,
+      ),
+    );
+  };
+
+  const deleteEntry = (id: string) => {
+    onChange(entries.filter((entry) => entry.id !== id));
+  };
+
+  return (
+    <div className="settings-overlay dictionary-overlay" onMouseDown={onClose}>
+      <section
+        className="dictionary-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dictionary-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="dictionary-header">
+          <div>
+            <p className="eyebrow">User terms</p>
+            <h2 id="dictionary-modal-title">Dictionary</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Close dictionary">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <form className="dictionary-add-form" onSubmit={addEntry}>
+          <label className="field">
+            <span>Reading</span>
+            <input
+              aria-label="Reading"
+              value={draft.reading}
+              maxLength={80}
+              placeholder="openai"
+              onChange={(event) => {
+                const reading = event.currentTarget.value;
+                setDraft((value) => ({ ...value, reading }));
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>Output</span>
+            <input
+              aria-label="Output"
+              value={draft.output}
+              maxLength={80}
+              placeholder="OpenAI"
+              onChange={(event) => {
+                const output = event.currentTarget.value;
+                setDraft((value) => ({ ...value, output }));
+              }}
+            />
+          </label>
+          <label className="field dictionary-note-field">
+            <span>Note</span>
+            <input
+              aria-label="Note"
+              value={draft.note}
+              maxLength={120}
+              placeholder="company name"
+              onChange={(event) => {
+                const note = event.currentTarget.value;
+                setDraft((value) => ({ ...value, note }));
+              }}
+            />
+          </label>
+          <button className="primary-button dictionary-add-button" type="submit" disabled={!canAdd}>
+            <Plus size={16} aria-hidden="true" />
+            Add entry
+          </button>
+        </form>
+
+        <div className="dictionary-list-header">
+          <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
+        </div>
+        {entries.length === 0 ? (
+          <p className="empty-state">No dictionary entries yet.</p>
+        ) : (
+          <div className="dictionary-list">
+            {entries.map((entry, index) => (
+              <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
+                <label className="dictionary-enable">
+                  <input
+                    type="checkbox"
+                    checked={entry.enabled}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { enabled: event.currentTarget.checked })
+                    }
+                  />
+                  Enabled
+                </label>
+                <div className="dictionary-entry-fields">
+                  <input
+                    aria-label={`Dictionary reading ${index + 1}`}
+                    value={entry.reading}
+                    maxLength={80}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { reading: event.currentTarget.value })
+                    }
+                  />
+                  <input
+                    aria-label={`Dictionary output ${index + 1}`}
+                    value={entry.output}
+                    maxLength={80}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { output: event.currentTarget.value })
+                    }
+                  />
+                  <input
+                    aria-label={`Dictionary note ${index + 1}`}
+                    value={entry.note}
+                    maxLength={120}
+                    placeholder="Note"
+                    onChange={(event) =>
+                      updateEntry(entry.id, { note: event.currentTarget.value })
+                    }
+                  />
+                </div>
+                <button
+                  className="icon-button dictionary-delete"
+                  type="button"
+                  onClick={() => deleteEntry(entry.id)}
+                  aria-label={`Delete ${entry.output || entry.reading}`}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function createDictionaryEntryId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `dictionary-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function StatusBar({

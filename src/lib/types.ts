@@ -7,6 +7,14 @@ export type ConversionTrigger =
 export type ModelProvider = "ollama" | "lmstudio";
 export type ConversionPreset = "none" | "conversation" | "businessEmail";
 
+export interface UserDictionaryEntry {
+  id: string;
+  reading: string;
+  output: string;
+  note: string;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   modelProvider: ModelProvider;
   ollamaApiUrl: string;
@@ -26,6 +34,7 @@ export interface AppSettings {
   };
   conversionPrompt: string;
   conversionPreset: ConversionPreset;
+  userDictionary: UserDictionaryEntry[];
   think: boolean;
 }
 

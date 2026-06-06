@@ -12,6 +12,7 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
+  BookMarked,
   ChevronDown,
   FileText,
   FolderOpen,
@@ -39,6 +40,7 @@ interface MarkdownEditorProps {
   settings: AppSettings;
   pending: PendingConversion[];
   historyCount: number;
+  dictionaryCount: number;
   initialDocument: string;
   fileName: string;
   isDirty: boolean;
@@ -49,6 +51,7 @@ interface MarkdownEditorProps {
   onSaveFileAs: () => void;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
+  onOpenDictionary: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   registerView: (view: EditorView | null) => void;
 }
@@ -264,6 +267,7 @@ export function MarkdownEditor({
   settings,
   pending,
   historyCount,
+  dictionaryCount,
   initialDocument,
   fileName,
   isDirty,
@@ -274,6 +278,7 @@ export function MarkdownEditor({
   onSaveFileAs,
   onOpenHistory,
   onOpenPrompt,
+  onOpenDictionary,
   onAcceptGhost,
   registerView,
 }: MarkdownEditorProps) {
@@ -620,7 +625,24 @@ export function MarkdownEditor({
           <span>{fileName}</span>
           {isDirty ? <span className="dirty-chip">Unsaved</span> : null}
         </div>
-        <div className="editor-filebar-side editor-filebar-side-right" aria-hidden="true" />
+        <div className="editor-filebar-side editor-filebar-side-right">
+          <button
+            className="editor-chrome-button dictionary-filebar-button"
+            type="button"
+            onClick={onOpenDictionary}
+            aria-label={
+              dictionaryCount > 0
+                ? `Open dictionary, ${dictionaryCount} enabled entries`
+                : "Open dictionary"
+            }
+            title="Dictionary"
+          >
+            <BookMarked size={16} aria-hidden="true" />
+            {dictionaryCount > 0 ? (
+              <span className="dictionary-filebar-count">{dictionaryCount}</span>
+            ) : null}
+          </button>
+        </div>
       </div>
       <div className="editor-host" ref={hostRef} />
     </section>
