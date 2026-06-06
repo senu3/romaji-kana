@@ -143,4 +143,28 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("When the input is よろしくおねがいします, prefer よろしくお願いします.");
     expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
   });
+
+  it("adds enabled user dictionary entries as strong kana-kanji hints", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", [
+      {
+        id: "enabled",
+        reading: "おーぷんえーあい",
+        output: "OpenAI",
+        note: "company name",
+        enabled: true,
+      },
+      {
+        id: "disabled",
+        reading: "てすと",
+        output: "TEST",
+        note: "",
+        enabled: false,
+      },
+    ]);
+
+    expect(prompt).toContain("User dictionary:");
+    expect(prompt).toContain("These entries are strong hints.");
+    expect(prompt).toContain("- おーぷんえーあい => OpenAI (company name)");
+    expect(prompt).not.toContain("TEST");
+  });
 });

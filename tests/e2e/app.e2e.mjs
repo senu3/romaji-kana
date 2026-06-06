@@ -56,6 +56,19 @@ try {
   const modelInput = page.getByRole("combobox");
   await assertLocatorValue(modelInput, "gemma4:latest");
 
+  await page.getByRole("button", { name: "Open dictionary" }).click();
+  await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
+  const dictionaryInputs = page.locator(".dictionary-add-form input");
+  await dictionaryInputs.nth(0).fill("openai");
+  await dictionaryInputs.nth(1).fill("OpenAI");
+  await dictionaryInputs.nth(2).fill("company name");
+  await page.getByRole("button", { name: "Add entry" }).click();
+  await assertLocatorValue(page.getByLabel("Dictionary output 1"), "OpenAI");
+  await page.getByRole("button", { name: "Close dictionary" }).click();
+  await page
+    .getByRole("button", { name: "Open dictionary, 1 enabled entries" })
+    .waitFor();
+
   await page.getByRole("button", { name: "Show local models" }).click();
   await page.getByRole("option", { name: "qwen3.5:0.8b" }).waitFor();
 

@@ -236,6 +236,29 @@ h3 {
   color: #0f766e;
 }
 
+.dictionary-filebar-button {
+  position: relative;
+}
+
+.dictionary-filebar-count {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: inline-flex;
+  min-width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  padding: 0 3px;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .editor-filebar-title {
   display: inline-flex;
   min-width: 0;
@@ -906,6 +929,116 @@ h3 {
   background: #ffffff;
 }
 
+.dictionary-overlay {
+  z-index: 36;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.dictionary-modal {
+  display: grid;
+  width: min(760px, 100%);
+  max-height: min(780px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid #b5d7d1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(19, 78, 74, 0.22);
+}
+
+.dictionary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 16px 18px;
+  background: #f8fffd;
+}
+
+.dictionary-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 16px 18px;
+}
+
+.dictionary-add-button {
+  min-width: 116px;
+}
+
+.dictionary-list-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 18px 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.dictionary-list {
+  display: grid;
+  gap: 10px;
+  max-height: calc(100vh - 330px);
+  overflow: auto;
+  padding: 12px 18px 18px;
+}
+
+.dictionary-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d5e8e5;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.dictionary-entry.disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.dictionary-enable {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #134e4a;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.dictionary-enable input {
+  width: 18px;
+  height: 18px;
+  accent-color: #0d9488;
+}
+
+.dictionary-entry-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.dictionary-entry-fields input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #b5d7d1;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #ffffff;
+  color: #134e4a;
+  font-size: 13px;
+}
+
+.dictionary-delete {
+  color: #b91c1c;
+}
+
 .primary-button {
   display: inline-flex;
   min-height: 36px;
@@ -1328,6 +1461,25 @@ h3 {
 
   .setup-modal {
     max-height: calc(100vh - 24px);
+  }
+
+  .dictionary-overlay {
+    padding: 12px;
+  }
+
+  .dictionary-modal {
+    max-height: calc(100vh - 24px);
+  }
+
+  .dictionary-add-form,
+  .dictionary-entry,
+  .dictionary-entry-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dictionary-delete,
+  .dictionary-add-button {
+    width: 100%;
   }
 }
 

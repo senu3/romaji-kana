@@ -1,7 +1,8 @@
-import type { AppSettings } from "./types";
+import type { AppSettings, UserDictionaryEntry } from "./types";
 import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
+const MAX_USER_DICTIONARY_ENTRIES = 50;
 
 export const defaultSettings: AppSettings = {
   modelProvider: "ollama",
@@ -22,6 +23,7 @@ export const defaultSettings: AppSettings = {
   },
   conversionPrompt: defaultConversionPrompt,
   conversionPreset: "none",
+  userDictionary: [],
   think: false,
 };
 
@@ -67,5 +69,41 @@ function mergeSettings(settings: LegacySettings): AppSettings {
       ...defaultSettings.punctuationConversion,
       ...settings.punctuationConversion,
     },
+    userDictionary: normalizeUserDictionary(settings.userDictionary),
   };
+}
+
+function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries
+    .flatMap((entry, index): UserDictionaryEntry[] => {
+      if (!entry || typeof entry !== "object") {
+        return [];
+      }
+
+      const record = entry as Record<string, unknown>;
+      const reading = readString(record.reading).trim();
+      const output = readString(record.output).trim();
+      if (!reading || !output) {
+        return [];
+      }
+
+      return [
+        {
+          id: readString(record.id).trim() || `dictionary-${index}`,
+          reading,
+          output,
+          note: readString(record.note).trim(),
+          enabled: typeof record.enabled === "boolean" ? record.enabled : true,
+        },
+      ];
+    })
+    .slice(0, MAX_USER_DICTIONARY_ENTRIES);
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
