@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapanese, kanjiizeKana, normalizeRomajiReadingCandidate } from "./ollama";
+import {
+  convertRomajiToJapanese,
+  convertRomajiToJapaneseDetailed,
+  kanjiizeKana,
+  normalizeRomajiReadingCandidate,
+} from "./ollama";
 import {
   buildConversionSystemPrompt,
   buildKanaKanjiSystemPrompt,
@@ -119,13 +124,10 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("protects matching user homophone preferences from kana-kanji conversion", async () => {
+  it("does not force user homophone preferences during kana-kanji conversion", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "このあたりの" })
-        .mockResolvedValueOnce({ response: "は変換前に確認したい" }),
+      generate: vi.fn().mockResolvedValue({ response: "今日の五時に集合な" }),
     };
     const settings = {
       ...defaultSettings,
@@ -134,53 +136,38 @@ describe("convertRomajiToJapanese", () => {
           id: "goji",
           reading: "ごじ",
           preferred: "誤字",
-          note: "text conversion",
-          enabled: true,
-        },
-        {
-          id: "michi",
-          reading: "みち",
-          preferred: "未知",
+          replaceFrom: ["五時", "ごじ"],
           note: "",
           enabled: true,
         },
       ],
     };
 
-    const result = await convertRomajiToJapanese(
-      "konoatarinogozihahenkanmaenikakuninshitai",
+    const result = await convertRomajiToJapaneseDetailed(
+      "kyounogozinisyuugouna",
       settings,
       transport,
     );
 
-    expect(result).toBe("このあたりの誤字は変換前に確認したい");
-    expect(transport.generate).toHaveBeenCalledTimes(2);
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      1,
+    expect(result).toEqual({
+      text: "今日の五時に集合な",
+      reviewKana: "きょうのごじにしゅうごうな",
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "このあたりの",
+        prompt: "きょうのごじにしゅうごうな",
       }),
       30_000,
     );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "はへんかんまえにかくにんしたい",
-      }),
-      30_000,
-    );
-    expect(transport.generate.mock.calls.map((call) => call[2].prompt)).not.toContain("ごじ");
-    expect(transport.generate.mock.calls.map((call) => call[2].prompt)).not.toContain("みち");
   });
 
-  it("returns a homophone preference directly when the whole kana input matches", async () => {
+  it("does not replace a whole kana input with a homophone preference", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "五時" }),
     };
     const settings = {
       ...defaultSettings,
@@ -189,17 +176,18 @@ describe("convertRomajiToJapanese", () => {
           id: "goji",
           reading: "ごじ",
           preferred: "誤字",
+          replaceFrom: ["五時", "ごじ"],
           note: "",
           enabled: true,
         },
       ],
     };
 
-    await expect(kanjiizeKana("ごじ", settings, transport)).resolves.toBe("誤字");
-    expect(transport.generate).not.toHaveBeenCalled();
+    await expect(kanjiizeKana("ごじ", settings, transport)).resolves.toBe("五時");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
-  it("does not protect homophone readings inside longer kana words", async () => {
+  it("keeps longer kana words intact without homophone pre-splitting", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi.fn().mockResolvedValue({ response: "リンゴジュースを買った" }),
@@ -211,6 +199,7 @@ describe("convertRomajiToJapanese", () => {
           id: "goji",
           reading: "ごじ",
           preferred: "誤字",
+          replaceFrom: ["五時", "ごじ"],
           note: "",
           enabled: true,
         },
@@ -535,6 +524,7 @@ describe("convertRomajiToJapanese", () => {
         id: "goji",
         reading: "ごじ",
         preferred: "誤字",
+        replaceFrom: ["五時", "ごじ"],
         note: "conversion notes",
         enabled: true,
       },
@@ -542,6 +532,7 @@ describe("convertRomajiToJapanese", () => {
         id: "michi",
         reading: "みち",
         preferred: "未知",
+        replaceFrom: ["道", "みち"],
         note: "",
         enabled: true,
       },
@@ -549,6 +540,7 @@ describe("convertRomajiToJapanese", () => {
         id: "disabled",
         reading: "ごじ",
         preferred: "五時",
+        replaceFrom: ["誤字"],
         note: "",
         enabled: false,
       },

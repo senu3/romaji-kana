@@ -19,6 +19,7 @@ export interface UserHomophonePreference {
   id: string;
   reading: string;
   preferred: string;
+  replaceFrom: string[];
   note: string;
   enabled: boolean;
 }
@@ -105,7 +106,18 @@ export interface GhostConversionSuggestion {
   originalText: string;
   convertedText: string;
   inputText: string;
+  reviewKana?: string;
   source: "editor" | "history";
+}
+
+export interface HomophoneReviewSuggestion {
+  id: string;
+  entryId: string;
+  reading: string;
+  preferred: string;
+  target: string;
+  from: number;
+  to: number;
 }
 
 export interface PendingConversion {
