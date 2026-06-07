@@ -96,6 +96,21 @@ try {
   await page.waitForTimeout(300);
   assert.equal(conversionRequestCount, 1, "Undo should not re-trigger conversion.");
 
+  conversionRequestCount = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("already written ashita no yotei");
+  await page.getByText("already written ashita no yotei").waitFor();
+  for (let index = 0; index < "ashita no yotei".length; index += 1) {
+    await page.keyboard.press("Shift+ArrowLeft");
+  }
+  await page.keyboard.press("Control+Enter");
+  await page.getByText("already written あなたは誰ですか。").waitFor();
+  assert.equal(
+    conversionRequestCount,
+    1,
+    "Manual shortcut should convert only the selected text.",
+  );
+
   await page.getByRole("button", { name: "Open dictionary" }).click();
   await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
   const dictionaryInputs = page.locator(".dictionary-add-form input");

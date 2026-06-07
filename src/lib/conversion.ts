@@ -67,6 +67,37 @@ export function extractConversionRange(
   };
 }
 
+export function extractSelectedConversionRange(
+  doc: string,
+  selectionFrom: number,
+  selectionTo: number,
+  trigger: ConversionTrigger,
+): ConversionRange | null {
+  const safeFrom = Math.max(0, Math.min(selectionFrom, selectionTo, doc.length));
+  const safeTo = Math.max(0, Math.min(Math.max(selectionFrom, selectionTo), doc.length));
+  if (safeFrom >= safeTo || rangeIntersectsExcludedMarkdown(doc, safeFrom, safeTo)) {
+    return null;
+  }
+
+  const selectedText = doc.slice(safeFrom, safeTo);
+  const leadingWhitespace = selectedText.length - selectedText.trimStart().length;
+  const trailingWhitespace = selectedText.length - selectedText.trimEnd().length;
+  const from = safeFrom + leadingWhitespace;
+  const to = safeTo - trailingWhitespace;
+  const text = doc.slice(from, to);
+
+  if (from >= to || !text.trim() || isJapaneseDominant(text)) {
+    return null;
+  }
+
+  return {
+    from,
+    to,
+    text,
+    trigger,
+  };
+}
+
 export function normalizeInputForPrompt(
   text: string,
   settings: AppSettings,
@@ -151,6 +182,24 @@ function isInsideUrl(doc: string, position: number): boolean {
     const start = line.from + (match.index ?? 0);
     const end = start + match[0].length;
     if (position >= start && position <= end) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function rangeIntersectsExcludedMarkdown(doc: string, from: number, to: number): boolean {
+  const lastPosition = Math.max(from, to - 1);
+  if (isInsideExcludedMarkdown(doc, from) || isInsideExcludedMarkdown(doc, lastPosition)) {
+    return true;
+  }
+
+  const selectedText = doc.slice(from, to);
+  for (const match of selectedText.matchAll(URL_RE)) {
+    const start = from + (match.index ?? 0);
+    const end = start + match[0].length;
+    if (start < to && end > from) {
       return true;
     }
   }

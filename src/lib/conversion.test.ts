@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   extractConversionRange,
+  extractSelectedConversionRange,
   isInsideExcludedMarkdown,
   isJapaneseDominant,
   normalizeInputForPrompt,
@@ -55,6 +56,45 @@ describe("extractConversionRange", () => {
   it("skips Japanese-dominant text", () => {
     const doc = "今日はいい天気です。";
     expect(extractConversionRange(doc, doc.length, "enter")).toBeNull();
+  });
+});
+
+describe("extractSelectedConversionRange", () => {
+  it("extracts only the selected text for manual conversion", () => {
+    const doc = "今日は会議の要点を確認します。 ashita no yotei mo kakunin shimasu";
+    const selected = "ashita no yotei mo kakunin shimasu";
+    const from = doc.indexOf(selected);
+    const to = from + selected.length;
+
+    expect(extractSelectedConversionRange(doc, from, to, "shortcut")).toEqual({
+      from,
+      to,
+      text: selected,
+      trigger: "shortcut",
+    });
+  });
+
+  it("trims surrounding whitespace from the selected range", () => {
+    const doc = "今日は会議です。  ashita no yotei  ";
+    const from = doc.indexOf("  ashita");
+    const to = doc.length;
+
+    expect(extractSelectedConversionRange(doc, from, to, "shortcut")).toEqual({
+      from: from + 2,
+      to: to - 2,
+      text: "ashita no yotei",
+      trigger: "shortcut",
+    });
+  });
+
+  it("skips Japanese-dominant selections", () => {
+    const doc = "今日はいい tenki";
+    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")).toBeNull();
+  });
+
+  it("skips selected text inside excluded markdown", () => {
+    const doc = "`anatahadaredesuka.`";
+    expect(extractSelectedConversionRange(doc, 1, doc.length - 1, "shortcut")).toBeNull();
   });
 });
 
