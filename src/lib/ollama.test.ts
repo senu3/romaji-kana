@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapanese } from "./ollama";
+import { convertRomajiToJapanese, normalizeRomajiReadingCandidate } from "./ollama";
 import {
   buildConversionSystemPrompt,
   buildKanaKanjiSystemPrompt,
@@ -92,6 +92,40 @@ describe("convertRomajiToJapanese", () => {
       }),
       30_000,
     );
+  });
+
+  it("normalizes common typo candidates before kana-kanji conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "あなたの笑顔が好きです。" }),
+    };
+
+    const result = await convertRomajiToJapanese(
+      "anatanoegawogasukidseu",
+      defaultSettings,
+      transport,
+    );
+
+    expect(result).toBe("あなたの笑顔が好きです。");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "あなたのえがおがすきです",
+      }),
+      30_000,
+    );
+  });
+
+  it("keeps valid wo particles before non-particle following text", () => {
+    expect(normalizeRomajiReadingCandidate("sorewokakuninshimasu")).toBe(
+      "sorewokakuninshimasu",
+    );
+  });
+
+  it("normalizes particle-like wo when another particle immediately follows", () => {
+    expect(normalizeRomajiReadingCandidate("egawoga")).toBe("egaoga");
   });
 
   it("reads LM Studio chat completion text", async () => {
@@ -366,8 +400,10 @@ describe("convertRomajiToJapanese", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
     expect(prompt).toContain("Choose homophones by semantic context");
+    expect(prompt).toContain("Do not add intensifiers");
     expect(prompt).toContain("Prefer 未知 over 道");
     expect(prompt).toContain("Prefer 誤字 over 五時");
+    expect(prompt).toContain("あなたの笑顔が好きです");
     expect(prompt).toContain("未知の英語については誤字の可能性もあるため");
     expect(prompt).toContain("未知の単語はひらがなのままでも構わない");
     expect(prompt).toContain("五時ではなく午後三時");

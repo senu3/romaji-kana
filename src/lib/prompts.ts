@@ -83,6 +83,12 @@ export const conversionFewShotExamples = [
 
 export const kanaKanjiFewShotExamples = [
   "入力:",
+  "あなたのえがおがすきです",
+  "",
+  "出力:",
+  "あなたの笑顔が好きです",
+  "",
+  "入力:",
   "みちのえいごについてはごじのかのうせいもあるため",
   "",
   "出力:",
@@ -174,7 +180,9 @@ export function buildKanaKanjiSystemPrompt(
     "5. Keep hiragana when kanji conversion is uncertain.",
     "6. Choose homophones by semantic context, not by the most common kanji in isolation.",
     "7. Avoid contextually odd kanji even when they match the reading.",
-    "8. Return only the converted Japanese text. Do not explain.",
+    "8. Do not add intensifiers, modifiers, nouns, or predicates that are not present in the kana.",
+    "9. If the kana appears to include a typo repair, keep the closest reading rather than making a more fluent different sentence.",
+    "10. Return only the converted Japanese text. Do not explain.",
     "",
     "Context disambiguation rules:",
     "1. Prefer 未知 over 道 when the context means unknown, unfamiliar, or unidentified.",
