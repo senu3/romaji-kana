@@ -25,6 +25,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   extractConversionRange,
+  extractSelectedConversionRange,
   isTriggerEnabled,
   triggerFromCharacter,
 } from "../lib/conversion";
@@ -360,15 +361,6 @@ export function MarkdownEditor({
       return;
     }
 
-    const manualConvert = (view: EditorView, trigger: ConversionTrigger) => {
-      const cursor = view.state.selection.main.head;
-      const range = extractConversionRange(view.state.doc.toString(), cursor, trigger);
-      if (range) {
-        onConvertRef.current(range);
-      }
-      return true;
-    };
-
     const state = EditorState.create({
       doc: initialDocumentRef.current,
       extensions: [
@@ -397,7 +389,7 @@ export function MarkdownEditor({
             },
             {
               key: settingsRef.current.triggers.manualShortcut,
-              run: (view) => manualConvert(view, "shortcut"),
+              run: runManualConversion,
             },
           ])),
         ),
@@ -462,17 +454,7 @@ export function MarkdownEditor({
           },
           {
             key: settings.triggers.manualShortcut,
-            run: (editorView) => {
-              const range = extractConversionRange(
-                editorView.state.doc.toString(),
-                editorView.state.selection.main.head,
-                "shortcut",
-              );
-              if (range) {
-                onConvertRef.current(range);
-              }
-              return true;
-            },
+            run: runManualConversion,
           },
           {
             key: "Tab",
@@ -506,6 +488,27 @@ export function MarkdownEditor({
 
     onConvertRef.current(range);
     return true;
+  }
+
+  function runManualConversion(view: EditorView) {
+    const range = extractManualConversionRange(view, "shortcut");
+    if (range) {
+      onConvertRef.current(range);
+    }
+    return true;
+  }
+
+  function extractManualConversionRange(
+    view: EditorView,
+    trigger: ConversionTrigger,
+  ): ConversionRange | null {
+    const doc = view.state.doc.toString();
+    const selection = view.state.selection.main;
+    if (!selection.empty) {
+      return extractSelectedConversionRange(doc, selection.from, selection.to, trigger);
+    }
+
+    return extractConversionRange(doc, selection.head, trigger);
   }
 
   function acceptGhostSuggestion(view: EditorView) {
