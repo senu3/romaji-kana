@@ -267,6 +267,7 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
   "input.ghostAccept",
+  "input.homophoneReview",
 ]);
 
 export function MarkdownEditor({

@@ -914,6 +914,85 @@ h3 {
   color: #9a3412;
 }
 
+.homophone-chip {
+  position: fixed;
+  z-index: 28;
+  right: 348px;
+  bottom: 58px;
+  display: inline-flex;
+  max-width: min(480px, calc(100vw - 380px));
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(19, 78, 74, 0.18);
+}
+
+.homophone-chip-main {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: #134e4a;
+}
+
+.homophone-chip-main:hover {
+  background: #ecfeff;
+}
+
+.homophone-chip-label {
+  flex: 0 0 auto;
+  color: #0d9488;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.homophone-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #134e4a;
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.homophone-chip kbd {
+  flex: 0 0 auto;
+  border: 1px solid #cbdedb;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: #f8fafc;
+  color: #64748b;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.homophone-chip-dismiss {
+  display: inline-flex;
+  width: 34px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-left: 1px solid #d5e8e5;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.homophone-chip-dismiss:hover {
+  background: #fff7ed;
+  color: #b91c1c;
+}
+
 .setup-overlay {
   z-index: 40;
   display: grid;
@@ -1078,7 +1157,7 @@ h3 {
 
 .dictionary-entry-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
 }
@@ -1507,6 +1586,12 @@ h3 {
 
   .floating-settings-button {
     display: inline-flex;
+  }
+
+  .homophone-chip {
+    right: 12px;
+    left: 12px;
+    max-width: none;
   }
 
   .editor-toolbar {

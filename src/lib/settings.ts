@@ -130,6 +130,7 @@ function normalizeUserHomophones(entries: unknown): UserHomophonePreference[] {
           id: readString(record.id).trim() || `homophone-${index}`,
           reading,
           preferred,
+          replaceFrom: normalizeStringList(record.replaceFrom),
           note: readString(record.note).trim(),
           enabled: typeof record.enabled === "boolean" ? record.enabled : true,
         },
@@ -144,4 +145,21 @@ function isHiraganaReading(value: string): boolean {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  return value.flatMap((item): string[] => {
+    const text = readString(item).trim();
+    if (!text || seen.has(text)) {
+      return [];
+    }
+
+    seen.add(text);
+    return [text];
+  });
 }

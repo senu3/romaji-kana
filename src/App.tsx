@@ -22,7 +22,16 @@ import { SettingsContent, SettingsPanel } from "./components/SettingsPanel";
 import { loadDocument, saveDocument } from "./lib/documentStore";
 import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
-import { convertRomajiToJapanese, providerLabel } from "./lib/ollama";
+import {
+  convertRomajiToJapaneseDetailed,
+  providerLabel,
+  type JapaneseConversionResult,
+} from "./lib/ollama";
+import {
+  buildHomophoneReviewSuggestions,
+  formatReplaceTargets,
+  parseReplaceTargets,
+} from "./lib/homophoneReview";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
@@ -35,6 +44,7 @@ import type {
   ConversionRange,
   ConversionStatus,
   GhostConversionSuggestion,
+  HomophoneReviewSuggestion,
   OllamaConnectionStatus,
   OllamaModel,
   PendingConversion,
@@ -50,6 +60,10 @@ const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
+type ActiveHomophoneReviewSuggestion = HomophoneReviewSuggestion & {
+  conversionId: string;
+};
+
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
     if (typeof localStorage === "undefined") {
@@ -61,6 +75,8 @@ function App() {
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
+  const [homophoneSuggestion, setHomophoneSuggestion] =
+    useState<ActiveHomophoneReviewSuggestion | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -304,6 +320,7 @@ function App() {
       return;
     }
 
+    setHomophoneSuggestion(null);
     suppressNextDirtyRef.current = true;
     view.dispatch({
       changes: {
@@ -362,6 +379,101 @@ function App() {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
   }, [getEditorDocument]);
+
+  const showHomophoneReviewSuggestion = useCallback(
+    (conversionId: string, conversion: JapaneseConversionResult, baseFrom: number) => {
+      const [suggestion] = buildHomophoneReviewSuggestions(
+        conversion.reviewKana,
+        conversion.text,
+        settingsRef.current.userHomophones,
+      );
+      if (!suggestion) {
+        setHomophoneSuggestion(null);
+        return;
+      }
+
+      setHomophoneSuggestion({
+        ...suggestion,
+        id: `${conversionId}:${suggestion.id}`,
+        conversionId,
+        from: baseFrom + suggestion.from,
+        to: baseFrom + suggestion.to,
+      });
+    },
+    [],
+  );
+
+  const applyHomophoneSuggestion = useCallback(() => {
+    const suggestion = homophoneSuggestion;
+    const view = editorViewRef.current;
+    if (!suggestion || !view) {
+      return false;
+    }
+
+    const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
+    if (currentText !== suggestion.target) {
+      setHomophoneSuggestion(null);
+      setStatus({
+        kind: "warning",
+        message: "Homophone suggestion was dismissed because the text changed.",
+      });
+      return true;
+    }
+
+    view.dispatch({
+      changes: {
+        from: suggestion.from,
+        to: suggestion.to,
+        insert: suggestion.preferred,
+      },
+      selection: { anchor: suggestion.from + suggestion.preferred.length },
+      userEvent: "input.homophoneReview",
+    });
+    saveDocument(view.state.doc.toString());
+    setHomophoneSuggestion(null);
+    setStatus({
+      kind: "success",
+      message: `Applied homophone suggestion: ${suggestion.target} -> ${suggestion.preferred}.`,
+    });
+    view.focus();
+    return true;
+  }, [homophoneSuggestion]);
+
+  const dismissHomophoneSuggestion = useCallback(() => {
+    setHomophoneSuggestion(null);
+  }, [showHomophoneReviewSuggestion]);
+
+  useEffect(() => {
+    if (!homophoneSuggestion || dictionaryPanelOpen || settingsDrawerOpen || !setupComplete) {
+      return;
+    }
+
+    const applyOnShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.shiftKey ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.key !== "."
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      applyHomophoneSuggestion();
+    };
+
+    document.addEventListener("keydown", applyOnShortcut);
+    return () => document.removeEventListener("keydown", applyOnShortcut);
+  }, [
+    applyHomophoneSuggestion,
+    dictionaryPanelOpen,
+    homophoneSuggestion,
+    settingsDrawerOpen,
+    setupComplete,
+  ]);
 
   useEffect(() => {
     const handleAppShortcut = (event: KeyboardEvent) => {
@@ -444,8 +556,16 @@ function App() {
       },
       ...items,
     ]);
+    showHomophoneReviewSuggestion(
+      suggestion.id,
+      {
+        text: suggestion.convertedText,
+        reviewKana: suggestion.reviewKana ?? suggestion.originalText,
+      },
+      suggestion.from,
+    );
     setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
-  }, []);
+  }, [showHomophoneReviewSuggestion]);
 
   const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
     if (!item.output || !item.anchor) {
@@ -493,14 +613,16 @@ function App() {
       source: "history",
     };
 
+    setHomophoneSuggestion(null);
     setPending((items) => [...items, request]);
     setStatus({ kind: "loading", message: `Re-converting "${item.input}"` });
 
-    convertRomajiToJapanese(item.input, settingsRef.current)
-      .then((converted) => {
+    convertRomajiToJapaneseDetailed(item.input, settingsRef.current)
+      .then((conversion) => {
         if (canceledRequestsRef.current.has(request.id)) {
           return;
         }
+        const converted = conversion.text;
 
         const currentView = editorViewRef.current;
         if (!currentView || !item.anchor) {
@@ -555,6 +677,7 @@ function App() {
               originalText: resolved.matchedText,
               convertedText: converted,
               inputText: item.input,
+              reviewKana: conversion.reviewKana,
               source: "history",
             }),
           });
@@ -600,6 +723,7 @@ function App() {
               ? "History conversion applied at a nearby matching anchor."
               : "History conversion applied.",
         });
+        showHomophoneReviewSuggestion(request.id, conversion, resolved.from);
       })
       .catch((error: unknown) => {
         if (canceledRequestsRef.current.has(request.id)) {
@@ -626,7 +750,7 @@ function App() {
         canceledRequestsRef.current.delete(request.id);
         setPending((items) => items.filter((pendingItem) => pendingItem.id !== request.id));
       });
-  }, []);
+  }, [showHomophoneReviewSuggestion]);
 
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
@@ -649,6 +773,7 @@ function App() {
       source: "editor",
     };
 
+    setHomophoneSuggestion(null);
     setPending((items) => [...items, request]);
     setStatus({ kind: "loading", message: `Converting "${range.text}"` });
     view.dispatch({
@@ -659,11 +784,12 @@ function App() {
       }),
     });
 
-    convertRomajiToJapanese(range.text, settingsRef.current)
-      .then((converted) => {
+    convertRomajiToJapaneseDetailed(range.text, settingsRef.current)
+      .then((conversion) => {
         if (canceledRequestsRef.current.has(request.id)) {
           return;
         }
+        const converted = conversion.text;
 
         const currentView = editorViewRef.current;
         if (!currentView) {
@@ -703,6 +829,7 @@ function App() {
                 originalText: request.originalText,
                 convertedText: converted,
                 inputText: request.originalText,
+                reviewKana: conversion.reviewKana,
                 source: "editor",
               }),
             ],
@@ -741,6 +868,7 @@ function App() {
           },
           ...items,
         ]);
+        showHomophoneReviewSuggestion(request.id, conversion, range.from);
         setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
       })
       .catch((error: unknown) => {
@@ -813,6 +941,13 @@ function App() {
         onAcceptGhost={handleAcceptGhost}
         registerView={registerView}
       />
+      {homophoneSuggestion ? (
+        <HomophoneSuggestionChip
+          suggestion={homophoneSuggestion}
+          onApply={applyHomophoneSuggestion}
+          onDismiss={dismissHomophoneSuggestion}
+        />
+      ) : null}
       {activePanel === "history" ? (
         <HistoryPanel
           history={history}
@@ -896,6 +1031,44 @@ function App() {
         onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
     </main>
+  );
+}
+
+function HomophoneSuggestionChip({
+  suggestion,
+  onApply,
+  onDismiss,
+}: {
+  suggestion: ActiveHomophoneReviewSuggestion;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <aside className="homophone-chip" aria-label="Homophone review suggestion">
+      <button
+        className="homophone-chip-main"
+        type="button"
+        onClick={onApply}
+        title="Apply homophone suggestion"
+      >
+        <span className="homophone-chip-label">Review</span>
+        <span className="homophone-chip-text">
+          {suggestion.target}
+          {" -> "}
+          {suggestion.preferred}
+        </span>
+        <kbd>Ctrl+.</kbd>
+      </button>
+      <button
+        className="homophone-chip-dismiss"
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss homophone suggestion"
+        title="Dismiss"
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </aside>
   );
 }
 
@@ -1201,6 +1374,7 @@ function DictionaryModal({
   const [homophoneDraft, setHomophoneDraft] = useState({
     reading: "",
     preferred: "",
+    replaceFrom: "",
     note: "",
   });
   const canAdd =
@@ -1244,11 +1418,12 @@ function DictionaryModal({
         id: createDictionaryEntryId("homophone"),
         reading: homophoneDraft.reading.trim(),
         preferred: homophoneDraft.preferred.trim(),
+        replaceFrom: parseReplaceTargets(homophoneDraft.replaceFrom),
         note: homophoneDraft.note.trim(),
         enabled: true,
       },
     ]);
-    setHomophoneDraft({ reading: "", preferred: "", note: "" });
+    setHomophoneDraft({ reading: "", preferred: "", replaceFrom: "", note: "" });
   };
 
   const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
@@ -1465,6 +1640,19 @@ function DictionaryModal({
                   }}
                 />
               </label>
+              <label className="field">
+                <span>Replace from</span>
+                <input
+                  aria-label="Homophone replace from"
+                  value={homophoneDraft.replaceFrom}
+                  maxLength={120}
+                  placeholder="五時, ごじ"
+                  onChange={(event) => {
+                    const replaceFrom = event.currentTarget.value;
+                    setHomophoneDraft((value) => ({ ...value, replaceFrom }));
+                  }}
+                />
+              </label>
               <label className="field dictionary-note-field">
                 <span>Note</span>
                 <input
@@ -1522,6 +1710,17 @@ function DictionaryModal({
                         maxLength={40}
                         onChange={(event) =>
                           updateHomophone(entry.id, { preferred: event.currentTarget.value })
+                        }
+                      />
+                      <input
+                        aria-label={`Homophone replace from ${index + 1}`}
+                        value={formatReplaceTargets(entry.replaceFrom)}
+                        maxLength={120}
+                        placeholder="Replace from"
+                        onChange={(event) =>
+                          updateHomophone(entry.id, {
+                            replaceFrom: parseReplaceTargets(event.currentTarget.value),
+                          })
                         }
                       />
                       <input
