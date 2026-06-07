@@ -1,25 +1,125 @@
 # Romaji Kana
 
-A Tauri v2, React, TypeScript, and CodeMirror 6 Markdown editor that converts rough romaji input into natural Japanese through a local Ollama model.
+Romaji Kana は、ラフなローマ字入力を自然な日本語へ変換するローカルファーストの
+Markdown エディタです。
 
-## Development
+## 必要なもの
+
+- Ollama または LM Studio
+- 日本語変換に使えるローカルモデル
+
+## 事前準備
+
+1. アプリを起動します。
+2. 設定から、モデルプロバイダ（Ollama / LMStudio）を設定します。
+3. モデルプロバイダに応じて、利用可能なモデル一覧が自動で取得されます。
+
+デフォルトでは Ollama の APIURL `http://localhost:11434` の `gemma3` を使います。LM Studio の
+デフォルト URL は `http://localhost:1234` です。
+（gemma4、QWEN3.5の利用を推奨します）
+
+## 入力例
+
+### Romajiを変換する
+
+短い文や段落を書きながら、その場で変換したいときの基本操作です。
+手動ショートカットの初期値は、Windows/Linux では `Ctrl+Enter`、macOS では
+Cmd+Enter になります。
+
+```text
+kyouha kaigi no youten wo kakunin shimasu.
+```
+
+`.` を入力すると、直前の文が変換されます。
+
+```text
+今日は会議の要点を確認します。
+```
+
+## 変換モード
+
+変換モードは 2 種類あります。
+
+- Replace: 元のローマ字を変換後の日本語で置き換えます。
+- Ghost + Tab: 変換候補をインライン表示します。`Tab` で採用し、`Esc` で破棄します。
+
+Undo すると、変換後の文章を元のローマ字へ戻せます。Undo/Redo 操作をきっかけに変換が
+再実行されることはありません。
+
+Replaceでは `.` と `,` が基本の変換トリガーです。Enter トリガーは任意で有効化できます
+
+## 文体プリセット
+
+Style パネルで変換の文体を選べます。
+
+- 指定なし: 文体を強く寄せず、中立的に変換します。
+- 会話: 話し言葉として自然な表現を優先します。
+- ビジネスメール: メール文として自然な敬体・業務表現を優先します。
+
+より細かく制御したい場合は、同じパネルの詳細設定からプロンプトを編集できます。
+
+## ユーザー辞書
+
+エディタ上部のファイルバー右側にある辞書ボタンから開きます。人名、サービス名、製品名、
+略語など、毎回安定して変換したい語を登録できます。
+
+辞書項目には以下を設定します。
+
+- Reading: マッチさせるローマ字読み。
+- Output: 挿入したい固定の出力。
+- Note: 補足メモ。
+- Enabled: 項目を有効にするかどうか。
+
+たとえば `openai` を `OpenAI`、`api` を `API` として登録できます。辞書にマッチした部分は
+LLM に送る前に分離され、登録した出力として扱われます。
+
+## バッククォート指定
+
+一時的な未知語や英単語は、バッククォートで囲むとその部分を固定できます。囲った文字列は
+そのまま残り、バッククォートだけが外れます。前後のローマ字は通常どおり変換されます。
+
+例:
+
+```text
+`openair` ni iku.
+```
+
+変換例:
+
+```text
+openairに行く。
+```
+
+一時的な語はバッククォート、繰り返し使う語はユーザー辞書に登録する使い分けが基本です。
+
+## 設定
+
+Settings パネルでは以下を調整できます。
+
+- モデルプロバイダ、API URL、モデル、Thinking mode
+- Replace / Ghost + Tab の切り替え
+- 自動変換とトリガー
+- 手動ショートカット
+- 句読点変換
+
+## 開発
+
+Tauri v2、React、TypeScript、CodeMirror 6 で構成されています。開発時は Node.js と npm が必要です。
 
 ```bash
 npm install
 npm run dev
 ```
 
-For the desktop shell:
+デスクトップシェルで起動する場合:
 
 ```bash
 npm run tauri dev
 ```
 
-## Verification
+## 検証
 
 ```bash
 npm test
 npm run build
 ```
-
-Ollama is expected to be running locally. The default API URL is `http://localhost:11434`, and the default model is `gemma3`.
