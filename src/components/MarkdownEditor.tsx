@@ -584,15 +584,18 @@ export function MarkdownEditor({
               <div className="toolbar-menu-items" role="menu" aria-label="File actions">
                 <button type="button" role="menuitem" onClick={() => runFileAction(onOpenFile)}>
                   <FolderOpen size={15} aria-hidden="true" />
-                  Open Markdown...
+                  <span>Open Markdown...</span>
+                  <kbd>Ctrl/Cmd + O</kbd>
                 </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFile)}>
                   <Save size={15} aria-hidden="true" />
-                  Save
+                  <span>Save</span>
+                  <kbd>Ctrl/Cmd + S</kbd>
                 </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFileAs)}>
                   <Save size={15} aria-hidden="true" />
-                  Save As...
+                  <span>Save As...</span>
+                  <kbd>Ctrl/Cmd + Shift + S</kbd>
                 </button>
               </div>
             ) : null}

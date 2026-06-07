@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatShortcutLabel, shortcutFromKeyboardEvent } from "./shortcuts";
+import {
+  appShortcutFromKeyboardEvent,
+  formatShortcutLabel,
+  isReservedAppShortcut,
+  shortcutFromKeyboardEvent,
+} from "./shortcuts";
 
 describe("shortcutFromKeyboardEvent", () => {
   it("normalizes Ctrl and Meta to the cross-platform Mod modifier", () => {
@@ -62,5 +67,82 @@ describe("shortcutFromKeyboardEvent", () => {
 describe("formatShortcutLabel", () => {
   it("renders a user-facing shortcut label", () => {
     expect(formatShortcutLabel("Mod-Shift-p")).toBe("Ctrl/Cmd + Shift + P");
+  });
+});
+
+describe("appShortcutFromKeyboardEvent", () => {
+  it("maps common file shortcuts", () => {
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "o",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe("open");
+
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "s",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe("save");
+
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "S",
+        ctrlKey: false,
+        metaKey: true,
+        altKey: false,
+        shiftKey: true,
+      }),
+    ).toBe("saveAs");
+  });
+
+  it("ignores composing, repeated, and alternate shortcuts", () => {
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "s",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+        isComposing: true,
+      }),
+    ).toBeNull();
+
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "s",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+        repeat: true,
+      }),
+    ).toBeNull();
+
+    expect(
+      appShortcutFromKeyboardEvent({
+        key: "o",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: true,
+        shiftKey: false,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("isReservedAppShortcut", () => {
+  it("reserves file shortcuts for app actions", () => {
+    expect(isReservedAppShortcut("Mod-o")).toBe(true);
+    expect(isReservedAppShortcut("Mod-s")).toBe(true);
+    expect(isReservedAppShortcut("Mod-Shift-s")).toBe(true);
+    expect(isReservedAppShortcut("Mod-Enter")).toBe(false);
   });
 });

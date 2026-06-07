@@ -16,7 +16,11 @@ import {
   useState,
 } from "react";
 import { defaultSettings } from "../lib/settings";
-import { formatShortcutLabel, shortcutFromKeyboardEvent } from "../lib/shortcuts";
+import {
+  formatShortcutLabel,
+  isReservedAppShortcut,
+  shortcutFromKeyboardEvent,
+} from "../lib/shortcuts";
 import type {
   AppSettings,
   ModelProvider,
@@ -149,6 +153,10 @@ export function SettingsContent({
     const nextShortcut = shortcutFromKeyboardEvent(event.nativeEvent);
     if (!nextShortcut) {
       setShortcutError("Use Ctrl/Cmd, Alt, Shift with a key, or a function key.");
+      return;
+    }
+    if (isReservedAppShortcut(nextShortcut)) {
+      setShortcutError("That shortcut is reserved for file actions.");
       return;
     }
 
@@ -376,6 +384,7 @@ export function SettingsContent({
                   }}
                   onKeyDown={handleShortcutKeyDown}
                   onBlur={() => setCapturingShortcut(false)}
+                  data-ignore-app-shortcuts="true"
                 >
                   <Keyboard size={15} aria-hidden="true" />
                   {capturingShortcut
