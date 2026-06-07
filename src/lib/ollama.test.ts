@@ -309,6 +309,17 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
   });
 
+  it("adds kana-kanji context disambiguation rules and examples", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
+
+    expect(prompt).toContain("Choose homophones by semantic context");
+    expect(prompt).toContain("Prefer 未知 over 道");
+    expect(prompt).toContain("Prefer 誤字 over 五時");
+    expect(prompt).toContain("未知の英語については誤字の可能性もあるため");
+    expect(prompt).toContain("未知の単語はひらがなのままでも構わない");
+    expect(prompt).toContain("五時ではなく午後三時");
+  });
+
   it("keeps kana-kanji prompts independent from user dictionary entries", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
