@@ -19,6 +19,7 @@ body {
   margin: 0;
   min-width: 360px;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 button,
@@ -49,7 +50,9 @@ button:disabled {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(240, 253, 250, 0.94), rgba(255, 255, 255, 0.98)),
     #f0fdfa;
@@ -59,11 +62,14 @@ button:disabled {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding-bottom: 44px;
 }
 
 .editor-toolbar {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -216,6 +222,8 @@ h3 {
 }
 
 .editor-filebar {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(92px, 1fr) minmax(0, auto) minmax(92px, 1fr);
   align-items: center;
@@ -313,9 +321,12 @@ h3 {
 }
 
 .settings-panel {
-  position: relative;
+  position: sticky;
+  top: 0;
   width: 320px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow-y: auto;
   padding-bottom: 44px;
   border-left: 1px solid #cbdedb;
   background: #f8fffd;
