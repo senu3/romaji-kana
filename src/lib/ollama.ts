@@ -59,7 +59,7 @@ export async function convertRomajiToJapanese(
       continue;
     }
 
-    const kanaResult = romajiToKana(part.value);
+    const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
     const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
     convertedParts.push(await kanjiizeKana(repaired.kana, settings, transport));
   }
@@ -292,6 +292,32 @@ function isAsciiWordCharacter(character: string): boolean {
 
 function hasConvertibleRomaji(value: string): boolean {
   return /[a-z]/i.test(value);
+}
+
+export function normalizeRomajiReadingCandidate(input: string): string {
+  return normalizeAmbiguousParticleWo(normalizeCommonRomajiTypos(input));
+}
+
+function normalizeCommonRomajiTypos(input: string): string {
+  return input
+    .replace(/dseu/gi, preserveCaseReplacement("desu"))
+    .replace(/deus/gi, preserveCaseReplacement("desu"))
+    .replace(/dsu/gi, preserveCaseReplacement("desu"));
+}
+
+function normalizeAmbiguousParticleWo(input: string): string {
+  return input.replace(/wo(?=ga|ha|wa|wo|ni|de|to|mo|e|he|kara|made|yori)/gi, (match, offset) => {
+    const previous = input[offset - 1] ?? "";
+    if (!/[a-z]/i.test(previous)) {
+      return match;
+    }
+
+    return match[0] === "W" ? "O" : "o";
+  });
+}
+
+function preserveCaseReplacement(replacement: string): (match: string) => string {
+  return (match) => (match.toUpperCase() === match ? replacement.toUpperCase() : replacement);
 }
 
 const ROMAJI_DICTIONARY_SUFFIXES = [
