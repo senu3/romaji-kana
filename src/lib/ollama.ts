@@ -26,7 +26,13 @@ interface DictionaryEntryPart {
   output: string;
 }
 
+interface LiteralNounPart {
+  type: "literal";
+  output: string;
+}
+
 type DictionarySplitPart = DictionaryTextPart | DictionaryEntryPart;
+type ConversionSplitPart = DictionaryTextPart | DictionaryEntryPart | LiteralNounPart;
 
 interface DictionaryCandidate {
   normalizedReading: string;
@@ -39,11 +45,11 @@ export async function convertRomajiToJapanese(
   transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
   const normalized = normalizeInputForPrompt(input, settings);
-  const parts = splitInputByDictionary(normalized, settings.userDictionary);
+  const parts = splitInputForConversion(normalized, settings.userDictionary);
   const convertedParts: string[] = [];
 
   for (const part of parts) {
-    if (part.type === "dictionary") {
+    if (part.type === "dictionary" || part.type === "literal") {
       convertedParts.push(part.output);
       continue;
     }
@@ -113,6 +119,73 @@ export async function kanjiizeKana(
   }
 
   return text;
+}
+
+function splitInputForConversion(
+  input: string,
+  entries: UserDictionaryEntry[],
+): ConversionSplitPart[] {
+  return splitInputByLiteralNouns(input).flatMap((part): ConversionSplitPart[] => {
+    if (part.type === "literal") {
+      return [part];
+    }
+
+    return splitInputByDictionary(part.value, entries);
+  });
+}
+
+function splitInputByLiteralNouns(input: string): Array<DictionaryTextPart | LiteralNounPart> {
+  const parts: Array<DictionaryTextPart | LiteralNounPart> = [];
+  let index = 0;
+  let lastCopiedIndex = 0;
+
+  while (index < input.length) {
+    if (input[index] !== "`" || isEscapedBacktick(input, index)) {
+      index += 1;
+      continue;
+    }
+
+    const end = findClosingBacktick(input, index + 1);
+    if (end === -1) {
+      index += 1;
+      continue;
+    }
+
+    if (lastCopiedIndex < index) {
+      parts.push({ type: "text", value: input.slice(lastCopiedIndex, index) });
+    }
+
+    parts.push({ type: "literal", output: input.slice(index + 1, end) });
+    index = end + 1;
+    lastCopiedIndex = index;
+  }
+
+  if (parts.length === 0) {
+    return [{ type: "text", value: input }];
+  }
+
+  if (lastCopiedIndex < input.length) {
+    parts.push({ type: "text", value: input.slice(lastCopiedIndex) });
+  }
+
+  return parts;
+}
+
+function findClosingBacktick(input: string, start: number): number {
+  for (let index = start; index < input.length; index += 1) {
+    if (input[index] === "`" && !isEscapedBacktick(input, index)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function isEscapedBacktick(input: string, index: number): boolean {
+  let slashCount = 0;
+  for (let position = index - 1; position >= 0 && input[position] === "\\"; position -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
 }
 
 function splitInputByDictionary(
