@@ -292,6 +292,59 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("keeps backtick-wrapped unknown nouns out of LLM conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+    };
+
+    const result = await convertRomajiToJapanese("`openair` ni iku.", defaultSettings, transport);
+
+    expect(result).toBe("openairに行く。");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("openair"),
+        prompt: " に いく。",
+      }),
+      30_000,
+    );
+  });
+
+  it("keeps backtick-wrapped nouns literal even when they match dictionary entries", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "について確認します。" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userDictionary: [
+        {
+          id: "openai",
+          reading: "openai",
+          output: "OpenAI",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    const result = await convertRomajiToJapanese("`openai` nitsuite kakunin.", settings, transport);
+
+    expect(result).toBe("openaiについて確認します。");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: " について かくにん。",
+      }),
+      30_000,
+    );
+  });
+
   it("adds the fixed romaji reference and few-shot examples to the editable prompt", () => {
     const prompt = buildConversionSystemPrompt(defaultConversionPrompt);
 
