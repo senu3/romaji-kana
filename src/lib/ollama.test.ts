@@ -220,6 +220,33 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("keeps lexical wording available for faithful kana-kanji conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "おじいさんご自慢の時計さ" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "oziisangozimannotokeisa",
+      defaultSettings,
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "おじいさんご自慢の時計さ",
+      reviewKana: "おじいさんごじまんのとけいさ",
+    });
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("Do not paraphrase"),
+        prompt: "おじいさんごじまんのとけいさ",
+      }),
+      30_000,
+    );
+  });
+
   it("keeps valid wo particles before non-particle following text", () => {
     expect(normalizeRomajiReadingCandidate("sorewokakuninshimasu")).toBe(
       "sorewokakuninshimasu",
@@ -498,17 +525,16 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
   });
 
-  it("adds kana-kanji context disambiguation rules and examples", () => {
+  it("adds kana-kanji fidelity rules and examples", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
-    expect(prompt).toContain("Choose homophones by semantic context");
+    expect(prompt).toContain("Do not paraphrase");
+    expect(prompt).toContain("ごじまん must stay ご自慢 or ごじまん");
     expect(prompt).toContain("Do not add intensifiers");
-    expect(prompt).toContain("Prefer 未知 over 道");
-    expect(prompt).toContain("Prefer 誤字 over 五時");
+    expect(prompt).toContain("User-side review handles homophone cleanup");
     expect(prompt).toContain("あなたの笑顔が好きです");
-    expect(prompt).toContain("未知の英語については誤字の可能性もあるため");
-    expect(prompt).toContain("未知の単語はひらがなのままでも構わない");
-    expect(prompt).toContain("五時ではなく午後三時");
+    expect(prompt).toContain("おじいさんご自慢の時計さ");
+    expect(prompt).toContain("みちの英語についてはごじの可能性もあるため");
   });
 
   it("keeps kana-kanji prompts independent from user dictionary entries", () => {
