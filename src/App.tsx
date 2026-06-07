@@ -26,6 +26,7 @@ import { convertRomajiToJapanese, providerLabel } from "./lib/ollama";
 import { checkOllamaConnection } from "./lib/ollamaConnection";
 import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
+import { appShortcutFromKeyboardEvent } from "./lib/shortcuts";
 import type {
   AppSettings,
   ConversionAnchor,
@@ -359,6 +360,36 @@ function App() {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
   }, [getEditorDocument]);
+
+  useEffect(() => {
+    const handleAppShortcut = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("[data-ignore-app-shortcuts='true']")
+      ) {
+        return;
+      }
+
+      const action = appShortcutFromKeyboardEvent(event);
+      if (!action) {
+        return;
+      }
+
+      event.preventDefault();
+      if (action === "open") {
+        void handleOpenFile();
+        return;
+      }
+      if (action === "saveAs") {
+        void handleSaveFileAs();
+        return;
+      }
+      void handleSaveFile();
+    };
+
+    document.addEventListener("keydown", handleAppShortcut);
+    return () => document.removeEventListener("keydown", handleAppShortcut);
+  }, [handleOpenFile, handleSaveFile, handleSaveFileAs]);
 
   const cancelConversion = useCallback((request: PendingConversion) => {
     canceledRequestsRef.current.add(request.id);

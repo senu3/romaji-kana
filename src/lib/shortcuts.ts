@@ -6,7 +6,44 @@ export interface ShortcutKeyEvent {
   shiftKey: boolean;
 }
 
+export interface AppShortcutKeyEvent extends ShortcutKeyEvent {
+  defaultPrevented?: boolean;
+  isComposing?: boolean;
+  repeat?: boolean;
+}
+
+export type AppShortcutAction = "open" | "save" | "saveAs";
+
 const modifierKeys = new Set(["Alt", "Control", "Meta", "Shift"]);
+const reservedAppShortcuts = new Set(["Mod-o", "Mod-s", "Mod-Shift-s"]);
+
+export function appShortcutFromKeyboardEvent(
+  event: AppShortcutKeyEvent,
+): AppShortcutAction | null {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.repeat ||
+    event.altKey ||
+    (!event.ctrlKey && !event.metaKey)
+  ) {
+    return null;
+  }
+
+  const key = normalizeKey(event.key);
+  if (key === "o" && !event.shiftKey) {
+    return "open";
+  }
+  if (key === "s") {
+    return event.shiftKey ? "saveAs" : "save";
+  }
+
+  return null;
+}
+
+export function isReservedAppShortcut(shortcut: string): boolean {
+  return reservedAppShortcuts.has(shortcut);
+}
 
 export function shortcutFromKeyboardEvent(event: ShortcutKeyEvent): string | null {
   if (modifierKeys.has(event.key)) {

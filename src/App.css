@@ -167,7 +167,7 @@ h3 {
   top: calc(100% + 8px);
   right: 0;
   display: grid;
-  width: 188px;
+  width: 268px;
   padding: 6px;
   border: 1px solid #b5d7d1;
   border-radius: 8px;
@@ -188,6 +188,26 @@ h3 {
   font-size: 13px;
   font-weight: 650;
   text-align: left;
+}
+
+.toolbar-menu-items button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-menu-items kbd {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 1px solid #cbdedb;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: #f8fafc;
+  color: #64748b;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 750;
 }
 
 .toolbar-menu-items button:hover {
