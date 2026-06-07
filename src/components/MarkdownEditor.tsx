@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap, redo, undo } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { Compartment, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -262,6 +262,11 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 const COMPOSITION_END_GRACE_MS = 120;
+const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
+  "input.convert",
+  "input.historyApply",
+  "input.ghostAccept",
+]);
 
 export function MarkdownEditor({
   settings,
@@ -293,6 +298,7 @@ export function MarkdownEditor({
   const composingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  settingsRef.current = settings;
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
@@ -307,11 +313,7 @@ export function MarkdownEditor({
       if (userEvent?.startsWith("document.")) {
         return;
       }
-      if (
-        userEvent === "input.convert" ||
-        userEvent === "input.historyApply" ||
-        userEvent === "input.ghostAccept"
-      ) {
+      if (shouldSuppressAutoTriggerForUserEvent(userEvent)) {
         return;
       }
 
@@ -334,7 +336,7 @@ export function MarkdownEditor({
   }, []);
 
   const shortcutCompartment = useMemo(() => new Compartment(), []);
-  const enterTriggerHandler = useMemo(() => {
+  const compositionHandler = useMemo(() => {
     return EditorView.domEventHandlers({
       compositionstart() {
         composingRef.current = true;
@@ -342,30 +344,6 @@ export function MarkdownEditor({
       compositionend() {
         composingRef.current = false;
         lastCompositionEndAtRef.current = Date.now();
-      },
-      keydown(event, view) {
-        if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
-          return false;
-        }
-        if (!settingsRef.current.autoConvert || !settingsRef.current.triggers.enter) {
-          return false;
-        }
-        if (
-          event.isComposing ||
-          composingRef.current ||
-          Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS
-        ) {
-          return false;
-        }
-
-        const cursor = view.state.selection.main.head;
-        const range = extractConversionRange(view.state.doc.toString(), cursor, "enter");
-        if (!range) {
-          return false;
-        }
-
-        onConvertRef.current(range);
-        return true;
       },
     });
   }, []);
@@ -402,9 +380,13 @@ export function MarkdownEditor({
         syntaxHighlighting(highlightStyle),
         placeholder("Romaji de nihongo wo kaitte kudasai..."),
         updateListener,
-        enterTriggerHandler,
+        compositionHandler,
         shortcutCompartment.of(
-          keymap.of([
+          Prec.highest(keymap.of([
+            {
+              key: "Enter",
+              run: runEnterConversion,
+            },
             {
               key: "Tab",
               run: acceptGhostSuggestion,
@@ -417,7 +399,7 @@ export function MarkdownEditor({
               key: settingsRef.current.triggers.manualShortcut,
               run: (view) => manualConvert(view, "shortcut"),
             },
-          ]),
+          ])),
         ),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
@@ -437,7 +419,7 @@ export function MarkdownEditor({
       view.destroy();
       viewRef.current = null;
     };
-  }, [enterTriggerHandler, registerView, shortcutCompartment, updateListener]);
+  }, [compositionHandler, registerView, shortcutCompartment, updateListener]);
 
   useEffect(() => {
     if (!fileMenuOpen) {
@@ -473,7 +455,11 @@ export function MarkdownEditor({
 
     view.dispatch({
       effects: shortcutCompartment.reconfigure(
-        keymap.of([
+        Prec.highest(keymap.of([
+          {
+            key: "Enter",
+            run: runEnterConversion,
+          },
           {
             key: settings.triggers.manualShortcut,
             run: (editorView) => {
@@ -496,10 +482,31 @@ export function MarkdownEditor({
             key: "Escape",
             run: dismissGhostSuggestion,
           },
-        ]),
+        ])),
       ),
     });
   }, [settings.triggers.manualShortcut, shortcutCompartment]);
+
+  function runEnterConversion(view: EditorView) {
+    if (!settingsRef.current.autoConvert || !settingsRef.current.triggers.enter) {
+      return false;
+    }
+    if (
+      composingRef.current ||
+      Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS
+    ) {
+      return false;
+    }
+
+    const cursor = view.state.selection.main.head;
+    const range = extractConversionRange(view.state.doc.toString(), cursor, "enter");
+    if (!range) {
+      return false;
+    }
+
+    onConvertRef.current(range);
+    return true;
+  }
 
   function acceptGhostSuggestion(view: EditorView) {
     const state = view.state.field(ghostSuggestionField);
@@ -646,5 +653,21 @@ export function MarkdownEditor({
       </div>
       <div className="editor-host" ref={hostRef} />
     </section>
+  );
+}
+
+function shouldSuppressAutoTriggerForUserEvent(userEvent: string | undefined): boolean {
+  if (!userEvent) {
+    return false;
+  }
+  if (AUTO_TRIGGER_SUPPRESSED_USER_EVENTS.has(userEvent)) {
+    return true;
+  }
+  return (
+    userEvent === "undo" ||
+    userEvent === "redo" ||
+    userEvent.startsWith("undo.") ||
+    userEvent.startsWith("redo.") ||
+    userEvent.startsWith("history.")
   );
 }

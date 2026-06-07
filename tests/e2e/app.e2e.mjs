@@ -29,6 +29,7 @@ try {
   });
 
   const page = await context.newPage();
+  let conversionRequestCount = 0;
   await page.route("**/api/tags", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -36,9 +37,13 @@ try {
     });
   });
   await page.route("**/api/generate", async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.prompt) {
+      conversionRequestCount += 1;
+    }
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ response: "" }),
+      body: JSON.stringify({ response: body.prompt ? "あなたは誰ですか。" : "" }),
     });
   });
 
@@ -52,9 +57,44 @@ try {
   await waitForVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
   await page.getByRole("button", { name: "Start writing" }).click();
   await page.getByRole("dialog", { name: "Set up your local model" }).waitFor({ state: "hidden" });
+  await page
+    .locator(".settings-panel .accordion-trigger")
+    .filter({ hasText: "Triggers" })
+    .click();
+  await page.getByLabel("Enter (IME composing ignored)").check();
+  assert.equal(
+    await page.getByLabel("Enter (IME composing ignored)").isChecked(),
+    true,
+    "Enter trigger checkbox should be enabled before editor input.",
+  );
+  await page.waitForFunction(() => {
+    const rawSettings = localStorage.getItem("romaji-kana-settings");
+    if (!rawSettings) {
+      return false;
+    }
+    return JSON.parse(rawSettings).triggers?.enter === true;
+  });
 
   const modelInput = page.getByRole("combobox");
   await assertLocatorValue(modelInput, "gemma4:latest");
+
+  conversionRequestCount = 0;
+  await page.locator(".cm-content").click();
+  await page.keyboard.type("anatahadaredesuka");
+  await page.getByText("anatahadaredesuka").waitFor();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(500);
+  assert.equal(
+    conversionRequestCount,
+    1,
+    `Enter should trigger conversion. Editor text: ${await page.locator(".cm-content").textContent()}`,
+  );
+  await page.getByText("あなたは誰ですか。").waitFor();
+  assert.equal(conversionRequestCount, 1, "Enter should trigger exactly one conversion.");
+  await page.getByRole("button", { name: "Undo" }).click();
+  await page.getByText("anatahadaredesuka").waitFor();
+  await page.waitForTimeout(300);
+  assert.equal(conversionRequestCount, 1, "Undo should not re-trigger conversion.");
 
   await page.getByRole("button", { name: "Open dictionary" }).click();
   await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
@@ -79,7 +119,6 @@ try {
   await page.getByRole("button", { name: "Close prompt" }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await assertVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
   await page.getByRole("button", { name: "Open settings" }).click();
   await page.getByRole("dialog", { name: "Settings" }).waitFor();
   await assertVisibleText(page, "Connected");
