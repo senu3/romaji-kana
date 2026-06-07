@@ -988,6 +988,34 @@ h3 {
   background: #f8fffd;
 }
 
+.dictionary-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid #d5e8e5;
+  background: #ffffff;
+}
+
+.dictionary-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid #d5e8e5;
+  background: transparent;
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dictionary-tabs button:last-child {
+  border-right: 0;
+}
+
+.dictionary-tabs button:hover,
+.dictionary-tabs button.selected {
+  background: #ecfeff;
+  color: #115e59;
+}
+
 .dictionary-add-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;

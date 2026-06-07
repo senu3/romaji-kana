@@ -39,6 +39,7 @@ import type {
   OllamaModel,
   PendingConversion,
   UserDictionaryEntry,
+  UserHomophonePreference,
 } from "./lib/types";
 
 type ActivePanel = "history" | "prompt" | null;
@@ -47,6 +48,7 @@ const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
+const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -783,6 +785,12 @@ function App() {
   const enabledDictionaryCount = settings.userDictionary.filter(
     (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
   ).length;
+  const enabledHomophoneCount = settings.userHomophones.filter(
+    (entry) =>
+      entry.enabled &&
+      isHiraganaReading(entry.reading.trim()) &&
+      entry.preferred.trim(),
+  ).length;
 
   return (
     <main className="app-shell">
@@ -790,7 +798,7 @@ function App() {
         settings={settings}
         pending={pending}
         historyCount={history.length}
-        dictionaryCount={enabledDictionaryCount}
+        dictionaryCount={enabledDictionaryCount + enabledHomophoneCount}
         initialDocument={initialDocument}
         fileName={currentFilePath ? basename(currentFilePath) : "Unsaved draft"}
         isDirty={isDirty}
@@ -833,7 +841,11 @@ function App() {
       {dictionaryPanelOpen ? (
         <DictionaryModal
           entries={settings.userDictionary}
+          homophones={settings.userHomophones}
           onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
+          onHomophonesChange={(userHomophones) =>
+            setSettings((value) => ({ ...value, userHomophones }))
+          }
           onClose={() => setDictionaryPanelOpen(false)}
         />
       ) : null}
@@ -1173,18 +1185,33 @@ function presetDescription(preset: ConversionPreset): string {
 
 function DictionaryModal({
   entries,
+  homophones,
   onChange,
+  onHomophonesChange,
   onClose,
 }: {
   entries: UserDictionaryEntry[];
+  homophones: UserHomophonePreference[];
   onChange: (entries: UserDictionaryEntry[]) => void;
+  onHomophonesChange: (entries: UserHomophonePreference[]) => void;
   onClose: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"terms" | "homophones">("terms");
   const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
+  const [homophoneDraft, setHomophoneDraft] = useState({
+    reading: "",
+    preferred: "",
+    note: "",
+  });
   const canAdd =
     draft.reading.trim().length > 0 &&
     draft.output.trim().length > 0 &&
     entries.length < MAX_USER_DICTIONARY_ENTRIES;
+  const canAddHomophone =
+    homophoneDraft.reading.trim().length > 0 &&
+    homophoneDraft.preferred.trim().length > 0 &&
+    isHiraganaReading(homophoneDraft.reading.trim()) &&
+    homophones.length < MAX_USER_HOMOPHONE_ENTRIES;
 
   const addEntry = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1205,6 +1232,25 @@ function DictionaryModal({
     setDraft({ reading: "", output: "", note: "" });
   };
 
+  const addHomophone = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canAddHomophone) {
+      return;
+    }
+
+    onHomophonesChange([
+      ...homophones,
+      {
+        id: createDictionaryEntryId("homophone"),
+        reading: homophoneDraft.reading.trim(),
+        preferred: homophoneDraft.preferred.trim(),
+        note: homophoneDraft.note.trim(),
+        enabled: true,
+      },
+    ]);
+    setHomophoneDraft({ reading: "", preferred: "", note: "" });
+  };
+
   const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
     onChange(
       entries.map((entry) =>
@@ -1220,6 +1266,23 @@ function DictionaryModal({
 
   const deleteEntry = (id: string) => {
     onChange(entries.filter((entry) => entry.id !== id));
+  };
+
+  const updateHomophone = (id: string, patch: Partial<UserHomophonePreference>) => {
+    onHomophonesChange(
+      homophones.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              ...patch,
+            }
+          : entry,
+      ),
+    );
+  };
+
+  const deleteHomophone = (id: string) => {
+    onHomophonesChange(homophones.filter((entry) => entry.id !== id));
   };
 
   return (
@@ -1241,121 +1304,265 @@ function DictionaryModal({
           </button>
         </div>
 
-        <form className="dictionary-add-form" onSubmit={addEntry}>
-          <label className="field">
-            <span>Romaji reading</span>
-            <input
-              aria-label="Romaji reading"
-              value={draft.reading}
-              maxLength={80}
-              placeholder="openai"
-              onChange={(event) => {
-                const reading = event.currentTarget.value;
-                setDraft((value) => ({ ...value, reading }));
-              }}
-            />
-          </label>
-          <label className="field">
-            <span>Output</span>
-            <input
-              aria-label="Output"
-              value={draft.output}
-              maxLength={80}
-              placeholder="OpenAI"
-              onChange={(event) => {
-                const output = event.currentTarget.value;
-                setDraft((value) => ({ ...value, output }));
-              }}
-            />
-          </label>
-          <label className="field dictionary-note-field">
-            <span>Note</span>
-            <input
-              aria-label="Note"
-              value={draft.note}
-              maxLength={120}
-              placeholder="company name"
-              onChange={(event) => {
-                const note = event.currentTarget.value;
-                setDraft((value) => ({ ...value, note }));
-              }}
-            />
-          </label>
-          <button className="primary-button dictionary-add-button" type="submit" disabled={!canAdd}>
-            <Plus size={16} aria-hidden="true" />
-            Add entry
+        <div className="dictionary-tabs" role="tablist" aria-label="Dictionary sections">
+          <button
+            className={activeTab === "terms" ? "selected" : ""}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "terms"}
+            onClick={() => setActiveTab("terms")}
+          >
+            Terms
           </button>
-        </form>
-
-        <div className="dictionary-list-header">
-          <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
+          <button
+            className={activeTab === "homophones" ? "selected" : ""}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "homophones"}
+            onClick={() => setActiveTab("homophones")}
+          >
+            Homophones
+          </button>
         </div>
-        {entries.length === 0 ? (
-          <p className="empty-state">No dictionary entries yet.</p>
+
+        {activeTab === "terms" ? (
+          <>
+            <form className="dictionary-add-form" onSubmit={addEntry}>
+              <label className="field">
+                <span>Romaji reading</span>
+                <input
+                  aria-label="Romaji reading"
+                  value={draft.reading}
+                  maxLength={80}
+                  placeholder="openai"
+                  onChange={(event) => {
+                    const reading = event.currentTarget.value;
+                    setDraft((value) => ({ ...value, reading }));
+                  }}
+                />
+              </label>
+              <label className="field">
+                <span>Output</span>
+                <input
+                  aria-label="Output"
+                  value={draft.output}
+                  maxLength={80}
+                  placeholder="OpenAI"
+                  onChange={(event) => {
+                    const output = event.currentTarget.value;
+                    setDraft((value) => ({ ...value, output }));
+                  }}
+                />
+              </label>
+              <label className="field dictionary-note-field">
+                <span>Note</span>
+                <input
+                  aria-label="Note"
+                  value={draft.note}
+                  maxLength={120}
+                  placeholder="company name"
+                  onChange={(event) => {
+                    const note = event.currentTarget.value;
+                    setDraft((value) => ({ ...value, note }));
+                  }}
+                />
+              </label>
+              <button
+                className="primary-button dictionary-add-button"
+                type="submit"
+                disabled={!canAdd}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Add entry
+              </button>
+            </form>
+
+            <div className="dictionary-list-header">
+              <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
+            </div>
+            {entries.length === 0 ? (
+              <p className="empty-state">No dictionary entries yet.</p>
+            ) : (
+              <div className="dictionary-list">
+                {entries.map((entry, index) => (
+                  <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
+                    <label className="dictionary-enable">
+                      <input
+                        type="checkbox"
+                        checked={entry.enabled}
+                        onChange={(event) =>
+                          updateEntry(entry.id, { enabled: event.currentTarget.checked })
+                        }
+                      />
+                      Enabled
+                    </label>
+                    <div className="dictionary-entry-fields">
+                      <input
+                        aria-label={`Dictionary reading ${index + 1}`}
+                        value={entry.reading}
+                        maxLength={80}
+                        onChange={(event) =>
+                          updateEntry(entry.id, { reading: event.currentTarget.value })
+                        }
+                      />
+                      <input
+                        aria-label={`Dictionary output ${index + 1}`}
+                        value={entry.output}
+                        maxLength={80}
+                        onChange={(event) =>
+                          updateEntry(entry.id, { output: event.currentTarget.value })
+                        }
+                      />
+                      <input
+                        aria-label={`Dictionary note ${index + 1}`}
+                        value={entry.note}
+                        maxLength={120}
+                        placeholder="Note"
+                        onChange={(event) =>
+                          updateEntry(entry.id, { note: event.currentTarget.value })
+                        }
+                      />
+                    </div>
+                    <button
+                      className="icon-button dictionary-delete"
+                      type="button"
+                      onClick={() => deleteEntry(entry.id)}
+                      aria-label={`Delete ${entry.output || entry.reading}`}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="dictionary-list">
-            {entries.map((entry, index) => (
-              <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
-                <label className="dictionary-enable">
-                  <input
-                    type="checkbox"
-                    checked={entry.enabled}
-                    onChange={(event) =>
-                      updateEntry(entry.id, { enabled: event.currentTarget.checked })
-                    }
-                  />
-                  Enabled
-                </label>
-                <div className="dictionary-entry-fields">
-                  <input
-                    aria-label={`Dictionary reading ${index + 1}`}
-                    value={entry.reading}
-                    maxLength={80}
-                    onChange={(event) =>
-                      updateEntry(entry.id, { reading: event.currentTarget.value })
-                    }
-                  />
-                  <input
-                    aria-label={`Dictionary output ${index + 1}`}
-                    value={entry.output}
-                    maxLength={80}
-                    onChange={(event) =>
-                      updateEntry(entry.id, { output: event.currentTarget.value })
-                    }
-                  />
-                  <input
-                    aria-label={`Dictionary note ${index + 1}`}
-                    value={entry.note}
-                    maxLength={120}
-                    placeholder="Note"
-                    onChange={(event) =>
-                      updateEntry(entry.id, { note: event.currentTarget.value })
-                    }
-                  />
-                </div>
-                <button
-                  className="icon-button dictionary-delete"
-                  type="button"
-                  onClick={() => deleteEntry(entry.id)}
-                  aria-label={`Delete ${entry.output || entry.reading}`}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
-              </article>
-            ))}
-          </div>
+          <>
+            <form className="dictionary-add-form" onSubmit={addHomophone}>
+              <label className="field">
+                <span>Hiragana reading</span>
+                <input
+                  aria-label="Homophone reading"
+                  value={homophoneDraft.reading}
+                  maxLength={40}
+                  placeholder="ごじ"
+                  onChange={(event) => {
+                    const reading = event.currentTarget.value;
+                    setHomophoneDraft((value) => ({ ...value, reading }));
+                  }}
+                />
+              </label>
+              <label className="field">
+                <span>Preferred spelling</span>
+                <input
+                  aria-label="Preferred spelling"
+                  value={homophoneDraft.preferred}
+                  maxLength={40}
+                  placeholder="誤字"
+                  onChange={(event) => {
+                    const preferred = event.currentTarget.value;
+                    setHomophoneDraft((value) => ({ ...value, preferred }));
+                  }}
+                />
+              </label>
+              <label className="field dictionary-note-field">
+                <span>Note</span>
+                <input
+                  aria-label="Homophone note"
+                  value={homophoneDraft.note}
+                  maxLength={120}
+                  placeholder="for text conversion notes"
+                  onChange={(event) => {
+                    const note = event.currentTarget.value;
+                    setHomophoneDraft((value) => ({ ...value, note }));
+                  }}
+                />
+              </label>
+              <button
+                className="primary-button dictionary-add-button"
+                type="submit"
+                disabled={!canAddHomophone}
+              >
+                <Plus size={16} aria-hidden="true" />
+                Add entry
+              </button>
+            </form>
+
+            <div className="dictionary-list-header">
+              <strong>{homophones.length} / {MAX_USER_HOMOPHONE_ENTRIES}</strong>
+            </div>
+            {homophones.length === 0 ? (
+              <p className="empty-state">No homophone preferences yet.</p>
+            ) : (
+              <div className="dictionary-list">
+                {homophones.map((entry, index) => (
+                  <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
+                    <label className="dictionary-enable">
+                      <input
+                        type="checkbox"
+                        checked={entry.enabled}
+                        onChange={(event) =>
+                          updateHomophone(entry.id, { enabled: event.currentTarget.checked })
+                        }
+                      />
+                      Enabled
+                    </label>
+                    <div className="dictionary-entry-fields">
+                      <input
+                        aria-label={`Homophone reading ${index + 1}`}
+                        value={entry.reading}
+                        maxLength={40}
+                        onChange={(event) =>
+                          updateHomophone(entry.id, { reading: event.currentTarget.value })
+                        }
+                      />
+                      <input
+                        aria-label={`Homophone preferred ${index + 1}`}
+                        value={entry.preferred}
+                        maxLength={40}
+                        onChange={(event) =>
+                          updateHomophone(entry.id, { preferred: event.currentTarget.value })
+                        }
+                      />
+                      <input
+                        aria-label={`Homophone note ${index + 1}`}
+                        value={entry.note}
+                        maxLength={120}
+                        placeholder="Note"
+                        onChange={(event) =>
+                          updateHomophone(entry.id, { note: event.currentTarget.value })
+                        }
+                      />
+                    </div>
+                    <button
+                      className="icon-button dictionary-delete"
+                      type="button"
+                      onClick={() => deleteHomophone(entry.id)}
+                      aria-label={`Delete ${entry.preferred || entry.reading}`}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>
   );
 }
 
-function createDictionaryEntryId(): string {
+function createDictionaryEntryId(prefix = "dictionary"): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
 
-  return `dictionary-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isHiraganaReading(value: string): boolean {
+  return /^[\u3041-\u3096ー]+$/u.test(value);
 }
 
 function StatusBar({

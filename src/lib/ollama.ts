@@ -1,4 +1,4 @@
-import type { AppSettings } from "./types";
+import type { AppSettings, UserHomophonePreference } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
 import { buildKanaKanjiSystemPrompt, buildKanaRepairSystemPrompt } from "./prompts";
 import {
@@ -31,13 +31,62 @@ interface LiteralNounPart {
   output: string;
 }
 
+interface HomophoneKanaPart {
+  type: "homophone";
+  output: string;
+}
+
 type DictionarySplitPart = DictionaryTextPart | DictionaryEntryPart;
 type ConversionSplitPart = DictionaryTextPart | DictionaryEntryPart | LiteralNounPart;
+type KanaSplitPart = DictionaryTextPart | HomophoneKanaPart;
 
 interface DictionaryCandidate {
   normalizedReading: string;
   output: string;
 }
+
+interface HomophoneCandidate {
+  reading: string;
+  output: string;
+}
+
+const HOMOPHONE_BOUNDARY_CHARS = new Set([
+  " ",
+  "\n",
+  "\t",
+  "。",
+  "、",
+  ".",
+  ",",
+  "！",
+  "？",
+  "!",
+  "?",
+  "「",
+  "」",
+  "『",
+  "』",
+  "（",
+  "）",
+  "(",
+  ")",
+  "[",
+  "]",
+]);
+const HOMOPHONE_PARTICLE_BOUNDARY_CHARS = new Set([
+  "は",
+  "が",
+  "を",
+  "に",
+  "で",
+  "と",
+  "も",
+  "の",
+  "へ",
+  "や",
+  "か",
+  "だ",
+]);
 
 export async function convertRomajiToJapanese(
   input: string,
@@ -95,12 +144,40 @@ export async function kanjiizeKana(
   settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
+  const kanaParts = splitKanaByHomophones(kana, settings.userHomophones);
+  if (kanaParts.length > 1 || kanaParts[0]?.type === "homophone") {
+    const convertedParts: string[] = [];
+    for (const part of kanaParts) {
+      if (part.type === "homophone") {
+        convertedParts.push(part.output);
+        continue;
+      }
+
+      convertedParts.push(await kanjiizeKanaPart(part.value, settings, transport));
+    }
+
+    return convertedParts.join("");
+  }
+
+  return kanjiizeKanaPart(kana, settings, transport);
+}
+
+async function kanjiizeKanaPart(
+  kana: string,
+  settings: AppSettings,
+  transport: OllamaTransport,
+): Promise<string> {
   const result = await transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildKanaKanjiSystemPrompt(settings.conversionPrompt, settings.conversionPreset),
+      system: buildKanaKanjiSystemPrompt(
+        settings.conversionPrompt,
+        settings.conversionPreset,
+        [],
+        kana,
+      ),
       prompt: kana,
       stream: false,
       think: settings.think,
@@ -119,6 +196,97 @@ export async function kanjiizeKana(
   }
 
   return text;
+}
+
+function splitKanaByHomophones(
+  kana: string,
+  entries: UserHomophonePreference[],
+): KanaSplitPart[] {
+  const candidates = buildHomophoneCandidates(entries);
+  if (candidates.length === 0) {
+    return [{ type: "text", value: kana }];
+  }
+
+  const parts: KanaSplitPart[] = [];
+  let index = 0;
+  let lastCopiedIndex = 0;
+
+  while (index < kana.length) {
+    const match = candidates.find(
+      (candidate) =>
+        kana.startsWith(candidate.reading, index) &&
+        canMatchHomophoneCandidate(kana, index, candidate),
+    );
+    if (!match) {
+      index += 1;
+      continue;
+    }
+
+    if (lastCopiedIndex < index) {
+      parts.push({ type: "text", value: kana.slice(lastCopiedIndex, index) });
+    }
+    parts.push({ type: "homophone", output: match.output });
+    index += match.reading.length;
+    lastCopiedIndex = index;
+  }
+
+  if (parts.length === 0) {
+    return [{ type: "text", value: kana }];
+  }
+
+  if (lastCopiedIndex < kana.length) {
+    parts.push({ type: "text", value: kana.slice(lastCopiedIndex) });
+  }
+
+  return parts;
+}
+
+function canMatchHomophoneCandidate(
+  kana: string,
+  startIndex: number,
+  candidate: HomophoneCandidate,
+): boolean {
+  const before = kana[startIndex - 1] ?? "";
+  const after = kana[startIndex + candidate.reading.length] ?? "";
+
+  return isHomophoneBoundaryBefore(before) && isHomophoneBoundaryAfter(after);
+}
+
+function isHomophoneBoundaryBefore(char: string): boolean {
+  return (
+    char.length === 0 ||
+    HOMOPHONE_BOUNDARY_CHARS.has(char) ||
+    HOMOPHONE_PARTICLE_BOUNDARY_CHARS.has(char)
+  );
+}
+
+function isHomophoneBoundaryAfter(char: string): boolean {
+  return (
+    char.length === 0 ||
+    HOMOPHONE_BOUNDARY_CHARS.has(char) ||
+    HOMOPHONE_PARTICLE_BOUNDARY_CHARS.has(char)
+  );
+}
+
+function buildHomophoneCandidates(entries: UserHomophonePreference[]): HomophoneCandidate[] {
+  return entries
+    .map((entry) => ({
+      reading: entry.reading.trim(),
+      output: entry.preferred.trim(),
+      enabled: entry.enabled,
+    }))
+    .filter(
+      (entry) =>
+        entry.enabled &&
+        entry.reading.length > 0 &&
+        entry.output.length > 0 &&
+        isHiraganaReading(entry.reading),
+    )
+    .sort((a, b) => b.reading.length - a.reading.length);
+}
+
+function isHiraganaReading(value: string): boolean {
+  return /^[\u3041-\u3096ー]+$/u.test(value);
 }
 
 function splitInputForConversion(
