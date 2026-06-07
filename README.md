@@ -16,7 +16,8 @@ Markdown エディタです。
 
 デフォルトでは Ollama の APIURL `http://localhost:11434` の `gemma3` を使います。LM Studio の
 デフォルト URL は `http://localhost:1234` です。
-（gemma4、QWEN3.5の利用を推奨します）
+
+gemma4、QWEN3.5の9B以上を推奨します。初回ロード後は
 
 ## 入力例
 

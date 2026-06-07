@@ -1,4 +1,4 @@
-import type { ConversionPreset } from "./types";
+import type { ConversionPreset, UserHomophonePreference } from "./types";
 
 export const legacyDefaultConversionPrompt = [
   "You convert rough romaji Japanese input into natural Japanese.",
@@ -167,8 +167,11 @@ export function buildKanaRepairSystemPrompt(): string {
 export function buildKanaKanjiSystemPrompt(
   userPrompt: string,
   preset: ConversionPreset = "none",
+  homophones: UserHomophonePreference[] = [],
+  targetKana = "",
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
+  const matchingHomophones = formatMatchingHomophonePreferences(targetKana, homophones);
 
   return [
     "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
@@ -194,10 +197,54 @@ export function buildKanaKanjiSystemPrompt(
     "Purpose preset:",
     conversionPresetInstructions[preset],
     "",
+    "User homophone preferences:",
+    matchingHomophones || "None.",
+    "",
     "Context few-shot examples:",
     kanaKanjiFewShotExamples,
     "",
     "Additional user preference:",
     prompt,
   ].join("\n");
+}
+
+export function formatMatchingHomophonePreferences(
+  targetKana: string,
+  homophones: UserHomophonePreference[],
+): string {
+  const seen = new Set<string>();
+  const lines = homophones.flatMap((entry): string[] => {
+    const reading = entry.reading.trim();
+    const preferred = entry.preferred.trim();
+    const key = `${reading}\t${preferred}`;
+    if (
+      !entry.enabled ||
+      !reading ||
+      !preferred ||
+      !isHiraganaReading(reading) ||
+      seen.has(key) ||
+      !targetKana ||
+      !targetKana.includes(reading)
+    ) {
+      return [];
+    }
+
+    seen.add(key);
+    const note = entry.note.trim() ? ` (${entry.note.trim()})` : "";
+    return [`- ${reading}: prefer ${preferred}${note}`];
+  });
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return [
+    "Use these only as kana-to-kanji preferences for matching readings.",
+    "They are not fixed replacements. If a preference clearly conflicts with context, preserve the reading and choose the natural spelling.",
+    ...lines,
+  ].join("\n");
+}
+
+function isHiraganaReading(value: string): boolean {
+  return /^[\u3041-\u3096ー]+$/u.test(value);
 }

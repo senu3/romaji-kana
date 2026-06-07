@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapanese, normalizeRomajiReadingCandidate } from "./ollama";
+import { convertRomajiToJapanese, kanjiizeKana, normalizeRomajiReadingCandidate } from "./ollama";
 import {
   buildConversionSystemPrompt,
   buildKanaKanjiSystemPrompt,
   defaultConversionPrompt,
+  formatMatchingHomophonePreferences,
 } from "./prompts";
 import { defaultSettings } from "./settings";
 
@@ -113,6 +114,118 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         prompt: "あなたのえがおがすきです",
+      }),
+      30_000,
+    );
+  });
+
+  it("protects matching user homophone preferences from kana-kanji conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "このあたりの" })
+        .mockResolvedValueOnce({ response: "は変換前に確認したい" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userHomophones: [
+        {
+          id: "goji",
+          reading: "ごじ",
+          preferred: "誤字",
+          note: "text conversion",
+          enabled: true,
+        },
+        {
+          id: "michi",
+          reading: "みち",
+          preferred: "未知",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    const result = await convertRomajiToJapanese(
+      "konoatarinogozihahenkanmaenikakuninshitai",
+      settings,
+      transport,
+    );
+
+    expect(result).toBe("このあたりの誤字は変換前に確認したい");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "このあたりの",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "はへんかんまえにかくにんしたい",
+      }),
+      30_000,
+    );
+    expect(transport.generate.mock.calls.map((call) => call[2].prompt)).not.toContain("ごじ");
+    expect(transport.generate.mock.calls.map((call) => call[2].prompt)).not.toContain("みち");
+  });
+
+  it("returns a homophone preference directly when the whole kana input matches", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn(),
+    };
+    const settings = {
+      ...defaultSettings,
+      userHomophones: [
+        {
+          id: "goji",
+          reading: "ごじ",
+          preferred: "誤字",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    await expect(kanjiizeKana("ごじ", settings, transport)).resolves.toBe("誤字");
+    expect(transport.generate).not.toHaveBeenCalled();
+  });
+
+  it("does not protect homophone readings inside longer kana words", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "リンゴジュースを買った" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userHomophones: [
+        {
+          id: "goji",
+          reading: "ごじ",
+          preferred: "誤字",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+
+    await expect(kanjiizeKana("りんごじゅーすをかった", settings, transport)).resolves.toBe(
+      "リンゴジュースを買った",
+    );
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "りんごじゅーすをかった",
       }),
       30_000,
     );
@@ -414,5 +527,36 @@ describe("convertRomajiToJapanese", () => {
 
     expect(prompt).not.toContain("User dictionary:");
     expect(prompt).not.toContain("Protected dictionary placeholders");
+  });
+
+  it("formats only matching enabled homophone preferences", () => {
+    const prompt = formatMatchingHomophonePreferences("このあたりのごじをかくにん", [
+      {
+        id: "goji",
+        reading: "ごじ",
+        preferred: "誤字",
+        note: "conversion notes",
+        enabled: true,
+      },
+      {
+        id: "michi",
+        reading: "みち",
+        preferred: "未知",
+        note: "",
+        enabled: true,
+      },
+      {
+        id: "disabled",
+        reading: "ごじ",
+        preferred: "五時",
+        note: "",
+        enabled: false,
+      },
+    ]);
+
+    expect(prompt).toContain("- ごじ: prefer 誤字 (conversion notes)");
+    expect(prompt).toContain("not fixed replacements");
+    expect(prompt).not.toContain("未知");
+    expect(prompt).not.toContain("五時");
   });
 });

@@ -1,8 +1,9 @@
-import type { AppSettings, UserDictionaryEntry } from "./types";
+import type { AppSettings, UserDictionaryEntry, UserHomophonePreference } from "./types";
 import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
+const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
 export const defaultSettings: AppSettings = {
   modelProvider: "ollama",
@@ -24,6 +25,7 @@ export const defaultSettings: AppSettings = {
   conversionPrompt: defaultConversionPrompt,
   conversionPreset: "none",
   userDictionary: [],
+  userHomophones: [],
   think: false,
 };
 
@@ -70,6 +72,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
       ...settings.punctuationConversion,
     },
     userDictionary: normalizeUserDictionary(settings.userDictionary),
+    userHomophones: normalizeUserHomophones(settings.userHomophones),
   };
 }
 
@@ -102,6 +105,41 @@ function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {
       ];
     })
     .slice(0, MAX_USER_DICTIONARY_ENTRIES);
+}
+
+function normalizeUserHomophones(entries: unknown): UserHomophonePreference[] {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries
+    .flatMap((entry, index): UserHomophonePreference[] => {
+      if (!entry || typeof entry !== "object") {
+        return [];
+      }
+
+      const record = entry as Record<string, unknown>;
+      const reading = readString(record.reading).trim();
+      const preferred = readString(record.preferred).trim();
+      if (!reading || !preferred || !isHiraganaReading(reading)) {
+        return [];
+      }
+
+      return [
+        {
+          id: readString(record.id).trim() || `homophone-${index}`,
+          reading,
+          preferred,
+          note: readString(record.note).trim(),
+          enabled: typeof record.enabled === "boolean" ? record.enabled : true,
+        },
+      ];
+    })
+    .slice(0, MAX_USER_HOMOPHONE_ENTRIES);
+}
+
+function isHiraganaReading(value: string): boolean {
+  return /^[\u3041-\u3096ー]+$/u.test(value);
 }
 
 function readString(value: unknown): string {

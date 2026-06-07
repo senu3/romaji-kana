@@ -15,6 +15,14 @@ export interface UserDictionaryEntry {
   enabled: boolean;
 }
 
+export interface UserHomophonePreference {
+  id: string;
+  reading: string;
+  preferred: string;
+  note: string;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   modelProvider: ModelProvider;
   ollamaApiUrl: string;
@@ -35,6 +43,7 @@ export interface AppSettings {
   conversionPrompt: string;
   conversionPreset: ConversionPreset;
   userDictionary: UserDictionaryEntry[];
+  userHomophones: UserHomophonePreference[];
   think: boolean;
 }
 
