@@ -1,5 +1,5 @@
 import type { AppSettings, UserDictionaryEntry, UserHomophonePreference } from "./types";
-import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
+import { defaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
@@ -52,10 +52,7 @@ type LegacySettings = Partial<AppSettings> & {
 
 function mergeSettings(settings: LegacySettings): AppSettings {
   const { thinkingMode, ...currentSettings } = settings;
-  const conversionPrompt =
-    !settings.conversionPrompt || settings.conversionPrompt === legacyDefaultConversionPrompt
-      ? defaultConversionPrompt
-      : settings.conversionPrompt;
+  const conversionPrompt = settings.conversionPrompt || defaultConversionPrompt;
   const think = settings.think ?? thinkingMode === "on";
 
   return {
