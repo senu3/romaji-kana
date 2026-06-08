@@ -19,8 +19,12 @@ import {
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
 import { SettingsContent, SettingsPanel } from "./components/SettingsPanel";
-import { clearDocument, loadDocument, saveDocument } from "./lib/documentStore";
-import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
+import {
+  loadDocumentSession,
+  saveFileDocumentSession,
+  saveNewDocumentSession,
+} from "./lib/documentStore";
+import { basename, openMarkdownFile, reopenMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
 import {
   convertRomajiToJapaneseDetailed,
@@ -65,6 +69,12 @@ type ActiveHomophoneReviewSuggestion = HomophoneReviewSuggestion & {
 };
 
 function App() {
+  const [initialSession] = useState(() => {
+    if (typeof localStorage === "undefined") {
+      return { kind: "new" as const, content: "" };
+    }
+    return loadDocumentSession();
+  });
   const [settings, setSettings] = useState<AppSettings>(() => {
     if (typeof localStorage === "undefined") {
       return defaultSettings;
@@ -78,25 +88,27 @@ function App() {
   const [homophoneSuggestion, setHomophoneSuggestion] =
     useState<ActiveHomophoneReviewSuggestion | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(
+    initialSession.kind === "file" ? initialSession.path : null,
+  );
+  const [isDirty, setIsDirty] = useState(
+    initialSession.kind === "new" && initialSession.content.length > 0,
+  );
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
     message: "Local model provider has not been checked yet.",
   });
-  const [initialDocument] = useState(() => {
-    if (typeof localStorage === "undefined") {
-      return "";
-    }
-    return loadDocument();
-  });
+  const [initialDocument] = useState(() =>
+    initialSession.kind === "new" ? initialSession.content : "",
+  );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "Ready. Type romaji and finish with punctuation, or press Ctrl+Enter.",
   });
   const [settingsCollapsed, setSettingsCollapsed] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const [setupComplete, setSetupComplete] = useState(() => {
     if (typeof localStorage === "undefined") {
       return true;
@@ -105,6 +117,11 @@ function App() {
   });
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
+  const currentFilePathRef = useRef<string | null>(
+    initialSession.kind === "file" ? initialSession.path : null,
+  );
+  const isDirtyRef = useRef(initialSession.kind === "new" && initialSession.content.length > 0);
+  const initialFileRestoreStartedRef = useRef(false);
   const docVersionRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionCheckIdRef = useRef(0);
@@ -155,6 +172,7 @@ function App() {
 
   const registerView = useCallback((view: EditorView | null) => {
     editorViewRef.current = view;
+    setEditorReady(Boolean(view));
   }, []);
 
   const completeSetup = useCallback(() => {
@@ -169,6 +187,7 @@ function App() {
     if (suppressNextDirtyRef.current) {
       suppressNextDirtyRef.current = false;
     } else {
+      isDirtyRef.current = true;
       setIsDirty(true);
     }
 
@@ -176,7 +195,12 @@ function App() {
       clearTimeout(saveTimerRef.current);
     }
     saveTimerRef.current = setTimeout(() => {
-      saveDocument(documentText);
+      const filePath = currentFilePathRef.current;
+      if (filePath) {
+        saveFileDocumentSession(filePath);
+      } else {
+        saveNewDocumentSession(documentText);
+      }
       saveTimerRef.current = null;
     }, 250);
   }, []);
@@ -356,45 +380,80 @@ function App() {
     });
   }, [clearPendingConversions]);
 
+  const markDocumentClean = useCallback(() => {
+    isDirtyRef.current = false;
+    setIsDirty(false);
+  }, []);
+
+  const confirmDiscardUnsavedChanges = useCallback(() => {
+    if (!isDirtyRef.current) {
+      return true;
+    }
+
+    return window.confirm("You have unsaved changes. Discard them?");
+  }, []);
+
+  const saveCurrentDocumentSession = useCallback((documentText: string) => {
+    const filePath = currentFilePathRef.current;
+    if (filePath) {
+      saveFileDocumentSession(filePath);
+      return;
+    }
+
+    saveNewDocumentSession(documentText);
+  }, []);
+
   const handleNewFile = useCallback(() => {
+    if (!confirmDiscardUnsavedChanges()) {
+      return;
+    }
+
+    currentFilePathRef.current = null;
     replaceEditorDocument("");
     setCurrentFilePath(null);
-    setIsDirty(false);
-    clearDocument();
+    markDocumentClean();
+    saveNewDocumentSession("");
     setStatus({ kind: "success", message: "Created a new file." });
-  }, [replaceEditorDocument]);
+  }, [confirmDiscardUnsavedChanges, markDocumentClean, replaceEditorDocument]);
 
   const handleOpenFile = useCallback(async () => {
+    if (!confirmDiscardUnsavedChanges()) {
+      return;
+    }
+
     try {
       const file = await openMarkdownFile();
       if (!file) {
         return;
       }
 
+      currentFilePathRef.current = file.path;
       replaceEditorDocument(file.content);
       setCurrentFilePath(file.path);
-      setIsDirty(false);
-      saveDocument(file.content);
+      markDocumentClean();
+      saveFileDocumentSession(file.path);
       setStatus({ kind: "success", message: `Opened ${basename(file.path)}.` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
-  }, [replaceEditorDocument]);
+  }, [confirmDiscardUnsavedChanges, markDocumentClean, replaceEditorDocument]);
 
   const handleSaveFile = useCallback(async () => {
     try {
-      const savedPath = await saveMarkdownFile(getEditorDocument(), currentFilePath);
+      const savedPath = await saveMarkdownFile(getEditorDocument(), currentFilePathRef.current);
       if (!savedPath) {
         return;
       }
 
+      currentFilePathRef.current = savedPath;
       setCurrentFilePath(savedPath);
-      setIsDirty(false);
+      markDocumentClean();
+      saveFileDocumentSession(savedPath);
       setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
-  }, [currentFilePath, getEditorDocument]);
+  }, [getEditorDocument, markDocumentClean]);
 
   const handleSaveFileAs = useCallback(async () => {
     try {
@@ -403,13 +462,42 @@ function App() {
         return;
       }
 
+      currentFilePathRef.current = savedPath;
       setCurrentFilePath(savedPath);
-      setIsDirty(false);
+      markDocumentClean();
+      saveFileDocumentSession(savedPath);
       setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
-  }, [getEditorDocument]);
+  }, [getEditorDocument, markDocumentClean]);
+
+  useEffect(() => {
+    if (!editorReady || initialSession.kind !== "file" || initialFileRestoreStartedRef.current) {
+      return;
+    }
+
+    initialFileRestoreStartedRef.current = true;
+    setStatus({ kind: "loading", message: `Re-opening ${basename(initialSession.path)}...` });
+
+    reopenMarkdownFile(initialSession.path)
+      .then((file) => {
+        currentFilePathRef.current = file.path;
+        replaceEditorDocument(file.content);
+        setCurrentFilePath(file.path);
+        markDocumentClean();
+        saveFileDocumentSession(file.path);
+        setStatus({ kind: "success", message: `Re-opened ${basename(file.path)}.` });
+      })
+      .catch((error: unknown) => {
+        currentFilePathRef.current = null;
+        replaceEditorDocument("");
+        setCurrentFilePath(null);
+        markDocumentClean();
+        saveNewDocumentSession("");
+        setStatus({ kind: "error", message: formatFileError(error) });
+      });
+  }, [editorReady, initialSession, markDocumentClean, replaceEditorDocument]);
 
   const showHomophoneReviewSuggestion = useCallback(
     (conversionId: string, conversion: JapaneseConversionResult, baseFrom: number) => {
@@ -460,7 +548,7 @@ function App() {
       selection: { anchor: suggestion.from + suggestion.preferred.length },
       userEvent: "input.homophoneReview",
     });
-    saveDocument(view.state.doc.toString());
+    saveCurrentDocumentSession(view.state.doc.toString());
     setHomophoneSuggestion(null);
     setStatus({
       kind: "success",
@@ -468,7 +556,7 @@ function App() {
     });
     view.focus();
     return true;
-  }, [homophoneSuggestion]);
+  }, [homophoneSuggestion, saveCurrentDocumentSession]);
 
   const dismissHomophoneSuggestion = useCallback(() => {
     setHomophoneSuggestion(null);
@@ -651,7 +739,7 @@ function App() {
         effects: removeLoadingDecoration.of(request.id),
         userEvent: "input.convert",
       });
-      saveDocument(currentView.state.doc.toString());
+      saveCurrentDocumentSession(currentView.state.doc.toString());
 
       const nextAnchor: ConversionAnchor = {
         from: latestResolved.from,
@@ -676,7 +764,7 @@ function App() {
       showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
       setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
     },
-    [showHomophoneReviewSuggestion, skipQueuedConversion],
+    [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
   );
 
   const processHistoryConversion = useCallback(
@@ -764,7 +852,7 @@ function App() {
         },
         userEvent: "input.historyApply",
       });
-      saveDocument(latestView.state.doc.toString());
+      saveCurrentDocumentSession(latestView.state.doc.toString());
 
       const nextAnchor: ConversionAnchor = {
         from: latestResolved.from,
@@ -796,7 +884,7 @@ function App() {
       });
       showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
     },
-    [showHomophoneReviewSuggestion, skipQueuedConversion],
+    [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
   );
 
   const processConversionQueue = useCallback(async () => {
@@ -914,7 +1002,7 @@ function App() {
     };
 
     if (view) {
-      saveDocument(view.state.doc.toString());
+      saveCurrentDocumentSession(view.state.doc.toString());
     }
 
     setHistory((items) => [
@@ -939,7 +1027,7 @@ function App() {
       suggestion.from,
     );
     setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
-  }, [showHomophoneReviewSuggestion]);
+  }, [saveCurrentDocumentSession, showHomophoneReviewSuggestion]);
 
   const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
     if (!item.output || !item.anchor) {

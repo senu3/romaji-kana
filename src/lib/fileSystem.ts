@@ -10,6 +10,11 @@ export async function openMarkdownFile(): Promise<OpenedMarkdownFile | null> {
   return invoke<OpenedMarkdownFile | null>("open_markdown_file");
 }
 
+export async function reopenMarkdownFile(path: string): Promise<OpenedMarkdownFile> {
+  ensureTauriFileAccess();
+  return invoke<OpenedMarkdownFile>("reopen_markdown_file", { path });
+}
+
 export async function saveMarkdownFile(
   content: string,
   path?: string | null,

@@ -26,10 +26,14 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem("romaji-kana-document", "previous file content should not restore.");
+    localStorage.setItem(
+      "romaji-kana-document-session",
+      JSON.stringify({ kind: "new", content: "restored unsaved draft." }),
+    );
   });
 
   const page = await context.newPage();
+  page.on("dialog", (dialog) => dialog.accept());
   let conversionRequestCount = 0;
   let activeConversionRequests = 0;
   let maxActiveConversionRequests = 0;
@@ -64,12 +68,7 @@ try {
   await page.goto(appUrl);
   await page.getByRole("heading", { name: "Romaji Kana" }).waitFor();
   await page.getByRole("dialog", { name: "Set up your local model" }).waitFor();
-  assert.equal(
-    await editorText(page),
-    "",
-    "App startup should create an empty new file instead of restoring the previous document.",
-  );
-  await page.getByText("previous file content should not restore.").waitFor({ state: "detached" });
+  assert.equal(await editorText(page), "restored unsaved draft.");
   await assertVisibleText(page, "Settings");
 
   await waitForVisibleText(page, 'Selected "gemma4:latest". Checking model availability...');
@@ -99,6 +98,7 @@ try {
 
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
   await page.keyboard.type("anatahadaredesuka");
   await page.getByText("anatahadaredesuka").waitFor();
   await page.keyboard.press("Enter");
