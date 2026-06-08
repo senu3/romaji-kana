@@ -111,6 +111,9 @@ function App() {
   const startupCheckStartedRef = useRef(false);
   const previousModelProviderRef = useRef(settings.modelProvider);
   const canceledRequestsRef = useRef(new Set<string>());
+  const conversionQueueRef = useRef<PendingConversion[]>([]);
+  const processingQueueRef = useRef(false);
+  const runningRequestIdRef = useRef<string | null>(null);
   const suppressNextDirtyRef = useRef(false);
 
   useEffect(() => {
@@ -505,9 +508,7 @@ function App() {
     return () => document.removeEventListener("keydown", handleAppShortcut);
   }, [handleOpenFile, handleSaveFile, handleSaveFileAs]);
 
-  const cancelConversion = useCallback((request: PendingConversion) => {
-    canceledRequestsRef.current.add(request.id);
-    setPending((items) => items.filter((item) => item.id !== request.id));
+  const recordCanceledConversion = useCallback((request: PendingConversion) => {
     setHistory((items) => [
       {
         id: request.id,
@@ -522,12 +523,353 @@ function App() {
       ...items,
     ]);
     setStatus({ kind: "warning", message: "Conversion canceled." });
-
-    const view = editorViewRef.current;
-    if (view) {
-      view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
-    }
   }, []);
+
+  const skipQueuedConversion = useCallback((request: PendingConversion, message: string) => {
+    setHistory((items) => [
+      {
+        id: request.id,
+        status: "skipped",
+        input: request.originalText,
+        error: message,
+        modelName: settingsRef.current.modelName,
+        createdAt: Date.now(),
+        source: request.source,
+        anchor: request.anchor,
+      },
+      ...items,
+    ]);
+    setStatus({ kind: "warning", message });
+  }, []);
+
+  const processEditorConversion = useCallback(
+    async (request: PendingConversion) => {
+      const view = editorViewRef.current;
+      const anchor = request.anchor;
+      if (!view || !anchor) {
+        skipQueuedConversion(request, "Conversion was skipped because the editor is unavailable.");
+        return;
+      }
+
+      const resolved = resolveConversionAnchor(view.state.doc.toString(), anchor);
+      if (!resolved) {
+        skipQueuedConversion(
+          request,
+          "Skipped because the source text changed before this queued conversion started.",
+        );
+        return;
+      }
+
+      const conversion = await convertRomajiToJapaneseDetailed(
+        resolved.matchedText,
+        settingsRef.current,
+      );
+      if (canceledRequestsRef.current.has(request.id)) {
+        return;
+      }
+
+      const currentView = editorViewRef.current;
+      if (!currentView) {
+        skipQueuedConversion(request, "Conversion was skipped because the editor is unavailable.");
+        return;
+      }
+
+      const latestAnchor: ConversionAnchor = {
+        ...anchor,
+        from: resolved.from,
+        to: resolved.to,
+        originalText: resolved.matchedText,
+      };
+      const latestResolved = resolveConversionAnchor(currentView.state.doc.toString(), latestAnchor);
+      if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
+        skipQueuedConversion(
+          request,
+          "Skipped because the source text changed before the queued conversion was applied.",
+        );
+        return;
+      }
+
+      const converted = conversion.text;
+      if (settingsRef.current.conversionMode === "ghost") {
+        currentView.dispatch({
+          effects: [
+            removeLoadingDecoration.of(request.id),
+            showGhostSuggestion.of({
+              id: request.id,
+              from: latestResolved.from,
+              to: latestResolved.to,
+              originalText: latestResolved.matchedText,
+              convertedText: converted,
+              inputText: request.originalText,
+              reviewKana: conversion.reviewKana,
+              source: "editor",
+            }),
+          ],
+        });
+        setStatus({ kind: "success", message: "Ghost suggestion ready. Press Tab to accept." });
+        return;
+      }
+
+      currentView.dispatch({
+        changes: {
+          from: latestResolved.from,
+          to: latestResolved.to,
+          insert: converted,
+        },
+        effects: removeLoadingDecoration.of(request.id),
+        userEvent: "input.convert",
+      });
+      saveDocument(currentView.state.doc.toString());
+
+      const nextAnchor: ConversionAnchor = {
+        from: latestResolved.from,
+        to: latestResolved.from + converted.length,
+        originalText: latestResolved.matchedText,
+        appliedText: converted,
+        docVersion: docVersionRef.current,
+      };
+      setHistory((items) => [
+        {
+          id: request.id,
+          status: "success",
+          input: request.originalText,
+          output: converted,
+          modelName: settingsRef.current.modelName,
+          createdAt: Date.now(),
+          source: "editor",
+          anchor: nextAnchor,
+        },
+        ...items,
+      ]);
+      showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
+      setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
+    },
+    [showHomophoneReviewSuggestion, skipQueuedConversion],
+  );
+
+  const processHistoryConversion = useCallback(
+    async (request: PendingConversion) => {
+      const currentView = editorViewRef.current;
+      const resolved = request.anchor && currentView
+        ? resolveConversionAnchor(currentView.state.doc.toString(), request.anchor)
+        : null;
+
+      if (request.anchor && currentView && !resolved) {
+        skipQueuedConversion(
+          request,
+          "History conversion was not applied because the anchor could not be resolved.",
+        );
+        return;
+      }
+
+      const conversion = await convertRomajiToJapaneseDetailed(
+        request.originalText,
+        settingsRef.current,
+      );
+      if (canceledRequestsRef.current.has(request.id)) {
+        return;
+      }
+
+      const converted = conversion.text;
+      const latestView = editorViewRef.current;
+      if (!latestView || !request.anchor || !resolved) {
+        setHistory((items) => [
+          {
+            id: request.id,
+            status: "success",
+            input: request.originalText,
+            output: converted,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+            source: "history",
+            anchor: request.anchor,
+          },
+          ...items,
+        ]);
+        setStatus({
+          kind: "success",
+          message: "History conversion re-run. No editor anchor was available to apply.",
+        });
+        return;
+      }
+
+      const latestResolved = resolveConversionAnchor(latestView.state.doc.toString(), {
+        ...request.anchor,
+        from: resolved.from,
+        to: resolved.to,
+        originalText: resolved.matchedText,
+      });
+      if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
+        skipQueuedConversion(
+          request,
+          "History conversion was not applied because the anchor changed before apply.",
+        );
+        return;
+      }
+
+      if (settingsRef.current.conversionMode === "ghost") {
+        latestView.dispatch({
+          effects: showGhostSuggestion.of({
+            id: request.id,
+            from: latestResolved.from,
+            to: latestResolved.to,
+            originalText: latestResolved.matchedText,
+            convertedText: converted,
+            inputText: request.originalText,
+            reviewKana: conversion.reviewKana,
+            source: "history",
+          }),
+        });
+        setStatus({ kind: "success", message: "History suggestion ready. Press Tab to apply." });
+        return;
+      }
+
+      latestView.dispatch({
+        changes: {
+          from: latestResolved.from,
+          to: latestResolved.to,
+          insert: converted,
+        },
+        userEvent: "input.historyApply",
+      });
+      saveDocument(latestView.state.doc.toString());
+
+      const nextAnchor: ConversionAnchor = {
+        from: latestResolved.from,
+        to: latestResolved.from + converted.length,
+        originalText: request.originalText,
+        appliedText: converted,
+        docVersion: docVersionRef.current,
+      };
+
+      setHistory((items) => [
+        {
+          id: request.id,
+          status: "success",
+          input: request.originalText,
+          output: converted,
+          modelName: settingsRef.current.modelName,
+          createdAt: Date.now(),
+          source: "history",
+          anchor: nextAnchor,
+        },
+        ...items,
+      ]);
+      setStatus({
+        kind: "success",
+        message:
+          latestResolved.matchedBy === "nearby"
+            ? "History conversion applied at a nearby matching anchor."
+            : "History conversion applied.",
+      });
+      showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
+    },
+    [showHomophoneReviewSuggestion, skipQueuedConversion],
+  );
+
+  const processConversionQueue = useCallback(async () => {
+    if (processingQueueRef.current) {
+      return;
+    }
+
+    processingQueueRef.current = true;
+    try {
+      while (conversionQueueRef.current.length > 0) {
+        const request = conversionQueueRef.current[0];
+        if (canceledRequestsRef.current.has(request.id)) {
+          canceledRequestsRef.current.delete(request.id);
+          conversionQueueRef.current = conversionQueueRef.current.slice(1);
+          setPending([...conversionQueueRef.current]);
+          continue;
+        }
+
+        request.status = "running";
+        runningRequestIdRef.current = request.id;
+        setPending([...conversionQueueRef.current]);
+        setStatus({
+          kind: "loading",
+          message:
+            request.source === "history"
+              ? `Re-converting "${request.originalText}"`
+              : `Converting "${request.originalText}"`,
+        });
+
+        try {
+          if (request.source === "history") {
+            await processHistoryConversion(request);
+          } else {
+            await processEditorConversion(request);
+          }
+        } catch (error: unknown) {
+          if (!canceledRequestsRef.current.has(request.id)) {
+            const message = formatConversionError(error);
+            setHistory((items) => [
+              {
+                id: request.id,
+                status: "error",
+                input: request.originalText,
+                error: message,
+                modelName: settingsRef.current.modelName,
+                createdAt: Date.now(),
+                source: request.source,
+                anchor: request.anchor,
+              },
+              ...items,
+            ]);
+            setStatus({ kind: "error", message });
+          }
+        } finally {
+          canceledRequestsRef.current.delete(request.id);
+          runningRequestIdRef.current = null;
+          const currentView = editorViewRef.current;
+          if (currentView) {
+            currentView.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+          }
+          conversionQueueRef.current = conversionQueueRef.current.filter(
+            (item) => item.id !== request.id,
+          );
+          setPending([...conversionQueueRef.current]);
+        }
+      }
+    } finally {
+      processingQueueRef.current = false;
+      runningRequestIdRef.current = null;
+    }
+  }, [processEditorConversion, processHistoryConversion]);
+
+  const enqueueConversion = useCallback(
+    (request: PendingConversion) => {
+      setHomophoneSuggestion(null);
+      conversionQueueRef.current = [...conversionQueueRef.current, request];
+      setPending([...conversionQueueRef.current]);
+      if (processingQueueRef.current) {
+        setStatus({ kind: "loading", message: `Queued "${request.originalText}"` });
+      }
+      void processConversionQueue();
+    },
+    [processConversionQueue],
+  );
+
+  const cancelConversion = useCallback(
+    (request: PendingConversion) => {
+      canceledRequestsRef.current.add(request.id);
+      const isRunning = runningRequestIdRef.current === request.id;
+      if (!isRunning) {
+        conversionQueueRef.current = conversionQueueRef.current.filter(
+          (item) => item.id !== request.id,
+        );
+        canceledRequestsRef.current.delete(request.id);
+      }
+      setPending((items) => items.filter((item) => item.id !== request.id));
+      recordCanceledConversion(request);
+
+      const view = editorViewRef.current;
+      if (view) {
+        view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+      }
+    },
+    [recordCanceledConversion],
+  );
 
   const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
     const view = editorViewRef.current;
@@ -611,146 +953,11 @@ function App() {
       originalText: item.input,
       createdAt: Date.now(),
       source: "history",
+      status: "queued",
     };
 
-    setHomophoneSuggestion(null);
-    setPending((items) => [...items, request]);
-    setStatus({ kind: "loading", message: `Re-converting "${item.input}"` });
-
-    convertRomajiToJapaneseDetailed(item.input, settingsRef.current)
-      .then((conversion) => {
-        if (canceledRequestsRef.current.has(request.id)) {
-          return;
-        }
-        const converted = conversion.text;
-
-        const currentView = editorViewRef.current;
-        if (!currentView || !item.anchor) {
-          setHistory((items) => [
-            {
-              id: request.id,
-              status: "success",
-              input: request.originalText,
-              output: converted,
-              modelName: settingsRef.current.modelName,
-              createdAt: Date.now(),
-              source: "history",
-              anchor: item.anchor,
-            },
-            ...items,
-          ]);
-          setStatus({
-            kind: "success",
-            message: "History conversion re-run. No editor anchor was available to apply.",
-          });
-          return;
-        }
-
-        const resolved = resolveConversionAnchor(currentView.state.doc.toString(), item.anchor);
-        if (!resolved) {
-          setHistory((items) => [
-            {
-              id: request.id,
-              status: "skipped",
-              input: request.originalText,
-              error: "Not applied because the original location changed or became ambiguous.",
-              modelName: settingsRef.current.modelName,
-              createdAt: Date.now(),
-              source: "history",
-              anchor: item.anchor,
-            },
-            ...items,
-          ]);
-          setStatus({
-            kind: "warning",
-            message: "History conversion was not applied because the anchor could not be resolved.",
-          });
-          return;
-        }
-
-        if (settingsRef.current.conversionMode === "ghost") {
-          currentView.dispatch({
-            effects: showGhostSuggestion.of({
-              id: request.id,
-              from: resolved.from,
-              to: resolved.to,
-              originalText: resolved.matchedText,
-              convertedText: converted,
-              inputText: item.input,
-              reviewKana: conversion.reviewKana,
-              source: "history",
-            }),
-          });
-          setStatus({ kind: "success", message: "History suggestion ready. Press Tab to apply." });
-          return;
-        }
-
-        currentView.dispatch({
-          changes: {
-            from: resolved.from,
-            to: resolved.to,
-            insert: converted,
-          },
-          userEvent: "input.historyApply",
-        });
-        saveDocument(currentView.state.doc.toString());
-
-        const nextAnchor: ConversionAnchor = {
-          from: resolved.from,
-          to: resolved.from + converted.length,
-          originalText: item.input,
-          appliedText: converted,
-          docVersion: docVersionRef.current,
-        };
-
-        setHistory((items) => [
-          {
-            id: request.id,
-            status: "success",
-            input: request.originalText,
-            output: converted,
-            modelName: settingsRef.current.modelName,
-            createdAt: Date.now(),
-            source: "history",
-            anchor: nextAnchor,
-          },
-          ...items,
-        ]);
-        setStatus({
-          kind: "success",
-          message:
-            resolved.matchedBy === "nearby"
-              ? "History conversion applied at a nearby matching anchor."
-              : "History conversion applied.",
-        });
-        showHomophoneReviewSuggestion(request.id, conversion, resolved.from);
-      })
-      .catch((error: unknown) => {
-        if (canceledRequestsRef.current.has(request.id)) {
-          return;
-        }
-
-        const message = formatConversionError(error);
-        setHistory((items) => [
-          {
-            id: request.id,
-            status: "error",
-            input: request.originalText,
-            error: message,
-            modelName: settingsRef.current.modelName,
-            createdAt: Date.now(),
-            source: "history",
-            anchor: item.anchor,
-          },
-          ...items,
-        ]);
-        setStatus({ kind: "error", message });
-      })
-      .finally(() => {
-        canceledRequestsRef.current.delete(request.id);
-        setPending((items) => items.filter((pendingItem) => pendingItem.id !== request.id));
-      });
-  }, [showHomophoneReviewSuggestion]);
+    enqueueConversion(request);
+  }, [enqueueConversion]);
 
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
@@ -771,11 +978,9 @@ function App() {
       createdAt: Date.now(),
       docVersion: docVersionRef.current,
       source: "editor",
+      status: "queued",
     };
 
-    setHomophoneSuggestion(null);
-    setPending((items) => [...items, request]);
-    setStatus({ kind: "loading", message: `Converting "${range.text}"` });
     view.dispatch({
       effects: addLoadingDecoration.of({
         id: request.id,
@@ -784,128 +989,8 @@ function App() {
       }),
     });
 
-    convertRomajiToJapaneseDetailed(range.text, settingsRef.current)
-      .then((conversion) => {
-        if (canceledRequestsRef.current.has(request.id)) {
-          return;
-        }
-        const converted = conversion.text;
-
-        const currentView = editorViewRef.current;
-        if (!currentView) {
-          return;
-        }
-
-        const currentText = currentView.state.doc.sliceString(range.from, range.to);
-        if (currentText !== request.originalText) {
-          setHistory((items) => [
-            {
-              id: request.id,
-              status: "skipped",
-              input: request.originalText,
-              error: "Skipped because the source text changed before the provider responded.",
-              modelName: settingsRef.current.modelName,
-              createdAt: Date.now(),
-              source: "editor",
-              anchor: request.anchor,
-            },
-            ...items,
-          ]);
-          setStatus({
-            kind: "warning",
-            message: "Skipped an older conversion because the text changed.",
-          });
-          return;
-        }
-
-        if (settingsRef.current.conversionMode === "ghost") {
-          currentView.dispatch({
-            effects: [
-              removeLoadingDecoration.of(request.id),
-              showGhostSuggestion.of({
-                id: request.id,
-                from: range.from,
-                to: range.to,
-                originalText: request.originalText,
-                convertedText: converted,
-                inputText: request.originalText,
-                reviewKana: conversion.reviewKana,
-                source: "editor",
-              }),
-            ],
-          });
-          setStatus({ kind: "success", message: "Ghost suggestion ready. Press Tab to accept." });
-          return;
-        }
-
-        currentView.dispatch({
-          changes: {
-            from: range.from,
-            to: range.to,
-            insert: converted,
-          },
-          effects: removeLoadingDecoration.of(request.id),
-          userEvent: "input.convert",
-        });
-        saveDocument(currentView.state.doc.toString());
-        const nextAnchor: ConversionAnchor = {
-          from: range.from,
-          to: range.from + converted.length,
-          originalText: request.originalText,
-          appliedText: converted,
-          docVersion: docVersionRef.current,
-        };
-        setHistory((items) => [
-          {
-            id: request.id,
-            status: "success",
-            input: request.originalText,
-            output: converted,
-            modelName: settingsRef.current.modelName,
-            createdAt: Date.now(),
-            source: "editor",
-            anchor: nextAnchor,
-          },
-          ...items,
-        ]);
-        showHomophoneReviewSuggestion(request.id, conversion, range.from);
-        setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
-      })
-      .catch((error: unknown) => {
-        if (canceledRequestsRef.current.has(request.id)) {
-          return;
-        }
-
-        const message = formatConversionError(error);
-        setHistory((items) => [
-          {
-            id: request.id,
-            status: "error",
-            input: request.originalText,
-            error: message,
-            modelName: settingsRef.current.modelName,
-            createdAt: Date.now(),
-            source: "editor",
-            anchor: request.anchor,
-          },
-          ...items,
-        ]);
-        setStatus({
-          kind: "error",
-          message,
-        });
-      })
-      .finally(() => {
-        canceledRequestsRef.current.delete(request.id);
-        const currentView = editorViewRef.current;
-        if (currentView) {
-          currentView.dispatch({
-            effects: removeLoadingDecoration.of(request.id),
-          });
-        }
-        setPending((items) => items.filter((item) => item.id !== request.id));
-      });
-  }, []);
+    enqueueConversion(request);
+  }, [enqueueConversion]);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
   const settingsAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
@@ -1204,7 +1289,13 @@ function HistoryPanel({
           {pending.map((request) => (
             <article className="pending-item" key={request.id}>
               <div>
-                <strong>{request.source === "history" ? "Re-applying" : "Converting"}</strong>
+                <strong>
+                  {request.status === "queued"
+                    ? "Queued"
+                    : request.source === "history"
+                      ? "Re-applying"
+                      : "Converting"}
+                </strong>
                 <p>{request.originalText}</p>
               </div>
               <button className="secondary-button" type="button" onClick={() => onCancel(request)}>
