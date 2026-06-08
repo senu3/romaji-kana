@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearDocument, emptyDocument, loadDocument, saveDocument } from "./documentStore";
+import {
+  clearDocumentSession,
+  loadDocumentSession,
+  saveFileDocumentSession,
+  saveNewDocumentSession,
+} from "./documentStore";
 
 const storage = new Map<string, string>();
 
@@ -17,18 +22,35 @@ beforeEach(() => {
 });
 
 describe("documentStore", () => {
-  it("starts with an empty new document", () => {
-    expect(loadDocument()).toBe(emptyDocument);
+  it("starts with an empty new document session", () => {
+    expect(loadDocumentSession()).toEqual({ kind: "new", content: "" });
   });
 
-  it("does not restore the previous document on app startup", () => {
-    saveDocument("# memo\nwatashihanihongogasukidesu.");
-    expect(loadDocument()).toBe(emptyDocument);
+  it("restores unsaved new document content", () => {
+    saveNewDocumentSession("# memo\nwatashihanihongogasukidesu.");
+
+    expect(loadDocumentSession()).toEqual({
+      kind: "new",
+      content: "# memo\nwatashihanihongogasukidesu.",
+    });
   });
 
-  it("clears the stored document snapshot", () => {
-    saveDocument("# memo");
-    clearDocument();
+  it("restores the previous file path without storing file content as a draft", () => {
+    saveFileDocumentSession("C:\\notes\\memo.md");
+
+    expect(loadDocumentSession()).toEqual({ kind: "file", path: "C:\\notes\\memo.md" });
+  });
+
+  it("falls back from the legacy document snapshot as an unsaved new document", () => {
+    storage.set("romaji-kana-document", "# old draft");
+
+    expect(loadDocumentSession()).toEqual({ kind: "new", content: "# old draft" });
+  });
+
+  it("clears the stored document session", () => {
+    saveNewDocumentSession("# memo");
+    clearDocumentSession();
+    expect(storage.get("romaji-kana-document-session")).toBeUndefined();
     expect(storage.get("romaji-kana-document")).toBeUndefined();
   });
 });

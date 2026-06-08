@@ -75,6 +75,22 @@ async fn open_markdown_file() -> Result<Option<OpenFileResult>, String> {
 }
 
 #[tauri::command]
+async fn reopen_markdown_file(path: String) -> Result<OpenFileResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = PathBuf::from(path);
+        let content = std::fs::read_to_string(&path)
+            .map_err(|error| format!("Failed to read file: {error}"))?;
+
+        Ok(OpenFileResult {
+            path: path_to_string(path)?,
+            content,
+        })
+    })
+    .await
+    .map_err(|error| format!("File reopen task failed: {error}"))?
+}
+
+#[tauri::command]
 async fn save_markdown_file(path: Option<String>, content: String) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = match path {
@@ -234,6 +250,7 @@ pub fn run() {
             lmstudio_models,
             lmstudio_chat_completions,
             open_markdown_file,
+            reopen_markdown_file,
             save_markdown_file
         ])
         .run(tauri::generate_context!())
