@@ -113,11 +113,29 @@ try {
     `Enter should trigger conversion. Editor text: ${await page.locator(".cm-content").textContent()}`,
   );
   await page.getByText("あなたは誰ですか。").waitFor();
+  assert.deepEqual((await editorLines(page)).slice(0, 2), ["あなたは誰ですか。", ""]);
   assert.equal(conversionRequestCount, 1, "Enter should trigger exactly one conversion.");
   await page.getByRole("button", { name: "Undo" }).click();
   await page.getByText("anatahadaredesuka").waitFor();
   await page.waitForTimeout(300);
   assert.equal(conversionRequestCount, 1, "Undo should not re-trigger conversion.");
+
+  conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ichi.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("ni.");
+  await page.getByText("一。").waitFor();
+  await page.getByText("二。").waitFor();
+  await page.waitForTimeout(300);
+  assert.deepEqual(conversionPrompts, ["いち。", "に。"]);
+  assert.equal(
+    conversionRequestCount,
+    2,
+    "Enter after a period-triggered conversion should not queue a duplicate conversion while typing continues on the next line.",
+  );
+  assert.deepEqual((await editorLines(page)).slice(0, 2), ["一。", "二。"]);
 
   conversionRequestCount = 0;
   await page.keyboard.press("Control+A");
@@ -211,6 +229,12 @@ async function waitForVisibleText(page, text) {
 async function editorText(page) {
   const text = (await page.locator(".cm-content").textContent()) ?? "";
   return text === "Romaji de nihongo wo kaitte kudasai..." ? "" : text;
+}
+
+async function editorLines(page) {
+  return page.locator(".cm-line").evaluateAll((lines) =>
+    lines.map((line) => line.textContent ?? ""),
+  );
 }
 
 async function panelTogglePaintsOutsideSettingsPanel(page) {

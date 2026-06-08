@@ -46,7 +46,7 @@ interface MarkdownEditorProps {
   initialDocument: string;
   fileName: string;
   isDirty: boolean;
-  onConvert: (range: ConversionRange) => void;
+  onConvert: (range: ConversionRange) => boolean;
   onDocumentChanged: (documentText: string) => void;
   onNewFile: () => void;
   onOpenFile: () => void;
@@ -491,7 +491,7 @@ export function MarkdownEditor({
     }
 
     onConvertRef.current(range);
-    return true;
+    return false;
   }
 
   function runManualConversion(view: EditorView) {
@@ -534,7 +534,6 @@ export function MarkdownEditor({
         to: suggestion.to,
         insert: suggestion.convertedText,
       },
-      selection: { anchor: suggestion.from + suggestion.convertedText.length },
       effects: clearGhostSuggestion.of(suggestion.id),
       userEvent: "input.ghostAccept",
     });
