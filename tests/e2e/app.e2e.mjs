@@ -75,6 +75,10 @@ try {
   await waitForVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
   await page.getByRole("button", { name: "Start writing" }).click();
   await page.getByRole("dialog", { name: "Set up your local model" }).waitFor({ state: "hidden" });
+  assert.ok(
+    await panelTogglePaintsOutsideSettingsPanel(page),
+    "Settings panel toggle should paint outside the panel without being clipped.",
+  );
   await page
     .locator(".settings-panel .accordion-trigger")
     .filter({ hasText: "Triggers" })
@@ -207,6 +211,26 @@ async function waitForVisibleText(page, text) {
 async function editorText(page) {
   const text = (await page.locator(".cm-content").textContent()) ?? "";
   return text === "Romaji de nihongo wo kaitte kudasai..." ? "" : text;
+}
+
+async function panelTogglePaintsOutsideSettingsPanel(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector(".settings-panel");
+    const toggle = document.querySelector(".panel-toggle");
+    if (!(panel instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+      return false;
+    }
+    const panelBox = panel.getBoundingClientRect();
+    const toggleBox = toggle.getBoundingClientRect();
+    const sampleX = toggleBox.left + 4;
+    const sampleY = toggleBox.top + toggleBox.height / 2;
+    const paintedElement = document.elementFromPoint(sampleX, sampleY);
+    return (
+      toggleBox.left < panelBox.left &&
+      sampleX >= 0 &&
+      (paintedElement === toggle || toggle.contains(paintedElement))
+    );
+  });
 }
 
 function conversionResponseForPrompt(prompt) {
