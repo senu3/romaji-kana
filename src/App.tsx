@@ -545,7 +545,6 @@ function App() {
         to: suggestion.to,
         insert: suggestion.preferred,
       },
-      selection: { anchor: suggestion.from + suggestion.preferred.length },
       userEvent: "input.homophoneReview",
     });
     saveCurrentDocumentSession(view.state.doc.toString());
@@ -1082,7 +1081,11 @@ function App() {
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
     if (!view) {
-      return;
+      return false;
+    }
+
+    if (hasMatchingPendingEditorConversion(conversionQueueRef.current, range)) {
+      return false;
     }
 
     const request: PendingConversion = {
@@ -1110,6 +1113,7 @@ function App() {
     });
 
     enqueueConversion(request);
+    return true;
   }, [enqueueConversion]);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
@@ -1974,6 +1978,20 @@ function createDictionaryEntryId(prefix = "dictionary"): string {
 
 function isHiraganaReading(value: string): boolean {
   return /^[\u3041-\u3096ー]+$/u.test(value);
+}
+
+function hasMatchingPendingEditorConversion(
+  requests: PendingConversion[],
+  range: ConversionRange,
+): boolean {
+  return requests.some(
+    (request) =>
+      request.source === "editor" &&
+      request.range !== undefined &&
+      request.range.from === range.from &&
+      request.range.to === range.to &&
+      request.range.text === range.text,
+  );
 }
 
 function StatusBar({
