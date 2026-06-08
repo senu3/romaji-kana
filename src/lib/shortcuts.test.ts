@@ -74,6 +74,16 @@ describe("appShortcutFromKeyboardEvent", () => {
   it("maps common file shortcuts", () => {
     expect(
       appShortcutFromKeyboardEvent({
+        key: "n",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+      }),
+    ).toBe("new");
+
+    expect(
+      appShortcutFromKeyboardEvent({
         key: "o",
         ctrlKey: true,
         metaKey: false,
@@ -140,6 +150,7 @@ describe("appShortcutFromKeyboardEvent", () => {
 
 describe("isReservedAppShortcut", () => {
   it("reserves file shortcuts for app actions", () => {
+    expect(isReservedAppShortcut("Mod-n")).toBe(true);
     expect(isReservedAppShortcut("Mod-o")).toBe(true);
     expect(isReservedAppShortcut("Mod-s")).toBe(true);
     expect(isReservedAppShortcut("Mod-Shift-s")).toBe(true);

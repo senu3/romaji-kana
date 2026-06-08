@@ -26,6 +26,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
     localStorage.clear();
+    localStorage.setItem("romaji-kana-document", "previous file content should not restore.");
   });
 
   const page = await context.newPage();
@@ -63,7 +64,12 @@ try {
   await page.goto(appUrl);
   await page.getByRole("heading", { name: "Romaji Kana" }).waitFor();
   await page.getByRole("dialog", { name: "Set up your local model" }).waitFor();
-  await assertVisibleText(page, "anatahadonnakotogasukidesuka.");
+  assert.equal(
+    await editorText(page),
+    "",
+    "App startup should create an empty new file instead of restoring the previous document.",
+  );
+  await page.getByText("previous file content should not restore.").waitFor({ state: "detached" });
   await assertVisibleText(page, "Settings");
 
   await waitForVisibleText(page, 'Selected "gemma4:latest". Checking model availability...');
@@ -136,6 +142,13 @@ try {
   assert.equal(conversionRequestCount, 2, "Both triggers should be converted.");
   assert.equal(maxActiveConversionRequests, 1, "Conversions should run sequentially.");
 
+  await page.keyboard.press("Control+N");
+  await page.waitForFunction(() => {
+    const text = document.querySelector(".cm-content")?.textContent ?? "";
+    return text === "" || text === "Romaji de nihongo wo kaitte kudasai...";
+  });
+  assert.equal(await editorText(page), "", "New file shortcut should clear the editor.");
+
   await page.getByRole("button", { name: "Open dictionary" }).click();
   await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
   const dictionaryInputs = page.locator(".dictionary-add-form input");
@@ -189,6 +202,11 @@ async function assertLocatorValue(locator, expectedValue) {
 
 async function waitForVisibleText(page, text) {
   await page.getByText(text).first().waitFor();
+}
+
+async function editorText(page) {
+  const text = (await page.locator(".cm-content").textContent()) ?? "";
+  return text === "Romaji de nihongo wo kaitte kudasai..." ? "" : text;
 }
 
 function conversionResponseForPrompt(prompt) {

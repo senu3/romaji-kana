@@ -14,6 +14,7 @@ import { tags } from "@lezer/highlight";
 import {
   BookMarked,
   ChevronDown,
+  FilePlus2,
   FileText,
   FolderOpen,
   History,
@@ -47,6 +48,7 @@ interface MarkdownEditorProps {
   isDirty: boolean;
   onConvert: (range: ConversionRange) => void;
   onDocumentChanged: (documentText: string) => void;
+  onNewFile: () => void;
   onOpenFile: () => void;
   onSaveFile: () => void;
   onSaveFileAs: () => void;
@@ -280,6 +282,7 @@ export function MarkdownEditor({
   isDirty,
   onConvert,
   onDocumentChanged,
+  onNewFile,
   onOpenFile,
   onSaveFile,
   onSaveFileAs,
@@ -586,6 +589,11 @@ export function MarkdownEditor({
             </button>
             {fileMenuOpen ? (
               <div className="toolbar-menu-items" role="menu" aria-label="File actions">
+                <button type="button" role="menuitem" onClick={() => runFileAction(onNewFile)}>
+                  <FilePlus2 size={15} aria-hidden="true" />
+                  <span>New file</span>
+                  <kbd>Ctrl/Cmd + N</kbd>
+                </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onOpenFile)}>
                   <FolderOpen size={15} aria-hidden="true" />
                   <span>Open Markdown...</span>
