@@ -30,6 +30,9 @@ try {
 
   const page = await context.newPage();
   let conversionRequestCount = 0;
+  let activeConversionRequests = 0;
+  let maxActiveConversionRequests = 0;
+  const conversionPrompts = [];
   await page.route("**/api/tags", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -40,11 +43,21 @@ try {
     const body = route.request().postDataJSON();
     if (body.prompt) {
       conversionRequestCount += 1;
+      conversionPrompts.push(body.prompt);
+      activeConversionRequests += 1;
+      maxActiveConversionRequests = Math.max(maxActiveConversionRequests, activeConversionRequests);
+      if (body.prompt === "いち。") {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
     }
+    const response = conversionResponseForPrompt(body.prompt);
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ response: body.prompt ? "あなたは誰ですか。" : "" }),
+      body: JSON.stringify({ response }),
     });
+    if (body.prompt) {
+      activeConversionRequests -= 1;
+    }
   });
 
   await page.goto(appUrl);
@@ -111,6 +124,18 @@ try {
     "Manual shortcut should convert only the selected text.",
   );
 
+  conversionRequestCount = 0;
+  activeConversionRequests = 0;
+  maxActiveConversionRequests = 0;
+  conversionPrompts.length = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ichi.");
+  await page.keyboard.type("ni.");
+  await page.getByText("一。二。").waitFor();
+  assert.deepEqual(conversionPrompts, ["いち。", "に。"]);
+  assert.equal(conversionRequestCount, 2, "Both triggers should be converted.");
+  assert.equal(maxActiveConversionRequests, 1, "Conversions should run sequentially.");
+
   await page.getByRole("button", { name: "Open dictionary" }).click();
   await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
   const dictionaryInputs = page.locator(".dictionary-add-form input");
@@ -164,4 +189,14 @@ async function assertLocatorValue(locator, expectedValue) {
 
 async function waitForVisibleText(page, text) {
   await page.getByText(text).first().waitFor();
+}
+
+function conversionResponseForPrompt(prompt) {
+  if (prompt === "いち。") {
+    return "一。";
+  }
+  if (prompt === "に。") {
+    return "二。";
+  }
+  return prompt ? "あなたは誰ですか。" : "";
 }

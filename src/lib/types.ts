@@ -128,6 +128,7 @@ export interface PendingConversion {
   createdAt: number;
   docVersion?: number;
   source: "editor" | "history";
+  status: "queued" | "running";
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
