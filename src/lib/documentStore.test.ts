@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadDocument, sampleDocument, saveDocument } from "./documentStore";
+import { clearDocument, emptyDocument, loadDocument, saveDocument } from "./documentStore";
 
 const storage = new Map<string, string>();
 
@@ -10,16 +10,25 @@ beforeEach(() => {
     setItem: (key: string, value: string) => {
       storage.set(key, value);
     },
+    removeItem: (key: string) => {
+      storage.delete(key);
+    },
   });
 });
 
 describe("documentStore", () => {
-  it("loads the sample document when nothing has been saved", () => {
-    expect(loadDocument()).toBe(sampleDocument);
+  it("starts with an empty new document", () => {
+    expect(loadDocument()).toBe(emptyDocument);
   });
 
-  it("saves and loads the editor document", () => {
+  it("does not restore the previous document on app startup", () => {
     saveDocument("# memo\nwatashihanihongogasukidesu.");
-    expect(loadDocument()).toBe("# memo\nwatashihanihongogasukidesu.");
+    expect(loadDocument()).toBe(emptyDocument);
+  });
+
+  it("clears the stored document snapshot", () => {
+    saveDocument("# memo");
+    clearDocument();
+    expect(storage.get("romaji-kana-document")).toBeUndefined();
   });
 });

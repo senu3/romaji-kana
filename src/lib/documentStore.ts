@@ -1,16 +1,15 @@
 const DOCUMENT_STORAGE_KEY = "romaji-kana-document";
 
-export const sampleDocument =
-  "anatahadonnakotogasukidesuka.\n\n## memo\n- kyouhayoi tenkidesu.";
+export const emptyDocument = "";
 
 export function loadDocument(): string {
-  try {
-    return localStorage.getItem(DOCUMENT_STORAGE_KEY) ?? sampleDocument;
-  } catch {
-    return sampleDocument;
-  }
+  return emptyDocument;
 }
 
 export function saveDocument(documentText: string): void {
   localStorage.setItem(DOCUMENT_STORAGE_KEY, documentText);
+}
+
+export function clearDocument(): void {
+  localStorage.removeItem(DOCUMENT_STORAGE_KEY);
 }

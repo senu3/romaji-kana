@@ -12,10 +12,10 @@ export interface AppShortcutKeyEvent extends ShortcutKeyEvent {
   repeat?: boolean;
 }
 
-export type AppShortcutAction = "open" | "save" | "saveAs";
+export type AppShortcutAction = "new" | "open" | "save" | "saveAs";
 
 const modifierKeys = new Set(["Alt", "Control", "Meta", "Shift"]);
-const reservedAppShortcuts = new Set(["Mod-o", "Mod-s", "Mod-Shift-s"]);
+const reservedAppShortcuts = new Set(["Mod-n", "Mod-o", "Mod-s", "Mod-Shift-s"]);
 
 export function appShortcutFromKeyboardEvent(
   event: AppShortcutKeyEvent,
@@ -31,6 +31,9 @@ export function appShortcutFromKeyboardEvent(
   }
 
   const key = normalizeKey(event.key);
+  if (key === "n" && !event.shiftKey) {
+    return "new";
+  }
   if (key === "o" && !event.shiftKey) {
     return "open";
   }

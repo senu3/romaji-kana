@@ -19,7 +19,7 @@ import {
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
 import { SettingsContent, SettingsPanel } from "./components/SettingsPanel";
-import { loadDocument, saveDocument } from "./lib/documentStore";
+import { clearDocument, loadDocument, saveDocument } from "./lib/documentStore";
 import { basename, openMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
 import {
@@ -317,12 +317,32 @@ function App() {
     return editorViewRef.current?.state.doc.toString() ?? "";
   }, []);
 
+  const clearPendingConversions = useCallback(() => {
+    const requests = conversionQueueRef.current;
+    const runningId = runningRequestIdRef.current;
+    for (const request of requests) {
+      if (request.id === runningId) {
+        canceledRequestsRef.current.add(request.id);
+      }
+    }
+    conversionQueueRef.current = [];
+    setPending([]);
+
+    const view = editorViewRef.current;
+    if (view) {
+      for (const request of requests) {
+        view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+      }
+    }
+  }, []);
+
   const replaceEditorDocument = useCallback((content: string) => {
     const view = editorViewRef.current;
     if (!view) {
       return;
     }
 
+    clearPendingConversions();
     setHomophoneSuggestion(null);
     suppressNextDirtyRef.current = true;
     view.dispatch({
@@ -334,7 +354,15 @@ function App() {
       selection: { anchor: 0 },
       userEvent: "document.open",
     });
-  }, []);
+  }, [clearPendingConversions]);
+
+  const handleNewFile = useCallback(() => {
+    replaceEditorDocument("");
+    setCurrentFilePath(null);
+    setIsDirty(false);
+    clearDocument();
+    setStatus({ kind: "success", message: "Created a new file." });
+  }, [replaceEditorDocument]);
 
   const handleOpenFile = useCallback(async () => {
     try {
@@ -493,6 +521,10 @@ function App() {
       }
 
       event.preventDefault();
+      if (action === "new") {
+        handleNewFile();
+        return;
+      }
       if (action === "open") {
         void handleOpenFile();
         return;
@@ -506,7 +538,7 @@ function App() {
 
     document.addEventListener("keydown", handleAppShortcut);
     return () => document.removeEventListener("keydown", handleAppShortcut);
-  }, [handleOpenFile, handleSaveFile, handleSaveFileAs]);
+  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs]);
 
   const recordCanceledConversion = useCallback((request: PendingConversion) => {
     setHistory((items) => [
@@ -1017,6 +1049,7 @@ function App() {
         isDirty={isDirty}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
+        onNewFile={handleNewFile}
         onOpenFile={handleOpenFile}
         onSaveFile={handleSaveFile}
         onSaveFileAs={handleSaveFileAs}
