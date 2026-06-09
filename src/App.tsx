@@ -304,16 +304,12 @@ function App() {
   ]);
 
   const closeActivePanel = useCallback(() => {
-    if (activePanel === "history") {
-      setHistory([]);
-    }
     setActivePanel(null);
-  }, [activePanel]);
+  }, []);
 
   const toggleHistoryPanel = useCallback(() => {
     setActivePanel((panel) => {
       if (panel === "history") {
-        setHistory([]);
         return null;
       }
       return "history";
@@ -322,20 +318,14 @@ function App() {
 
   const togglePromptPanel = useCallback(() => {
     setActivePanel((panel) => {
-      if (panel === "history") {
-        setHistory([]);
-      }
       return panel === "prompt" ? null : "prompt";
     });
   }, []);
 
   const openDictionaryPanel = useCallback(() => {
-    if (activePanel === "history") {
-      setHistory([]);
-    }
     setActivePanel(null);
     setDictionaryPanelOpen(true);
-  }, [activePanel]);
+  }, []);
 
   const getEditorDocument = useCallback(() => {
     return editorViewRef.current?.state.doc.toString() ?? "";
@@ -638,6 +628,8 @@ function App() {
         createdAt: Date.now(),
         source: request.source,
         anchor: request.anchor,
+        retryOf: request.retryOf,
+        avoidOutputs: request.avoidOutputs,
       },
       ...items,
     ]);
@@ -655,6 +647,8 @@ function App() {
         createdAt: Date.now(),
         source: request.source,
         anchor: request.anchor,
+        retryOf: request.retryOf,
+        avoidOutputs: request.avoidOutputs,
       },
       ...items,
     ]);
@@ -682,6 +676,8 @@ function App() {
       const conversion = await convertRomajiToJapaneseDetailed(
         resolved.matchedText,
         settingsRef.current,
+        undefined,
+        { avoidOutputs: request.avoidOutputs },
       );
       if (canceledRequestsRef.current.has(request.id)) {
         return;
@@ -722,10 +718,15 @@ function App() {
               inputText: request.originalText,
               reviewKana: conversion.reviewKana,
               source: "editor",
+              retryOf: request.retryOf,
+              avoidOutputs: request.avoidOutputs,
             }),
           ],
         });
-        setStatus({ kind: "success", message: "Ghost suggestion ready. Press Tab to accept." });
+        setStatus({
+          kind: "success",
+          message: "Ghost suggestion ready. Press Tab to accept or Ctrl+/ to try another.",
+        });
         return;
       }
 
@@ -757,6 +758,8 @@ function App() {
           createdAt: Date.now(),
           source: "editor",
           anchor: nextAnchor,
+          retryOf: request.retryOf,
+          avoidOutputs: request.avoidOutputs,
         },
         ...items,
       ]);
@@ -784,6 +787,8 @@ function App() {
       const conversion = await convertRomajiToJapaneseDetailed(
         request.originalText,
         settingsRef.current,
+        undefined,
+        { avoidOutputs: request.avoidOutputs },
       );
       if (canceledRequestsRef.current.has(request.id)) {
         return;
@@ -802,6 +807,8 @@ function App() {
             createdAt: Date.now(),
             source: "history",
             anchor: request.anchor,
+            retryOf: request.retryOf,
+            avoidOutputs: request.avoidOutputs,
           },
           ...items,
         ]);
@@ -837,9 +844,14 @@ function App() {
             inputText: request.originalText,
             reviewKana: conversion.reviewKana,
             source: "history",
+            retryOf: request.retryOf,
+            avoidOutputs: request.avoidOutputs,
           }),
         });
-        setStatus({ kind: "success", message: "History suggestion ready. Press Tab to apply." });
+        setStatus({
+          kind: "success",
+          message: "History suggestion ready. Press Tab to apply or Ctrl+/ to try another.",
+        });
         return;
       }
 
@@ -871,6 +883,8 @@ function App() {
           createdAt: Date.now(),
           source: "history",
           anchor: nextAnchor,
+          retryOf: request.retryOf,
+          avoidOutputs: request.avoidOutputs,
         },
         ...items,
       ]);
@@ -908,7 +922,9 @@ function App() {
         setStatus({
           kind: "loading",
           message:
-            request.source === "history"
+            request.retryOf
+              ? `Trying another candidate for "${request.originalText}"`
+              : request.source === "history"
               ? `Re-converting "${request.originalText}"`
               : `Converting "${request.originalText}"`,
         });
@@ -932,6 +948,8 @@ function App() {
                 createdAt: Date.now(),
                 source: request.source,
                 anchor: request.anchor,
+                retryOf: request.retryOf,
+                avoidOutputs: request.avoidOutputs,
               },
               ...items,
             ]);
@@ -1014,6 +1032,8 @@ function App() {
         createdAt: Date.now(),
         source: suggestion.source,
         anchor: nextAnchor,
+        retryOf: suggestion.retryOf,
+        avoidOutputs: suggestion.avoidOutputs,
       },
       ...items,
     ]);
@@ -1027,6 +1047,56 @@ function App() {
     );
     setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
   }, [saveCurrentDocumentSession, showHomophoneReviewSuggestion]);
+
+  const handleRetryGhost = useCallback(
+    (suggestion: GhostConversionSuggestion) => {
+      const view = editorViewRef.current;
+      if (!view) {
+        return;
+      }
+
+      const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
+      if (currentText !== suggestion.originalText) {
+        view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+        setStatus({
+          kind: "warning",
+          message: "Ghost suggestion was dismissed because the source text changed.",
+        });
+        return;
+      }
+
+      const request: PendingConversion = {
+        id: crypto.randomUUID(),
+        anchor: {
+          from: suggestion.from,
+          to: suggestion.to,
+          originalText: suggestion.originalText,
+          docVersion: docVersionRef.current,
+        },
+        originalText: suggestion.inputText,
+        createdAt: Date.now(),
+        docVersion: docVersionRef.current,
+        source: suggestion.source,
+        status: "queued",
+        retryOf: suggestion.retryOf ?? suggestion.id,
+        avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
+      };
+
+      view.dispatch({
+        effects: [
+          clearGhostSuggestion.of(suggestion.id),
+          addLoadingDecoration.of({
+            id: request.id,
+            from: suggestion.from,
+            to: suggestion.to,
+          }),
+        ],
+      });
+
+      enqueueConversion(request);
+    },
+    [enqueueConversion],
+  );
 
   const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
     if (!item.output || !item.anchor) {
@@ -1073,6 +1143,8 @@ function App() {
       createdAt: Date.now(),
       source: "history",
       status: "queued",
+      retryOf: item.id,
+      avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
     };
 
     enqueueConversion(request);
@@ -1149,6 +1221,7 @@ function App() {
         onOpenPrompt={togglePromptPanel}
         onOpenDictionary={openDictionaryPanel}
         onAcceptGhost={handleAcceptGhost}
+        onRetryGhost={handleRetryGhost}
         registerView={registerView}
       />
       {homophoneSuggestion ? (
@@ -1415,7 +1488,11 @@ function HistoryPanel({
             <article className="pending-item" key={request.id}>
               <div>
                 <strong>
-                  {request.status === "queued"
+                  {request.retryOf
+                    ? request.status === "queued"
+                      ? "Queued retry"
+                      : "Trying another"
+                    : request.status === "queued"
                     ? "Queued"
                     : request.source === "history"
                       ? "Re-applying"
@@ -1451,8 +1528,8 @@ function HistoryPanel({
               onMouseLeave={() => onPreviewEnd(item)}
               title={
                 item.anchor
-                  ? "Click to re-convert and apply this item"
-                  : "Click to re-run this conversion"
+                  ? "Click to try another conversion and apply it"
+                  : "Click to try this conversion again"
               }
             >
               <div className="history-meta">
@@ -1473,7 +1550,7 @@ function HistoryPanel({
                 <span>{item.modelName}</span>
                 <span className="rerun-hint">
                   <RotateCcw size={13} aria-hidden="true" />
-                  {item.anchor ? "Apply again" : "Re-run"}
+                  Try again
                 </span>
               </div>
             </button>
@@ -1991,6 +2068,16 @@ function hasMatchingPendingEditorConversion(
       request.range.from === range.from &&
       request.range.to === range.to &&
       request.range.text === range.text,
+  );
+}
+
+function collectAvoidOutputs(existing: string[] | undefined, next: string | undefined): string[] {
+  return Array.from(
+    new Set(
+      [...(existing ?? []), next]
+        .map((output) => output?.trim())
+        .filter((output): output is string => Boolean(output)),
+    ),
   );
 }
 
