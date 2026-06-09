@@ -44,6 +44,11 @@ export interface JapaneseConversionResult {
   reviewKana: string;
 }
 
+export interface JapaneseConversionOptions {
+  avoidOutputs?: string[];
+  strictAlternative?: boolean;
+}
+
 export async function convertRomajiToJapanese(
   input: string,
   settings: AppSettings,
@@ -57,6 +62,36 @@ export async function convertRomajiToJapaneseDetailed(
   input: string,
   settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport,
+  options: JapaneseConversionOptions = {},
+): Promise<JapaneseConversionResult> {
+  const result = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, options);
+  if (!isAvoidedConversionOutput(result.text, options.avoidOutputs)) {
+    return result;
+  }
+
+  if (!options.strictAlternative) {
+    return convertRomajiToJapaneseDetailed(input, settings, transport, {
+      ...options,
+      strictAlternative: true,
+    });
+  }
+
+  const fallback = result.reviewKana.trim();
+  if (fallback && !isAvoidedConversionOutput(fallback, options.avoidOutputs)) {
+    return {
+      ...result,
+      text: fallback,
+    };
+  }
+
+  return result;
+}
+
+async function convertRomajiToJapaneseDetailedOnce(
+  input: string,
+  settings: AppSettings,
+  transport: OllamaTransport,
+  options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
   const normalized = normalizeInputForPrompt(input, settings);
   const parts = splitInputForConversion(normalized, settings.userDictionary);
@@ -79,13 +114,21 @@ export async function convertRomajiToJapaneseDetailed(
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
     const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
     reviewKanaParts.push(repaired.kana);
-    convertedParts.push(await kanjiizeKana(repaired.kana, settings, transport));
+    convertedParts.push(await kanjiizeKana(repaired.kana, settings, transport, options));
   }
 
   return {
     text: convertedParts.join(""),
     reviewKana: reviewKanaParts.join(""),
   };
+}
+
+function isAvoidedConversionOutput(output: string, avoidOutputs: string[] | undefined): boolean {
+  const normalizedOutput = output.trim();
+  return Boolean(
+    normalizedOutput &&
+      avoidOutputs?.some((avoidOutput) => avoidOutput.trim() === normalizedOutput),
+  );
 }
 
 export async function repairLowConfidenceKana(
@@ -115,6 +158,7 @@ export async function kanjiizeKana(
   kana: string,
   settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport,
+  options: JapaneseConversionOptions = {},
 ): Promise<string> {
   const result = await transport.generate(
     settings.modelProvider,
@@ -126,6 +170,8 @@ export async function kanjiizeKana(
         settings.conversionPreset,
         [],
         kana,
+        options.avoidOutputs ?? [],
+        options.strictAlternative ?? false,
       ),
       prompt: kana,
       stream: false,

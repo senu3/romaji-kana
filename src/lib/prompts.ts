@@ -88,6 +88,12 @@ export const kanaKanjiFewShotExamples = [
   "おじいさんご自慢の時計さ",
   "",
   "入力:",
+  "ごじだつじはおそろしいものだ",
+  "",
+  "出力:",
+  "誤字脱字は恐ろしいものだ",
+  "",
+  "入力:",
   "みちのえいごについてはごじのかのうせいもあるため",
   "",
   "出力:",
@@ -162,9 +168,15 @@ export function buildKanaKanjiSystemPrompt(
   preset: ConversionPreset = "none",
   homophones: UserHomophonePreference[] = [],
   targetKana = "",
+  avoidOutputs: string[] = [],
+  strictAlternative = false,
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
   const matchingHomophones = formatMatchingHomophonePreferences(targetKana, homophones);
+  const alternativeInstructions = formatAlternativeConversionInstructions(
+    avoidOutputs,
+    strictAlternative,
+  );
 
   return [
     "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
@@ -182,6 +194,9 @@ export function buildKanaKanjiSystemPrompt(
     "11. User-side review handles homophone cleanup, so do not over-correct homophones by guessing hidden intent.",
     "12. Return only the converted Japanese text. Do not explain.",
     "",
+    "Alternative conversion request:",
+    alternativeInstructions || "None.",
+    "",
     "Purpose preset:",
     conversionPresetInstructions[preset],
     "",
@@ -193,6 +208,29 @@ export function buildKanaKanjiSystemPrompt(
     "",
     "Additional user preference:",
     prompt,
+  ].join("\n");
+}
+
+function formatAlternativeConversionInstructions(
+  avoidOutputs: string[],
+  strictAlternative: boolean,
+): string {
+  const uniqueOutputs = Array.from(
+    new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
+  );
+  if (uniqueOutputs.length === 0) {
+    return "";
+  }
+
+  return [
+    "Generate a different valid conversion candidate for the same kana input.",
+    "Avoid returning these previous outputs exactly:",
+    ...uniqueOutputs.map((output) => `- ${output}`),
+    strictAlternative
+      ? "Returning any listed output exactly is invalid. If needed, return a conservative hiragana-heavy spelling instead."
+      : "If possible, return a candidate that differs from the listed outputs by at least one character.",
+    "Keep the same reading and do not paraphrase just to be different.",
+    "If no clearly better candidate exists, prefer a conservative kana or hiragana-heavy spelling over repeating the previous output.",
   ].join("\n");
 }
 

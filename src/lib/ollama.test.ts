@@ -247,6 +247,38 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("falls back to a conservative kana candidate when retry keeps returning an avoided output", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "gozidatuzihaosorosiimonoda",
+      defaultSettings,
+      transport,
+      { avoidOutputs: ["ご時達事はおそろしいものだ"] },
+    );
+
+    expect(result).toEqual({
+      text: "ごじだつじはおそろしいものだ",
+      reviewKana: "ごじだつじはおそろしいものだ",
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("Returning any listed output exactly is invalid"),
+      }),
+      30_000,
+    );
+  });
+
   it("keeps valid wo particles before non-particle following text", () => {
     expect(normalizeRomajiReadingCandidate("sorewokakuninshimasu")).toBe(
       "sorewokakuninshimasu",
@@ -534,7 +566,18 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("User-side review handles homophone cleanup");
     expect(prompt).toContain("あなたの笑顔が好きです");
     expect(prompt).toContain("おじいさんご自慢の時計さ");
+    expect(prompt).toContain("誤字脱字は恐ろしいものだ");
     expect(prompt).toContain("みちの英語についてはごじの可能性もあるため");
+  });
+
+  it("adds alternative conversion instructions only when previous outputs are provided", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", [], "いち。", [
+      "一。",
+    ]);
+
+    expect(prompt).toContain("Generate a different valid conversion candidate");
+    expect(prompt).toContain("Avoid returning these previous outputs exactly:");
+    expect(prompt).toContain("- 一。");
   });
 
   it("keeps kana-kanji prompts independent from user dictionary entries", () => {
@@ -542,6 +585,7 @@ describe("convertRomajiToJapanese", () => {
 
     expect(prompt).not.toContain("User dictionary:");
     expect(prompt).not.toContain("Protected dictionary placeholders");
+    expect(prompt).toContain("Alternative conversion request:\nNone.");
   });
 
   it("formats only matching enabled homophone preferences", () => {

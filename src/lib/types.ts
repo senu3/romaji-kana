@@ -108,6 +108,8 @@ export interface GhostConversionSuggestion {
   inputText: string;
   reviewKana?: string;
   source: "editor" | "history";
+  retryOf?: string;
+  avoidOutputs?: string[];
 }
 
 export interface HomophoneReviewSuggestion {
@@ -129,6 +131,8 @@ export interface PendingConversion {
   docVersion?: number;
   source: "editor" | "history";
   status: "queued" | "running";
+  retryOf?: string;
+  avoidOutputs?: string[];
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
@@ -143,6 +147,8 @@ export interface ConversionHistoryItem {
   createdAt: number;
   source: "editor" | "history";
   anchor?: ConversionAnchor;
+  retryOf?: string;
+  avoidOutputs?: string[];
 }
 
 export interface LocalModel {

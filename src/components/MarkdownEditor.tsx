@@ -56,6 +56,7 @@ interface MarkdownEditorProps {
   onOpenPrompt: () => void;
   onOpenDictionary: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
+  onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   registerView: (view: EditorView | null) => void;
 }
 
@@ -108,7 +109,7 @@ class GhostTextWidget extends WidgetType {
   toDOM() {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
-    element.title = "Press Tab to accept, Esc to dismiss";
+    element.title = "Press Tab to accept, Ctrl+/ to try another candidate";
 
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
@@ -116,7 +117,7 @@ class GhostTextWidget extends WidgetType {
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent = "Tab accept / Esc dismiss";
+    hint.textContent = "Tab accept  Ctrl+/ retry";
 
     element.append(suggestion, hint);
     return element;
@@ -290,6 +291,7 @@ export function MarkdownEditor({
   onOpenPrompt,
   onOpenDictionary,
   onAcceptGhost,
+  onRetryGhost,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -298,6 +300,7 @@ export function MarkdownEditor({
   const onConvertRef = useRef(onConvert);
   const onDocumentChangedRef = useRef(onDocumentChanged);
   const onAcceptGhostRef = useRef(onAcceptGhost);
+  const onRetryGhostRef = useRef(onRetryGhost);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
   const composingRef = useRef(false);
@@ -357,8 +360,9 @@ export function MarkdownEditor({
     onConvertRef.current = onConvert;
     onDocumentChangedRef.current = onDocumentChanged;
     onAcceptGhostRef.current = onAcceptGhost;
+    onRetryGhostRef.current = onRetryGhost;
     settingsRef.current = settings;
-  }, [onAcceptGhost, onConvert, onDocumentChanged, settings]);
+  }, [onAcceptGhost, onConvert, onDocumentChanged, onRetryGhost, settings]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -386,6 +390,10 @@ export function MarkdownEditor({
             {
               key: "Tab",
               run: acceptGhostSuggestion,
+            },
+            {
+              key: "Mod-/",
+              run: retryGhostSuggestion,
             },
             {
               key: "Escape",
@@ -465,6 +473,10 @@ export function MarkdownEditor({
             run: acceptGhostSuggestion,
           },
           {
+            key: "Mod-/",
+            run: retryGhostSuggestion,
+          },
+          {
             key: "Escape",
             run: dismissGhostSuggestion,
           },
@@ -538,6 +550,23 @@ export function MarkdownEditor({
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);
+    return true;
+  }
+
+  function retryGhostSuggestion(view: EditorView) {
+    const state = view.state.field(ghostSuggestionField);
+    const suggestion = state.suggestion;
+    if (!suggestion) {
+      return false;
+    }
+
+    const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
+    if (currentText !== suggestion.originalText) {
+      view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+      return true;
+    }
+
+    onRetryGhostRef.current(suggestion);
     return true;
   }
 

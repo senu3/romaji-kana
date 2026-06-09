@@ -38,6 +38,7 @@ try {
   let activeConversionRequests = 0;
   let maxActiveConversionRequests = 0;
   const conversionPrompts = [];
+  const conversionSystems = [];
   await page.route("**/api/tags", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -49,13 +50,14 @@ try {
     if (body.prompt) {
       conversionRequestCount += 1;
       conversionPrompts.push(body.prompt);
+      conversionSystems.push(body.system ?? "");
       activeConversionRequests += 1;
       maxActiveConversionRequests = Math.max(maxActiveConversionRequests, activeConversionRequests);
       if (body.prompt === "いち。") {
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
     }
-    const response = conversionResponseForPrompt(body.prompt);
+    const response = conversionResponseForPrompt(body.prompt, body.system ?? "");
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ response }),
@@ -156,6 +158,7 @@ try {
   activeConversionRequests = 0;
   maxActiveConversionRequests = 0;
   conversionPrompts.length = 0;
+  conversionSystems.length = 0;
   await page.keyboard.press("Control+A");
   await page.keyboard.type("ichi.");
   await page.keyboard.type("ni.");
@@ -163,6 +166,28 @@ try {
   assert.deepEqual(conversionPrompts, ["いち。", "に。"]);
   assert.equal(conversionRequestCount, 2, "Both triggers should be converted.");
   assert.equal(maxActiveConversionRequests, 1, "Conversions should run sequentially.");
+
+  conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
+  await page.getByRole("button", { name: /History/ }).click();
+  await page
+    .locator(".history-item")
+    .filter({ hasText: "ichi." })
+    .first()
+    .click();
+  await page.getByText("壱。二。").waitFor();
+  assert.deepEqual(conversionPrompts, ["いち。"]);
+  assert.ok(
+    conversionSystems[0]?.includes("Avoid returning these previous outputs exactly:"),
+    "History Try again should ask for an alternative candidate.",
+  );
+  await page.getByRole("button", { name: /History/ }).click();
+  assert.ok(
+    (await page.locator(".history-item").count()) >= 2,
+    "History should remain available after Try again closes the panel.",
+  );
+  await page.getByRole("button", { name: "Close history" }).click();
 
   await page.keyboard.press("Control+N");
   await page.waitForFunction(() => {
@@ -192,6 +217,25 @@ try {
   await page.getByRole("button", { name: "ビジネスメール" }).click();
   await page.getByText("Work messages and email drafts.").waitFor();
   await page.getByRole("button", { name: "Close prompt" }).click();
+
+  conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
+  await page.getByRole("button", { name: "Ghost + Tab" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("san.");
+  await page.getByText("Tab accept / Ctrl+/ retry").waitFor();
+  await page.getByText("三。").waitFor();
+  await page.keyboard.press("Control+/");
+  await page.getByText("参。").waitFor();
+  assert.deepEqual(conversionPrompts, ["さん。", "さん。"]);
+  assert.ok(
+    conversionSystems[1]?.includes("Avoid returning these previous outputs exactly:"),
+    "Ghost retry should ask for an alternative candidate.",
+  );
+  await page.keyboard.press("Tab");
+  await page.getByText("参。").waitFor();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Open settings" }).click();
@@ -257,12 +301,23 @@ async function panelTogglePaintsOutsideSettingsPanel(page) {
   });
 }
 
-function conversionResponseForPrompt(prompt) {
+function conversionResponseForPrompt(prompt, system = "") {
+  if (system.includes("Avoid returning these previous outputs exactly:")) {
+    if (prompt === "いち。") {
+      return "壱。";
+    }
+    if (prompt === "さん。") {
+      return "参。";
+    }
+  }
   if (prompt === "いち。") {
     return "一。";
   }
   if (prompt === "に。") {
     return "二。";
+  }
+  if (prompt === "さん。") {
+    return "三。";
   }
   return prompt ? "あなたは誰ですか。" : "";
 }
