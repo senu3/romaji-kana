@@ -61,6 +61,30 @@ describe("extractConversionRange", () => {
     });
   });
 
+  it("extracts only appended romaji after existing Japanese text on the same line", () => {
+    const doc = "今日は会議です ashita no yotei.";
+    const appended = "ashita no yotei.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: doc.indexOf(appended),
+      to: doc.length,
+      text: appended,
+      trigger: "period",
+    });
+  });
+
+  it("extracts appended romaji after existing Japanese text before an enter trigger", () => {
+    const doc = "今日は会議です ashita no yotei";
+    const appended = "ashita no yotei";
+    const range = extractConversionRange(doc, doc.length, "enter");
+    expect(range).toEqual({
+      from: doc.indexOf(appended),
+      to: doc.length,
+      text: appended,
+      trigger: "enter",
+    });
+  });
+
   it("does not include markdown heading markers", () => {
     const doc = "## kyouhayoi tenkidesu.";
     const range = extractConversionRange(doc, doc.length, "period");
