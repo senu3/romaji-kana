@@ -110,6 +110,7 @@ export interface GhostConversionSuggestion {
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
+  fixedTerms?: string[];
 }
 
 export interface HomophoneReviewSuggestion {
@@ -133,6 +134,7 @@ export interface PendingConversion {
   status: "queued" | "running";
   retryOf?: string;
   avoidOutputs?: string[];
+  fixedTerms?: string[];
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
@@ -149,6 +151,7 @@ export interface ConversionHistoryItem {
   anchor?: ConversionAnchor;
   retryOf?: string;
   avoidOutputs?: string[];
+  fixedTerms?: string[];
 }
 
 export interface LocalModel {

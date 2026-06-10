@@ -32,6 +32,7 @@ import {
   type JapaneseConversionResult,
 } from "./lib/ollama";
 import {
+  buildHomophoneFixedTermSuggestions,
   buildHomophoneReviewSuggestions,
   formatReplaceTargets,
   parseReplaceTargets,
@@ -66,7 +67,21 @@ const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
 type ActiveHomophoneReviewSuggestion = HomophoneReviewSuggestion & {
   conversionId: string;
+  conversionInput: string;
+  conversionAnchor: ConversionAnchor;
+  avoidOutputs?: string[];
+  fixedTerms?: string[];
 };
+
+interface HomophoneRerunPrompt {
+  id: string;
+  conversionId: string;
+  conversionInput: string;
+  anchor: ConversionAnchor;
+  fixedTerm: string;
+  fixedTerms?: string[];
+  avoidOutputs?: string[];
+}
 
 function App() {
   const [initialSession] = useState(() => {
@@ -87,6 +102,9 @@ function App() {
   const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
   const [homophoneSuggestion, setHomophoneSuggestion] =
     useState<ActiveHomophoneReviewSuggestion | null>(null);
+  const [homophoneRerunPrompt, setHomophoneRerunPrompt] = useState<HomophoneRerunPrompt | null>(
+    null,
+  );
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
@@ -490,21 +508,51 @@ function App() {
   }, [editorReady, initialSession, markDocumentClean, replaceEditorDocument]);
 
   const showHomophoneReviewSuggestion = useCallback(
-    (conversionId: string, conversion: JapaneseConversionResult, baseFrom: number) => {
+    (
+      request: PendingConversion,
+      conversion: JapaneseConversionResult,
+      baseFrom: number,
+      conversionAnchor: ConversionAnchor,
+    ) => {
       const [suggestion] = buildHomophoneReviewSuggestions(
         conversion.reviewKana,
         conversion.text,
         settingsRef.current.userHomophones,
       );
       if (!suggestion) {
+        const [fixedSuggestion] = buildHomophoneFixedTermSuggestions(
+          conversion.reviewKana,
+          conversion.text,
+          settingsRef.current.userHomophones,
+        );
+        if (fixedSuggestion) {
+          setHomophoneSuggestion(null);
+          setHomophoneRerunPrompt({
+            id: `${request.id}:${fixedSuggestion.id}:rerun`,
+            conversionId: request.id,
+            conversionInput: request.originalText,
+            fixedTerm: fixedSuggestion.preferred,
+            fixedTerms: request.fixedTerms,
+            avoidOutputs: collectAvoidOutputs(request.avoidOutputs, conversionAnchor.appliedText),
+            anchor: conversionAnchor,
+          });
+          return;
+        }
+
         setHomophoneSuggestion(null);
+        setHomophoneRerunPrompt(null);
         return;
       }
 
+      setHomophoneRerunPrompt(null);
       setHomophoneSuggestion({
         ...suggestion,
-        id: `${conversionId}:${suggestion.id}`,
-        conversionId,
+        id: `${request.id}:${suggestion.id}`,
+        conversionId: request.id,
+        conversionInput: request.originalText,
+        conversionAnchor,
+        avoidOutputs: request.avoidOutputs,
+        fixedTerms: request.fixedTerms,
         from: baseFrom + suggestion.from,
         to: baseFrom + suggestion.to,
       });
@@ -537,11 +585,34 @@ function App() {
       },
       userEvent: "input.homophoneReview",
     });
-    saveCurrentDocumentSession(view.state.doc.toString());
+    const nextDocument = view.state.doc.toString();
+    saveCurrentDocumentSession(nextDocument);
+    const delta = suggestion.preferred.length - suggestion.target.length;
+    const nextAnchorFrom = suggestion.conversionAnchor.from;
+    const nextAnchorTo = suggestion.conversionAnchor.to + delta;
+    const currentRangeText = nextDocument.slice(nextAnchorFrom, nextAnchorTo);
+    setHomophoneRerunPrompt({
+      id: `${suggestion.id}:rerun`,
+      conversionId: suggestion.conversionId,
+      conversionInput: suggestion.conversionInput,
+      fixedTerm: suggestion.preferred,
+      fixedTerms: suggestion.fixedTerms,
+      avoidOutputs: collectAvoidOutputs(
+        suggestion.avoidOutputs,
+        suggestion.conversionAnchor.appliedText,
+      ),
+      anchor: {
+        from: nextAnchorFrom,
+        to: nextAnchorTo,
+        originalText: currentRangeText,
+        appliedText: currentRangeText,
+        docVersion: docVersionRef.current,
+      },
+    });
     setHomophoneSuggestion(null);
     setStatus({
       kind: "success",
-      message: `Applied homophone suggestion: ${suggestion.target} -> ${suggestion.preferred}.`,
+      message: `Applied homophone suggestion: ${suggestion.target} -> ${suggestion.preferred}. You can re-convert the containing range.`,
     });
     view.focus();
     return true;
@@ -550,6 +621,10 @@ function App() {
   const dismissHomophoneSuggestion = useCallback(() => {
     setHomophoneSuggestion(null);
   }, [showHomophoneReviewSuggestion]);
+
+  const dismissHomophoneRerunPrompt = useCallback(() => {
+    setHomophoneRerunPrompt(null);
+  }, []);
 
   useEffect(() => {
     if (!homophoneSuggestion || dictionaryPanelOpen || settingsDrawerOpen || !setupComplete) {
@@ -630,6 +705,7 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
+        fixedTerms: request.fixedTerms,
       },
       ...items,
     ]);
@@ -649,6 +725,7 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
+        fixedTerms: request.fixedTerms,
       },
       ...items,
     ]);
@@ -677,7 +754,10 @@ function App() {
         resolved.matchedText,
         settingsRef.current,
         undefined,
-        { avoidOutputs: request.avoidOutputs },
+        {
+          avoidOutputs: request.avoidOutputs,
+          fixedTerms: request.fixedTerms,
+        },
       );
       if (canceledRequestsRef.current.has(request.id)) {
         return;
@@ -720,6 +800,7 @@ function App() {
               source: "editor",
               retryOf: request.retryOf,
               avoidOutputs: request.avoidOutputs,
+              fixedTerms: request.fixedTerms,
             }),
           ],
         });
@@ -760,10 +841,11 @@ function App() {
           anchor: nextAnchor,
           retryOf: request.retryOf,
           avoidOutputs: request.avoidOutputs,
+          fixedTerms: request.fixedTerms,
         },
         ...items,
       ]);
-      showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
+      showHomophoneReviewSuggestion(request, conversion, latestResolved.from, nextAnchor);
       setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
     },
     [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
@@ -788,7 +870,10 @@ function App() {
         request.originalText,
         settingsRef.current,
         undefined,
-        { avoidOutputs: request.avoidOutputs },
+        {
+          avoidOutputs: request.avoidOutputs,
+          fixedTerms: request.fixedTerms,
+        },
       );
       if (canceledRequestsRef.current.has(request.id)) {
         return;
@@ -809,6 +894,7 @@ function App() {
             anchor: request.anchor,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
+            fixedTerms: request.fixedTerms,
           },
           ...items,
         ]);
@@ -854,6 +940,7 @@ function App() {
             anchor: nextAnchor,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
+            fixedTerms: request.fixedTerms,
           }),
         );
         latestView.dispatch({
@@ -868,6 +955,7 @@ function App() {
             source: "history",
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
+            fixedTerms: request.fixedTerms,
           }),
         });
         setStatus({
@@ -907,6 +995,7 @@ function App() {
           anchor: nextAnchor,
           retryOf: request.retryOf,
           avoidOutputs: request.avoidOutputs,
+          fixedTerms: request.fixedTerms,
         },
         ...items,
       ]);
@@ -917,7 +1006,7 @@ function App() {
             ? "History conversion applied at a nearby matching anchor."
             : "History conversion applied.",
       });
-      showHomophoneReviewSuggestion(request.id, conversion, latestResolved.from);
+      showHomophoneReviewSuggestion(request, conversion, latestResolved.from, nextAnchor);
     },
     [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
   );
@@ -972,6 +1061,7 @@ function App() {
                 anchor: request.anchor,
                 retryOf: request.retryOf,
                 avoidOutputs: request.avoidOutputs,
+                fixedTerms: request.fixedTerms,
               },
               ...items,
             ]);
@@ -999,6 +1089,7 @@ function App() {
   const enqueueConversion = useCallback(
     (request: PendingConversion) => {
       setHomophoneSuggestion(null);
+      setHomophoneRerunPrompt(null);
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
       if (processingQueueRef.current) {
@@ -1008,6 +1099,53 @@ function App() {
     },
     [processConversionQueue],
   );
+
+  const rerunHomophoneRange = useCallback(() => {
+    const prompt = homophoneRerunPrompt;
+    const view = editorViewRef.current;
+    if (!prompt || !view) {
+      return;
+    }
+
+    const resolved = resolveConversionAnchor(view.state.doc.toString(), prompt.anchor);
+    if (!resolved) {
+      setHomophoneRerunPrompt(null);
+      setStatus({
+        kind: "warning",
+        message: "Could not re-convert because the homophone range changed.",
+      });
+      return;
+    }
+
+    const request: PendingConversion = {
+      id: crypto.randomUUID(),
+      anchor: {
+        ...prompt.anchor,
+        from: resolved.from,
+        to: resolved.to,
+        originalText: resolved.matchedText,
+        appliedText: resolved.matchedText,
+        docVersion: docVersionRef.current,
+      },
+      originalText: prompt.conversionInput,
+      createdAt: Date.now(),
+      source: "history",
+      status: "queued",
+      retryOf: prompt.conversionId,
+      avoidOutputs: prompt.avoidOutputs,
+      fixedTerms: collectFixedTerms(prompt.fixedTerms, prompt.fixedTerm),
+    };
+
+    view.dispatch({
+      effects: addLoadingDecoration.of({
+        id: request.id,
+        from: resolved.from,
+        to: resolved.to,
+      }),
+    });
+
+    enqueueConversion(request);
+  }, [enqueueConversion, homophoneRerunPrompt]);
 
   const cancelConversion = useCallback(
     (request: PendingConversion) => {
@@ -1056,15 +1194,26 @@ function App() {
         anchor: nextAnchor,
         retryOf: suggestion.retryOf,
         avoidOutputs: suggestion.avoidOutputs,
+        fixedTerms: suggestion.fixedTerms,
       }),
     );
     showHomophoneReviewSuggestion(
-      suggestion.id,
+      {
+        id: suggestion.id,
+        originalText: suggestion.inputText,
+        createdAt: Date.now(),
+        source: suggestion.source,
+        status: "queued",
+        retryOf: suggestion.retryOf,
+        avoidOutputs: suggestion.avoidOutputs,
+        fixedTerms: suggestion.fixedTerms,
+      },
       {
         text: suggestion.convertedText,
         reviewKana: suggestion.reviewKana ?? suggestion.originalText,
       },
       suggestion.from,
+      nextAnchor,
     );
     setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
   }, [saveCurrentDocumentSession, showHomophoneReviewSuggestion]);
@@ -1101,6 +1250,7 @@ function App() {
         status: "queued",
         retryOf: suggestion.retryOf ?? suggestion.id,
         avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
+        fixedTerms: suggestion.fixedTerms,
       };
 
       view.dispatch({
@@ -1143,6 +1293,9 @@ function App() {
         convertedText: item.output,
         inputText: item.input,
         source: "history",
+        retryOf: item.retryOf,
+        avoidOutputs: item.avoidOutputs,
+        fixedTerms: item.fixedTerms,
       }),
     });
   }, []);
@@ -1166,6 +1319,7 @@ function App() {
       status: "queued",
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
+      fixedTerms: item.fixedTerms,
     };
 
     enqueueConversion(request);
@@ -1252,6 +1406,13 @@ function App() {
           onDismiss={dismissHomophoneSuggestion}
         />
       ) : null}
+      {homophoneRerunPrompt ? (
+        <HomophoneRerunChip
+          prompt={homophoneRerunPrompt}
+          onRerun={rerunHomophoneRange}
+          onDismiss={dismissHomophoneRerunPrompt}
+        />
+      ) : null}
       {activePanel === "history" ? (
         <HistoryPanel
           history={history}
@@ -1335,6 +1496,42 @@ function App() {
         onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
     </main>
+  );
+}
+
+function HomophoneRerunChip({
+  prompt,
+  onRerun,
+  onDismiss,
+}: {
+  prompt: HomophoneRerunPrompt;
+  onRerun: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <aside className="homophone-chip homophone-rerun-chip" aria-label="Homophone re-conversion">
+      <button
+        className="homophone-chip-main"
+        type="button"
+        onClick={onRerun}
+        title="Re-convert the range containing the fixed term"
+      >
+        <span className="homophone-chip-label">Fixed</span>
+        <span className="homophone-chip-text">
+          Retry range with {prompt.fixedTerm}
+        </span>
+        <kbd>Retry</kbd>
+      </button>
+      <button
+        className="homophone-chip-dismiss"
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss homophone re-conversion"
+        title="Dismiss"
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </aside>
   );
 }
 
@@ -2098,6 +2295,16 @@ function collectAvoidOutputs(existing: string[] | undefined, next: string | unde
       [...(existing ?? []), next]
         .map((output) => output?.trim())
         .filter((output): output is string => Boolean(output)),
+    ),
+  );
+}
+
+function collectFixedTerms(existing: string[] | undefined, next: string | undefined): string[] {
+  return Array.from(
+    new Set(
+      [...(existing ?? []), next]
+        .map((term) => term?.trim())
+        .filter((term): term is string => Boolean(term)),
     ),
   );
 }

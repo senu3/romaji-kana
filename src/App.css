@@ -1000,6 +1000,18 @@ h3 {
   color: #b91c1c;
 }
 
+.homophone-rerun-chip {
+  border-color: #fde68a;
+}
+
+.homophone-rerun-chip .homophone-chip-main:hover {
+  background: #fffbeb;
+}
+
+.homophone-rerun-chip .homophone-chip-label {
+  color: #b45309;
+}
+
 .setup-overlay {
   z-index: 40;
   display: grid;
