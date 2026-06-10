@@ -51,9 +51,11 @@ export function extractConversionRange(
     }
   }
 
-  const text = doc.slice(start, safeCursor).trimStart();
-  const leadingWhitespace = doc.slice(start, safeCursor).length - doc.slice(start, safeCursor).trimStart().length;
-  const from = start + leadingWhitespace;
+  const adjustedStart = start + startOffsetAfterExistingJapanese(doc.slice(start, safeCursor));
+  const rawText = doc.slice(adjustedStart, safeCursor);
+  const text = rawText.trimStart();
+  const leadingWhitespace = rawText.length - text.length;
+  const from = adjustedStart + leadingWhitespace;
 
   if (from >= safeCursor || !text.trim() || isJapaneseDominant(text)) {
     return null;
@@ -152,6 +154,32 @@ function getMarkdownLineBoundary(line: string): number {
   }
 
   return 0;
+}
+
+function startOffsetAfterExistingJapanese(text: string): number {
+  let lastJapaneseIndex = -1;
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (isJapaneseCharacter(text[index] ?? "")) {
+      lastJapaneseIndex = index;
+    }
+  }
+
+  if (lastJapaneseIndex === -1) {
+    return 0;
+  }
+
+  const trailing = text.slice(lastJapaneseIndex + 1);
+  if (!/[A-Za-z]/.test(trailing)) {
+    return 0;
+  }
+
+  const leadingWhitespace = trailing.length - trailing.trimStart().length;
+  return lastJapaneseIndex + 1 + leadingWhitespace;
+}
+
+function isJapaneseCharacter(char: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u9fff。、]/u.test(char);
 }
 
 function isInsideFencedCode(doc: string, position: number): boolean {
