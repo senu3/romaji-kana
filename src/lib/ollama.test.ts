@@ -595,7 +595,9 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("あなたの笑顔が好きです");
     expect(prompt).toContain("おじいさんご自慢の時計さ");
     expect(prompt).toContain("誤字脱字は恐ろしいものだ");
-    expect(prompt).toContain("みちの英語についてはごじの可能性もあるため");
+    expect(prompt).toContain("五時にケーキを食べよう");
+    expect(prompt).toContain("議事に参加しよう");
+    expect(prompt).toContain("未知の英語については誤字の可能性もあるため");
   });
 
   it("adds alternative conversion instructions only when previous outputs are provided", () => {
