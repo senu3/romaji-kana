@@ -834,6 +834,28 @@ function App() {
       }
 
       if (settingsRef.current.conversionMode === "ghost") {
+        const nextAnchor: ConversionAnchor = {
+          from: latestResolved.from,
+          to: latestResolved.to,
+          originalText: latestResolved.matchedText,
+          appliedText: converted,
+          docVersion: docVersionRef.current,
+        };
+
+        setHistory((items) =>
+          upsertConversionHistory(items, {
+            id: request.id,
+            status: "success",
+            input: request.originalText,
+            output: converted,
+            modelName: settingsRef.current.modelName,
+            createdAt: Date.now(),
+            source: "history",
+            anchor: nextAnchor,
+            retryOf: request.retryOf,
+            avoidOutputs: request.avoidOutputs,
+          }),
+        );
         latestView.dispatch({
           effects: showGhostSuggestion.of({
             id: request.id,
@@ -1022,8 +1044,8 @@ function App() {
       saveCurrentDocumentSession(view.state.doc.toString());
     }
 
-    setHistory((items) => [
-      {
+    setHistory((items) =>
+      upsertConversionHistory(items, {
         id: suggestion.id,
         status: "success",
         input: suggestion.inputText,
@@ -1034,9 +1056,8 @@ function App() {
         anchor: nextAnchor,
         retryOf: suggestion.retryOf,
         avoidOutputs: suggestion.avoidOutputs,
-      },
-      ...items,
-    ]);
+      }),
+    );
     showHomophoneReviewSuggestion(
       suggestion.id,
       {
@@ -2079,6 +2100,13 @@ function collectAvoidOutputs(existing: string[] | undefined, next: string | unde
         .filter((output): output is string => Boolean(output)),
     ),
   );
+}
+
+function upsertConversionHistory(
+  items: ConversionHistoryItem[],
+  nextItem: ConversionHistoryItem,
+): ConversionHistoryItem[] {
+  return [nextItem, ...items.filter((item) => item.id !== nextItem.id)];
 }
 
 function StatusBar({

@@ -187,6 +187,11 @@ try {
     (await page.locator(".history-item").count()) >= 2,
     "History should remain available after Try again closes the panel.",
   );
+  await page
+    .locator(".history-item")
+    .first()
+    .getByText("壱。")
+    .waitFor();
   await page.getByRole("button", { name: "Close history" }).click();
 
   await page.keyboard.press("Control+N");
@@ -211,6 +216,7 @@ try {
 
   await page.getByRole("button", { name: "Show local models" }).click();
   await page.getByRole("option", { name: "qwen3.5:0.8b" }).waitFor();
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Style" }).click();
   await page.getByRole("region", { name: "Conversion prompt editor" }).waitFor();
@@ -222,10 +228,33 @@ try {
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.getByRole("button", { name: "Ghost + Tab" }).click();
+  await page.waitForFunction(() => {
+    const rawSettings = localStorage.getItem("romaji-kana-settings");
+    if (!rawSettings) {
+      return false;
+    }
+    return JSON.parse(rawSettings).conversionMode === "ghost";
+  });
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
   await page.keyboard.type("san.");
-  await page.getByText("Tab accept / Ctrl+/ retry").waitFor();
+  await page.waitForTimeout(500);
+  assert.ok(
+    conversionRequestCount > 0,
+    `Ghost mode period trigger should request a conversion. Editor text: ${await editorText(page)}`,
+  );
+  assert.notEqual(
+    await editorText(page),
+    "三。",
+    "Ghost mode should show a suggestion instead of replacing the editor text immediately.",
+  );
+  assert.ok(
+    (await page.locator(".cm-ghost-text-hint").count()) > 0,
+    `Ghost mode should render a suggestion widget. Editor text: ${await editorText(page)} Status: ${
+      (await page.locator(".status-bar").textContent()) ?? ""
+    }`,
+  );
+  await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl+/ retry" }).waitFor();
   await page.getByText("三。").waitFor();
   await page.keyboard.press("Control+/");
   await page.getByText("参。").waitFor();
@@ -236,6 +265,23 @@ try {
   );
   await page.keyboard.press("Tab");
   await page.getByText("参。").waitFor();
+  conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
+  await page.getByRole("button", { name: /History/ }).click();
+  await page
+    .locator(".history-item")
+    .filter({ hasText: "san." })
+    .first()
+    .click();
+  await page.getByText("さん。").waitFor();
+  await page.getByRole("button", { name: /History/ }).click();
+  await page
+    .locator(".history-item")
+    .first()
+    .getByText("さん。")
+    .waitFor();
+  await page.getByRole("button", { name: "Close history" }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Open settings" }).click();
@@ -307,6 +353,9 @@ function conversionResponseForPrompt(prompt, system = "") {
       return "壱。";
     }
     if (prompt === "さん。") {
+      if (system.includes("- 参。")) {
+        return "三。";
+      }
       return "参。";
     }
   }
