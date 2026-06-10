@@ -32,11 +32,33 @@ describe("extractConversionRange", () => {
     expect(range?.text).toBe("tsuginobun.");
   });
 
+  it("stays inside the current line even when the previous line has no punctuation", () => {
+    const doc = "maenobun\ntsuginobun.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: "maenobun\n".length,
+      to: doc.length,
+      text: "tsuginobun.",
+      trigger: "period",
+    });
+  });
+
   it("extracts the current line before an enter trigger", () => {
     const doc = "maenobun.\ntsuginobun";
     const range = extractConversionRange(doc, doc.length, "enter");
     expect(range?.text).toBe("tsuginobun");
     expect(range?.trigger).toBe("enter");
+  });
+
+  it("extracts only the current line before an enter trigger after an unpunctuated line", () => {
+    const doc = "maenobun\ntsuginobun";
+    const range = extractConversionRange(doc, doc.length, "enter");
+    expect(range).toEqual({
+      from: "maenobun\n".length,
+      to: doc.length,
+      text: "tsuginobun",
+      trigger: "enter",
+    });
   });
 
   it("does not include markdown heading markers", () => {

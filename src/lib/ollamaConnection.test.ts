@@ -28,9 +28,34 @@ describe("checkOllamaConnection", () => {
     expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
-      expect.objectContaining({ model: "gemma3", stream: false, think: false }),
+      expect.objectContaining({
+        model: "gemma3",
+        prompt: "ok",
+        stream: false,
+        think: false,
+      }),
       100,
     );
+  });
+
+  it("retries model warm-up once before failing the connection check", async () => {
+    const transport = {
+      models: vi.fn().mockResolvedValue({
+        models: [{ name: "gemma3:latest", modified_at: "2026-01-02T00:00:00Z", size: 456 }],
+      }),
+      generate: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("warm-up timeout"))
+        .mockResolvedValueOnce({ done: true }),
+    };
+
+    const result = await checkOllamaConnection(defaultSettings, {
+      transport,
+      timeoutMs: 100,
+    });
+
+    expect(result.kind).toBe("connected");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
   });
 
   it("fetches LM Studio models and warms the selected model", async () => {
