@@ -279,6 +279,34 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("passes fixed user-reviewed terms into kana-kanji conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "誤字を確認する" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "gojiwokakuninsuru",
+      defaultSettings,
+      transport,
+      { fixedTerms: ["誤字"] },
+    );
+
+    expect(result).toEqual({
+      text: "誤字を確認する",
+      reviewKana: "ごじをかくにんする",
+    });
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("- 誤字"),
+        prompt: "ごじをかくにんする",
+      }),
+      30_000,
+    );
+  });
+
   it("keeps valid wo particles before non-particle following text", () => {
     expect(normalizeRomajiReadingCandidate("sorewokakuninshimasu")).toBe(
       "sorewokakuninshimasu",

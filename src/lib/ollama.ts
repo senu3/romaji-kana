@@ -47,6 +47,7 @@ export interface JapaneseConversionResult {
 export interface JapaneseConversionOptions {
   avoidOutputs?: string[];
   strictAlternative?: boolean;
+  fixedTerms?: string[];
 }
 
 export async function convertRomajiToJapanese(
@@ -172,6 +173,7 @@ export async function kanjiizeKana(
         kana,
         options.avoidOutputs ?? [],
         options.strictAlternative ?? false,
+        options.fixedTerms ?? [],
       ),
       prompt: kana,
       stream: false,

@@ -1,5 +1,12 @@
 import type { HomophoneReviewSuggestion, UserHomophonePreference } from "./types";
 
+export interface HomophoneFixedTermSuggestion {
+  id: string;
+  entryId: string;
+  reading: string;
+  preferred: string;
+}
+
 const HOMOPHONE_BOUNDARY_CHARS = new Set([
   " ",
   "\n",
@@ -87,6 +94,42 @@ export function buildHomophoneReviewSuggestions(
       });
       break;
     }
+  }
+
+  return suggestions;
+}
+
+export function buildHomophoneFixedTermSuggestions(
+  sourceKana: string,
+  convertedText: string,
+  entries: UserHomophonePreference[],
+): HomophoneFixedTermSuggestion[] {
+  const seen = new Set<string>();
+  const suggestions: HomophoneFixedTermSuggestion[] = [];
+
+  for (const entry of entries) {
+    const reading = entry.reading.trim();
+    const preferred = entry.preferred.trim();
+    const key = `${entry.id}\t${reading}\t${preferred}`;
+    if (
+      !entry.enabled ||
+      !reading ||
+      !preferred ||
+      !isHiraganaReading(reading) ||
+      !hasStandaloneReading(sourceKana, reading) ||
+      convertedText.includes(preferred) ||
+      seen.has(key)
+    ) {
+      continue;
+    }
+
+    seen.add(key);
+    suggestions.push({
+      id: `${entry.id}:fixed:${preferred}`,
+      entryId: entry.id,
+      reading,
+      preferred,
+    });
   }
 
   return suggestions;

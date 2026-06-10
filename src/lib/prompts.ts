@@ -170,6 +170,7 @@ export function buildKanaKanjiSystemPrompt(
   targetKana = "",
   avoidOutputs: string[] = [],
   strictAlternative = false,
+  fixedTerms: string[] = [],
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
   const matchingHomophones = formatMatchingHomophonePreferences(targetKana, homophones);
@@ -177,6 +178,7 @@ export function buildKanaKanjiSystemPrompt(
     avoidOutputs,
     strictAlternative,
   );
+  const fixedTermInstructions = formatFixedTermInstructions(fixedTerms);
 
   return [
     "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
@@ -197,6 +199,9 @@ export function buildKanaKanjiSystemPrompt(
     "Alternative conversion request:",
     alternativeInstructions || "None.",
     "",
+    "Fixed terms from user review:",
+    fixedTermInstructions || "None.",
+    "",
     "Purpose preset:",
     conversionPresetInstructions[preset],
     "",
@@ -208,6 +213,19 @@ export function buildKanaKanjiSystemPrompt(
     "",
     "Additional user preference:",
     prompt,
+  ].join("\n");
+}
+
+function formatFixedTermInstructions(fixedTerms: string[]): string {
+  const uniqueTerms = Array.from(new Set(fixedTerms.map((term) => term.trim()).filter(Boolean)));
+  if (uniqueTerms.length === 0) {
+    return "";
+  }
+
+  return [
+    "Preserve these user-confirmed terms exactly when the reading/context allows:",
+    ...uniqueTerms.map((term) => `- ${term}`),
+    "Do not replace these terms with another homophone unless the input clearly requires a different word.",
   ].join("\n");
 }
 
