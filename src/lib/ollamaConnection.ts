@@ -13,6 +13,7 @@ export interface OllamaConnectionResult {
 interface CheckOptions {
   transport?: OllamaTransport;
   timeoutMs?: number;
+  warmupTimeoutMs?: number;
 }
 
 export async function checkOllamaConnection(
@@ -21,6 +22,7 @@ export async function checkOllamaConnection(
 ): Promise<OllamaConnectionResult> {
   const transport = options.transport ?? defaultOllamaTransport;
   const timeoutMs = options.timeoutMs ?? 12_000;
+  const warmupTimeoutMs = options.warmupTimeoutMs ?? options.timeoutMs ?? 30_000;
   const label = providerLabel(settings);
   const models = await fetchLocalModels(settings, transport, timeoutMs);
   const modelName = settings.modelName.trim();
@@ -51,7 +53,7 @@ export async function checkOllamaConnection(
     };
   }
 
-  await warmLocalModel(settings, modelName, transport, timeoutMs);
+  await warmLocalModelWithRetry(settings, modelName, transport, warmupTimeoutMs);
 
   return {
     models,
@@ -106,14 +108,27 @@ async function warmLocalModel(
     currentProviderBaseUrl(settings),
     {
       model: modelName,
-      system: "You are a local model warm-up request. Return nothing.",
-      prompt: "",
+      system: "You are a local model warm-up request. Reply with ok.",
+      prompt: "ok",
       stream: false,
       think: settings.think,
       keep_alive: "5m",
     },
     timeoutMs,
   );
+}
+
+async function warmLocalModelWithRetry(
+  settings: AppSettings,
+  modelName: string,
+  transport: OllamaTransport,
+  timeoutMs: number,
+): Promise<void> {
+  try {
+    await warmLocalModel(settings, modelName, transport, timeoutMs);
+  } catch {
+    await warmLocalModel(settings, modelName, transport, timeoutMs);
+  }
 }
 
 function matchesLocalModel(availableName: string, selectedName: string): boolean {
