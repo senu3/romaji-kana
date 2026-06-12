@@ -57,7 +57,11 @@ export function extractConversionRange(
   const leadingWhitespace = rawText.length - text.length;
   const from = adjustedStart + leadingWhitespace;
 
-  if (from >= safeCursor || !text.trim() || isJapaneseDominant(text)) {
+  if (
+    from >= safeCursor ||
+    !text.trim() ||
+    (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))
+  ) {
     return null;
   }
 
@@ -157,29 +161,42 @@ function getMarkdownLineBoundary(line: string): number {
 }
 
 function startOffsetAfterExistingJapanese(text: string): number {
-  let lastJapaneseIndex = -1;
+  const boundary = findTrailingRomajiBoundaryAfterJapaneseText(text);
+  if (boundary !== -1) {
+    return boundary;
+  }
+
+  return 0;
+}
+
+function findTrailingRomajiBoundaryAfterJapaneseText(text: string): number {
+  let boundary = -1;
 
   for (let index = 0; index < text.length; index += 1) {
-    if (isJapaneseCharacter(text[index] ?? "")) {
-      lastJapaneseIndex = index;
+    const char = text[index] ?? "";
+    const previous = text[index - 1] ?? "";
+
+    if (/\s/u.test(char) && isJapaneseCharacter(previous)) {
+      let end = index + 1;
+      while (end < text.length && /\s/u.test(text[end] ?? "")) {
+        end += 1;
+      }
+
+      if (/[A-Za-z`]/.test(text[end] ?? "") && isJapaneseDominant(text.slice(0, index))) {
+        boundary = end;
+      }
     }
   }
 
-  if (lastJapaneseIndex === -1) {
-    return 0;
-  }
-
-  const trailing = text.slice(lastJapaneseIndex + 1);
-  if (!/[A-Za-z]/.test(trailing)) {
-    return 0;
-  }
-
-  const leadingWhitespace = trailing.length - trailing.trimStart().length;
-  return lastJapaneseIndex + 1 + leadingWhitespace;
+  return boundary;
 }
 
 function isJapaneseCharacter(char: string): boolean {
   return /[\u3040-\u30ff\u3400-\u9fff。、]/u.test(char);
+}
+
+function isKanjiMixedRomajiInput(text: string): boolean {
+  return /[A-Za-z]/.test(text) && /[\u3400-\u9fff]/u.test(text);
 }
 
 function isInsideFencedCode(doc: string, position: number): boolean {
