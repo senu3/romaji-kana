@@ -85,6 +85,52 @@ describe("extractConversionRange", () => {
     });
   });
 
+  it("extracts appended romaji after multiple spaces following existing Japanese text", () => {
+    const doc = "今日は会議です  ashita no yotei.";
+    const appended = "ashita no yotei.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: doc.indexOf(appended),
+      to: doc.length,
+      text: appended,
+      trigger: "period",
+    });
+  });
+
+  it("keeps kanji-mixed romaji input in the conversion range", () => {
+    const doc = "watasiha迎賓館niikoutoomoimasu.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: 0,
+      to: doc.length,
+      text: doc,
+      trigger: "period",
+    });
+  });
+
+  it("extracts appended kanji-mixed romaji after existing Japanese text", () => {
+    const doc = "今日は会議です watasiha迎賓館niikoutoomoimasu.";
+    const appended = "watasiha迎賓館niikoutoomoimasu.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: doc.indexOf(appended),
+      to: doc.length,
+      text: appended,
+      trigger: "period",
+    });
+  });
+
+  it("allows kanji-first mixed romaji input", () => {
+    const doc = "国立国会図書館niikimasu.";
+    const range = extractConversionRange(doc, doc.length, "period");
+    expect(range).toEqual({
+      from: 0,
+      to: doc.length,
+      text: doc,
+      trigger: "period",
+    });
+  });
+
   it("does not include markdown heading markers", () => {
     const doc = "## kyouhayoi tenkidesu.";
     const range = extractConversionRange(doc, doc.length, "period");

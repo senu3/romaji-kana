@@ -199,7 +199,15 @@ function splitInputForConversion(
   input: string,
   entries: UserDictionaryEntry[],
 ): ConversionSplitPart[] {
-  return splitInputByLiteralNouns(input).flatMap((part): ConversionSplitPart[] => {
+  const literalParts = splitInputByLiteralNouns(input).flatMap((part) => {
+    if (part.type === "literal") {
+      return [part];
+    }
+
+    return splitInputByInlineKanjiTerms(part.value);
+  });
+
+  return literalParts.flatMap((part): ConversionSplitPart[] => {
     if (part.type === "literal") {
       return [part];
     }
@@ -243,6 +251,56 @@ function splitInputByLiteralNouns(input: string): Array<DictionaryTextPart | Lit
   }
 
   return parts;
+}
+
+function splitInputByInlineKanjiTerms(input: string): Array<DictionaryTextPart | LiteralNounPart> {
+  const parts: Array<DictionaryTextPart | LiteralNounPart> = [];
+  let index = 0;
+  let lastCopiedIndex = 0;
+
+  while (index < input.length) {
+    if (!isJapaneseTermCharacter(input[index] ?? "")) {
+      index += 1;
+      continue;
+    }
+
+    const start = index;
+    let hasKanji = false;
+    while (index < input.length && isJapaneseTermCharacter(input[index] ?? "")) {
+      if (isKanjiCharacter(input[index] ?? "")) {
+        hasKanji = true;
+      }
+      index += 1;
+    }
+
+    if (!hasKanji) {
+      continue;
+    }
+
+    if (lastCopiedIndex < start) {
+      parts.push({ type: "text", value: input.slice(lastCopiedIndex, start) });
+    }
+    parts.push({ type: "literal", output: input.slice(start, index) });
+    lastCopiedIndex = index;
+  }
+
+  if (parts.length === 0) {
+    return [{ type: "text", value: input }];
+  }
+
+  if (lastCopiedIndex < input.length) {
+    parts.push({ type: "text", value: input.slice(lastCopiedIndex) });
+  }
+
+  return parts;
+}
+
+function isJapaneseTermCharacter(character: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u9fff々〆ヵヶ]/u.test(character);
+}
+
+function isKanjiCharacter(character: string): boolean {
+  return /[\u3400-\u9fff々〆]/u.test(character);
 }
 
 function findClosingBacktick(input: string, start: number): number {

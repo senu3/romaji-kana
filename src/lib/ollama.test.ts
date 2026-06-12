@@ -568,6 +568,92 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
+  it("keeps inline kanji terms out of LLM conversion and joins converted romaji segments", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "私は" })
+        .mockResolvedValueOnce({ response: "に行こうと思います。" }),
+    };
+
+    const result = await convertRomajiToJapanese(
+      "watasiha迎賓館niikoutoomoimasu.",
+      defaultSettings,
+      transport,
+    );
+
+    expect(result).toBe("私は迎賓館に行こうと思います。");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("迎賓館"),
+        prompt: "わたしは",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("迎賓館"),
+        prompt: "にいこうとおもいます。",
+      }),
+      30_000,
+    );
+  });
+
+  it("keeps multiple inline kanji terms literal", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "今日は" })
+        .mockResolvedValueOnce({ response: "の" })
+        .mockResolvedValueOnce({ response: "を確認します。" }),
+    };
+
+    const result = await convertRomajiToJapanese(
+      "kyouha昨日no予定wokakuninsimasu.",
+      defaultSettings,
+      transport,
+    );
+
+    expect(result).toBe("今日は昨日の予定を確認します。");
+    expect(transport.generate).toHaveBeenCalledTimes(3);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "きょうは",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "の",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      3,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "をかくにんします。",
+      }),
+      30_000,
+    );
+  });
+
   it("adds the fixed romaji reference and few-shot examples to the editable prompt", () => {
     const prompt = buildConversionSystemPrompt(defaultConversionPrompt);
 
