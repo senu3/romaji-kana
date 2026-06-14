@@ -36,7 +36,10 @@ interface SettingsPanelProps {
   onToggleCollapsed: () => void;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
+  onProviderSelected?: (modelProvider: ModelProvider) => void;
 }
+
+type SettingsContentMode = "full" | "setup";
 
 export interface SettingsContentProps {
   settings: AppSettings;
@@ -44,7 +47,9 @@ export interface SettingsContentProps {
   ollamaConnection: OllamaConnectionStatus;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
+  onProviderSelected?: (modelProvider: ModelProvider) => void;
   headingId?: string;
+  mode?: SettingsContentMode;
 }
 
 export function SettingsPanel({
@@ -55,6 +60,7 @@ export function SettingsPanel({
   onToggleCollapsed,
   onChange,
   onCheckOllama,
+  onProviderSelected,
 }: SettingsPanelProps) {
   return (
     <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
@@ -79,6 +85,7 @@ export function SettingsPanel({
           ollamaConnection={ollamaConnection}
           onChange={onChange}
           onCheckOllama={onCheckOllama}
+          onProviderSelected={onProviderSelected}
         />
       )}
     </aside>
@@ -91,7 +98,9 @@ export function SettingsContent({
   ollamaConnection,
   onChange,
   onCheckOllama,
+  onProviderSelected,
   headingId,
+  mode = "full",
 }: SettingsContentProps) {
   const [modelListOpen, setModelListOpen] = useState(false);
   const [capturingShortcut, setCapturingShortcut] = useState(false);
@@ -125,6 +134,7 @@ export function SettingsContent({
   };
   const updateProvider = (modelProvider: ModelProvider) => {
     update({ modelProvider });
+    onProviderSelected?.(modelProvider);
     setModelListOpen(false);
   };
   const updateCurrentApiUrl = (apiUrl: string) => {
@@ -184,6 +194,7 @@ export function SettingsContent({
   const providerName = providerLabel(settings.modelProvider);
   const currentApiUrl =
     settings.modelProvider === "lmstudio" ? settings.lmStudioApiUrl : settings.ollamaApiUrl;
+  const setupMode = mode === "setup";
 
   return (
     <div className="settings-content">
@@ -191,7 +202,7 @@ export function SettingsContent({
             <SlidersHorizontal size={20} aria-hidden="true" />
             <div>
               <p className="eyebrow">Local AI</p>
-              <h2 id={headingId}>Settings</h2>
+              <h2 id={headingId}>{setupMode ? "Model settings" : "Settings"}</h2>
             </div>
           </div>
 
@@ -315,6 +326,13 @@ export function SettingsContent({
             </button>
           </div>
 
+          {setupMode ? (
+            <p className="setup-settings-note">
+              Conversion style and trigger behavior can be changed later from Settings.
+            </p>
+          ) : (
+            <>
+
           <div className="settings-group">
             <h3>Conversion</h3>
             <div className="mode-field">
@@ -427,6 +445,8 @@ export function SettingsContent({
               onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
             />
           </AccordionSection>
+            </>
+          )}
         </div>
   );
 }

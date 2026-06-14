@@ -37,7 +37,7 @@ import {
   formatReplaceTargets,
   parseReplaceTargets,
 } from "./lib/homophoneReview";
-import { checkOllamaConnection } from "./lib/ollamaConnection";
+import { checkOllamaConnection, listLocalModels } from "./lib/ollamaConnection";
 import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import { appShortcutFromKeyboardEvent } from "./lib/shortcuts";
@@ -50,6 +50,7 @@ import type {
   ConversionStatus,
   GhostConversionSuggestion,
   HomophoneReviewSuggestion,
+  ModelProvider,
   OllamaConnectionStatus,
   OllamaModel,
   PendingConversion,
@@ -62,6 +63,7 @@ const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
+const FORCE_SETUP_QUERY_PARAM = "setup";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
@@ -81,6 +83,15 @@ interface HomophoneRerunPrompt {
   fixedTerm: string;
   fixedTerms?: string[];
   avoidOutputs?: string[];
+}
+
+function shouldForceSetupModalFromQuery(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const value = new URLSearchParams(window.location.search).get(FORCE_SETUP_QUERY_PARAM);
+  return value === "1" || value === "true";
 }
 
 function App() {
@@ -131,10 +142,14 @@ function App() {
     if (typeof localStorage === "undefined") {
       return true;
     }
+    if (shouldForceSetupModalFromQuery()) {
+      return false;
+    }
     return localStorage.getItem(SETUP_COMPLETE_STORAGE_KEY) === "true";
   });
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
+  const setupCompleteRef = useRef(setupComplete);
   const currentFilePathRef = useRef<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
   );
@@ -155,6 +170,10 @@ function App() {
     settingsRef.current = settings;
     saveSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    setupCompleteRef.current = setupComplete;
+  }, [setupComplete]);
 
   useEffect(() => {
     return () => {
@@ -247,6 +266,7 @@ function App() {
       setOllamaModels(result.models);
       const currentModelName = settingsRef.current.modelName.trim();
       const shouldAutoSelectModel =
+        setupCompleteRef.current &&
         Boolean(result.suggestedModelName) &&
         result.kind === "warning" &&
         (!currentModelName || currentModelName === defaultSettings.modelName);
@@ -295,12 +315,91 @@ function App() {
     }
   }, []);
 
+  const handleSetupProviderSelected = useCallback(async (modelProvider: ModelProvider) => {
+    if (setupCompleteRef.current) {
+      return;
+    }
+
+    const checkId = connectionCheckIdRef.current + 1;
+    connectionCheckIdRef.current = checkId;
+    const nextSettings = { ...settingsRef.current, modelProvider };
+    const label = providerLabel(nextSettings);
+
+    setOllamaModels([]);
+    setOllamaConnection({
+      kind: "checking",
+      message: `Loading ${label} models...`,
+    });
+    setStatus({
+      kind: "loading",
+      message: `Loading ${label} models...`,
+    });
+
+    try {
+      const models = await listLocalModels(nextSettings);
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      setOllamaModels(models);
+      setOllamaConnection({
+        kind: models.length > 0 ? "warning" : "idle",
+        message:
+          models.length > 0
+            ? `Loaded ${models.length} ${label} model(s). Select one, then run Check.`
+            : `Connected to ${label}, but no local models were found.`,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: models.length > 0 ? "warning" : "idle",
+        message:
+          models.length > 0
+            ? "Select a model, then run Check to finish setup."
+            : `No ${label} models were found.`,
+      });
+    } catch (error: unknown) {
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      const message = formatOllamaConnectionError(error, label);
+      setOllamaModels([]);
+      setOllamaConnection({
+        kind: "error",
+        message,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: "error",
+        message,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const providerChanged = previousModelProviderRef.current !== settings.modelProvider;
     previousModelProviderRef.current = settings.modelProvider;
 
     if (providerChanged) {
       setOllamaModels([]);
+    }
+
+    if (!setupComplete) {
+      startupCheckStartedRef.current = false;
+      setOllamaConnection({
+        kind: "idle",
+        message: "Choose a model, then run Check to start writing.",
+      });
+      setStatus({
+        kind: "idle",
+        message: "Choose a local model and run Check to finish setup.",
+      });
+      return;
+    }
+
+    if (!startupCheckStartedRef.current && ollamaConnection.kind === "connected") {
+      startupCheckStartedRef.current = true;
+      return;
     }
 
     if (startupCheckStartedRef.current) {
@@ -318,6 +417,7 @@ function App() {
     settings.modelName,
     settings.ollamaApiUrl,
     settings.lmStudioApiUrl,
+    setupComplete,
     handleCheckOllama,
   ]);
 
@@ -1485,6 +1585,7 @@ function App() {
           canStartWriting={canStartWriting}
           onChange={setSettings}
           onCheckOllama={handleCheckOllama}
+          onProviderSelected={handleSetupProviderSelected}
           onComplete={completeSetup}
         />
       ) : null}
@@ -1620,6 +1721,7 @@ function SetupModal({
   canStartWriting,
   onChange,
   onCheckOllama,
+  onProviderSelected,
   onComplete,
 }: {
   settings: AppSettings;
@@ -1628,6 +1730,7 @@ function SetupModal({
   canStartWriting: boolean;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
+  onProviderSelected: (modelProvider: ModelProvider) => void;
   onComplete: () => void;
 }) {
   return (
@@ -1652,11 +1755,10 @@ function SetupModal({
           ollamaConnection={ollamaConnection}
           onChange={onChange}
           onCheckOllama={onCheckOllama}
+          onProviderSelected={onProviderSelected}
+          mode="setup"
         />
         <div className="setup-actions">
-          <button className="secondary-button" type="button" onClick={onComplete}>
-            Skip for now
-          </button>
           <button
             className="primary-button"
             type="button"

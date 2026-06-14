@@ -16,6 +16,20 @@ interface CheckOptions {
   warmupTimeoutMs?: number;
 }
 
+interface ListOptions {
+  transport?: OllamaTransport;
+  timeoutMs?: number;
+}
+
+export async function listLocalModels(
+  settings: AppSettings,
+  options: ListOptions = {},
+): Promise<OllamaModel[]> {
+  const transport = options.transport ?? defaultOllamaTransport;
+  const timeoutMs = options.timeoutMs ?? 12_000;
+  return fetchLocalModels(settings, transport, timeoutMs);
+}
+
 export async function checkOllamaConnection(
   settings: AppSettings,
   options: CheckOptions = {},

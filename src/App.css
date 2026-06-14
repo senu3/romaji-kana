@@ -1049,6 +1049,15 @@ h3 {
   padding: 18px 20px;
 }
 
+.setup-settings-note {
+  margin: 0;
+  border-top: 1px solid #d5e8e5;
+  padding-top: 12px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .setup-actions {
   display: flex;
   justify-content: flex-end;
