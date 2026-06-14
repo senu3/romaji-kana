@@ -64,6 +64,7 @@ const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
+const ENABLE_FIRST_RUN_SETUP_MODAL = false;
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
@@ -92,6 +93,18 @@ function shouldForceSetupModalFromQuery(): boolean {
 
   const value = new URLSearchParams(window.location.search).get(FORCE_SETUP_QUERY_PARAM);
   return value === "1" || value === "true";
+}
+
+function shouldShowSetupModalOnStartup(): boolean {
+  if (shouldForceSetupModalFromQuery()) {
+    return true;
+  }
+
+  if (!ENABLE_FIRST_RUN_SETUP_MODAL) {
+    return false;
+  }
+
+  return localStorage.getItem(SETUP_COMPLETE_STORAGE_KEY) !== "true";
 }
 
 function App() {
@@ -142,10 +155,7 @@ function App() {
     if (typeof localStorage === "undefined") {
       return true;
     }
-    if (shouldForceSetupModalFromQuery()) {
-      return false;
-    }
-    return localStorage.getItem(SETUP_COMPLETE_STORAGE_KEY) === "true";
+    return !shouldShowSetupModalOnStartup();
   });
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
