@@ -1,8 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkOllamaConnection } from "./ollamaConnection";
+import { checkOllamaConnection, listLocalModels } from "./ollamaConnection";
 import { defaultSettings } from "./settings";
 
 describe("checkOllamaConnection", () => {
+  it("lists local models without warming the selected model", async () => {
+    const transport = {
+      models: vi.fn().mockResolvedValue({
+        models: [
+          { name: "llama3.2:latest", modified_at: "2026-01-01T00:00:00Z", size: 123 },
+          { name: "gemma3:latest", modified_at: "2026-01-02T00:00:00Z", size: 456 },
+        ],
+      }),
+      generate: vi.fn(),
+    };
+
+    const models = await listLocalModels(defaultSettings, {
+      transport,
+      timeoutMs: 100,
+    });
+
+    expect(models.map((model) => model.name)).toEqual(["gemma3:latest", "llama3.2:latest"]);
+    expect(transport.models).toHaveBeenCalledWith("ollama", "http://localhost:11434/api", 100);
+    expect(transport.generate).not.toHaveBeenCalled();
+  });
+
   it("fetches local models and warms the selected model", async () => {
     const transport = {
       models: vi.fn().mockResolvedValue(
