@@ -297,7 +297,7 @@ export function SettingsContent({
               ) : null}
             </div>
             <CheckRow
-              label="Think mode"
+              label={settings.think ? "Think mode" : "Think off (Recommended)"}
               checked={settings.think}
               onChange={(checked) => update({ think: checked })}
             />
@@ -332,119 +332,118 @@ export function SettingsContent({
             </p>
           ) : (
             <>
-
-          <div className="settings-group">
-            <h3>Conversion</h3>
-            <div className="mode-field">
-              <span>Conversion mode</span>
-              <div className="segmented-control" role="group" aria-label="Conversion mode">
-                <button
-                  className={settings.conversionMode === "replace" ? "selected" : ""}
-                  type="button"
-                  onClick={() => update({ conversionMode: "replace" })}
-                >
-                  Auto replace
-                </button>
-                <button
-                  className={settings.conversionMode === "ghost" ? "selected" : ""}
-                  type="button"
-                  onClick={() => update({ conversionMode: "ghost" })}
-                >
-                  Ghost + Tab
-                </button>
+              <div className="settings-group">
+                <h3>Conversion</h3>
+                <div className="mode-field">
+                  <span>Conversion mode</span>
+                  <div className="segmented-control" role="group" aria-label="Conversion mode">
+                    <button
+                      className={settings.conversionMode === "replace" ? "selected" : ""}
+                      type="button"
+                      onClick={() => update({ conversionMode: "replace" })}
+                    >
+                      Auto replace
+                    </button>
+                    <button
+                      className={settings.conversionMode === "ghost" ? "selected" : ""}
+                      type="button"
+                      onClick={() => update({ conversionMode: "ghost" })}
+                    >
+                      Ghost + Tab
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <AccordionSection
-            title="Triggers"
-            summary={settings.autoConvert ? `${enabledTriggerCount}/3 enabled` : "Auto off"}
-            open={openAccordions.triggers}
-            onToggle={() => toggleAccordion("triggers")}
-          >
-            <CheckRow
-              label="Auto convert"
-              checked={settings.autoConvert}
-              onChange={(checked) => update({ autoConvert: checked })}
-            />
-            <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
-              <CheckRow
-                label="Period ."
-                checked={settings.triggers.period}
-                disabled={!settings.autoConvert}
-                onChange={(checked) => updateTriggers({ period: checked })}
-              />
-              <CheckRow
-                label="Comma ,"
-                checked={settings.triggers.comma}
-                disabled={!settings.autoConvert}
-                onChange={(checked) => updateTriggers({ comma: checked })}
-              />
-              <CheckRow
-                label="Enter (IME composing ignored)"
-                checked={settings.triggers.enter}
-                disabled={!settings.autoConvert}
-                onChange={(checked) => updateTriggers({ enter: checked })}
-              />
-            </div>
-            <div className="shortcut-field">
-              <div>
-                <span>Manual shortcut</span>
-                <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
-              </div>
-              <div className="shortcut-controls">
-                <button
-                  className={`shortcut-recorder ${capturingShortcut ? "recording" : ""}`}
-                  type="button"
-                  onClick={() => {
-                    setCapturingShortcut(true);
-                    setShortcutError("");
-                  }}
-                  onKeyDown={handleShortcutKeyDown}
-                  onBlur={() => setCapturingShortcut(false)}
-                  data-ignore-app-shortcuts="true"
-                >
-                  <Keyboard size={15} aria-hidden="true" />
-                  {capturingShortcut
-                    ? "Press shortcut..."
-                    : formatShortcutLabel(settings.triggers.manualShortcut)}
-                </button>
-                <button
-                  className="shortcut-reset"
-                  type="button"
-                  onClick={() =>
-                    updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
-                  }
-                  aria-label="Reset manual shortcut"
-                  title="Reset manual shortcut"
-                >
-                  <RotateCcw size={15} aria-hidden="true" />
-                </button>
-              </div>
-              <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
-                {shortcutError ||
-                  "Manual conversion is available even when auto convert is off."}
-              </p>
-            </div>
-          </AccordionSection>
+              <AccordionSection
+                title="Triggers"
+                summary={settings.autoConvert ? `${enabledTriggerCount}/3 enabled` : "Auto off"}
+                open={openAccordions.triggers}
+                onToggle={() => toggleAccordion("triggers")}
+              >
+                <CheckRow
+                  label="Auto convert"
+                  checked={settings.autoConvert}
+                  onChange={(checked) => update({ autoConvert: checked })}
+                />
+                <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
+                  <CheckRow
+                    label="Period ."
+                    checked={settings.triggers.period}
+                    disabled={!settings.autoConvert}
+                    onChange={(checked) => updateTriggers({ period: checked })}
+                  />
+                  <CheckRow
+                    label="Comma ,"
+                    checked={settings.triggers.comma}
+                    disabled={!settings.autoConvert}
+                    onChange={(checked) => updateTriggers({ comma: checked })}
+                  />
+                  <CheckRow
+                    label="Enter (IME composing ignored)"
+                    checked={settings.triggers.enter}
+                    disabled={!settings.autoConvert}
+                    onChange={(checked) => updateTriggers({ enter: checked })}
+                  />
+                </div>
+                <div className="shortcut-field">
+                  <div>
+                    <span>Manual shortcut</span>
+                    <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
+                  </div>
+                  <div className="shortcut-controls">
+                    <button
+                      className={`shortcut-recorder ${capturingShortcut ? "recording" : ""}`}
+                      type="button"
+                      onClick={() => {
+                        setCapturingShortcut(true);
+                        setShortcutError("");
+                      }}
+                      onKeyDown={handleShortcutKeyDown}
+                      onBlur={() => setCapturingShortcut(false)}
+                      data-ignore-app-shortcuts="true"
+                    >
+                      <Keyboard size={15} aria-hidden="true" />
+                      {capturingShortcut
+                        ? "Press shortcut..."
+                        : formatShortcutLabel(settings.triggers.manualShortcut)}
+                    </button>
+                    <button
+                      className="shortcut-reset"
+                      type="button"
+                      onClick={() =>
+                        updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
+                      }
+                      aria-label="Reset manual shortcut"
+                      title="Reset manual shortcut"
+                    >
+                      <RotateCcw size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
+                    {shortcutError ||
+                      "Manual conversion is available even when auto convert is off."}
+                  </p>
+                </div>
+              </AccordionSection>
 
-          <AccordionSection
-            title="Punctuation"
-            summary={`${punctuationCount}/2 enabled`}
-            open={openAccordions.punctuation}
-            onToggle={() => toggleAccordion("punctuation")}
-          >
-            <CheckRow
-              label=". to 。"
-              checked={settings.punctuationConversion.periodToJapanese}
-              onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
-            />
-            <CheckRow
-              label=", to 、"
-              checked={settings.punctuationConversion.commaToJapanese}
-              onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
-            />
-          </AccordionSection>
+              <AccordionSection
+                title="Punctuation"
+                summary={`${punctuationCount}/2 enabled`}
+                open={openAccordions.punctuation}
+                onToggle={() => toggleAccordion("punctuation")}
+              >
+                <CheckRow
+                  label=". to 。"
+                  checked={settings.punctuationConversion.periodToJapanese}
+                  onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
+                />
+                <CheckRow
+                  label=", to 、"
+                  checked={settings.punctuationConversion.commaToJapanese}
+                  onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
+                />
+              </AccordionSection>
             </>
           )}
         </div>

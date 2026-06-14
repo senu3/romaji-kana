@@ -389,6 +389,10 @@ h3 {
   padding: 24px 22px 70px;
 }
 
+.settings-content > * {
+  flex-shrink: 0;
+}
+
 .settings-heading {
   display: flex;
   align-items: center;
