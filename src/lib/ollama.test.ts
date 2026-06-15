@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildProtectedDictionaryEntries,
   convertRomajiToJapanese,
   convertRomajiToJapaneseDetailed,
   normalizeRomajiReadingCandidate,
@@ -479,6 +480,87 @@ describe("convertRomajiToJapanese", () => {
       }),
       30_000,
     );
+  });
+
+  it("re-protects current ASCII terms for history retry without sending them to the LLM", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+    };
+    const protectedDictionaryEntries = buildProtectedDictionaryEntries(
+      "openair ni iku.",
+      "openairに行く。",
+      [],
+    );
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "openair ni iku.",
+      defaultSettings,
+      transport,
+      { protectedDictionaryEntries },
+    );
+
+    expect(result).toEqual({
+      text: "openairに行く。",
+      reviewKana: "openair に いく。",
+    });
+    expect(protectedDictionaryEntries).toEqual([
+      {
+        reading: "openair",
+        output: "openair",
+        enabled: true,
+      },
+    ]);
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.not.stringContaining("openair"),
+        prompt: " に いく。",
+      }),
+      30_000,
+    );
+  });
+
+  it("uses the current protected spelling ahead of matching user dictionary entries on history retry", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "について確認します。" }),
+    };
+    const settings = {
+      ...defaultSettings,
+      userDictionary: [
+        {
+          id: "openai",
+          reading: "openai",
+          output: "OpenAI Inc.",
+          note: "",
+          enabled: true,
+        },
+      ],
+    };
+    const protectedDictionaryEntries = buildProtectedDictionaryEntries(
+      "openai nitsuite kakunin.",
+      "OpenAIについて確認します。",
+      settings.userDictionary,
+    );
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "openai nitsuite kakunin.",
+      settings,
+      transport,
+      { protectedDictionaryEntries },
+    );
+
+    expect(result.text).toBe("OpenAIについて確認します。");
+    expect(protectedDictionaryEntries).toEqual([
+      {
+        reading: "openai",
+        output: "OpenAI",
+        enabled: true,
+      },
+    ]);
   });
 
   it("keeps multiple inline kanji terms literal", async () => {

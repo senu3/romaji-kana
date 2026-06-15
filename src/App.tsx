@@ -27,6 +27,7 @@ import {
 import { basename, openMarkdownFile, reopenMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
 import {
+  buildProtectedDictionaryEntries,
   convertRomajiToJapaneseDetailed,
   providerLabel,
 } from "./lib/ollama";
@@ -791,6 +792,13 @@ function App() {
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
+          protectedDictionaryEntries: resolved
+            ? buildProtectedDictionaryEntries(
+                request.originalText,
+                resolved.matchedText,
+                settingsRef.current.userDictionary,
+              )
+            : [],
         },
       );
       if (canceledRequestsRef.current.has(request.id)) {
