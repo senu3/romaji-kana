@@ -22,6 +22,15 @@ body {
   overflow: hidden;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 button,
 input,
 select,
@@ -64,7 +73,7 @@ button:disabled {
   min-width: 0;
   height: 100vh;
   min-height: 0;
-  padding-bottom: 44px;
+  padding-bottom: 54px;
 }
 
 .editor-toolbar {
@@ -228,7 +237,6 @@ h3 {
   grid-template-columns: minmax(92px, 1fr) minmax(0, auto) minmax(92px, 1fr);
   align-items: center;
   min-height: 42px;
-  border-right: 1px solid #cbdedb;
   background: #ffffff;
 }
 
@@ -312,7 +320,6 @@ h3 {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid #cbdedb;
   background: #ffffff;
 }
 
@@ -407,6 +414,16 @@ h3 {
   color: #134e4a;
   font-size: 13px;
   font-weight: 700;
+}
+
+.field legend {
+  padding: 0;
+}
+
+.provider-field {
+  margin: 0;
+  border: 0;
+  padding: 0;
 }
 
 .field > input,
@@ -667,14 +684,40 @@ h3 {
   font-weight: 750;
 }
 
-.segmented-control button + button {
+.segmented-control label {
+  position: relative;
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.segmented-control label input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented-control button + button,
+.segmented-control label + label {
   border-left: 1px solid #b5d7d1;
 }
 
 .segmented-control button:hover,
-.segmented-control button.selected {
+.segmented-control button.selected,
+.segmented-control label:hover,
+.segmented-control label.selected {
   background: #ecfeff;
   color: #115e59;
+}
+
+.segmented-control label:has(input:focus-visible) {
+  outline: 3px solid #5eead4;
+  outline-offset: -3px;
 }
 
 .compact-mode-field .segmented-control {
@@ -1098,7 +1141,7 @@ h3 {
 
 .dictionary-entry-fields {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
 }
@@ -1320,43 +1363,67 @@ h3 {
   padding: 16px;
 }
 
-.preset-control {
+.preset-options {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  overflow: hidden;
-  border: 1px solid #8bc7bf;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.preset-control button {
-  min-height: 40px;
-  border: 0;
-  background: transparent;
-  color: #0f766e;
-  font-size: 13px;
-  font-weight: 750;
-}
-
-.preset-control button + button {
-  border-left: 1px solid #b5d7d1;
-}
-
-.preset-control button:hover,
-.preset-control button.selected {
-  background: #ecfeff;
-  color: #115e59;
-}
-
-.preset-summary {
+  gap: 9px;
   margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.preset-options label {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 54px;
   border: 1px solid #d5e8e5;
   border-radius: 8px;
-  padding: 11px 12px;
-  background: #f8fffd;
-  color: #475569;
+  padding: 10px 11px;
+  background: #ffffff;
+  color: #134e4a;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.preset-options label:hover,
+.preset-options label.selected {
+  border-color: #8bc7bf;
+  background: #ecfeff;
+}
+
+.preset-options input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: #0d9488;
+}
+
+.preset-options input:focus-visible {
+  outline: 3px solid #5eead4;
+  outline-offset: 2px;
+}
+
+.preset-options span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.preset-options strong {
+  color: #0f766e;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.35;
+}
+
+.preset-options small {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .advanced-prompt {
@@ -1422,10 +1489,11 @@ h3 {
   bottom: 0;
   left: 0;
   z-index: 5;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 44px;
   align-items: center;
-  gap: 10px;
+  gap: 6px 12px;
   border-top: 1px solid #cbdedb;
   padding: 8px 18px;
   background: rgba(255, 255, 255, 0.96);
@@ -1433,13 +1501,37 @@ h3 {
   font-size: 13px;
 }
 
-.status-bar strong {
-  margin-left: auto;
+.status-main {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.status-main svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.status-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status-actions strong {
   color: #0f766e;
+  line-height: 26px;
 }
 
 .status-cancel {
-  margin-left: auto;
   border: 1px solid #8bc7bf;
   border-radius: 8px;
   padding: 5px 9px;
@@ -1455,7 +1547,6 @@ h3 {
 }
 
 .status-settings {
-  margin-left: auto;
   border: 1px solid #8bc7bf;
   border-radius: 8px;
   padding: 5px 9px;
@@ -1468,14 +1559,6 @@ h3 {
 .status-settings:hover {
   border-color: #0d9488;
   background: #ecfeff;
-}
-
-.status-settings + .status-cancel {
-  margin-left: 0;
-}
-
-.status-cancel + strong {
-  margin-left: 0;
 }
 
 .status-bar.loading {
@@ -1527,11 +1610,28 @@ h3 {
 
   .floating-settings-button {
     display: inline-flex;
+    bottom: 78px;
   }
 
   .editor-toolbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .editor-shell {
+    padding-bottom: 78px;
+  }
+
+  .status-bar.has-actions {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    min-height: 64px;
+    padding: 8px 18px 10px;
+  }
+
+  .status-bar.has-actions .status-actions {
+    justify-content: flex-start;
+    padding-left: 26px;
   }
 
   .setup-overlay {
