@@ -110,6 +110,7 @@ export function SettingsContent({
     punctuation: false,
   });
   const modelOptionsId = useId();
+  const providerRadioName = `${useId()}-provider`;
   const modelInputRef = useRef<HTMLInputElement | null>(null);
   const sortedModelNames = useMemo(
     () => ollamaModels.map((model) => model.name).sort((a, b) => a.localeCompare(b)),
@@ -206,25 +207,31 @@ export function SettingsContent({
             </div>
           </div>
 
-          <div className="field">
-            <span>Provider</span>
-            <div className="segmented-control provider-control" role="group" aria-label="Model provider">
-              <button
-                className={settings.modelProvider === "ollama" ? "selected" : ""}
-                type="button"
-                onClick={() => updateProvider("ollama")}
-              >
-                Ollama
-              </button>
-              <button
-                className={settings.modelProvider === "lmstudio" ? "selected" : ""}
-                type="button"
-                onClick={() => updateProvider("lmstudio")}
-              >
-                LM Studio
-              </button>
+          <fieldset className="field provider-field">
+            <legend>Provider</legend>
+            <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
+              <label className={settings.modelProvider === "ollama" ? "selected" : ""}>
+                <input
+                  type="radio"
+                  name={providerRadioName}
+                  value="ollama"
+                  checked={settings.modelProvider === "ollama"}
+                  onChange={() => updateProvider("ollama")}
+                />
+                <span>Ollama</span>
+              </label>
+              <label className={settings.modelProvider === "lmstudio" ? "selected" : ""}>
+                <input
+                  type="radio"
+                  name={providerRadioName}
+                  value="lmstudio"
+                  checked={settings.modelProvider === "lmstudio"}
+                  onChange={() => updateProvider("lmstudio")}
+                />
+                <span>LM Studio</span>
+              </label>
             </div>
-          </div>
+          </fieldset>
 
           <label className="field">
             <span>{providerName} API URL</span>

@@ -1572,19 +1572,27 @@ function PromptPanel({
         </button>
       </div>
       <div className="preset-panel-content">
-        <div className="preset-control" role="group" aria-label="Conversion preset">
+        <fieldset className="preset-options">
+          <legend className="sr-only">Conversion preset</legend>
           {CONVERSION_PRESET_OPTIONS.map((option) => (
-            <button
+            <label
               className={preset === option ? "selected" : ""}
-              type="button"
               key={option}
-              onClick={() => onPresetChange(option)}
             >
-              {conversionPresetLabels[option]}
-            </button>
+              <input
+                type="radio"
+                name="conversion-preset"
+                value={option}
+                checked={preset === option}
+                onChange={() => onPresetChange(option)}
+              />
+              <span>
+                <strong>{conversionPresetLabels[option]}</strong>
+                <small>{presetDescription(option)}</small>
+              </span>
+            </label>
           ))}
-        </div>
-        <p className="preset-summary">{presetDescription(preset)}</p>
+        </fieldset>
 
         <details className="advanced-prompt">
           <summary>Advanced prompt</summary>
@@ -1858,22 +1866,33 @@ function StatusBar({
   const Icon =
     status.kind === "loading" ? Loader2 : status.kind === "error" ? AlertCircle : CheckCircle2;
   const canOpenSettings = status.kind === "warning" || status.kind === "error";
+  const hasStatusActions = canOpenSettings || Boolean(pending[0]) || pendingCount > 0;
 
   return (
-    <div className={`status-bar ${status.kind}`} role="status" aria-live="polite">
-      <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
-      <span>{status.message}</span>
-      {canOpenSettings ? (
-        <button className="status-settings" type="button" onClick={onOpenSettings}>
-          Open settings
-        </button>
+    <div
+      className={`status-bar ${status.kind} ${hasStatusActions ? "has-actions" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="status-main">
+        <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
+        <span className="status-message">{status.message}</span>
+      </div>
+      {hasStatusActions ? (
+        <div className="status-actions">
+          {canOpenSettings ? (
+            <button className="status-settings" type="button" onClick={onOpenSettings}>
+              Open settings
+            </button>
+          ) : null}
+          {pending[0] ? (
+            <button className="status-cancel" type="button" onClick={() => onCancel(pending[0])}>
+              Cancel slow conversion
+            </button>
+          ) : null}
+          {pendingCount > 0 ? <strong>{pendingCount} pending</strong> : null}
+        </div>
       ) : null}
-      {pending[0] ? (
-        <button className="status-cancel" type="button" onClick={() => onCancel(pending[0])}>
-          Cancel slow conversion
-        </button>
-      ) : null}
-      {pendingCount > 0 ? <strong>{pendingCount} pending</strong> : null}
     </div>
   );
 }
