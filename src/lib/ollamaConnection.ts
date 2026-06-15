@@ -49,8 +49,8 @@ export async function checkOllamaConnection(
       kind: "warning",
       suggestedModelName,
       message: suggestedModelName
-        ? `Connected to ${label}. Select a model to start converting. Suggested: "${suggestedModelName}".`
-        : `Connected to ${label}, but no local models were found.`,
+        ? `${label} に接続しました。変換を始めるにはモデルを選択してください。候補: "${suggestedModelName}".`
+        : `${label} に接続しましたが、ローカルモデルが見つかりませんでした。`,
     };
   }
 
@@ -62,8 +62,8 @@ export async function checkOllamaConnection(
       kind: "warning",
       suggestedModelName,
       message: suggestedModelName
-        ? `Connected to ${label}, but "${modelName}" was not found. Suggested: "${suggestedModelName}".`
-        : `Connected to ${label}, but "${modelName}" was not found and no local models are available.`,
+        ? `${label} に接続しましたが、"${modelName}" は見つかりませんでした。候補: "${suggestedModelName}".`
+        : `${label} に接続しましたが、"${modelName}" は見つからず、利用できるローカルモデルもありません。`,
     };
   }
 
@@ -73,7 +73,7 @@ export async function checkOllamaConnection(
     models,
     modelLoaded: true,
     kind: "connected",
-    message: `Connected to ${label}. Loaded "${modelName}". ${models.length} model(s) available.`,
+    message: `${label} に接続しました。"${modelName}" を読み込みました。利用可能なモデル: ${models.length} 件。`,
   };
 }
 

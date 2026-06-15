@@ -107,14 +107,14 @@ function App() {
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
-    message: "Local model provider has not been checked yet.",
+    message: "ローカルモデル Provider はまだ確認されていません。",
   });
   const [initialDocument] = useState(() =>
     initialSession.kind === "new" ? initialSession.content : "",
   );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
-    message: "Ready. Type romaji and finish with punctuation, or press Ctrl+Enter.",
+    message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
   });
   const [settingsCollapsed, setSettingsCollapsed] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
@@ -223,16 +223,16 @@ function App() {
   const handleCheckOllama = useCallback(async () => {
     const checkId = connectionCheckIdRef.current + 1;
     connectionCheckIdRef.current = checkId;
-    const modelName = settingsRef.current.modelName.trim() || "the selected model";
+    const modelName = settingsRef.current.modelName.trim() || "選択中のモデル";
     const label = providerLabel(settingsRef.current);
 
     setOllamaConnection({
       kind: "checking",
-      message: `Checking ${label} and loading ${modelName}...`,
+      message: `${label} を確認し、${modelName} を読み込んでいます...`,
     });
     setStatus({
       kind: "loading",
-      message: `Checking ${label} and loading ${modelName}...`,
+      message: `${label} を確認し、${modelName} を読み込んでいます...`,
     });
 
     try {
@@ -256,11 +256,11 @@ function App() {
         }));
         setOllamaConnection({
           kind: "checking",
-          message: `Selected "${result.suggestedModelName}". Checking model availability...`,
+          message: `"${result.suggestedModelName}" を選択しました。モデルを確認しています...`,
         });
         setStatus({
           kind: "loading",
-          message: `Selected "${result.suggestedModelName}". Checking model availability...`,
+          message: `"${result.suggestedModelName}" を選択しました。モデルを確認しています...`,
         });
         return;
       }
@@ -306,11 +306,11 @@ function App() {
     setOllamaModels([]);
     setOllamaConnection({
       kind: "checking",
-      message: `Loading ${label} models...`,
+      message: `${label} のモデルを読み込んでいます...`,
     });
     setStatus({
       kind: "loading",
-      message: `Loading ${label} models...`,
+      message: `${label} のモデルを読み込んでいます...`,
     });
 
     try {
@@ -324,16 +324,16 @@ function App() {
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? `Loaded ${models.length} ${label} model(s). Select one, then run Check.`
-            : `Connected to ${label}, but no local models were found.`,
+            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで Check してください。`
+            : `${label} に接続しましたが、ローカルモデルが見つかりませんでした。`,
         checkedAt: Date.now(),
       });
       setStatus({
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? "Select a model, then run Check to finish setup."
-            : `No ${label} models were found.`,
+            ? "モデルを選択し、Check を実行するとセットアップが完了します。"
+            : `${label} のモデルが見つかりませんでした。`,
       });
     } catch (error: unknown) {
       if (connectionCheckIdRef.current !== checkId) {
@@ -366,11 +366,11 @@ function App() {
       startupCheckStartedRef.current = false;
       setOllamaConnection({
         kind: "idle",
-        message: "Choose a model, then run Check to start writing.",
+        message: "モデルを選択し、Check を実行すると書き始められます。",
       });
       setStatus({
         kind: "idle",
-        message: "Choose a local model and run Check to finish setup.",
+        message: "ローカルモデルを選び、Check を実行してセットアップを完了してください。",
       });
       return;
     }
@@ -475,7 +475,7 @@ function App() {
       return true;
     }
 
-    return window.confirm("You have unsaved changes. Discard them?");
+    return window.confirm("未保存の変更があります。破棄しますか？");
   }, []);
 
   const saveCurrentDocumentSession = useCallback((documentText: string) => {
@@ -498,7 +498,7 @@ function App() {
     setCurrentFilePath(null);
     markDocumentClean();
     saveNewDocumentSession("");
-    setStatus({ kind: "success", message: "Created a new file." });
+    setStatus({ kind: "success", message: "新しいファイルを作成しました。" });
   }, [confirmDiscardUnsavedChanges, markDocumentClean, replaceEditorDocument]);
 
   const handleOpenFile = useCallback(async () => {
@@ -517,7 +517,7 @@ function App() {
       setCurrentFilePath(file.path);
       markDocumentClean();
       saveFileDocumentSession(file.path);
-      setStatus({ kind: "success", message: `Opened ${basename(file.path)}.` });
+      setStatus({ kind: "success", message: `${basename(file.path)} を開きました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
@@ -534,7 +534,7 @@ function App() {
       setCurrentFilePath(savedPath);
       markDocumentClean();
       saveFileDocumentSession(savedPath);
-      setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
+      setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
@@ -551,7 +551,7 @@ function App() {
       setCurrentFilePath(savedPath);
       markDocumentClean();
       saveFileDocumentSession(savedPath);
-      setStatus({ kind: "success", message: `Saved ${basename(savedPath)}.` });
+      setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
     }
@@ -563,7 +563,7 @@ function App() {
     }
 
     initialFileRestoreStartedRef.current = true;
-    setStatus({ kind: "loading", message: `Re-opening ${basename(initialSession.path)}...` });
+    setStatus({ kind: "loading", message: `${basename(initialSession.path)} を再度開いています...` });
 
     reopenMarkdownFile(initialSession.path)
       .then((file) => {
@@ -572,7 +572,7 @@ function App() {
         setCurrentFilePath(file.path);
         markDocumentClean();
         saveFileDocumentSession(file.path);
-        setStatus({ kind: "success", message: `Re-opened ${basename(file.path)}.` });
+        setStatus({ kind: "success", message: `${basename(file.path)} を再度開きました。` });
       })
       .catch((error: unknown) => {
         currentFilePathRef.current = null;
@@ -624,7 +624,7 @@ function App() {
         id: request.id,
         status: "canceled",
         input: request.originalText,
-        error: "Canceled by user.",
+        error: "ユーザーがキャンセルしました。",
         modelName: settingsRef.current.modelName,
         createdAt: Date.now(),
         source: request.source,
@@ -634,7 +634,7 @@ function App() {
       },
       ...items,
     ]);
-    setStatus({ kind: "warning", message: "Conversion canceled." });
+    setStatus({ kind: "warning", message: "変換をキャンセルしました。" });
   }, []);
 
   const skipQueuedConversion = useCallback((request: PendingConversion, message: string) => {
@@ -661,7 +661,7 @@ function App() {
       const view = editorViewRef.current;
       const anchor = request.anchor;
       if (!view || !anchor) {
-        skipQueuedConversion(request, "Conversion was skipped because the editor is unavailable.");
+        skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
         return;
       }
 
@@ -669,7 +669,7 @@ function App() {
       if (!resolved) {
         skipQueuedConversion(
           request,
-          "Skipped because the source text changed before this queued conversion started.",
+          "キュー内の変換を開始する前に元のテキストが変わったため、スキップしました。",
         );
         return;
       }
@@ -688,7 +688,7 @@ function App() {
 
       const currentView = editorViewRef.current;
       if (!currentView) {
-        skipQueuedConversion(request, "Conversion was skipped because the editor is unavailable.");
+        skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
         return;
       }
 
@@ -702,7 +702,7 @@ function App() {
       if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
         skipQueuedConversion(
           request,
-          "Skipped because the source text changed before the queued conversion was applied.",
+          "キュー内の変換を適用する前に元のテキストが変わったため、スキップしました。",
         );
         return;
       }
@@ -728,7 +728,7 @@ function App() {
         });
         setStatus({
           kind: "success",
-          message: "Ghost suggestion ready. Press Tab to accept or Ctrl+/ to try another.",
+          message: "Ghost suggestion の準備ができました。Tab で確定、Ctrl+/ で別候補を試せます。",
         });
         return;
       }
@@ -766,7 +766,7 @@ function App() {
         },
         ...items,
       ]);
-      setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
+      setStatus({ kind: "success", message: "変換しました。Undo で romaji に戻せます。" });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
   );
@@ -781,7 +781,7 @@ function App() {
       if (request.anchor && currentView && !resolved) {
         skipQueuedConversion(
           request,
-          "History conversion was not applied because the anchor could not be resolved.",
+          "適用位置を解決できなかったため、History からの変換を適用しませんでした。",
         );
         return;
       }
@@ -825,7 +825,7 @@ function App() {
         ]);
         setStatus({
           kind: "success",
-          message: "History conversion re-run. No editor anchor was available to apply.",
+          message: "History から再変換しました。適用先がないため結果のみ保存しました。",
         });
         return;
       }
@@ -839,7 +839,7 @@ function App() {
       if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
         skipQueuedConversion(
           request,
-          "History conversion was not applied because the anchor changed before apply.",
+          "適用前に位置が変わったため、History からの変換を適用しませんでした。",
         );
         return;
       }
@@ -883,7 +883,7 @@ function App() {
         });
         setStatus({
           kind: "success",
-          message: "History suggestion ready. Press Tab to apply or Ctrl+/ to try another.",
+          message: "History suggestion の準備ができました。Tab で適用、Ctrl+/ で別候補を試せます。",
         });
         return;
       }
@@ -925,8 +925,8 @@ function App() {
         kind: "success",
         message:
           latestResolved.matchedBy === "nearby"
-            ? "History conversion applied at a nearby matching anchor."
-            : "History conversion applied.",
+            ? "近くの一致位置に History の変換を適用しました。"
+            : "History の変換を適用しました。",
       });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
@@ -953,12 +953,12 @@ function App() {
         setPending([...conversionQueueRef.current]);
         setStatus({
           kind: "loading",
-          message:
-            request.retryOf
-              ? `Trying another candidate for "${request.originalText}"`
-              : request.source === "history"
-              ? `Re-converting "${request.originalText}"`
-              : `Converting "${request.originalText}"`,
+            message:
+              request.retryOf
+                ? `"${request.originalText}" の別候補を試しています`
+                : request.source === "history"
+                ? `"${request.originalText}" を再変換しています`
+                : `"${request.originalText}" を変換しています`,
         });
 
         try {
@@ -1011,7 +1011,7 @@ function App() {
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
       if (processingQueueRef.current) {
-        setStatus({ kind: "loading", message: `Queued "${request.originalText}"` });
+        setStatus({ kind: "loading", message: `"${request.originalText}" をキューに追加しました` });
       }
       void processConversionQueue();
     },
@@ -1067,7 +1067,7 @@ function App() {
         avoidOutputs: suggestion.avoidOutputs,
       }),
     );
-    setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
+    setStatus({ kind: "success", message: "Ghost suggestion を確定しました。Undo で romaji に戻せます。" });
   }, [saveCurrentDocumentSession]);
 
   const handleRetryGhost = useCallback(
@@ -1082,7 +1082,7 @@ function App() {
         view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
         setStatus({
           kind: "warning",
-          message: "Ghost suggestion was dismissed because the source text changed.",
+          message: "元のテキストが変わったため、Ghost suggestion を閉じました。",
         });
         return;
       }
@@ -1227,7 +1227,7 @@ function App() {
         historyCount={history.length}
         dictionaryCount={enabledDictionaryCount}
         initialDocument={initialDocument}
-        fileName={currentFilePath ? basename(currentFilePath) : "Unsaved draft"}
+        fileName={currentFilePath ? basename(currentFilePath) : "未保存の下書き"}
         isDirty={isDirty}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
@@ -1287,7 +1287,7 @@ function App() {
         className={`floating-settings-button ${settingsAttention ? "attention" : ""}`}
         type="button"
         onClick={() => setSettingsDrawerOpen(true)}
-        aria-label="Open settings"
+        aria-label="Settings を開く"
       >
         <SlidersHorizontal size={17} aria-hidden="true" />
         Settings
@@ -1349,7 +1349,7 @@ function SettingsDrawer({
         aria-labelledby="settings-drawer-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button className="icon-button drawer-close" type="button" onClick={onClose} aria-label="Close settings">
+        <button className="icon-button drawer-close" type="button" onClick={onClose} aria-label="Settings を閉じる">
           <X size={18} aria-hidden="true" />
         </button>
         <SettingsContent
@@ -1394,10 +1394,9 @@ function SetupModal({
       >
         <div className="setup-intro">
           <p className="eyebrow">First run</p>
-          <h2 id="setup-modal-title">Set up your local model</h2>
+          <h2 id="setup-modal-title">ローカルモデルのセットアップ</h2>
           <p>
-            Choose a provider, confirm the API URL, and select a model before using romaji
-            conversion.
+            Provider と API URL を確認し、romaji 変換に使うモデルを選択してください。
           </p>
         </div>
         <SettingsContent
@@ -1416,7 +1415,7 @@ function SetupModal({
             disabled={!canStartWriting}
             onClick={onComplete}
           >
-            Start writing
+            書き始める
           </button>
         </div>
       </section>
@@ -1442,37 +1441,37 @@ function HistoryPanel({
   onClose: () => void;
 }) {
   return (
-    <section className="floating-panel history-panel" aria-label="history">
+    <section className="floating-panel history-panel" aria-label="History">
       <div className="floating-panel-header">
         <div>
           <p className="eyebrow">Conversion log</p>
           <h2>History</h2>
         </div>
-        <button className="icon-button" type="button" onClick={onClose} aria-label="Close history">
+        <button className="icon-button" type="button" onClick={onClose} aria-label="History を閉じる">
           <X size={18} aria-hidden="true" />
         </button>
       </div>
 
       {pending.length > 0 ? (
-        <div className="pending-list" aria-label="Slow conversions">
+        <div className="pending-list" aria-label="処理中の変換">
           {pending.map((request) => (
             <article className="pending-item" key={request.id}>
               <div>
                 <strong>
                   {request.retryOf
                     ? request.status === "queued"
-                      ? "Queued retry"
-                      : "Trying another"
+                      ? "再試行待ち"
+                      : "別候補を生成中"
                     : request.status === "queued"
-                    ? "Queued"
+                    ? "待機中"
                     : request.source === "history"
-                      ? "Re-applying"
-                      : "Converting"}
+                      ? "再適用中"
+                      : "変換中"}
                 </strong>
                 <p>{request.originalText}</p>
               </div>
               <button className="secondary-button" type="button" onClick={() => onCancel(request)}>
-                Cancel
+                キャンセル
               </button>
             </article>
           ))}
@@ -1480,7 +1479,7 @@ function HistoryPanel({
       ) : null}
 
       {history.length === 0 ? (
-        <p className="empty-state">No conversions in this open history panel yet.</p>
+        <p className="empty-state">変換はまだありません。</p>
       ) : (
         <div className="history-list">
           {history.map((item) => (
@@ -1499,8 +1498,8 @@ function HistoryPanel({
               onMouseLeave={() => onPreviewEnd(item)}
               title={
                 item.anchor
-                  ? "Click to try another conversion and apply it"
-                  : "Click to try this conversion again"
+                  ? "クリックすると別候補を生成して適用します"
+                  : "クリックするとこの変換を再実行します"
               }
             >
               <div className="history-meta">
@@ -1513,15 +1512,15 @@ function HistoryPanel({
                   <dd>{item.input}</dd>
                 </div>
                 <div>
-                  <dt>{item.status === "success" ? "Japanese" : "Result"}</dt>
-                  <dd>{item.output ?? item.error ?? "No output."}</dd>
+                  <dt>{item.status === "success" ? "日本語" : "結果"}</dt>
+                  <dd>{item.output ?? item.error ?? "出力はありません。"}</dd>
                 </div>
               </dl>
               <div className="rerun-meta">
                 <span>{item.modelName}</span>
                 <span className="rerun-hint">
                   <RotateCcw size={13} aria-hidden="true" />
-                  Try again
+                  再試行
                 </span>
               </div>
             </button>
@@ -1534,15 +1533,15 @@ function HistoryPanel({
 
 function historyStatusLabel(status: ConversionHistoryItem["status"]): string {
   if (status === "success") {
-    return "Success";
+    return "成功";
   }
   if (status === "error") {
-    return "Failed";
+    return "失敗";
   }
   if (status === "skipped") {
-    return "Skipped";
+    return "スキップ";
   }
-  return "Canceled";
+  return "キャンセル";
 }
 
 function PromptPanel({
@@ -1561,19 +1560,19 @@ function PromptPanel({
   onClose: () => void;
 }) {
   return (
-    <section className="floating-panel prompt-panel" aria-label="Conversion prompt editor">
+    <section className="floating-panel prompt-panel" aria-label="変換スタイル">
       <div className="floating-panel-header">
         <div>
           <p className="eyebrow">Conversion style</p>
           <h2>Preset</h2>
         </div>
-        <button className="icon-button" type="button" onClick={onClose} aria-label="Close prompt">
+        <button className="icon-button" type="button" onClick={onClose} aria-label="Preset を閉じる">
           <X size={18} aria-hidden="true" />
         </button>
       </div>
       <div className="preset-panel-content">
         <fieldset className="preset-options">
-          <legend className="sr-only">Conversion preset</legend>
+          <legend className="sr-only">変換 Preset</legend>
           {CONVERSION_PRESET_OPTIONS.map((option) => (
             <label
               className={preset === option ? "selected" : ""}
@@ -1597,7 +1596,7 @@ function PromptPanel({
         <details className="advanced-prompt">
           <summary>Advanced prompt</summary>
           <label className="prompt-editor">
-            <span>Japanese conversion instructions</span>
+            <span>日本語変換の指示</span>
             <textarea
               value={prompt}
               onChange={(event) => onChange(event.currentTarget.value)}
@@ -1606,11 +1605,11 @@ function PromptPanel({
           </label>
           <div className="panel-actions">
             <button className="secondary-button" type="button" onClick={onReset}>
-              Reset to default
+              デフォルトに戻す
             </button>
           </div>
           <p className="panel-note">
-            This prompt is saved locally. Romaji table and few-shots are auto-appended.
+            このプロンプトはローカルに保存されます。Romaji 表と few-shot は自動で追加されます。
           </p>
         </details>
       </div>
@@ -1620,12 +1619,12 @@ function PromptPanel({
 
 function presetDescription(preset: ConversionPreset): string {
   if (preset === "conversation") {
-    return "Chat and spoken notes. Keeps wording natural without forcing business politeness.";
+    return "チャットや口語メモ向け。ビジネス表現に寄せすぎず、自然な言い回しを優先します。";
   }
   if (preset === "businessEmail") {
-    return "Work messages and email drafts. Prefers clear, polite wording with standard business kanji.";
+    return "仕事の連絡やメール下書き向け。標準的なビジネス漢字と丁寧な表記を優先します。";
   }
-  return "General conversion. Prioritizes the reading and common written Japanese.";
+  return "汎用の変換。読みと一般的な日本語表記を優先します。";
 }
 
 function DictionaryModal({
@@ -1693,7 +1692,7 @@ function DictionaryModal({
             <p className="eyebrow">User terms</p>
             <h2 id="dictionary-modal-title">Dictionary</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Close dictionary">
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Dictionary を閉じる">
             <X size={18} aria-hidden="true" />
           </button>
         </div>
@@ -1713,9 +1712,9 @@ function DictionaryModal({
             />
           </label>
           <label className="field">
-            <span>Output</span>
+            <span>出力</span>
             <input
-              aria-label="Output"
+              aria-label="出力"
               value={draft.output}
               maxLength={80}
               placeholder="OpenAI"
@@ -1726,12 +1725,12 @@ function DictionaryModal({
             />
           </label>
           <label className="field dictionary-note-field">
-            <span>Note</span>
+            <span>メモ</span>
             <input
-              aria-label="Note"
+              aria-label="メモ"
               value={draft.note}
               maxLength={120}
-              placeholder="company name"
+              placeholder="会社名など"
               onChange={(event) => {
                 const note = event.currentTarget.value;
                 setDraft((value) => ({ ...value, note }));
@@ -1744,7 +1743,7 @@ function DictionaryModal({
             disabled={!canAdd}
           >
             <Plus size={16} aria-hidden="true" />
-            Add entry
+            追加
           </button>
         </form>
 
@@ -1752,7 +1751,7 @@ function DictionaryModal({
           <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
         </div>
         {entries.length === 0 ? (
-          <p className="empty-state">No dictionary entries yet.</p>
+          <p className="empty-state">Dictionary の登録はまだありません。</p>
         ) : (
           <div className="dictionary-list">
             {entries.map((entry, index) => (
@@ -1765,7 +1764,7 @@ function DictionaryModal({
                       updateEntry(entry.id, { enabled: event.currentTarget.checked })
                     }
                   />
-                  Enabled
+                  有効
                 </label>
                 <div className="dictionary-entry-fields">
                   <input
@@ -1788,7 +1787,7 @@ function DictionaryModal({
                     aria-label={`Dictionary note ${index + 1}`}
                     value={entry.note}
                     maxLength={120}
-                    placeholder="Note"
+                    placeholder="メモ"
                     onChange={(event) =>
                       updateEntry(entry.id, { note: event.currentTarget.value })
                     }
@@ -1798,7 +1797,7 @@ function DictionaryModal({
                   className="icon-button dictionary-delete"
                   type="button"
                   onClick={() => deleteEntry(entry.id)}
-                  aria-label={`Delete ${entry.output || entry.reading}`}
+                  aria-label={`${entry.output || entry.reading} を削除`}
                 >
                   <Trash2 size={16} aria-hidden="true" />
                 </button>
@@ -1882,15 +1881,15 @@ function StatusBar({
         <div className="status-actions">
           {canOpenSettings ? (
             <button className="status-settings" type="button" onClick={onOpenSettings}>
-              Open settings
+              Settings を開く
             </button>
           ) : null}
           {pending[0] ? (
             <button className="status-cancel" type="button" onClick={() => onCancel(pending[0])}>
-              Cancel slow conversion
+              遅い変換をキャンセル
             </button>
           ) : null}
-          {pendingCount > 0 ? <strong>{pendingCount} pending</strong> : null}
+          {pendingCount > 0 ? <strong>{pendingCount} 件待機中</strong> : null}
         </div>
       ) : null}
     </div>
@@ -1900,24 +1899,24 @@ function StatusBar({
 function formatConversionError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
-    return "Could not reach the selected local model provider. Confirm it is running at the configured URL.";
+    return "選択中のローカルモデル Provider に接続できません。設定した URL で起動しているか確認してください。";
   }
-  return message || "Conversion failed.";
+  return message || "変換に失敗しました。";
 }
 
 function formatOllamaConnectionError(error: unknown, label: string): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/abort/i.test(message)) {
-    return `${label} connection check timed out. Confirm ${label} is running and the selected model can load.`;
+    return `${label} の接続確認がタイムアウトしました。${label} が起動していて、選択中のモデルを読み込めるか確認してください。`;
   }
   if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
-    return `Could not reach ${label}. Confirm it is running at the configured URL.`;
+    return `${label} に接続できません。設定した URL で起動しているか確認してください。`;
   }
-  return message || `${label} connection check failed.`;
+  return message || `${label} の接続確認に失敗しました。`;
 }
 
 function formatFileError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error || "File operation failed.");
+  return error instanceof Error ? error.message : String(error || "ファイル操作に失敗しました。");
 }
 
 export default App;

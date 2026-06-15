@@ -67,16 +67,21 @@ try {
     }
   });
 
-  await page.goto(appUrl);
+  await page.goto(`${appUrl}?setup=1`);
   await page.getByRole("heading", { name: "Romaji Kana" }).waitFor();
-  await page.getByRole("dialog", { name: "Set up your local model" }).waitFor();
+  const setupDialog = page.getByRole("dialog", { name: "ローカルモデルのセットアップ" });
+  await setupDialog.waitFor();
   assert.equal(await editorText(page), "restored unsaved draft.");
   await assertVisibleText(page, "Settings");
 
-  await waitForVisibleText(page, 'Selected "gemma4:latest". Checking model availability...');
-  await waitForVisibleText(page, 'Connected to Ollama. Loaded "gemma4:latest". 2 model(s) available.');
-  await page.getByRole("button", { name: "Start writing" }).click();
-  await page.getByRole("dialog", { name: "Set up your local model" }).waitFor({ state: "hidden" });
+  await setupDialog.getByRole("button", { name: "Check" }).click();
+  await waitForVisibleText(page, 'Ollama に接続しましたが、"gemma3" は見つかりませんでした。候補: "gemma4:latest".');
+  await setupDialog.getByRole("button", { name: "ローカルモデルを表示" }).click();
+  await setupDialog.getByRole("option", { name: "gemma4:latest" }).click();
+  await setupDialog.getByRole("button", { name: "Check" }).click();
+  await waitForVisibleText(page, 'Ollama に接続しました。"gemma4:latest" を読み込みました。利用可能なモデル: 2 件。');
+  await page.getByRole("button", { name: "書き始める" }).click();
+  await setupDialog.waitFor({ state: "hidden" });
   assert.ok(
     await panelTogglePaintsOutsideSettingsPanel(page),
     "Settings panel toggle should paint outside the panel without being clipped.",
@@ -85,9 +90,9 @@ try {
     .locator(".settings-panel .accordion-trigger")
     .filter({ hasText: "Triggers" })
     .click();
-  await page.getByLabel("Enter (IME composing ignored)").check();
+  await page.getByLabel("Enter（IME 変換中は無視）").check();
   assert.equal(
-    await page.getByLabel("Enter (IME composing ignored)").isChecked(),
+    await page.getByLabel("Enter（IME 変換中は無視）").isChecked(),
     true,
     "Enter trigger checkbox should be enabled before editor input.",
   );
@@ -192,37 +197,37 @@ try {
     .first()
     .getByText("壱。")
     .waitFor();
-  await page.getByRole("button", { name: "Close history" }).click();
+  await page.getByRole("button", { name: "History を閉じる" }).click();
 
   await page.keyboard.press("Control+N");
   await page.waitForFunction(() => {
     const text = document.querySelector(".cm-content")?.textContent ?? "";
-    return text === "" || text === "Romaji de nihongo wo kaitte kudasai...";
+    return text === "" || text === "romaji で日本語を書いてください...";
   });
   assert.equal(await editorText(page), "", "New file shortcut should clear the editor.");
 
-  await page.getByRole("button", { name: "Open dictionary" }).click();
+  await page.getByRole("button", { name: "Dictionary を開く" }).click();
   await page.getByRole("dialog", { name: "Dictionary" }).waitFor();
   const dictionaryInputs = page.locator(".dictionary-add-form input");
   await dictionaryInputs.nth(0).fill("openai");
   await dictionaryInputs.nth(1).fill("OpenAI");
   await dictionaryInputs.nth(2).fill("company name");
-  await page.getByRole("button", { name: "Add entry" }).click();
+  await page.getByRole("button", { name: "追加" }).click();
   await assertLocatorValue(page.getByLabel("Dictionary output 1"), "OpenAI");
-  await page.getByRole("button", { name: "Close dictionary" }).click();
+  await page.getByRole("button", { name: "Dictionary を閉じる" }).click();
   await page
-    .getByRole("button", { name: "Open dictionary, 1 enabled entries" })
+    .getByRole("button", { name: "Dictionary を開く、1 件有効" })
     .waitFor();
 
-  await page.getByRole("button", { name: "Show local models" }).click();
+  await page.getByRole("button", { name: "ローカルモデルを表示" }).click();
   await page.getByRole("option", { name: "qwen3.5:0.8b" }).waitFor();
   await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Style" }).click();
-  await page.getByRole("region", { name: "Conversion prompt editor" }).waitFor();
-  await page.getByRole("button", { name: "ビジネスメール" }).click();
-  await page.getByText("Work messages and email drafts.").waitFor();
-  await page.getByRole("button", { name: "Close prompt" }).click();
+  await page.getByRole("region", { name: "変換スタイル" }).waitFor();
+  await page.getByLabel("ビジネスメール").check();
+  await page.getByText("仕事の連絡やメール下書き向け。").waitFor();
+  await page.getByRole("button", { name: "Preset を閉じる" }).click();
 
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
@@ -254,7 +259,7 @@ try {
       (await page.locator(".status-bar").textContent()) ?? ""
     }`,
   );
-  await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl+/ retry" }).waitFor();
+  await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl+/で再試行" }).waitFor();
   await page.getByText("三。").waitFor();
   await page.keyboard.press("Control+/");
   await page.getByText("参。").waitFor();
@@ -281,13 +286,13 @@ try {
     .first()
     .getByText("さん。")
     .waitFor();
-  await page.getByRole("button", { name: "Close history" }).click();
+  await page.getByRole("button", { name: "History を閉じる" }).click();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "Open settings" }).click();
+  await page.getByRole("button", { name: "Settings を開く" }).click();
   await page.getByRole("dialog", { name: "Settings" }).waitFor();
-  await assertVisibleText(page, "Connected");
-  await page.getByRole("button", { name: "Close settings" }).click();
+  await assertVisibleText(page, "接続済み");
+  await page.getByRole("button", { name: "Settings を閉じる" }).click();
   assert.ok(
     await page.getByRole("button", { name: "Style" }).isVisible(),
     "Style action should remain visible on a narrow viewport.",
@@ -318,7 +323,7 @@ async function waitForVisibleText(page, text) {
 
 async function editorText(page) {
   const text = (await page.locator(".cm-content").textContent()) ?? "";
-  return text === "Romaji de nihongo wo kaitte kudasai..." ? "" : text;
+  return text === "romaji で日本語を書いてください..." ? "" : text;
 }
 
 async function editorLines(page) {

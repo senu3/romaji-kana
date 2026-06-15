@@ -109,7 +109,7 @@ class GhostTextWidget extends WidgetType {
   toDOM() {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
-    element.title = "Press Tab to accept, Ctrl+/ to try another candidate";
+    element.title = "Tab で確定、Ctrl+/ で別候補を試す";
 
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
@@ -117,7 +117,7 @@ class GhostTextWidget extends WidgetType {
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent = "Tab accept  Ctrl+/ retry";
+    hint.textContent = "Tabで確定  Ctrl+/で再試行";
 
     element.append(suggestion, hint);
     return element;
@@ -377,7 +377,7 @@ export function MarkdownEditor({
         ghostSuggestionField,
         theme,
         syntaxHighlighting(highlightStyle),
-        placeholder("Romaji de nihongo wo kaitte kudasai..."),
+        placeholder("romaji で日本語を書いてください..."),
         updateListener,
         compositionHandler,
         shortcutCompartment.of(
@@ -618,22 +618,22 @@ export function MarkdownEditor({
               <div className="toolbar-menu-items" role="menu" aria-label="File actions">
                 <button type="button" role="menuitem" onClick={() => runFileAction(onNewFile)}>
                   <FilePlus2 size={15} aria-hidden="true" />
-                  <span>New file</span>
+                  <span>新規ファイル</span>
                   <kbd>Ctrl/Cmd + N</kbd>
                 </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onOpenFile)}>
                   <FolderOpen size={15} aria-hidden="true" />
-                  <span>Open Markdown...</span>
+                  <span>Markdownを開く...</span>
                   <kbd>Ctrl/Cmd + O</kbd>
                 </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFile)}>
                   <Save size={15} aria-hidden="true" />
-                  <span>Save</span>
+                  <span>保存</span>
                   <kbd>Ctrl/Cmd + S</kbd>
                 </button>
                 <button type="button" role="menuitem" onClick={() => runFileAction(onSaveFileAs)}>
                   <Save size={15} aria-hidden="true" />
-                  <span>Save As...</span>
+                  <span>別名で保存...</span>
                   <kbd>Ctrl/Cmd + Shift + S</kbd>
                 </button>
               </div>
@@ -641,7 +641,7 @@ export function MarkdownEditor({
           </div>
           <button className="pill pill-action" type="button" onClick={onOpenHistory}>
             <History size={15} aria-hidden="true" />
-            {pending.length > 0 ? `${pending.length} converting` : `${historyCount} History`}
+            {pending.length > 0 ? `${pending.length} 件変換中` : `${historyCount} History`}
           </button>
           <button className="pill pill-action" type="button" onClick={onOpenPrompt}>
             <MessageSquareText size={15} aria-hidden="true" />
@@ -656,7 +656,7 @@ export function MarkdownEditor({
             type="button"
             onClick={() => runEditorCommand(undo)}
             aria-label="Undo"
-            title="Undo"
+            title="元に戻す"
           >
             <Undo2 size={16} aria-hidden="true" />
           </button>
@@ -665,14 +665,14 @@ export function MarkdownEditor({
             type="button"
             onClick={() => runEditorCommand(redo)}
             aria-label="Redo"
-            title="Redo"
+            title="やり直し"
           >
             <Redo2 size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="editor-filebar-title" title={fileName}>
           <span>{fileName}</span>
-          {isDirty ? <span className="dirty-chip">Unsaved</span> : null}
+          {isDirty ? <span className="dirty-chip">未保存</span> : null}
         </div>
         <div className="editor-filebar-side editor-filebar-side-right">
           <button
@@ -681,8 +681,8 @@ export function MarkdownEditor({
             onClick={onOpenDictionary}
             aria-label={
               dictionaryCount > 0
-                ? `Open dictionary, ${dictionaryCount} enabled entries`
-                : "Open dictionary"
+                ? `Dictionary を開く、${dictionaryCount} 件有効`
+                : "Dictionary を開く"
             }
             title="Dictionary"
           >
