@@ -39,6 +39,11 @@ interface DictionaryCandidate {
   output: string;
 }
 
+export type ProtectedDictionaryEntry = Pick<
+  UserDictionaryEntry,
+  "reading" | "output" | "enabled"
+>;
+
 export interface JapaneseConversionResult {
   text: string;
   reviewKana: string;
@@ -47,6 +52,7 @@ export interface JapaneseConversionResult {
 export interface JapaneseConversionOptions {
   avoidOutputs?: string[];
   strictAlternative?: boolean;
+  protectedDictionaryEntries?: ProtectedDictionaryEntry[];
 }
 
 export async function convertRomajiToJapanese(
@@ -94,7 +100,10 @@ async function convertRomajiToJapaneseDetailedOnce(
   options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
   const normalized = normalizeInputForPrompt(input, settings);
-  const parts = splitInputForConversion(normalized, settings.userDictionary);
+  const parts = splitInputForConversion(normalized, [
+    ...(options.protectedDictionaryEntries ?? []),
+    ...settings.userDictionary,
+  ]);
   const convertedParts: string[] = [];
   const reviewKanaParts: string[] = [];
 
@@ -191,9 +200,53 @@ export async function kanjiizeKana(
   return text;
 }
 
+export function buildProtectedDictionaryEntries(
+  input: string,
+  currentText: string,
+  entries: UserDictionaryEntry[],
+): ProtectedDictionaryEntry[] {
+  const protectedEntries: ProtectedDictionaryEntry[] = [];
+  const seen = new Set<string>();
+
+  const addEntry = (reading: string, output: string) => {
+    const normalizedReading = normalizeDictionaryReading(reading);
+    const trimmedOutput = output.trim();
+    const key = `${normalizedReading}\t${trimmedOutput}`;
+    if (
+      !normalizedReading ||
+      !trimmedOutput ||
+      seen.has(key) ||
+      !isRomajiDictionaryReading(normalizedReading) ||
+      !hasDictionaryReadingMatch(input, normalizedReading)
+    ) {
+      return;
+    }
+
+    seen.add(key);
+    protectedEntries.push({
+      reading: normalizedReading,
+      output: trimmedOutput,
+      enabled: true,
+    });
+  };
+
+  for (const entry of entries) {
+    if (!entry.enabled || !entry.output.trim() || !currentText.includes(entry.output.trim())) {
+      continue;
+    }
+    addEntry(entry.reading, entry.output);
+  }
+
+  for (const term of extractAsciiProtectedTerms(currentText)) {
+    addEntry(term, term);
+  }
+
+  return protectedEntries;
+}
+
 function splitInputForConversion(
   input: string,
-  entries: UserDictionaryEntry[],
+  entries: ProtectedDictionaryEntry[],
 ): ConversionSplitPart[] {
   const literalParts = splitInputByLiteralNouns(input).flatMap((part) => {
     if (part.type === "literal") {
@@ -318,7 +371,7 @@ function isEscapedBacktick(input: string, index: number): boolean {
 
 function splitInputByDictionary(
   input: string,
-  entries: UserDictionaryEntry[],
+  entries: ProtectedDictionaryEntry[],
 ): DictionarySplitPart[] {
   const candidates = buildDictionaryCandidates(entries);
 
@@ -361,7 +414,7 @@ function splitInputByDictionary(
   return parts;
 }
 
-function buildDictionaryCandidates(entries: UserDictionaryEntry[]): DictionaryCandidate[] {
+function buildDictionaryCandidates(entries: ProtectedDictionaryEntry[]): DictionaryCandidate[] {
   return entries
     .map((entry) => ({
       normalizedReading: normalizeDictionaryReading(entry.reading),
@@ -395,8 +448,40 @@ function canMatchDictionaryCandidate(
   return hasAllowedLongDictionarySuffix(input, start + length);
 }
 
+function hasDictionaryReadingMatch(input: string, normalizedReading: string): boolean {
+  const normalizedInput = input.toLowerCase();
+  const candidate: DictionaryCandidate = {
+    normalizedReading,
+    output: normalizedReading,
+  };
+  let index = normalizedInput.indexOf(normalizedReading);
+  while (index !== -1) {
+    if (canMatchDictionaryCandidate(normalizedInput, index, candidate)) {
+      return true;
+    }
+    index = normalizedInput.indexOf(normalizedReading, index + 1);
+  }
+  return false;
+}
+
 function isRomajiDictionaryReading(reading: string): boolean {
   return /^[a-z0-9][a-z0-9' -]*[a-z0-9]$/i.test(reading) || /^[a-z0-9]$/i.test(reading);
+}
+
+function extractAsciiProtectedTerms(text: string): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const match of text.matchAll(/[A-Za-z][A-Za-z0-9]*(?:[._-][A-Za-z0-9]+)*/g)) {
+    const term = match[0].trim();
+    const key = term.toLowerCase();
+    if (term.length < 3 || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    terms.push(term);
+  }
+  return terms;
 }
 
 function hasDictionaryWordBoundary(input: string, start: number, length: number): boolean {
