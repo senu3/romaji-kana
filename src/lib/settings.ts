@@ -1,9 +1,8 @@
-import type { AppSettings, UserDictionaryEntry, UserHomophonePreference } from "./types";
+import type { AppSettings, UserDictionaryEntry } from "./types";
 import { defaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
-const MAX_USER_HOMOPHONE_ENTRIES = 50;
 
 export const defaultSettings: AppSettings = {
   modelProvider: "ollama",
@@ -25,7 +24,6 @@ export const defaultSettings: AppSettings = {
   conversionPrompt: defaultConversionPrompt,
   conversionPreset: "none",
   userDictionary: [],
-  userHomophones: [],
   think: false,
 };
 
@@ -48,10 +46,12 @@ export function saveSettings(settings: AppSettings): void {
 
 type LegacySettings = Partial<AppSettings> & {
   thinkingMode?: "auto" | "on" | "off";
+  userHomophones?: unknown;
 };
 
 function mergeSettings(settings: LegacySettings): AppSettings {
-  const { thinkingMode, ...currentSettings } = settings;
+  const { thinkingMode, userHomophones, ...currentSettings } = settings;
+  void userHomophones;
   const conversionPrompt = settings.conversionPrompt || defaultConversionPrompt;
   const think = settings.think ?? thinkingMode === "on";
 
@@ -69,7 +69,6 @@ function mergeSettings(settings: LegacySettings): AppSettings {
       ...settings.punctuationConversion,
     },
     userDictionary: normalizeUserDictionary(settings.userDictionary),
-    userHomophones: normalizeUserHomophones(settings.userHomophones),
   };
 }
 
@@ -104,59 +103,6 @@ function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {
     .slice(0, MAX_USER_DICTIONARY_ENTRIES);
 }
 
-function normalizeUserHomophones(entries: unknown): UserHomophonePreference[] {
-  if (!Array.isArray(entries)) {
-    return [];
-  }
-
-  return entries
-    .flatMap((entry, index): UserHomophonePreference[] => {
-      if (!entry || typeof entry !== "object") {
-        return [];
-      }
-
-      const record = entry as Record<string, unknown>;
-      const reading = readString(record.reading).trim();
-      const preferred = readString(record.preferred).trim();
-      if (!reading || !preferred || !isHiraganaReading(reading)) {
-        return [];
-      }
-
-      return [
-        {
-          id: readString(record.id).trim() || `homophone-${index}`,
-          reading,
-          preferred,
-          replaceFrom: normalizeStringList(record.replaceFrom),
-          note: readString(record.note).trim(),
-          enabled: typeof record.enabled === "boolean" ? record.enabled : true,
-        },
-      ];
-    })
-    .slice(0, MAX_USER_HOMOPHONE_ENTRIES);
-}
-
-function isHiraganaReading(value: string): boolean {
-  return /^[\u3041-\u3096ー]+$/u.test(value);
-}
-
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
-}
-
-function normalizeStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const seen = new Set<string>();
-  return value.flatMap((item): string[] => {
-    const text = readString(item).trim();
-    if (!text || seen.has(text)) {
-      return [];
-    }
-
-    seen.add(text);
-    return [text];
-  });
 }

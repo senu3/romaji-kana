@@ -12,11 +12,20 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
-  it("normalizes user homophone preferences", () => {
+  it("drops removed homophone settings while preserving dictionary entries", () => {
     storage.set(
       "romaji-kana-settings",
       JSON.stringify({
         ...defaultSettings,
+        userDictionary: [
+          {
+            id: "openai",
+            reading: "openai",
+            output: "OpenAI",
+            note: "company name",
+            enabled: true,
+          },
+        ],
         userHomophones: [
           {
             id: "goji",
@@ -44,13 +53,13 @@ describe("loadSettings", () => {
       }),
     );
 
-    expect(loadSettings().userHomophones).toEqual([
+    expect(loadSettings()).not.toHaveProperty("userHomophones");
+    expect(loadSettings().userDictionary).toEqual([
       {
-        id: "goji",
-        reading: "ごじ",
-        preferred: "誤字",
-        replaceFrom: ["五時", "ごじ"],
-        note: "conversion notes",
+        id: "openai",
+        reading: "openai",
+        output: "OpenAI",
+        note: "company name",
         enabled: true,
       },
     ]);

@@ -2,14 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   convertRomajiToJapanese,
   convertRomajiToJapaneseDetailed,
-  kanjiizeKana,
   normalizeRomajiReadingCandidate,
 } from "./ollama";
 import {
   buildConversionSystemPrompt,
   buildKanaKanjiSystemPrompt,
   defaultConversionPrompt,
-  formatMatchingHomophonePreferences,
 } from "./prompts";
 import { defaultSettings } from "./settings";
 
@@ -124,102 +122,6 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("does not force user homophone preferences during kana-kanji conversion", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "今日の五時に集合な" }),
-    };
-    const settings = {
-      ...defaultSettings,
-      userHomophones: [
-        {
-          id: "goji",
-          reading: "ごじ",
-          preferred: "誤字",
-          replaceFrom: ["五時", "ごじ"],
-          note: "",
-          enabled: true,
-        },
-      ],
-    };
-
-    const result = await convertRomajiToJapaneseDetailed(
-      "kyounogozinisyuugouna",
-      settings,
-      transport,
-    );
-
-    expect(result).toEqual({
-      text: "今日の五時に集合な",
-      reviewKana: "きょうのごじにしゅうごうな",
-    });
-    expect(transport.generate).toHaveBeenCalledTimes(1);
-    expect(transport.generate).toHaveBeenCalledWith(
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "きょうのごじにしゅうごうな",
-      }),
-      30_000,
-    );
-  });
-
-  it("does not replace a whole kana input with a homophone preference", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "五時" }),
-    };
-    const settings = {
-      ...defaultSettings,
-      userHomophones: [
-        {
-          id: "goji",
-          reading: "ごじ",
-          preferred: "誤字",
-          replaceFrom: ["五時", "ごじ"],
-          note: "",
-          enabled: true,
-        },
-      ],
-    };
-
-    await expect(kanjiizeKana("ごじ", settings, transport)).resolves.toBe("五時");
-    expect(transport.generate).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps longer kana words intact without homophone pre-splitting", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "リンゴジュースを買った" }),
-    };
-    const settings = {
-      ...defaultSettings,
-      userHomophones: [
-        {
-          id: "goji",
-          reading: "ごじ",
-          preferred: "誤字",
-          replaceFrom: ["五時", "ごじ"],
-          note: "",
-          enabled: true,
-        },
-      ],
-    };
-
-    await expect(kanjiizeKana("りんごじゅーすをかった", settings, transport)).resolves.toBe(
-      "リンゴジュースを買った",
-    );
-    expect(transport.generate).toHaveBeenCalledTimes(1);
-    expect(transport.generate).toHaveBeenCalledWith(
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "りんごじゅーすをかった",
-      }),
-      30_000,
-    );
-  });
-
   it("keeps lexical wording available for faithful kana-kanji conversion", async () => {
     const transport = {
       models: vi.fn(),
@@ -274,34 +176,6 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.stringContaining("Returning any listed output exactly is invalid"),
-      }),
-      30_000,
-    );
-  });
-
-  it("passes fixed user-reviewed terms into kana-kanji conversion", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "誤字を確認する" }),
-    };
-
-    const result = await convertRomajiToJapaneseDetailed(
-      "gojiwokakuninsuru",
-      defaultSettings,
-      transport,
-      { fixedTerms: ["誤字"] },
-    );
-
-    expect(result).toEqual({
-      text: "誤字を確認する",
-      reviewKana: "ごじをかくにんする",
-    });
-    expect(transport.generate).toHaveBeenCalledWith(
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        system: expect.stringContaining("- 誤字"),
-        prompt: "ごじをかくにんする",
       }),
       30_000,
     );
@@ -677,7 +551,6 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Do not paraphrase");
     expect(prompt).toContain("ごじまん must stay ご自慢 or ごじまん");
     expect(prompt).toContain("Do not add intensifiers");
-    expect(prompt).toContain("User-side review handles homophone cleanup");
     expect(prompt).toContain("あなたの笑顔が好きです");
     expect(prompt).toContain("おじいさんご自慢の時計さ");
     expect(prompt).toContain("誤字脱字は恐ろしいものだ");
@@ -687,9 +560,7 @@ describe("convertRomajiToJapanese", () => {
   });
 
   it("adds alternative conversion instructions only when previous outputs are provided", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", [], "いち。", [
-      "一。",
-    ]);
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", ["一。"]);
 
     expect(prompt).toContain("Generate a different valid conversion candidate");
     expect(prompt).toContain("Avoid returning these previous outputs exactly:");
@@ -704,37 +575,4 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Alternative conversion request:\nNone.");
   });
 
-  it("formats only matching enabled homophone preferences", () => {
-    const prompt = formatMatchingHomophonePreferences("このあたりのごじをかくにん", [
-      {
-        id: "goji",
-        reading: "ごじ",
-        preferred: "誤字",
-        replaceFrom: ["五時", "ごじ"],
-        note: "conversion notes",
-        enabled: true,
-      },
-      {
-        id: "michi",
-        reading: "みち",
-        preferred: "未知",
-        replaceFrom: ["道", "みち"],
-        note: "",
-        enabled: true,
-      },
-      {
-        id: "disabled",
-        reading: "ごじ",
-        preferred: "五時",
-        replaceFrom: ["誤字"],
-        note: "",
-        enabled: false,
-      },
-    ]);
-
-    expect(prompt).toContain("- ごじ: prefer 誤字 (conversion notes)");
-    expect(prompt).toContain("not fixed replacements");
-    expect(prompt).not.toContain("未知");
-    expect(prompt).not.toContain("五時");
-  });
 });
