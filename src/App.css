@@ -132,8 +132,8 @@ h2 {
 
 h3 {
   font-size: 13px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .editor-actions {
@@ -834,8 +834,8 @@ h3 {
 
 .accordion-trigger strong {
   font-size: 13px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .accordion-trigger small {
