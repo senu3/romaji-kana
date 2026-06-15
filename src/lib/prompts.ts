@@ -1,4 +1,4 @@
-import type { ConversionPreset, UserHomophonePreference } from "./types";
+import type { ConversionPreset } from "./types";
 
 export const defaultConversionPrompt = [
   "You are an advanced Japanese conversion engine.",
@@ -178,19 +178,14 @@ export function buildKanaRepairSystemPrompt(): string {
 export function buildKanaKanjiSystemPrompt(
   userPrompt: string,
   preset: ConversionPreset = "none",
-  homophones: UserHomophonePreference[] = [],
-  targetKana = "",
   avoidOutputs: string[] = [],
   strictAlternative = false,
-  fixedTerms: string[] = [],
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
-  const matchingHomophones = formatMatchingHomophonePreferences(targetKana, homophones);
   const alternativeInstructions = formatAlternativeConversionInstructions(
     avoidOutputs,
     strictAlternative,
   );
-  const fixedTermInstructions = formatFixedTermInstructions(fixedTerms);
 
   return [
     "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
@@ -205,39 +200,19 @@ export function buildKanaKanjiSystemPrompt(
     "8. Avoid contextually odd kanji even when they match the reading.",
     "9. Do not add intensifiers, modifiers, nouns, particles, or predicates that are not present in the kana.",
     "10. If the kana appears to include a typo repair, keep the closest reading rather than making a more fluent different sentence.",
-    "11. User-side review handles homophone cleanup, so do not over-correct homophones by guessing hidden intent.",
-    "12. Return only the converted Japanese text. Do not explain.",
+    "11. Return only the converted Japanese text. Do not explain.",
     "",
     "Alternative conversion request:",
     alternativeInstructions || "None.",
     "",
-    "Fixed terms from user review:",
-    fixedTermInstructions || "None.",
-    "",
     "Purpose preset:",
     conversionPresetInstructions[preset],
-    "",
-    "User homophone preferences:",
-    matchingHomophones || "None.",
     "",
     "Context few-shot examples:",
     kanaKanjiFewShotExamples,
     "",
     "Additional user preference:",
     prompt,
-  ].join("\n");
-}
-
-function formatFixedTermInstructions(fixedTerms: string[]): string {
-  const uniqueTerms = Array.from(new Set(fixedTerms.map((term) => term.trim()).filter(Boolean)));
-  if (uniqueTerms.length === 0) {
-    return "";
-  }
-
-  return [
-    "Preserve these user-confirmed terms exactly when the reading/context allows:",
-    ...uniqueTerms.map((term) => `- ${term}`),
-    "Do not replace these terms with another homophone unless the input clearly requires a different word.",
   ].join("\n");
 }
 
@@ -262,45 +237,4 @@ function formatAlternativeConversionInstructions(
     "Keep the same reading and do not paraphrase just to be different.",
     "If no clearly better candidate exists, prefer a conservative kana or hiragana-heavy spelling over repeating the previous output.",
   ].join("\n");
-}
-
-export function formatMatchingHomophonePreferences(
-  targetKana: string,
-  homophones: UserHomophonePreference[],
-): string {
-  const seen = new Set<string>();
-  const lines = homophones.flatMap((entry): string[] => {
-    const reading = entry.reading.trim();
-    const preferred = entry.preferred.trim();
-    const key = `${reading}\t${preferred}`;
-    if (
-      !entry.enabled ||
-      !reading ||
-      !preferred ||
-      !isHiraganaReading(reading) ||
-      seen.has(key) ||
-      !targetKana ||
-      !targetKana.includes(reading)
-    ) {
-      return [];
-    }
-
-    seen.add(key);
-    const note = entry.note.trim() ? ` (${entry.note.trim()})` : "";
-    return [`- ${reading}: prefer ${preferred}${note}`];
-  });
-
-  if (lines.length === 0) {
-    return "";
-  }
-
-  return [
-    "Use these only as kana-to-kanji preferences for matching readings.",
-    "They are not fixed replacements. If a preference clearly conflicts with context, preserve the reading and choose the natural spelling.",
-    ...lines,
-  ].join("\n");
-}
-
-function isHiraganaReading(value: string): boolean {
-  return /^[\u3041-\u3096ー]+$/u.test(value);
 }

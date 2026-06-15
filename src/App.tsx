@@ -29,14 +29,7 @@ import { resolveConversionAnchor } from "./lib/historyAnchor";
 import {
   convertRomajiToJapaneseDetailed,
   providerLabel,
-  type JapaneseConversionResult,
 } from "./lib/ollama";
-import {
-  buildHomophoneFixedTermSuggestions,
-  buildHomophoneReviewSuggestions,
-  formatReplaceTargets,
-  parseReplaceTargets,
-} from "./lib/homophoneReview";
 import { checkOllamaConnection, listLocalModels } from "./lib/ollamaConnection";
 import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
@@ -49,13 +42,11 @@ import type {
   ConversionRange,
   ConversionStatus,
   GhostConversionSuggestion,
-  HomophoneReviewSuggestion,
   ModelProvider,
   OllamaConnectionStatus,
   OllamaModel,
   PendingConversion,
   UserDictionaryEntry,
-  UserHomophonePreference,
 } from "./lib/types";
 
 type ActivePanel = "history" | "prompt" | null;
@@ -66,25 +57,6 @@ const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
 const ENABLE_FIRST_RUN_SETUP_MODAL = false;
 const MAX_USER_DICTIONARY_ENTRIES = 50;
-const MAX_USER_HOMOPHONE_ENTRIES = 50;
-
-type ActiveHomophoneReviewSuggestion = HomophoneReviewSuggestion & {
-  conversionId: string;
-  conversionInput: string;
-  conversionAnchor: ConversionAnchor;
-  avoidOutputs?: string[];
-  fixedTerms?: string[];
-};
-
-interface HomophoneRerunPrompt {
-  id: string;
-  conversionId: string;
-  conversionInput: string;
-  anchor: ConversionAnchor;
-  fixedTerm: string;
-  fixedTerms?: string[];
-  avoidOutputs?: string[];
-}
 
 function shouldForceSetupModalFromQuery(): boolean {
   if (typeof window === "undefined") {
@@ -124,11 +96,6 @@ function App() {
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
-  const [homophoneSuggestion, setHomophoneSuggestion] =
-    useState<ActiveHomophoneReviewSuggestion | null>(null);
-  const [homophoneRerunPrompt, setHomophoneRerunPrompt] = useState<HomophoneRerunPrompt | null>(
-    null,
-  );
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
@@ -485,7 +452,6 @@ function App() {
     }
 
     clearPendingConversions();
-    setHomophoneSuggestion(null);
     suppressNextDirtyRef.current = true;
     view.dispatch({
       changes: {
@@ -617,157 +583,6 @@ function App() {
       });
   }, [editorReady, initialSession, markDocumentClean, replaceEditorDocument]);
 
-  const showHomophoneReviewSuggestion = useCallback(
-    (
-      request: PendingConversion,
-      conversion: JapaneseConversionResult,
-      baseFrom: number,
-      conversionAnchor: ConversionAnchor,
-    ) => {
-      const [suggestion] = buildHomophoneReviewSuggestions(
-        conversion.reviewKana,
-        conversion.text,
-        settingsRef.current.userHomophones,
-      );
-      if (!suggestion) {
-        const [fixedSuggestion] = buildHomophoneFixedTermSuggestions(
-          conversion.reviewKana,
-          conversion.text,
-          settingsRef.current.userHomophones,
-        );
-        if (fixedSuggestion) {
-          setHomophoneSuggestion(null);
-          setHomophoneRerunPrompt({
-            id: `${request.id}:${fixedSuggestion.id}:rerun`,
-            conversionId: request.id,
-            conversionInput: request.originalText,
-            fixedTerm: fixedSuggestion.preferred,
-            fixedTerms: request.fixedTerms,
-            avoidOutputs: collectAvoidOutputs(request.avoidOutputs, conversionAnchor.appliedText),
-            anchor: conversionAnchor,
-          });
-          return;
-        }
-
-        setHomophoneSuggestion(null);
-        setHomophoneRerunPrompt(null);
-        return;
-      }
-
-      setHomophoneRerunPrompt(null);
-      setHomophoneSuggestion({
-        ...suggestion,
-        id: `${request.id}:${suggestion.id}`,
-        conversionId: request.id,
-        conversionInput: request.originalText,
-        conversionAnchor,
-        avoidOutputs: request.avoidOutputs,
-        fixedTerms: request.fixedTerms,
-        from: baseFrom + suggestion.from,
-        to: baseFrom + suggestion.to,
-      });
-    },
-    [],
-  );
-
-  const applyHomophoneSuggestion = useCallback(() => {
-    const suggestion = homophoneSuggestion;
-    const view = editorViewRef.current;
-    if (!suggestion || !view) {
-      return false;
-    }
-
-    const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
-    if (currentText !== suggestion.target) {
-      setHomophoneSuggestion(null);
-      setStatus({
-        kind: "warning",
-        message: "Homophone suggestion was dismissed because the text changed.",
-      });
-      return true;
-    }
-
-    view.dispatch({
-      changes: {
-        from: suggestion.from,
-        to: suggestion.to,
-        insert: suggestion.preferred,
-      },
-      userEvent: "input.homophoneReview",
-    });
-    const nextDocument = view.state.doc.toString();
-    saveCurrentDocumentSession(nextDocument);
-    const delta = suggestion.preferred.length - suggestion.target.length;
-    const nextAnchorFrom = suggestion.conversionAnchor.from;
-    const nextAnchorTo = suggestion.conversionAnchor.to + delta;
-    const currentRangeText = nextDocument.slice(nextAnchorFrom, nextAnchorTo);
-    setHomophoneRerunPrompt({
-      id: `${suggestion.id}:rerun`,
-      conversionId: suggestion.conversionId,
-      conversionInput: suggestion.conversionInput,
-      fixedTerm: suggestion.preferred,
-      fixedTerms: suggestion.fixedTerms,
-      avoidOutputs: collectAvoidOutputs(
-        suggestion.avoidOutputs,
-        suggestion.conversionAnchor.appliedText,
-      ),
-      anchor: {
-        from: nextAnchorFrom,
-        to: nextAnchorTo,
-        originalText: currentRangeText,
-        appliedText: currentRangeText,
-        docVersion: docVersionRef.current,
-      },
-    });
-    setHomophoneSuggestion(null);
-    setStatus({
-      kind: "success",
-      message: `Applied homophone suggestion: ${suggestion.target} -> ${suggestion.preferred}. You can re-convert the containing range.`,
-    });
-    view.focus();
-    return true;
-  }, [homophoneSuggestion, saveCurrentDocumentSession]);
-
-  const dismissHomophoneSuggestion = useCallback(() => {
-    setHomophoneSuggestion(null);
-  }, [showHomophoneReviewSuggestion]);
-
-  const dismissHomophoneRerunPrompt = useCallback(() => {
-    setHomophoneRerunPrompt(null);
-  }, []);
-
-  useEffect(() => {
-    if (!homophoneSuggestion || dictionaryPanelOpen || settingsDrawerOpen || !setupComplete) {
-      return;
-    }
-
-    const applyOnShortcut = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.isComposing ||
-        event.repeat ||
-        event.altKey ||
-        event.shiftKey ||
-        (!event.ctrlKey && !event.metaKey) ||
-        event.key !== "."
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      applyHomophoneSuggestion();
-    };
-
-    document.addEventListener("keydown", applyOnShortcut);
-    return () => document.removeEventListener("keydown", applyOnShortcut);
-  }, [
-    applyHomophoneSuggestion,
-    dictionaryPanelOpen,
-    homophoneSuggestion,
-    settingsDrawerOpen,
-    setupComplete,
-  ]);
-
   useEffect(() => {
     const handleAppShortcut = (event: KeyboardEvent) => {
       if (
@@ -815,7 +630,6 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
-        fixedTerms: request.fixedTerms,
       },
       ...items,
     ]);
@@ -835,7 +649,6 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
-        fixedTerms: request.fixedTerms,
       },
       ...items,
     ]);
@@ -866,7 +679,6 @@ function App() {
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
-          fixedTerms: request.fixedTerms,
         },
       );
       if (canceledRequestsRef.current.has(request.id)) {
@@ -910,7 +722,6 @@ function App() {
               source: "editor",
               retryOf: request.retryOf,
               avoidOutputs: request.avoidOutputs,
-              fixedTerms: request.fixedTerms,
             }),
           ],
         });
@@ -951,14 +762,12 @@ function App() {
           anchor: nextAnchor,
           retryOf: request.retryOf,
           avoidOutputs: request.avoidOutputs,
-          fixedTerms: request.fixedTerms,
         },
         ...items,
       ]);
-      showHomophoneReviewSuggestion(request, conversion, latestResolved.from, nextAnchor);
       setStatus({ kind: "success", message: "Converted. Undo returns to romaji." });
     },
-    [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
+    [saveCurrentDocumentSession, skipQueuedConversion],
   );
 
   const processHistoryConversion = useCallback(
@@ -982,7 +791,6 @@ function App() {
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
-          fixedTerms: request.fixedTerms,
         },
       );
       if (canceledRequestsRef.current.has(request.id)) {
@@ -1004,7 +812,6 @@ function App() {
             anchor: request.anchor,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
-            fixedTerms: request.fixedTerms,
           },
           ...items,
         ]);
@@ -1050,7 +857,6 @@ function App() {
             anchor: nextAnchor,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
-            fixedTerms: request.fixedTerms,
           }),
         );
         latestView.dispatch({
@@ -1065,7 +871,6 @@ function App() {
             source: "history",
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
-            fixedTerms: request.fixedTerms,
           }),
         });
         setStatus({
@@ -1105,7 +910,6 @@ function App() {
           anchor: nextAnchor,
           retryOf: request.retryOf,
           avoidOutputs: request.avoidOutputs,
-          fixedTerms: request.fixedTerms,
         },
         ...items,
       ]);
@@ -1116,9 +920,8 @@ function App() {
             ? "History conversion applied at a nearby matching anchor."
             : "History conversion applied.",
       });
-      showHomophoneReviewSuggestion(request, conversion, latestResolved.from, nextAnchor);
     },
-    [saveCurrentDocumentSession, showHomophoneReviewSuggestion, skipQueuedConversion],
+    [saveCurrentDocumentSession, skipQueuedConversion],
   );
 
   const processConversionQueue = useCallback(async () => {
@@ -1171,7 +974,6 @@ function App() {
                 anchor: request.anchor,
                 retryOf: request.retryOf,
                 avoidOutputs: request.avoidOutputs,
-                fixedTerms: request.fixedTerms,
               },
               ...items,
             ]);
@@ -1198,8 +1000,6 @@ function App() {
 
   const enqueueConversion = useCallback(
     (request: PendingConversion) => {
-      setHomophoneSuggestion(null);
-      setHomophoneRerunPrompt(null);
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
       if (processingQueueRef.current) {
@@ -1209,53 +1009,6 @@ function App() {
     },
     [processConversionQueue],
   );
-
-  const rerunHomophoneRange = useCallback(() => {
-    const prompt = homophoneRerunPrompt;
-    const view = editorViewRef.current;
-    if (!prompt || !view) {
-      return;
-    }
-
-    const resolved = resolveConversionAnchor(view.state.doc.toString(), prompt.anchor);
-    if (!resolved) {
-      setHomophoneRerunPrompt(null);
-      setStatus({
-        kind: "warning",
-        message: "Could not re-convert because the homophone range changed.",
-      });
-      return;
-    }
-
-    const request: PendingConversion = {
-      id: crypto.randomUUID(),
-      anchor: {
-        ...prompt.anchor,
-        from: resolved.from,
-        to: resolved.to,
-        originalText: resolved.matchedText,
-        appliedText: resolved.matchedText,
-        docVersion: docVersionRef.current,
-      },
-      originalText: prompt.conversionInput,
-      createdAt: Date.now(),
-      source: "history",
-      status: "queued",
-      retryOf: prompt.conversionId,
-      avoidOutputs: prompt.avoidOutputs,
-      fixedTerms: collectFixedTerms(prompt.fixedTerms, prompt.fixedTerm),
-    };
-
-    view.dispatch({
-      effects: addLoadingDecoration.of({
-        id: request.id,
-        from: resolved.from,
-        to: resolved.to,
-      }),
-    });
-
-    enqueueConversion(request);
-  }, [enqueueConversion, homophoneRerunPrompt]);
 
   const cancelConversion = useCallback(
     (request: PendingConversion) => {
@@ -1304,29 +1057,10 @@ function App() {
         anchor: nextAnchor,
         retryOf: suggestion.retryOf,
         avoidOutputs: suggestion.avoidOutputs,
-        fixedTerms: suggestion.fixedTerms,
       }),
     );
-    showHomophoneReviewSuggestion(
-      {
-        id: suggestion.id,
-        originalText: suggestion.inputText,
-        createdAt: Date.now(),
-        source: suggestion.source,
-        status: "queued",
-        retryOf: suggestion.retryOf,
-        avoidOutputs: suggestion.avoidOutputs,
-        fixedTerms: suggestion.fixedTerms,
-      },
-      {
-        text: suggestion.convertedText,
-        reviewKana: suggestion.reviewKana ?? suggestion.originalText,
-      },
-      suggestion.from,
-      nextAnchor,
-    );
     setStatus({ kind: "success", message: "Ghost suggestion accepted. Undo returns to romaji." });
-  }, [saveCurrentDocumentSession, showHomophoneReviewSuggestion]);
+  }, [saveCurrentDocumentSession]);
 
   const handleRetryGhost = useCallback(
     (suggestion: GhostConversionSuggestion) => {
@@ -1360,7 +1094,6 @@ function App() {
         status: "queued",
         retryOf: suggestion.retryOf ?? suggestion.id,
         avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
-        fixedTerms: suggestion.fixedTerms,
       };
 
       view.dispatch({
@@ -1405,7 +1138,6 @@ function App() {
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
-        fixedTerms: item.fixedTerms,
       }),
     });
   }, []);
@@ -1429,7 +1161,6 @@ function App() {
       status: "queued",
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
-      fixedTerms: item.fixedTerms,
     };
 
     enqueueConversion(request);
@@ -1479,12 +1210,6 @@ function App() {
   const enabledDictionaryCount = settings.userDictionary.filter(
     (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
   ).length;
-  const enabledHomophoneCount = settings.userHomophones.filter(
-    (entry) =>
-      entry.enabled &&
-      isHiraganaReading(entry.reading.trim()) &&
-      entry.preferred.trim(),
-  ).length;
 
   return (
     <main className="app-shell">
@@ -1492,7 +1217,7 @@ function App() {
         settings={settings}
         pending={pending}
         historyCount={history.length}
-        dictionaryCount={enabledDictionaryCount + enabledHomophoneCount}
+        dictionaryCount={enabledDictionaryCount}
         initialDocument={initialDocument}
         fileName={currentFilePath ? basename(currentFilePath) : "Unsaved draft"}
         isDirty={isDirty}
@@ -1509,20 +1234,6 @@ function App() {
         onRetryGhost={handleRetryGhost}
         registerView={registerView}
       />
-      {homophoneSuggestion ? (
-        <HomophoneSuggestionChip
-          suggestion={homophoneSuggestion}
-          onApply={applyHomophoneSuggestion}
-          onDismiss={dismissHomophoneSuggestion}
-        />
-      ) : null}
-      {homophoneRerunPrompt ? (
-        <HomophoneRerunChip
-          prompt={homophoneRerunPrompt}
-          onRerun={rerunHomophoneRange}
-          onDismiss={dismissHomophoneRerunPrompt}
-        />
-      ) : null}
       {activePanel === "history" ? (
         <HistoryPanel
           history={history}
@@ -1551,11 +1262,7 @@ function App() {
       {dictionaryPanelOpen ? (
         <DictionaryModal
           entries={settings.userDictionary}
-          homophones={settings.userHomophones}
           onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
-          onHomophonesChange={(userHomophones) =>
-            setSettings((value) => ({ ...value, userHomophones }))
-          }
           onClose={() => setDictionaryPanelOpen(false)}
         />
       ) : null}
@@ -1607,80 +1314,6 @@ function App() {
         onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
     </main>
-  );
-}
-
-function HomophoneRerunChip({
-  prompt,
-  onRerun,
-  onDismiss,
-}: {
-  prompt: HomophoneRerunPrompt;
-  onRerun: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <aside className="homophone-chip homophone-rerun-chip" aria-label="Homophone re-conversion">
-      <button
-        className="homophone-chip-main"
-        type="button"
-        onClick={onRerun}
-        title="Re-convert the range containing the fixed term"
-      >
-        <span className="homophone-chip-label">Fixed</span>
-        <span className="homophone-chip-text">
-          Retry range with {prompt.fixedTerm}
-        </span>
-        <kbd>Retry</kbd>
-      </button>
-      <button
-        className="homophone-chip-dismiss"
-        type="button"
-        onClick={onDismiss}
-        aria-label="Dismiss homophone re-conversion"
-        title="Dismiss"
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
-    </aside>
-  );
-}
-
-function HomophoneSuggestionChip({
-  suggestion,
-  onApply,
-  onDismiss,
-}: {
-  suggestion: ActiveHomophoneReviewSuggestion;
-  onApply: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <aside className="homophone-chip" aria-label="Homophone review suggestion">
-      <button
-        className="homophone-chip-main"
-        type="button"
-        onClick={onApply}
-        title="Apply homophone suggestion"
-      >
-        <span className="homophone-chip-label">Review</span>
-        <span className="homophone-chip-text">
-          {suggestion.target}
-          {" -> "}
-          {suggestion.preferred}
-        </span>
-        <kbd>Ctrl+.</kbd>
-      </button>
-      <button
-        className="homophone-chip-dismiss"
-        type="button"
-        onClick={onDismiss}
-        aria-label="Dismiss homophone suggestion"
-        title="Dismiss"
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
-    </aside>
   );
 }
 
@@ -1981,34 +1614,18 @@ function presetDescription(preset: ConversionPreset): string {
 
 function DictionaryModal({
   entries,
-  homophones,
   onChange,
-  onHomophonesChange,
   onClose,
 }: {
   entries: UserDictionaryEntry[];
-  homophones: UserHomophonePreference[];
   onChange: (entries: UserDictionaryEntry[]) => void;
-  onHomophonesChange: (entries: UserHomophonePreference[]) => void;
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"terms" | "homophones">("terms");
   const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
-  const [homophoneDraft, setHomophoneDraft] = useState({
-    reading: "",
-    preferred: "",
-    replaceFrom: "",
-    note: "",
-  });
   const canAdd =
     draft.reading.trim().length > 0 &&
     draft.output.trim().length > 0 &&
     entries.length < MAX_USER_DICTIONARY_ENTRIES;
-  const canAddHomophone =
-    homophoneDraft.reading.trim().length > 0 &&
-    homophoneDraft.preferred.trim().length > 0 &&
-    isHiraganaReading(homophoneDraft.reading.trim()) &&
-    homophones.length < MAX_USER_HOMOPHONE_ENTRIES;
 
   const addEntry = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2029,26 +1646,6 @@ function DictionaryModal({
     setDraft({ reading: "", output: "", note: "" });
   };
 
-  const addHomophone = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canAddHomophone) {
-      return;
-    }
-
-    onHomophonesChange([
-      ...homophones,
-      {
-        id: createDictionaryEntryId("homophone"),
-        reading: homophoneDraft.reading.trim(),
-        preferred: homophoneDraft.preferred.trim(),
-        replaceFrom: parseReplaceTargets(homophoneDraft.replaceFrom),
-        note: homophoneDraft.note.trim(),
-        enabled: true,
-      },
-    ]);
-    setHomophoneDraft({ reading: "", preferred: "", replaceFrom: "", note: "" });
-  };
-
   const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
     onChange(
       entries.map((entry) =>
@@ -2064,23 +1661,6 @@ function DictionaryModal({
 
   const deleteEntry = (id: string) => {
     onChange(entries.filter((entry) => entry.id !== id));
-  };
-
-  const updateHomophone = (id: string, patch: Partial<UserHomophonePreference>) => {
-    onHomophonesChange(
-      homophones.map((entry) =>
-        entry.id === id
-          ? {
-              ...entry,
-              ...patch,
-            }
-          : entry,
-      ),
-    );
-  };
-
-  const deleteHomophone = (id: string) => {
-    onHomophonesChange(homophones.filter((entry) => entry.id !== id));
   };
 
   return (
@@ -2102,273 +1682,113 @@ function DictionaryModal({
           </button>
         </div>
 
-        <div className="dictionary-tabs" role="tablist" aria-label="Dictionary sections">
+        <form className="dictionary-add-form" onSubmit={addEntry}>
+          <label className="field">
+            <span>Romaji reading</span>
+            <input
+              aria-label="Romaji reading"
+              value={draft.reading}
+              maxLength={80}
+              placeholder="openai"
+              onChange={(event) => {
+                const reading = event.currentTarget.value;
+                setDraft((value) => ({ ...value, reading }));
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>Output</span>
+            <input
+              aria-label="Output"
+              value={draft.output}
+              maxLength={80}
+              placeholder="OpenAI"
+              onChange={(event) => {
+                const output = event.currentTarget.value;
+                setDraft((value) => ({ ...value, output }));
+              }}
+            />
+          </label>
+          <label className="field dictionary-note-field">
+            <span>Note</span>
+            <input
+              aria-label="Note"
+              value={draft.note}
+              maxLength={120}
+              placeholder="company name"
+              onChange={(event) => {
+                const note = event.currentTarget.value;
+                setDraft((value) => ({ ...value, note }));
+              }}
+            />
+          </label>
           <button
-            className={activeTab === "terms" ? "selected" : ""}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "terms"}
-            onClick={() => setActiveTab("terms")}
+            className="primary-button dictionary-add-button"
+            type="submit"
+            disabled={!canAdd}
           >
-            Terms
+            <Plus size={16} aria-hidden="true" />
+            Add entry
           </button>
-          <button
-            className={activeTab === "homophones" ? "selected" : ""}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "homophones"}
-            onClick={() => setActiveTab("homophones")}
-          >
-            Homophones
-          </button>
+        </form>
+
+        <div className="dictionary-list-header">
+          <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
         </div>
-
-        {activeTab === "terms" ? (
-          <>
-            <form className="dictionary-add-form" onSubmit={addEntry}>
-              <label className="field">
-                <span>Romaji reading</span>
-                <input
-                  aria-label="Romaji reading"
-                  value={draft.reading}
-                  maxLength={80}
-                  placeholder="openai"
-                  onChange={(event) => {
-                    const reading = event.currentTarget.value;
-                    setDraft((value) => ({ ...value, reading }));
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>Output</span>
-                <input
-                  aria-label="Output"
-                  value={draft.output}
-                  maxLength={80}
-                  placeholder="OpenAI"
-                  onChange={(event) => {
-                    const output = event.currentTarget.value;
-                    setDraft((value) => ({ ...value, output }));
-                  }}
-                />
-              </label>
-              <label className="field dictionary-note-field">
-                <span>Note</span>
-                <input
-                  aria-label="Note"
-                  value={draft.note}
-                  maxLength={120}
-                  placeholder="company name"
-                  onChange={(event) => {
-                    const note = event.currentTarget.value;
-                    setDraft((value) => ({ ...value, note }));
-                  }}
-                />
-              </label>
-              <button
-                className="primary-button dictionary-add-button"
-                type="submit"
-                disabled={!canAdd}
-              >
-                <Plus size={16} aria-hidden="true" />
-                Add entry
-              </button>
-            </form>
-
-            <div className="dictionary-list-header">
-              <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
-            </div>
-            {entries.length === 0 ? (
-              <p className="empty-state">No dictionary entries yet.</p>
-            ) : (
-              <div className="dictionary-list">
-                {entries.map((entry, index) => (
-                  <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
-                    <label className="dictionary-enable">
-                      <input
-                        type="checkbox"
-                        checked={entry.enabled}
-                        onChange={(event) =>
-                          updateEntry(entry.id, { enabled: event.currentTarget.checked })
-                        }
-                      />
-                      Enabled
-                    </label>
-                    <div className="dictionary-entry-fields">
-                      <input
-                        aria-label={`Dictionary reading ${index + 1}`}
-                        value={entry.reading}
-                        maxLength={80}
-                        onChange={(event) =>
-                          updateEntry(entry.id, { reading: event.currentTarget.value })
-                        }
-                      />
-                      <input
-                        aria-label={`Dictionary output ${index + 1}`}
-                        value={entry.output}
-                        maxLength={80}
-                        onChange={(event) =>
-                          updateEntry(entry.id, { output: event.currentTarget.value })
-                        }
-                      />
-                      <input
-                        aria-label={`Dictionary note ${index + 1}`}
-                        value={entry.note}
-                        maxLength={120}
-                        placeholder="Note"
-                        onChange={(event) =>
-                          updateEntry(entry.id, { note: event.currentTarget.value })
-                        }
-                      />
-                    </div>
-                    <button
-                      className="icon-button dictionary-delete"
-                      type="button"
-                      onClick={() => deleteEntry(entry.id)}
-                      aria-label={`Delete ${entry.output || entry.reading}`}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </>
+        {entries.length === 0 ? (
+          <p className="empty-state">No dictionary entries yet.</p>
         ) : (
-          <>
-            <form className="dictionary-add-form" onSubmit={addHomophone}>
-              <label className="field">
-                <span>Hiragana reading</span>
-                <input
-                  aria-label="Homophone reading"
-                  value={homophoneDraft.reading}
-                  maxLength={40}
-                  placeholder="ごじ"
-                  onChange={(event) => {
-                    const reading = event.currentTarget.value;
-                    setHomophoneDraft((value) => ({ ...value, reading }));
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>Preferred spelling</span>
-                <input
-                  aria-label="Preferred spelling"
-                  value={homophoneDraft.preferred}
-                  maxLength={40}
-                  placeholder="誤字"
-                  onChange={(event) => {
-                    const preferred = event.currentTarget.value;
-                    setHomophoneDraft((value) => ({ ...value, preferred }));
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>Replace from</span>
-                <input
-                  aria-label="Homophone replace from"
-                  value={homophoneDraft.replaceFrom}
-                  maxLength={120}
-                  placeholder="五時, ごじ"
-                  onChange={(event) => {
-                    const replaceFrom = event.currentTarget.value;
-                    setHomophoneDraft((value) => ({ ...value, replaceFrom }));
-                  }}
-                />
-              </label>
-              <label className="field dictionary-note-field">
-                <span>Note</span>
-                <input
-                  aria-label="Homophone note"
-                  value={homophoneDraft.note}
-                  maxLength={120}
-                  placeholder="for text conversion notes"
-                  onChange={(event) => {
-                    const note = event.currentTarget.value;
-                    setHomophoneDraft((value) => ({ ...value, note }));
-                  }}
-                />
-              </label>
-              <button
-                className="primary-button dictionary-add-button"
-                type="submit"
-                disabled={!canAddHomophone}
-              >
-                <Plus size={16} aria-hidden="true" />
-                Add entry
-              </button>
-            </form>
-
-            <div className="dictionary-list-header">
-              <strong>{homophones.length} / {MAX_USER_HOMOPHONE_ENTRIES}</strong>
-            </div>
-            {homophones.length === 0 ? (
-              <p className="empty-state">No homophone preferences yet.</p>
-            ) : (
-              <div className="dictionary-list">
-                {homophones.map((entry, index) => (
-                  <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
-                    <label className="dictionary-enable">
-                      <input
-                        type="checkbox"
-                        checked={entry.enabled}
-                        onChange={(event) =>
-                          updateHomophone(entry.id, { enabled: event.currentTarget.checked })
-                        }
-                      />
-                      Enabled
-                    </label>
-                    <div className="dictionary-entry-fields">
-                      <input
-                        aria-label={`Homophone reading ${index + 1}`}
-                        value={entry.reading}
-                        maxLength={40}
-                        onChange={(event) =>
-                          updateHomophone(entry.id, { reading: event.currentTarget.value })
-                        }
-                      />
-                      <input
-                        aria-label={`Homophone preferred ${index + 1}`}
-                        value={entry.preferred}
-                        maxLength={40}
-                        onChange={(event) =>
-                          updateHomophone(entry.id, { preferred: event.currentTarget.value })
-                        }
-                      />
-                      <input
-                        aria-label={`Homophone replace from ${index + 1}`}
-                        value={formatReplaceTargets(entry.replaceFrom)}
-                        maxLength={120}
-                        placeholder="Replace from"
-                        onChange={(event) =>
-                          updateHomophone(entry.id, {
-                            replaceFrom: parseReplaceTargets(event.currentTarget.value),
-                          })
-                        }
-                      />
-                      <input
-                        aria-label={`Homophone note ${index + 1}`}
-                        value={entry.note}
-                        maxLength={120}
-                        placeholder="Note"
-                        onChange={(event) =>
-                          updateHomophone(entry.id, { note: event.currentTarget.value })
-                        }
-                      />
-                    </div>
-                    <button
-                      className="icon-button dictionary-delete"
-                      type="button"
-                      onClick={() => deleteHomophone(entry.id)}
-                      aria-label={`Delete ${entry.preferred || entry.reading}`}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </>
+          <div className="dictionary-list">
+            {entries.map((entry, index) => (
+              <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
+                <label className="dictionary-enable">
+                  <input
+                    type="checkbox"
+                    checked={entry.enabled}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { enabled: event.currentTarget.checked })
+                    }
+                  />
+                  Enabled
+                </label>
+                <div className="dictionary-entry-fields">
+                  <input
+                    aria-label={`Dictionary reading ${index + 1}`}
+                    value={entry.reading}
+                    maxLength={80}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { reading: event.currentTarget.value })
+                    }
+                  />
+                  <input
+                    aria-label={`Dictionary output ${index + 1}`}
+                    value={entry.output}
+                    maxLength={80}
+                    onChange={(event) =>
+                      updateEntry(entry.id, { output: event.currentTarget.value })
+                    }
+                  />
+                  <input
+                    aria-label={`Dictionary note ${index + 1}`}
+                    value={entry.note}
+                    maxLength={120}
+                    placeholder="Note"
+                    onChange={(event) =>
+                      updateEntry(entry.id, { note: event.currentTarget.value })
+                    }
+                  />
+                </div>
+                <button
+                  className="icon-button dictionary-delete"
+                  type="button"
+                  onClick={() => deleteEntry(entry.id)}
+                  aria-label={`Delete ${entry.output || entry.reading}`}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </article>
+            ))}
+          </div>
         )}
       </section>
     </div>
@@ -2381,10 +1801,6 @@ function createDictionaryEntryId(prefix = "dictionary"): string {
   }
 
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function isHiraganaReading(value: string): boolean {
-  return /^[\u3041-\u3096ー]+$/u.test(value);
 }
 
 function hasMatchingPendingEditorConversion(
@@ -2407,16 +1823,6 @@ function collectAvoidOutputs(existing: string[] | undefined, next: string | unde
       [...(existing ?? []), next]
         .map((output) => output?.trim())
         .filter((output): output is string => Boolean(output)),
-    ),
-  );
-}
-
-function collectFixedTerms(existing: string[] | undefined, next: string | undefined): string[] {
-  return Array.from(
-    new Set(
-      [...(existing ?? []), next]
-        .map((term) => term?.trim())
-        .filter((term): term is string => Boolean(term)),
     ),
   );
 }

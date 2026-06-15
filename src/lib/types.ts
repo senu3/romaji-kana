@@ -15,15 +15,6 @@ export interface UserDictionaryEntry {
   enabled: boolean;
 }
 
-export interface UserHomophonePreference {
-  id: string;
-  reading: string;
-  preferred: string;
-  replaceFrom: string[];
-  note: string;
-  enabled: boolean;
-}
-
 export interface AppSettings {
   modelProvider: ModelProvider;
   ollamaApiUrl: string;
@@ -44,7 +35,6 @@ export interface AppSettings {
   conversionPrompt: string;
   conversionPreset: ConversionPreset;
   userDictionary: UserDictionaryEntry[];
-  userHomophones: UserHomophonePreference[];
   think: boolean;
 }
 
@@ -110,17 +100,6 @@ export interface GhostConversionSuggestion {
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
-  fixedTerms?: string[];
-}
-
-export interface HomophoneReviewSuggestion {
-  id: string;
-  entryId: string;
-  reading: string;
-  preferred: string;
-  target: string;
-  from: number;
-  to: number;
 }
 
 export interface PendingConversion {
@@ -134,7 +113,6 @@ export interface PendingConversion {
   status: "queued" | "running";
   retryOf?: string;
   avoidOutputs?: string[];
-  fixedTerms?: string[];
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
@@ -151,7 +129,6 @@ export interface ConversionHistoryItem {
   anchor?: ConversionAnchor;
   retryOf?: string;
   avoidOutputs?: string[];
-  fixedTerms?: string[];
 }
 
 export interface LocalModel {
