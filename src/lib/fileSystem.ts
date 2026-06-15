@@ -32,6 +32,6 @@ export function basename(path: string): string {
 
 function ensureTauriFileAccess(): void {
   if (!isTauri()) {
-    throw new Error("File open/save is available in the Tauri desktop app.");
+    throw new Error("File の開く/保存は Tauri デスクトップアプリで利用できます。");
   }
 }

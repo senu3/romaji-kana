@@ -68,7 +68,7 @@ export function SettingsPanel({
         className="panel-toggle"
         type="button"
         onClick={onToggleCollapsed}
-        aria-label={collapsed ? "Open settings" : "Close settings"}
+        aria-label={collapsed ? "Settings を開く" : "Settings を閉じる"}
       >
         {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </button>
@@ -163,11 +163,11 @@ export function SettingsContent({
 
     const nextShortcut = shortcutFromKeyboardEvent(event.nativeEvent);
     if (!nextShortcut) {
-      setShortcutError("Use Ctrl/Cmd, Alt, Shift with a key, or a function key.");
+      setShortcutError("Ctrl/Cmd、Alt、Shift とキーの組み合わせ、またはファンクションキーを使ってください。");
       return;
     }
     if (isReservedAppShortcut(nextShortcut)) {
-      setShortcutError("That shortcut is reserved for file actions.");
+      setShortcutError("そのショートカットは File 操作用に予約されています。");
       return;
     }
 
@@ -273,14 +273,14 @@ export function SettingsContent({
                   setModelListOpen((open) => !open);
                   modelInputRef.current?.focus();
                 }}
-                aria-label="Show local models"
+                aria-label="ローカルモデルを表示"
               >
                 <ChevronRight size={16} aria-hidden="true" />
               </button>
               {modelListOpen ? (
                 <div className="model-options" id={modelOptionsId} role="listbox">
                   {sortedModelNames.length === 0 ? (
-                    <p>No models loaded. Run Check to refresh {providerName} models.</p>
+                    <p>モデルはまだ読み込まれていません。Check で {providerName} のモデルを更新できます。</p>
                   ) : (
                     sortedModelNames.map((modelName) => (
                       <button
@@ -304,7 +304,7 @@ export function SettingsContent({
               ) : null}
             </div>
             <CheckRow
-              label={settings.think ? "Think mode" : "Think off (Recommended)"}
+              label={settings.think ? "Think mode" : "Think off（推奨）"}
               checked={settings.think}
               onChange={(checked) => update({ think: checked })}
             />
@@ -315,7 +315,7 @@ export function SettingsContent({
               <strong>{connectionTitle(ollamaConnection.kind)}</strong>
               <p>{ollamaConnection.message}</p>
               {ollamaModels.length > 0 ? (
-                <span>{ollamaModels.length} local model(s) found</span>
+                <span>{ollamaModels.length} 件のローカルモデル</span>
               ) : null}
             </div>
             <button
@@ -335,28 +335,28 @@ export function SettingsContent({
 
           {setupMode ? (
             <p className="setup-settings-note">
-              Conversion style and trigger behavior can be changed later from Settings.
+              変換スタイルとトリガー動作は、あとから Settings で変更できます。
             </p>
           ) : (
             <>
               <div className="settings-group">
                 <h3>Conversion</h3>
                 <div className="mode-field">
-                  <span>Conversion mode</span>
-                  <div className="segmented-control" role="group" aria-label="Conversion mode">
+                  <span>変換モード</span>
+                  <div className="segmented-control" role="group" aria-label="変換モード">
                     <button
                       className={settings.conversionMode === "replace" ? "selected" : ""}
                       type="button"
                       onClick={() => update({ conversionMode: "replace" })}
                     >
-                      Auto replace
+                      自動置換
                     </button>
                     <button
                       className={settings.conversionMode === "ghost" ? "selected" : ""}
                       type="button"
                       onClick={() => update({ conversionMode: "ghost" })}
                     >
-                      Ghost + Tab
+                      ゴースト + Tab
                     </button>
                   </div>
                 </div>
@@ -364,30 +364,30 @@ export function SettingsContent({
 
               <AccordionSection
                 title="Triggers"
-                summary={settings.autoConvert ? `${enabledTriggerCount}/3 enabled` : "Auto off"}
+                summary={settings.autoConvert ? `${enabledTriggerCount}/3 有効` : "Auto off"}
                 open={openAccordions.triggers}
                 onToggle={() => toggleAccordion("triggers")}
               >
                 <CheckRow
-                  label="Auto convert"
+                  label="自動変換トリガー"
                   checked={settings.autoConvert}
                   onChange={(checked) => update({ autoConvert: checked })}
                 />
                 <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
                   <CheckRow
-                    label="Period ."
+                    label="ピリオド ."
                     checked={settings.triggers.period}
                     disabled={!settings.autoConvert}
                     onChange={(checked) => updateTriggers({ period: checked })}
                   />
                   <CheckRow
-                    label="Comma ,"
+                    label="カンマ ,"
                     checked={settings.triggers.comma}
                     disabled={!settings.autoConvert}
                     onChange={(checked) => updateTriggers({ comma: checked })}
                   />
                   <CheckRow
-                    label="Enter (IME composing ignored)"
+                    label="Enter（IME 変換中は無視）"
                     checked={settings.triggers.enter}
                     disabled={!settings.autoConvert}
                     onChange={(checked) => updateTriggers({ enter: checked })}
@@ -395,7 +395,7 @@ export function SettingsContent({
                 </div>
                 <div className="shortcut-field">
                   <div>
-                    <span>Manual shortcut</span>
+                    <span>手動ショートカット</span>
                     <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
                   </div>
                   <div className="shortcut-controls">
@@ -412,7 +412,7 @@ export function SettingsContent({
                     >
                       <Keyboard size={15} aria-hidden="true" />
                       {capturingShortcut
-                        ? "Press shortcut..."
+                        ? "ショートカットを押してください..."
                         : formatShortcutLabel(settings.triggers.manualShortcut)}
                     </button>
                     <button
@@ -421,32 +421,32 @@ export function SettingsContent({
                       onClick={() =>
                         updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
                       }
-                      aria-label="Reset manual shortcut"
-                      title="Reset manual shortcut"
+                      aria-label="手動ショートカットをリセット"
+                      title="手動ショートカットをリセット"
                     >
                       <RotateCcw size={15} aria-hidden="true" />
                     </button>
                   </div>
                   <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
                     {shortcutError ||
-                      "Manual conversion is available even when auto convert is off."}
+                      "自動変換がオフでも手動変換は使えます。"}
                   </p>
                 </div>
               </AccordionSection>
 
               <AccordionSection
                 title="Punctuation"
-                summary={`${punctuationCount}/2 enabled`}
+                summary={`${punctuationCount}/2 有効`}
                 open={openAccordions.punctuation}
                 onToggle={() => toggleAccordion("punctuation")}
               >
                 <CheckRow
-                  label=". to 。"
+                  label=". を 。へ"
                   checked={settings.punctuationConversion.periodToJapanese}
                   onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
                 />
                 <CheckRow
-                  label=", to 、"
+                  label=", を 、へ"
                   checked={settings.punctuationConversion.commaToJapanese}
                   onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
                 />
@@ -459,18 +459,18 @@ export function SettingsContent({
 
 function connectionTitle(kind: OllamaConnectionStatus["kind"]): string {
   if (kind === "checking") {
-    return "Checking";
+    return "確認中";
   }
   if (kind === "connected") {
-    return "Connected";
+    return "接続済み";
   }
   if (kind === "warning") {
-    return "Needs attention";
+    return "確認が必要";
   }
   if (kind === "error") {
-    return "Unavailable";
+    return "利用不可";
   }
-  return "Not checked";
+  return "未確認";
 }
 
 function providerLabel(provider: ModelProvider): string {

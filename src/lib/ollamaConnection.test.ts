@@ -136,7 +136,7 @@ describe("checkOllamaConnection", () => {
     expect(result.kind).toBe("warning");
     expect(result.modelLoaded).toBe(false);
     expect(result.suggestedModelName).toBe("llama3.2:latest");
-    expect(result.message).toContain('Suggested: "llama3.2:latest"');
+    expect(result.message).toContain('候補: "llama3.2:latest"');
     expect(transport.models).toHaveBeenCalledTimes(1);
     expect(transport.generate).not.toHaveBeenCalled();
   });
