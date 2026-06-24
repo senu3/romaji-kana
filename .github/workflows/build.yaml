@@ -1,0 +1,40 @@
+name 'publish'
+on
+  push
+    branches
+      - main # ä»íPÇÃÇΩÇﬂ main Ç…ïœçX
+
+jobs
+  publish-tauri
+    permissions
+      contents write
+    strategy
+      fail-fast false
+      matrix
+        platform [macos-latest, ubuntu-20.04, windows-latest]
+
+    runs-on ${{ matrix.platform }}
+    steps
+      - uses actionscheckout@v3
+      - name setup node
+        uses actionssetup-node@v3
+        with
+          node-version 16
+      - name install Rust stable
+        uses dtolnayrust-toolchain@stable
+      - name install dependencies (ubuntu only)
+        if matrix.platform == 'ubuntu-20.04'
+        run 
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+      - name install frontend dependencies
+        run yarn install # change this to npm or pnpm depending on which one you use
+      - uses tauri-appstauri-action@v0
+        env
+          GITHUB_TOKEN ${{ secrets.GITHUB_TOKEN }}
+        with
+          tagName app-v__VERSION__ # the action automatically replaces __VERSION__ with the app version
+          releaseName 'App v__VERSION__'
+          releaseBody 'See the assets to download this version and install.'
+          releaseDraft true
+          prerelease false
