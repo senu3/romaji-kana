@@ -968,6 +968,76 @@ h3 {
   color: #9a3412;
 }
 
+.recent-retry-chip {
+  position: fixed;
+  right: 348px;
+  bottom: 58px;
+  z-index: 28;
+  display: inline-flex;
+  max-width: min(460px, calc(100vw - 380px));
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(19, 78, 74, 0.18);
+}
+
+.recent-retry-chip-main {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: #134e4a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.recent-retry-chip-main:hover {
+  background: #ecfeff;
+}
+
+.recent-retry-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-retry-chip kbd {
+  flex: 0 0 auto;
+  border: 1px solid #cbdedb;
+  border-radius: 5px;
+  padding: 2px 5px;
+  background: #f8fafc;
+  color: #64748b;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.recent-retry-chip-dismiss {
+  display: inline-flex;
+  width: 34px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-left: 1px solid #d5e8e5;
+  background: #ffffff;
+  color: #64748b;
+}
+
+.recent-retry-chip-dismiss:hover {
+  background: #fff7ed;
+  color: #b91c1c;
+}
+
 .setup-overlay {
   z-index: 40;
   display: grid;
@@ -1611,6 +1681,13 @@ h3 {
   .floating-settings-button {
     display: inline-flex;
     bottom: 78px;
+  }
+
+  .recent-retry-chip {
+    right: 12px;
+    left: 12px;
+    bottom: 132px;
+    max-width: none;
   }
 
   .editor-toolbar {

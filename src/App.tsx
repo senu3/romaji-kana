@@ -53,6 +53,7 @@ import type {
 type ActivePanel = "history" | "prompt" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
+const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
@@ -95,6 +96,7 @@ function App() {
   });
   const [pending, setPending] = useState<PendingConversion[]>([]);
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
+  const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -751,22 +753,24 @@ function App() {
         appliedText: converted,
         docVersion: docVersionRef.current,
       };
-      setHistory((items) => [
-        {
-          id: request.id,
-          status: "success",
-          input: request.originalText,
-          output: converted,
-          modelName: settingsRef.current.modelName,
-          createdAt: Date.now(),
-          source: "editor",
-          anchor: nextAnchor,
-          retryOf: request.retryOf,
-          avoidOutputs: request.avoidOutputs,
-        },
-        ...items,
-      ]);
-      setStatus({ kind: "success", message: "変換しました。Undo で romaji に戻せます。" });
+      const historyItem: ConversionHistoryItem = {
+        id: request.id,
+        status: "success",
+        input: request.originalText,
+        output: converted,
+        modelName: settingsRef.current.modelName,
+        createdAt: Date.now(),
+        source: "editor",
+        anchor: nextAnchor,
+        retryOf: request.retryOf,
+        avoidOutputs: request.avoidOutputs,
+      };
+      setHistory((items) => [historyItem, ...items]);
+      setRecentRetryItem(historyItem);
+      setStatus({
+        kind: "success",
+        message: "変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。",
+      });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
   );
@@ -906,27 +910,27 @@ function App() {
         docVersion: docVersionRef.current,
       };
 
-      setHistory((items) => [
-        {
-          id: request.id,
-          status: "success",
-          input: request.originalText,
-          output: converted,
-          modelName: settingsRef.current.modelName,
-          createdAt: Date.now(),
-          source: "history",
-          anchor: nextAnchor,
-          retryOf: request.retryOf,
-          avoidOutputs: request.avoidOutputs,
-        },
-        ...items,
-      ]);
+      const historyItem: ConversionHistoryItem = {
+        id: request.id,
+        status: "success",
+        input: request.originalText,
+        output: converted,
+        modelName: settingsRef.current.modelName,
+        createdAt: Date.now(),
+        source: "history",
+        anchor: nextAnchor,
+        retryOf: request.retryOf,
+        avoidOutputs: request.avoidOutputs,
+      };
+
+      setHistory((items) => [historyItem, ...items]);
+      setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
         message:
           latestResolved.matchedBy === "nearby"
-            ? "近くの一致位置に History の変換を適用しました。"
-            : "History の変換を適用しました。",
+            ? "近くの一致位置に History の変換を適用しました。Ctrl+/ で別候補を試せます。"
+            : "History の変換を適用しました。Ctrl+/ で別候補を試せます。",
       });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
@@ -1008,6 +1012,7 @@ function App() {
 
   const enqueueConversion = useCallback(
     (request: PendingConversion) => {
+      setRecentRetryItem(null);
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
       if (processingQueueRef.current) {
@@ -1053,21 +1058,27 @@ function App() {
       saveCurrentDocumentSession(view.state.doc.toString());
     }
 
+    const historyItem: ConversionHistoryItem = {
+      id: suggestion.id,
+      status: "success",
+      input: suggestion.inputText,
+      output: suggestion.convertedText,
+      modelName: settingsRef.current.modelName,
+      createdAt: Date.now(),
+      source: suggestion.source,
+      anchor: nextAnchor,
+      retryOf: suggestion.retryOf,
+      avoidOutputs: suggestion.avoidOutputs,
+    };
+
     setHistory((items) =>
-      upsertConversionHistory(items, {
-        id: suggestion.id,
-        status: "success",
-        input: suggestion.inputText,
-        output: suggestion.convertedText,
-        modelName: settingsRef.current.modelName,
-        createdAt: Date.now(),
-        source: suggestion.source,
-        anchor: nextAnchor,
-        retryOf: suggestion.retryOf,
-        avoidOutputs: suggestion.avoidOutputs,
-      }),
+      upsertConversionHistory(items, historyItem),
     );
-    setStatus({ kind: "success", message: "Ghost suggestion を確定しました。Undo で romaji に戻せます。" });
+    setRecentRetryItem(historyItem);
+    setStatus({
+      kind: "success",
+      message: "Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。",
+    });
   }, [saveCurrentDocumentSession]);
 
   const handleRetryGhost = useCallback(
@@ -1174,6 +1185,72 @@ function App() {
     enqueueConversion(request);
   }, [enqueueConversion]);
 
+  const dismissRecentRetryChip = useCallback(() => {
+    setRecentRetryItem(null);
+  }, []);
+
+  const retryRecentConversion = useCallback(() => {
+    if (!recentRetryItem) {
+      return false;
+    }
+
+    handleRerunHistory(recentRetryItem);
+    return true;
+  }, [handleRerunHistory, recentRetryItem]);
+
+  useEffect(() => {
+    if (!recentRetryItem) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setRecentRetryItem((current) =>
+        current?.id === recentRetryItem.id ? null : current,
+      );
+    }, RECENT_RETRY_CHIP_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [recentRetryItem]);
+
+  useEffect(() => {
+    if (
+      !recentRetryItem ||
+      activePanel ||
+      dictionaryPanelOpen ||
+      settingsDrawerOpen ||
+      !setupComplete
+    ) {
+      return;
+    }
+
+    const retryOnShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.shiftKey ||
+        (!event.ctrlKey && !event.metaKey) ||
+        event.key !== "/"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      retryRecentConversion();
+    };
+
+    document.addEventListener("keydown", retryOnShortcut);
+    return () => document.removeEventListener("keydown", retryOnShortcut);
+  }, [
+    activePanel,
+    dictionaryPanelOpen,
+    recentRetryItem,
+    retryRecentConversion,
+    settingsDrawerOpen,
+    setupComplete,
+  ]);
+
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
     if (!view) {
@@ -1240,8 +1317,16 @@ function App() {
         onOpenDictionary={openDictionaryPanel}
         onAcceptGhost={handleAcceptGhost}
         onRetryGhost={handleRetryGhost}
+        onRetryRecent={retryRecentConversion}
         registerView={registerView}
       />
+      {recentRetryItem ? (
+        <RecentRetryChip
+          item={recentRetryItem}
+          onRetry={retryRecentConversion}
+          onDismiss={dismissRecentRetryChip}
+        />
+      ) : null}
       {activePanel === "history" ? (
         <HistoryPanel
           history={history}
@@ -1322,6 +1407,42 @@ function App() {
         onOpenSettings={() => setSettingsDrawerOpen(true)}
       />
     </main>
+  );
+}
+
+function RecentRetryChip({
+  item,
+  onRetry,
+  onDismiss,
+}: {
+  item: ConversionHistoryItem;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <aside className="recent-retry-chip" aria-label="別候補への再変換">
+      <button
+        className="recent-retry-chip-main"
+        type="button"
+        onClick={onRetry}
+        title="別候補を再生成"
+      >
+        <RotateCcw size={15} aria-hidden="true" />
+        <span className="recent-retry-chip-text">
+          {item.output ? `${item.output} の別候補を試す` : "別候補を試す"}
+        </span>
+        <kbd>Ctrl+/</kbd>
+      </button>
+      <button
+        className="recent-retry-chip-dismiss"
+        type="button"
+        onClick={onDismiss}
+        aria-label="別候補チップを閉じる"
+        title="閉じる"
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </aside>
   );
 }
 
