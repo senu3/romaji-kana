@@ -57,6 +57,7 @@ interface MarkdownEditorProps {
   onOpenDictionary: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
+  onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
 }
 
@@ -291,6 +292,7 @@ export function MarkdownEditor({
   onOpenDictionary,
   onAcceptGhost,
   onRetryGhost,
+  onRetryRecent,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -300,6 +302,7 @@ export function MarkdownEditor({
   const onDocumentChangedRef = useRef(onDocumentChanged);
   const onAcceptGhostRef = useRef(onAcceptGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
+  const onRetryRecentRef = useRef(onRetryRecent);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
   const composingRef = useRef(false);
@@ -360,8 +363,9 @@ export function MarkdownEditor({
     onDocumentChangedRef.current = onDocumentChanged;
     onAcceptGhostRef.current = onAcceptGhost;
     onRetryGhostRef.current = onRetryGhost;
+    onRetryRecentRef.current = onRetryRecent;
     settingsRef.current = settings;
-  }, [onAcceptGhost, onConvert, onDocumentChanged, onRetryGhost, settings]);
+  }, [onAcceptGhost, onConvert, onDocumentChanged, onRetryGhost, onRetryRecent, settings]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -392,6 +396,14 @@ export function MarkdownEditor({
             },
             {
               key: "Mod-/",
+              run: retryGhostSuggestion,
+            },
+            {
+              key: "Ctrl-/",
+              run: retryGhostSuggestion,
+            },
+            {
+              key: "Cmd-/",
               run: retryGhostSuggestion,
             },
             {
@@ -476,6 +488,14 @@ export function MarkdownEditor({
             run: retryGhostSuggestion,
           },
           {
+            key: "Ctrl-/",
+            run: retryGhostSuggestion,
+          },
+          {
+            key: "Cmd-/",
+            run: retryGhostSuggestion,
+          },
+          {
             key: "Escape",
             run: dismissGhostSuggestion,
           },
@@ -556,7 +576,8 @@ export function MarkdownEditor({
     const state = view.state.field(ghostSuggestionField);
     const suggestion = state.suggestion;
     if (!suggestion) {
-      return false;
+      onRetryRecentRef.current();
+      return true;
     }
 
     const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
