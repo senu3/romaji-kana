@@ -191,12 +191,12 @@ describe("convertRomajiToJapanese", () => {
         .fn()
         .mockResolvedValueOnce({ response: "失費のテストです" })
         .mockResolvedValueOnce({ response: "失費のテストです" })
-        .mockResolvedValueOnce({ response: "しぴっつののてすとです" })
+        .mockResolvedValueOnce({ response: "しっぴつのてすとです" })
         .mockResolvedValueOnce({ response: "執筆のテストです" }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
-      "sipittunonotesutodesu",
+      "sippitunotesutodesu",
       defaultSettings,
       transport,
       { avoidOutputs: ["失費のテストです"] },
@@ -204,9 +204,18 @@ describe("convertRomajiToJapanese", () => {
 
     expect(result).toEqual({
       text: "執筆のテストです",
-      reviewKana: "しぴっつののてすとです",
+      reviewKana: "しっぴつのてすとです",
     });
     expect(transport.generate).toHaveBeenCalledTimes(4);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("never 失費"),
+      }),
+      30_000,
+    );
   });
 
   it("keeps valid wo particles before non-particle following text", () => {
@@ -658,9 +667,11 @@ describe("convertRomajiToJapanese", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
     expect(prompt).toContain("Do not paraphrase");
+    expect(prompt).toContain("never 失費");
     expect(prompt).toContain("ごじまん must stay ご自慢 or ごじまん");
     expect(prompt).toContain("Do not add intensifiers");
     expect(prompt).toContain("あなたの笑顔が好きです");
+    expect(prompt).toContain("執筆のテストです");
     expect(prompt).toContain("おじいさんご自慢の時計さ");
     expect(prompt).toContain("誤字脱字は恐ろしいものだ");
     expect(prompt).toContain("五時にケーキを食べよう");
@@ -673,6 +684,7 @@ describe("convertRomajiToJapanese", () => {
 
     expect(prompt).toContain("Generate a different valid conversion candidate");
     expect(prompt).toContain("Avoid returning these previous outputs exactly:");
+    expect(prompt).toContain("preserves every kana sound");
     expect(prompt).toContain("- 一。");
   });
 
