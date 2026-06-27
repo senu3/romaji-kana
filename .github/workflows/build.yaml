@@ -2,8 +2,8 @@ name: publish
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 jobs:
   publish-tauri:
@@ -28,10 +28,10 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: lts/*
           cache: npm
@@ -54,8 +54,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__
-          releaseName: Romaji Kana v__VERSION__
+          tagName: ${{ github.ref_name }}
+          releaseName: Romaji Kana ${{ github.ref_name }}
           releaseBody: See the assets to download this version and install.
           releaseDraft: true
           prerelease: false
