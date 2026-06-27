@@ -103,14 +103,20 @@ interface GhostState {
 }
 
 class GhostTextWidget extends WidgetType {
-  constructor(private readonly text: string) {
+  constructor(
+    private readonly text: string,
+    private readonly conversionStrategy: GhostConversionSuggestion["conversionStrategy"],
+  ) {
     super();
   }
 
   toDOM() {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
-    element.title = "Tab で確定、Ctrl+/ で別候補を試す";
+    element.title =
+      this.conversionStrategy === "completion"
+        ? "補完変換候補。Tab で確定、Ctrl+/ で別候補を試す"
+        : "Tab で確定、Ctrl+/ で別候補を試す";
 
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
@@ -118,7 +124,10 @@ class GhostTextWidget extends WidgetType {
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent = "Tabで確定  Ctrl+/で再試行";
+    hint.textContent =
+      this.conversionStrategy === "completion"
+        ? "補完変換  Tabで確定  Ctrl+/で再試行"
+        : "Tabで確定  Ctrl+/で再試行";
 
     element.append(suggestion, hint);
     return element;
@@ -172,7 +181,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
   return Decoration.set([
     Decoration.mark({ class: "cm-ghost-source" }).range(suggestion.from, suggestion.to),
     Decoration.widget({
-      widget: new GhostTextWidget(suggestion.convertedText),
+      widget: new GhostTextWidget(suggestion.convertedText, suggestion.conversionStrategy),
       side: 1,
     }).range(suggestion.to),
   ]);

@@ -73,6 +73,26 @@ export const kanaKanjiFewShotExamples = [
   "変換が不安なところはひらがなのままにしてください",
 ].join("\n");
 
+export const completionKanaKanjiFewShotExamples = [
+  "入力:",
+  "あなたのえがおがすきです",
+  "",
+  "出力:",
+  "あなたの笑顔が好きです",
+  "",
+  "入力:",
+  "しっぴつのてすとです",
+  "",
+  "出力:",
+  "執筆のテストです",
+  "",
+  "入力:",
+  "おじいさんごじまんのとけいさ",
+  "",
+  "出力:",
+  "おじいさんご自慢の時計さ",
+].join("\n");
+
 export const conversionPresetLabels: Record<ConversionPreset, string> = {
   none: "指定なし",
   conversation: "会話",
@@ -116,12 +136,18 @@ export function buildKanaKanjiSystemPrompt(
   avoidOutputs: string[] = [],
   strictAlternative = false,
   alternativeAttempt = 0,
+  completionMode = false,
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
   const alternativeInstructions = formatAlternativeConversionInstructions(
     avoidOutputs,
     strictAlternative,
     alternativeAttempt,
+    completionMode,
+  );
+  const completionInstructions = formatCompletionConversionInstructions(
+    completionMode,
+    avoidOutputs,
   );
 
   return [
@@ -143,11 +169,14 @@ export function buildKanaKanjiSystemPrompt(
     "Alternative conversion request:",
     alternativeInstructions || "None.",
     "",
+    "Typo completion request:",
+    completionInstructions || "None.",
+    "",
     "Purpose preset:",
     conversionPresetInstructions[preset],
     "",
     "Context few-shot examples:",
-    kanaKanjiFewShotExamples,
+    completionMode ? completionKanaKanjiFewShotExamples : kanaKanjiFewShotExamples,
     "",
     "Additional user preference:",
     prompt,
@@ -158,7 +187,12 @@ function formatAlternativeConversionInstructions(
   avoidOutputs: string[],
   strictAlternative: boolean,
   alternativeAttempt: number,
+  completionMode: boolean,
 ): string {
+  if (completionMode) {
+    return "";
+  }
+
   const uniqueOutputs = Array.from(
     new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
   );
@@ -169,7 +203,7 @@ function formatAlternativeConversionInstructions(
   return [
     "Generate a different valid conversion candidate for the same kana input.",
     alternativeAttempt > 0
-      ? `Alternative attempt ${alternativeAttempt}: re-evaluate the reading and try another natural kana-kanji spelling before falling back to hiragana.`
+      ? `Alternative attempt ${alternativeAttempt}: re-evaluate the reading and try another natural kana-kanji spelling. Do not fall back to all-hiragana just to avoid a previous output.`
       : "",
     "Avoid returning these previous outputs exactly:",
     ...uniqueOutputs.map((output) => `- ${output}`),
@@ -179,6 +213,30 @@ function formatAlternativeConversionInstructions(
     "When replacing an avoided output, first check whether it omitted kana from the input reading; choose a candidate that preserves every kana sound.",
     "Do not return the entire input in hiragana unless every kana-kanji candidate would be clearly wrong.",
     "Keep the same reading and do not paraphrase just to be different.",
-    "If no clearly better candidate exists after trying alternatives, prefer a conservative kana or hiragana-heavy spelling over repeating the previous output.",
+    "If no clearly better candidate exists, still avoid all-hiragana output solely as a fallback; the application will try a separate typo-completion pass.",
   ].filter(Boolean).join("\n");
+}
+
+function formatCompletionConversionInstructions(
+  completionMode: boolean,
+  avoidOutputs: string[],
+): string {
+  if (!completionMode) {
+    return "";
+  }
+
+  const uniqueOutputs = Array.from(
+    new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
+  );
+
+  return [
+    "The previous attempts produced the same or unusable output.",
+    uniqueOutputs.length > 0 ? "Avoid returning these previous outputs exactly:" : "",
+    ...uniqueOutputs.map((output) => `- ${output}`),
+    "Assume the kana input may contain a small typing error.",
+    "Repair only the minimum kana needed to produce a natural Japanese sentence.",
+    "Do not paraphrase, summarize, or replace words whose reading already makes sense.",
+    "Do not add new information. Keep the output close to the original wording.",
+    "If the intended repair is still unclear, keep the uncertain part in hiragana rather than inventing meaning.",
+  ].join("\n");
 }

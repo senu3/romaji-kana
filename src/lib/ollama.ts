@@ -39,7 +39,8 @@ interface DictionaryCandidate {
   output: string;
 }
 
-const MAX_ALTERNATIVE_CONVERSION_ATTEMPTS = 3;
+const MAX_ALTERNATIVE_CONVERSION_ATTEMPTS = 2;
+const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
 
 export type ProtectedDictionaryEntry = Pick<
   UserDictionaryEntry,
@@ -49,12 +50,14 @@ export type ProtectedDictionaryEntry = Pick<
 export interface JapaneseConversionResult {
   text: string;
   reviewKana: string;
+  conversionStrategy?: "completion";
 }
 
 export interface JapaneseConversionOptions {
   avoidOutputs?: string[];
   strictAlternative?: boolean;
   alternativeAttempt?: number;
+  completionMode?: boolean;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
 }
 
@@ -82,29 +85,34 @@ export async function convertRomajiToJapaneseDetailed(
     return result;
   }
 
-  let lastResult = result;
   for (let attempt = 1; attempt <= MAX_ALTERNATIVE_CONVERSION_ATTEMPTS; attempt += 1) {
     const alternative = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
       ...options,
       strictAlternative: true,
       alternativeAttempt: attempt,
+      completionMode: false,
     });
     if (isUsableConversionResult(alternative, options)) {
       return alternative;
     }
-    lastResult = alternative;
   }
 
-  const fallback = lastResult.reviewKana.trim();
-  if (fallback && !isAvoidedConversionOutput(fallback, options.avoidOutputs)) {
+  const completion = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
+    ...options,
+    strictAlternative: true,
+    alternativeAttempt: 0,
+    completionMode: true,
+  });
+  if (isUsableConversionResult(completion, options)) {
     return {
-      ...lastResult,
-      text: fallback,
+      ...completion,
+      conversionStrategy: "completion",
     };
   }
 
-  return lastResult;
+  throw new Error(ALTERNATIVE_CONVERSION_FAILED_MESSAGE);
 }
+
 async function convertRomajiToJapaneseDetailedOnce(
   input: string,
   settings: AppSettings,
@@ -214,12 +222,13 @@ export async function kanjiizeKana(
         options.avoidOutputs ?? [],
         options.strictAlternative ?? false,
         options.alternativeAttempt ?? 0,
+        options.completionMode ?? false,
       ),
       prompt: kana,
       stream: false,
       think: settings.think,
       options: {
-        temperature: options.alternativeAttempt ? 0.25 : 0.1,
+        temperature: options.completionMode ? 0.35 : options.alternativeAttempt ? 0.25 : 0.1,
       },
       keep_alive: "5m",
     },

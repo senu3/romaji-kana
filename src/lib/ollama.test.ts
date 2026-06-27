@@ -149,15 +149,15 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("tries multiple alternative conversions before falling back to kana", async () => {
+  it("tries typo completion after repeated unusable alternative conversions", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
         .fn()
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" }),
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "誤字脱字は恐ろしいものだ" }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -168,29 +168,60 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toEqual({
-      text: "ごじだつじはおそろしいものだ",
+      text: "誤字脱字は恐ろしいものだ",
       reviewKana: "ごじだつじはおそろしいものだ",
+      conversionStrategy: "completion",
     });
     expect(transport.generate).toHaveBeenCalledTimes(4);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      3,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("Alternative attempt 2"),
+      }),
+      30_000,
+    );
     expect(transport.generate).toHaveBeenNthCalledWith(
       4,
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        system: expect.stringContaining("Alternative attempt 3"),
+        system: expect.stringContaining("Typo completion request:"),
       }),
       30_000,
     );
   });
 
-  it("uses a later non-kana alternative instead of immediately falling back", async () => {
+  it("throws when typo completion cannot produce a usable alternative", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" }),
+    };
+
+    await expect(
+      convertRomajiToJapaneseDetailed(
+        "gozidatuzihaosorosiimonoda",
+        defaultSettings,
+        transport,
+        { avoidOutputs: ["ご時達事はおそろしいものだ"] },
+      ),
+    ).rejects.toThrow("別候補に変換できませんでした。");
+    expect(transport.generate).toHaveBeenCalledTimes(4);
+  });
+
+  it("uses a later non-kana alternative instead of returning kana immediately", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
         .fn()
         .mockResolvedValueOnce({ response: "失費のテストです" })
         .mockResolvedValueOnce({ response: "失費のテストです" })
-        .mockResolvedValueOnce({ response: "しっぴつのてすとです" })
         .mockResolvedValueOnce({ response: "執筆のテストです" }),
     };
 
@@ -205,7 +236,7 @@ describe("convertRomajiToJapanese", () => {
       text: "執筆のテストです",
       reviewKana: "しっぴつのてすとです",
     });
-    expect(transport.generate).toHaveBeenCalledTimes(4);
+    expect(transport.generate).toHaveBeenCalledTimes(3);
     expect(transport.generate).toHaveBeenNthCalledWith(
       2,
       "ollama",
@@ -678,6 +709,23 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Avoid returning these previous outputs exactly:");
     expect(prompt).toContain("preserves every kana sound");
     expect(prompt).toContain("- 一。");
+    expect(prompt).toContain("Typo completion request:\nNone.");
+  });
+
+  it("adds lightweight typo completion instructions and examples only in completion mode", () => {
+    const prompt = buildKanaKanjiSystemPrompt(
+      defaultConversionPrompt,
+      "none",
+      ["失費のテストです"],
+      true,
+      0,
+      true,
+    );
+
+    expect(prompt).toContain("Assume the kana input may contain a small typing error.");
+    expect(prompt).toContain("- 失費のテストです");
+    expect(prompt).toContain("執筆のテストです");
+    expect(prompt).not.toContain("未知の英語については誤字の可能性もあるため");
   });
 
   it("keeps kana-kanji prompts independent from user dictionary entries", () => {

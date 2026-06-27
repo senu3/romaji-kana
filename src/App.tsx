@@ -722,6 +722,7 @@ function App() {
               convertedText: converted,
               inputText: request.originalText,
               reviewKana: conversion.reviewKana,
+              conversionStrategy: conversion.conversionStrategy,
               source: "editor",
               retryOf: request.retryOf,
               avoidOutputs: request.avoidOutputs,
@@ -730,7 +731,10 @@ function App() {
         });
         setStatus({
           kind: "success",
-          message: "Ghost suggestion の準備ができました。Tab で確定、Ctrl+/ で別候補を試せます。",
+          message:
+            conversion.conversionStrategy === "completion"
+              ? "補完変換で Ghost suggestion を生成しました。Tab で確定、Ctrl+/ で別候補を試せます。"
+              : "Ghost suggestion の準備ができました。Tab で確定、Ctrl+/ で別候補を試せます。",
         });
         return;
       }
@@ -762,6 +766,7 @@ function App() {
         createdAt: Date.now(),
         source: "editor",
         anchor: nextAnchor,
+        conversionStrategy: conversion.conversionStrategy,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -769,7 +774,10 @@ function App() {
       setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
-        message: "変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。",
+        message:
+          conversion.conversionStrategy === "completion"
+            ? "補完変換で変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。"
+            : "変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。",
       });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
@@ -822,6 +830,7 @@ function App() {
             createdAt: Date.now(),
             source: "history",
             anchor: request.anchor,
+            conversionStrategy: conversion.conversionStrategy,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
           },
@@ -829,7 +838,10 @@ function App() {
         ]);
         setStatus({
           kind: "success",
-          message: "History から再変換しました。適用先がないため結果のみ保存しました。",
+          message:
+            conversion.conversionStrategy === "completion"
+              ? "補完変換で History から再変換しました。適用先がないため結果のみ保存しました。"
+              : "History から再変換しました。適用先がないため結果のみ保存しました。",
         });
         return;
       }
@@ -867,6 +879,7 @@ function App() {
             createdAt: Date.now(),
             source: "history",
             anchor: nextAnchor,
+            conversionStrategy: conversion.conversionStrategy,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
           }),
@@ -880,6 +893,7 @@ function App() {
             convertedText: converted,
             inputText: request.originalText,
             reviewKana: conversion.reviewKana,
+            conversionStrategy: conversion.conversionStrategy,
             source: "history",
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
@@ -887,7 +901,10 @@ function App() {
         });
         setStatus({
           kind: "success",
-          message: "History suggestion の準備ができました。Tab で適用、Ctrl+/ で別候補を試せます。",
+          message:
+            conversion.conversionStrategy === "completion"
+              ? "補完変換で History suggestion を生成しました。Tab で適用、Ctrl+/ で別候補を試せます。"
+              : "History suggestion の準備ができました。Tab で適用、Ctrl+/ で別候補を試せます。",
         });
         return;
       }
@@ -919,6 +936,7 @@ function App() {
         createdAt: Date.now(),
         source: "history",
         anchor: nextAnchor,
+        conversionStrategy: conversion.conversionStrategy,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -928,7 +946,9 @@ function App() {
       setStatus({
         kind: "success",
         message:
-          latestResolved.matchedBy === "nearby"
+          conversion.conversionStrategy === "completion"
+            ? "補完変換で History の変換を適用しました。Ctrl+/ で別候補を試せます。"
+            : latestResolved.matchedBy === "nearby"
             ? "近くの一致位置に History の変換を適用しました。Ctrl+/ で別候補を試せます。"
             : "History の変換を適用しました。Ctrl+/ で別候補を試せます。",
       });
@@ -1067,6 +1087,7 @@ function App() {
       createdAt: Date.now(),
       source: suggestion.source,
       anchor: nextAnchor,
+      conversionStrategy: suggestion.conversionStrategy,
       retryOf: suggestion.retryOf,
       avoidOutputs: suggestion.avoidOutputs,
     };
@@ -1077,7 +1098,10 @@ function App() {
     setRecentRetryItem(historyItem);
     setStatus({
       kind: "success",
-      message: "Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。",
+      message:
+        suggestion.conversionStrategy === "completion"
+          ? "補完変換の Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。"
+          : "Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。",
     });
   }, [saveCurrentDocumentSession]);
 
@@ -1154,6 +1178,7 @@ function App() {
         originalText: resolved.matchedText,
         convertedText: item.output,
         inputText: item.input,
+        conversionStrategy: item.conversionStrategy,
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
@@ -1420,7 +1445,10 @@ function RecentRetryChip({
   onDismiss: () => void;
 }) {
   return (
-    <aside className="recent-retry-chip" aria-label="別候補への再変換">
+    <aside
+      className={`recent-retry-chip ${item.conversionStrategy === "completion" ? "completion" : ""}`}
+      aria-label="別候補への再変換"
+    >
       <button
         className="recent-retry-chip-main"
         type="button"
@@ -1429,7 +1457,13 @@ function RecentRetryChip({
       >
         <RotateCcw size={15} aria-hidden="true" />
         <span className="recent-retry-chip-text">
-          {item.output ? `${item.output} の別候補を試す` : "別候補を試す"}
+          {item.conversionStrategy === "completion"
+            ? item.output
+              ? `補完変換: ${item.output}`
+              : "補完変換で生成しました"
+            : item.output
+              ? `${item.output} の別候補を試す`
+              : "別候補を試す"}
         </span>
         <kbd>Ctrl+/</kbd>
       </button>
@@ -1730,7 +1764,7 @@ function PromptPanel({
             </button>
           </div>
           <p className="panel-note">
-            このプロンプトはローカルに保存されます。Romaji 表と few-shot は自動で追加されます。
+            このプロンプトはローカルに保存されます。かな漢字変換の安全ルールと few-shot は自動で追加されます。
           </p>
         </details>
       </div>

@@ -97,6 +97,7 @@ export interface GhostConversionSuggestion {
   convertedText: string;
   inputText: string;
   reviewKana?: string;
+  conversionStrategy?: "completion";
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
@@ -127,6 +128,7 @@ export interface ConversionHistoryItem {
   createdAt: number;
   source: "editor" | "history";
   anchor?: ConversionAnchor;
+  conversionStrategy?: "completion";
   retryOf?: string;
   avoidOutputs?: string[];
 }

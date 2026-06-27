@@ -983,6 +983,15 @@ h3 {
   box-shadow: 0 14px 36px rgba(19, 78, 74, 0.18);
 }
 
+.recent-retry-chip.completion {
+  border-color: #f6c453;
+  background: #fffbeb;
+}
+
+.recent-retry-chip.completion .recent-retry-chip-main:hover {
+  background: #fef3c7;
+}
+
 .recent-retry-chip-main {
   display: inline-flex;
   min-width: 0;
