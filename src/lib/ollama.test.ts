@@ -6,7 +6,6 @@ import {
   normalizeRomajiReadingCandidate,
 } from "./ollama";
 import {
-  buildConversionSystemPrompt,
   buildKanaKanjiSystemPrompt,
   defaultConversionPrompt,
 } from "./prompts";
@@ -646,15 +645,6 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("adds the fixed romaji reference and few-shot examples to the editable prompt", () => {
-    const prompt = buildConversionSystemPrompt(defaultConversionPrompt);
-
-    expect(prompt).toContain("You are an advanced Japanese conversion engine.");
-    expect(prompt).toContain("shi/si=し");
-    expect(prompt).toContain("anatahayokuwaraujhitoda");
-    expect(prompt).toContain("あなたはよく笑う人だ");
-  });
-
   it("adds business email preset instructions without allowing over-polite rewrites", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "businessEmail");
 
@@ -666,6 +656,8 @@ describe("convertRomajiToJapanese", () => {
   it("adds kana-kanji fidelity rules and examples", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
 
+    expect(prompt).toContain("Japanese kana-to-kanji conversion engine");
+    expect(prompt).toContain("Japanese kana text produced from romaji typing");
     expect(prompt).toContain("Do not paraphrase");
     expect(prompt).toContain("never 失費");
     expect(prompt).toContain("ごじまん must stay ご自慢 or ごじまん");
