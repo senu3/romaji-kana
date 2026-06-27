@@ -39,6 +39,8 @@ interface DictionaryCandidate {
   output: string;
 }
 
+const MAX_ALTERNATIVE_CONVERSION_ATTEMPTS = 3;
+
 export type ProtectedDictionaryEntry = Pick<
   UserDictionaryEntry,
   "reading" | "output" | "enabled"
@@ -52,6 +54,7 @@ export interface JapaneseConversionResult {
 export interface JapaneseConversionOptions {
   avoidOutputs?: string[];
   strictAlternative?: boolean;
+  alternativeAttempt?: number;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
 }
 
@@ -71,28 +74,37 @@ export async function convertRomajiToJapaneseDetailed(
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
   const result = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, options);
-  if (!isAvoidedConversionOutput(result.text, options.avoidOutputs)) {
+  if (isUsableConversionResult(result, options)) {
     return result;
   }
 
-  if (!options.strictAlternative) {
-    return convertRomajiToJapaneseDetailed(input, settings, transport, {
-      ...options,
-      strictAlternative: true,
-    });
+  if (!hasAvoidOutputs(options.avoidOutputs)) {
+    return result;
   }
 
-  const fallback = result.reviewKana.trim();
+  let lastResult = result;
+  for (let attempt = 1; attempt <= MAX_ALTERNATIVE_CONVERSION_ATTEMPTS; attempt += 1) {
+    const alternative = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
+      ...options,
+      strictAlternative: true,
+      alternativeAttempt: attempt,
+    });
+    if (isUsableConversionResult(alternative, options)) {
+      return alternative;
+    }
+    lastResult = alternative;
+  }
+
+  const fallback = lastResult.reviewKana.trim();
   if (fallback && !isAvoidedConversionOutput(fallback, options.avoidOutputs)) {
     return {
-      ...result,
+      ...lastResult,
       text: fallback,
     };
   }
 
-  return result;
+  return lastResult;
 }
-
 async function convertRomajiToJapaneseDetailedOnce(
   input: string,
   settings: AppSettings,
@@ -140,6 +152,28 @@ function isAvoidedConversionOutput(output: string, avoidOutputs: string[] | unde
   );
 }
 
+function hasAvoidOutputs(avoidOutputs: string[] | undefined): boolean {
+  return Boolean(avoidOutputs?.some((output) => output.trim()));
+}
+
+function isUsableConversionResult(
+  result: JapaneseConversionResult,
+  options: JapaneseConversionOptions,
+): boolean {
+  if (isAvoidedConversionOutput(result.text, options.avoidOutputs)) {
+    return false;
+  }
+
+  if (
+    hasAvoidOutputs(options.avoidOutputs) &&
+    result.text.trim() &&
+    result.text.trim() === result.reviewKana.trim()
+  ) {
+    return false;
+  }
+
+  return true;
+}
 export async function repairLowConfidenceKana(
   result: RomajiKanaResult,
   settings: AppSettings,
@@ -179,12 +213,13 @@ export async function kanjiizeKana(
         settings.conversionPreset,
         options.avoidOutputs ?? [],
         options.strictAlternative ?? false,
+        options.alternativeAttempt ?? 0,
       ),
       prompt: kana,
       stream: false,
       think: settings.think,
       options: {
-        temperature: 0.1,
+        temperature: options.alternativeAttempt ? 0.25 : 0.1,
       },
       keep_alive: "5m",
     },

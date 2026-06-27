@@ -180,11 +180,13 @@ export function buildKanaKanjiSystemPrompt(
   preset: ConversionPreset = "none",
   avoidOutputs: string[] = [],
   strictAlternative = false,
+  alternativeAttempt = 0,
 ): string {
   const prompt = userPrompt.trim() || defaultConversionPrompt;
   const alternativeInstructions = formatAlternativeConversionInstructions(
     avoidOutputs,
     strictAlternative,
+    alternativeAttempt,
   );
 
   return [
@@ -219,6 +221,7 @@ export function buildKanaKanjiSystemPrompt(
 function formatAlternativeConversionInstructions(
   avoidOutputs: string[],
   strictAlternative: boolean,
+  alternativeAttempt: number,
 ): string {
   const uniqueOutputs = Array.from(
     new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
@@ -229,12 +232,16 @@ function formatAlternativeConversionInstructions(
 
   return [
     "Generate a different valid conversion candidate for the same kana input.",
+    alternativeAttempt > 0
+      ? `Alternative attempt ${alternativeAttempt}: re-evaluate the reading and try another natural kana-kanji spelling before falling back to hiragana.`
+      : "",
     "Avoid returning these previous outputs exactly:",
     ...uniqueOutputs.map((output) => `- ${output}`),
     strictAlternative
-      ? "Returning any listed output exactly is invalid. If needed, return a conservative hiragana-heavy spelling instead."
+      ? "Returning any listed output exactly is invalid. Try a different natural kanji or kana-kanji spelling that preserves the same reading."
       : "If possible, return a candidate that differs from the listed outputs by at least one character.",
+    "Do not return the entire input in hiragana unless every kana-kanji candidate would be clearly wrong.",
     "Keep the same reading and do not paraphrase just to be different.",
-    "If no clearly better candidate exists, prefer a conservative kana or hiragana-heavy spelling over repeating the previous output.",
-  ].join("\n");
+    "If no clearly better candidate exists after trying alternatives, prefer a conservative kana or hiragana-heavy spelling over repeating the previous output.",
+  ].filter(Boolean).join("\n");
 }

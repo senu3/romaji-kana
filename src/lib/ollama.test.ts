@@ -150,12 +150,14 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("falls back to a conservative kana candidate when retry keeps returning an avoided output", async () => {
+  it("tries multiple alternative conversions before falling back to kana", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
         .fn()
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" })
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" }),
     };
 
@@ -170,16 +172,41 @@ describe("convertRomajiToJapanese", () => {
       text: "ごじだつじはおそろしいものだ",
       reviewKana: "ごじだつじはおそろしいものだ",
     });
-    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenCalledTimes(4);
     expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
+      4,
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        system: expect.stringContaining("Returning any listed output exactly is invalid"),
+        system: expect.stringContaining("Alternative attempt 3"),
       }),
       30_000,
     );
+  });
+
+  it("uses a later non-kana alternative instead of immediately falling back", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "失費のテストです" })
+        .mockResolvedValueOnce({ response: "失費のテストです" })
+        .mockResolvedValueOnce({ response: "しぴっつののてすとです" })
+        .mockResolvedValueOnce({ response: "執筆のテストです" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "sipittunonotesutodesu",
+      defaultSettings,
+      transport,
+      { avoidOutputs: ["失費のテストです"] },
+    );
+
+    expect(result).toEqual({
+      text: "執筆のテストです",
+      reviewKana: "しぴっつののてすとです",
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(4);
   });
 
   it("keeps valid wo particles before non-particle following text", () => {
