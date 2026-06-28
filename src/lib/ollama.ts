@@ -58,6 +58,7 @@ export interface JapaneseConversionOptions {
   strictAlternative?: boolean;
   alternativeAttempt?: number;
   completionMode?: boolean;
+  completionSourceRomaji?: string;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
 }
 
@@ -143,7 +144,14 @@ async function convertRomajiToJapaneseDetailedOnce(
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
     const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
     reviewKanaParts.push(repaired.kana);
-    convertedParts.push(await kanjiizeKana(repaired.kana, settings, transport, options));
+    convertedParts.push(
+      await kanjiizeKana(repaired.kana, settings, transport, {
+        ...options,
+        completionSourceRomaji: options.completionMode
+          ? part.value
+          : options.completionSourceRomaji,
+      }),
+    );
   }
 
   return {
@@ -224,7 +232,7 @@ export async function kanjiizeKana(
         options.alternativeAttempt ?? 0,
         options.completionMode ?? false,
       ),
-      prompt: kana,
+      prompt: buildKanaKanjiUserPrompt(kana, options),
       stream: false,
       think: settings.think,
       options: {
@@ -242,6 +250,20 @@ export async function kanjiizeKana(
   }
 
   return text;
+}
+
+function buildKanaKanjiUserPrompt(kana: string, options: JapaneseConversionOptions): string {
+  if (!options.completionMode) {
+    return kana;
+  }
+
+  return [
+    "Original romaji input:",
+    options.completionSourceRomaji?.trim() || "(not available)",
+    "",
+    "Mechanical kana:",
+    kana,
+  ].join("\n");
 }
 
 export function buildProtectedDictionaryEntries(

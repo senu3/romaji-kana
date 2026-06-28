@@ -215,6 +215,48 @@ describe("convertRomajiToJapanese", () => {
     expect(transport.generate).toHaveBeenCalledTimes(4);
   });
 
+  it("passes original romaji and mechanical kana to typo completion", async () => {
+    const failedOutput = "ガイドラインに戻づき変換してください";
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: failedOutput })
+        .mockResolvedValueOnce({ response: failedOutput })
+        .mockResolvedValueOnce({ response: failedOutput })
+        .mockResolvedValueOnce({ response: "ガイドラインに基づき変換してください" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "gaidorainnimododukihenkansitekudasai",
+      defaultSettings,
+      transport,
+      { avoidOutputs: [failedOutput] },
+    );
+
+    expect(result).toEqual({
+      text: "ガイドラインに基づき変換してください",
+      reviewKana: "がいどらいんにもどづきへんかんしてください",
+      conversionStrategy: "completion",
+    });
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      4,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("mododuki may be a typo of motoduki"),
+        prompt: [
+          "Original romaji input:",
+          "gaidorainnimododukihenkansitekudasai",
+          "",
+          "Mechanical kana:",
+          "がいどらいんにもどづきへんかんしてください",
+        ].join("\n"),
+      }),
+      30_000,
+    );
+  });
+
   it("uses a later non-kana alternative instead of returning kana immediately", async () => {
     const transport = {
       models: vi.fn(),
@@ -722,7 +764,9 @@ describe("convertRomajiToJapanese", () => {
       true,
     );
 
-    expect(prompt).toContain("Assume the kana input may contain a small typing error.");
+    expect(prompt).toContain("Assume the romaji input may contain a small typing error such as one wrong consonant.");
+    expect(prompt).toContain("mododuki may be a typo of motoduki");
+    expect(prompt).toContain("ガイドラインに基づき変換してください");
     expect(prompt).toContain("- 失費のテストです");
     expect(prompt).toContain("執筆のテストです");
     expect(prompt).not.toContain("未知の英語については誤字の可能性もあるため");
