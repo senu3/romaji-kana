@@ -12,7 +12,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
   addLoadingDecoration,
@@ -53,7 +53,7 @@ import type {
   UserDictionaryEntry,
 } from "./lib/types";
 
-type ActivePanel = "history" | "prompt" | null;
+type ActivePanel = "settings" | "history" | "dictionary" | "prompt" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
@@ -101,7 +101,6 @@ function App() {
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const [dictionaryPanelOpen, setDictionaryPanelOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
@@ -121,7 +120,6 @@ function App() {
     kind: "idle",
     message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
   });
-  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
   const [setupComplete, setSetupComplete] = useState(() => {
     if (typeof localStorage === "undefined") {
@@ -176,19 +174,19 @@ function App() {
   }, [pending.length]);
 
   useEffect(() => {
-    if (!settingsDrawerOpen) {
+    if (!activePanel) {
       return;
     }
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setSettingsDrawerOpen(false);
+        setActivePanel(null);
       }
     };
 
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [settingsDrawerOpen]);
+  }, [activePanel]);
 
   const registerView = useCallback((view: EditorView | null) => {
     editorViewRef.current = view;
@@ -415,8 +413,6 @@ function App() {
   }, []);
 
   const toggleHistoryPanel = useCallback(() => {
-    setDictionaryPanelOpen(false);
-    setSettingsDrawerOpen(false);
     setActivePanel((panel) => {
       if (panel === "history") {
         return null;
@@ -426,29 +422,25 @@ function App() {
   }, []);
 
   const togglePromptPanel = useCallback(() => {
-    setDictionaryPanelOpen(false);
-    setSettingsDrawerOpen(false);
     setActivePanel((panel) => {
       return panel === "prompt" ? null : "prompt";
     });
   }, []);
 
   const toggleDictionaryPanel = useCallback(() => {
-    setActivePanel(null);
-    setSettingsDrawerOpen(false);
-    setDictionaryPanelOpen((open) => !open);
+    setActivePanel((panel) => {
+      return panel === "dictionary" ? null : "dictionary";
+    });
   }, []);
 
   const toggleSettingsDrawer = useCallback(() => {
-    setActivePanel(null);
-    setDictionaryPanelOpen(false);
-    setSettingsDrawerOpen((open) => !open);
+    setActivePanel((panel) => {
+      return panel === "settings" ? null : "settings";
+    });
   }, []);
 
   const openSettingsDrawer = useCallback(() => {
-    setActivePanel(null);
-    setDictionaryPanelOpen(false);
-    setSettingsDrawerOpen(true);
+    setActivePanel("settings");
   }, []);
 
   const getEditorDocument = useCallback(() => {
@@ -1280,8 +1272,6 @@ function App() {
     if (
       !recentRetryItem ||
       activePanel ||
-      dictionaryPanelOpen ||
-      settingsDrawerOpen ||
       !setupComplete
     ) {
       return;
@@ -1308,10 +1298,8 @@ function App() {
     return () => document.removeEventListener("keydown", retryOnShortcut);
   }, [
     activePanel,
-    dictionaryPanelOpen,
     recentRetryItem,
     retryRecentConversion,
-    settingsDrawerOpen,
     setupComplete,
   ]);
 
@@ -1388,8 +1376,6 @@ function App() {
         historyCount={history.length}
         dictionaryCount={enabledDictionaryCount}
         activePanel={activePanel}
-        dictionaryOpen={dictionaryPanelOpen}
-        settingsOpen={settingsDrawerOpen}
         settingsAttention={settingsAttention}
         onOpenHistory={toggleHistoryPanel}
         onOpenPrompt={togglePromptPanel}
@@ -1403,48 +1389,55 @@ function App() {
           onDismiss={dismissRecentRetryChip}
         />
       ) : null}
-      {activePanel === "history" ? (
-        <HistoryPanel
-          history={history}
-          pending={delayedPending}
-          onCancel={cancelConversion}
-          onRerun={handleRerunHistory}
-          onAlternative={handleAlternativeHistory}
-          onPreview={previewHistoryGhost}
-          onPreviewEnd={clearHistoryGhost}
+      {activePanel ? (
+        <InspectorDrawer
+          panel={activePanel}
           onClose={closeActivePanel}
-        />
-      ) : null}
-      {activePanel === "prompt" ? (
-        <PromptPanel
-          prompt={settings.conversionPrompt}
-          preset={settings.conversionPreset}
-          onPresetChange={(conversionPreset) =>
-            setSettings((value) => ({ ...value, conversionPreset }))
-          }
-          onChange={(conversionPrompt) => setSettings((value) => ({ ...value, conversionPrompt }))}
-          onReset={() =>
-            setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
-          }
-          onClose={closeActivePanel}
-        />
-      ) : null}
-      {dictionaryPanelOpen ? (
-        <DictionaryModal
-          entries={settings.userDictionary}
-          onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
-          onClose={() => setDictionaryPanelOpen(false)}
-        />
-      ) : null}
-      {settingsDrawerOpen ? (
-        <SettingsDrawer
-          settings={settings}
-          ollamaModels={ollamaModels}
-          ollamaConnection={ollamaConnection}
-          onChange={setSettings}
-          onCheckOllama={handleCheckOllama}
-          onClose={() => setSettingsDrawerOpen(false)}
-        />
+        >
+          {activePanel === "settings" ? (
+            <SettingsDrawerContent
+              settings={settings}
+              ollamaModels={ollamaModels}
+              ollamaConnection={ollamaConnection}
+              onChange={setSettings}
+              onCheckOllama={handleCheckOllama}
+            />
+          ) : null}
+          {activePanel === "history" ? (
+            <HistoryPanel
+              history={history}
+              pending={delayedPending}
+              onCancel={cancelConversion}
+              onRerun={handleRerunHistory}
+              onAlternative={handleAlternativeHistory}
+              onPreview={previewHistoryGhost}
+              onPreviewEnd={clearHistoryGhost}
+              onClose={closeActivePanel}
+            />
+          ) : null}
+          {activePanel === "dictionary" ? (
+            <DictionaryModal
+              entries={settings.userDictionary}
+              onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
+            />
+          ) : null}
+          {activePanel === "prompt" ? (
+            <PromptPanel
+              prompt={settings.conversionPrompt}
+              preset={settings.conversionPreset}
+              onPresetChange={(conversionPreset) =>
+                setSettings((value) => ({ ...value, conversionPreset }))
+              }
+              onChange={(conversionPrompt) =>
+                setSettings((value) => ({ ...value, conversionPrompt }))
+              }
+              onReset={() =>
+                setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
+              }
+              onClose={closeActivePanel}
+            />
+          ) : null}
+        </InspectorDrawer>
       ) : null}
       {!setupComplete ? (
         <SetupModal
@@ -1519,8 +1512,6 @@ function AppRail({
   historyCount,
   dictionaryCount,
   activePanel,
-  dictionaryOpen,
-  settingsOpen,
   settingsAttention,
   onOpenHistory,
   onOpenPrompt,
@@ -1530,8 +1521,6 @@ function AppRail({
   historyCount: number;
   dictionaryCount: number;
   activePanel: ActivePanel;
-  dictionaryOpen: boolean;
-  settingsOpen: boolean;
   settingsAttention: boolean;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
@@ -1541,10 +1530,10 @@ function AppRail({
   return (
     <nav className="app-rail" aria-label="App tools">
       <button
-        className={`rail-button ${settingsOpen ? "active" : ""} ${settingsAttention ? "attention" : ""}`}
+        className={`rail-button ${activePanel === "settings" ? "active" : ""} ${settingsAttention ? "attention" : ""}`}
         type="button"
         onClick={onOpenSettings}
-        aria-pressed={settingsOpen}
+        aria-pressed={activePanel === "settings"}
         aria-label="Settings を開く"
         title="Settings"
       >
@@ -1564,10 +1553,10 @@ function AppRail({
         <span>History</span>
       </button>
       <button
-        className={`rail-button ${dictionaryOpen ? "active" : ""}`}
+        className={`rail-button ${activePanel === "dictionary" ? "active" : ""}`}
         type="button"
         onClick={onOpenDictionary}
-        aria-pressed={dictionaryOpen}
+        aria-pressed={activePanel === "dictionary"}
         aria-label={
           dictionaryCount > 0
             ? `Dictionary を開く、${dictionaryCount} 件有効`
@@ -1616,43 +1605,94 @@ function formatModelStatusLabel(
   return `${label} · ${modelName} · 未確認`;
 }
 
-function SettingsDrawer({
+function InspectorDrawer({
+  panel,
+  children,
+  onClose,
+}: {
+  panel: NonNullable<ActivePanel>;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  const title = panelTitle(panel);
+  const eyebrow = panelEyebrow(panel);
+
+  return (
+    <div className="inspector-overlay" onMouseDown={onClose}>
+      <aside
+        className="inspector-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inspector-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="inspector-header">
+          <div>
+            <p className="eyebrow">{eyebrow}</p>
+            <h2 id="inspector-title">{title}</h2>
+          </div>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={onClose}
+            aria-label={`${title} を閉じる`}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="inspector-body">{children}</div>
+      </aside>
+    </div>
+  );
+}
+
+function panelTitle(panel: NonNullable<ActivePanel>): string {
+  if (panel === "settings") {
+    return "Settings";
+  }
+  if (panel === "history") {
+    return "History";
+  }
+  if (panel === "dictionary") {
+    return "Dictionary";
+  }
+  return "Style";
+}
+
+function panelEyebrow(panel: NonNullable<ActivePanel>): string {
+  if (panel === "settings") {
+    return "Model setup";
+  }
+  if (panel === "history") {
+    return "Conversion log";
+  }
+  if (panel === "dictionary") {
+    return "User terms";
+  }
+  return "Conversion style";
+}
+
+function SettingsDrawerContent({
   settings,
   ollamaModels,
   ollamaConnection,
   onChange,
   onCheckOllama,
-  onClose,
 }: {
   settings: AppSettings;
   ollamaModels: OllamaModel[];
   ollamaConnection: OllamaConnectionStatus;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
-  onClose: () => void;
 }) {
   return (
-    <div className="settings-overlay drawer-overlay" onMouseDown={onClose}>
-      <aside
-        className="settings-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-drawer-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <button className="icon-button drawer-close" type="button" onClick={onClose} aria-label="Settings を閉じる">
-          <X size={18} aria-hidden="true" />
-        </button>
-        <SettingsContent
-          settings={settings}
-          ollamaModels={ollamaModels}
-          ollamaConnection={ollamaConnection}
-          onChange={onChange}
-          onCheckOllama={onCheckOllama}
-          headingId="settings-drawer-title"
-        />
-      </aside>
-    </div>
+    <SettingsContent
+      settings={settings}
+      ollamaModels={ollamaModels}
+      ollamaConnection={ollamaConnection}
+      onChange={onChange}
+      onCheckOllama={onCheckOllama}
+    />
   );
 }
 
@@ -1940,11 +1980,9 @@ function presetDescription(preset: ConversionPreset): string {
 function DictionaryModal({
   entries,
   onChange,
-  onClose,
 }: {
   entries: UserDictionaryEntry[];
   onChange: (entries: UserDictionaryEntry[]) => void;
-  onClose: () => void;
 }) {
   const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
   const canAdd =
@@ -1989,24 +2027,7 @@ function DictionaryModal({
   };
 
   return (
-    <div className="settings-overlay dictionary-overlay" onMouseDown={onClose}>
-      <section
-        className="dictionary-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dictionary-modal-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="dictionary-header">
-          <div>
-            <p className="eyebrow">User terms</p>
-            <h2 id="dictionary-modal-title">Dictionary</h2>
-          </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="Dictionary を閉じる">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
-
+      <section className="dictionary-modal inspector-panel" aria-label="Dictionary entries">
         <form className="dictionary-add-form" onSubmit={addEntry}>
           <label className="field">
             <span>Romaji reading</span>
@@ -2116,7 +2137,6 @@ function DictionaryModal({
           </div>
         )}
       </section>
-    </div>
   );
 }
 

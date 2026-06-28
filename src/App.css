@@ -208,6 +208,89 @@ button:disabled {
   padding: 11px 8px 58px;
 }
 
+.inspector-overlay {
+  position: fixed;
+  inset: 0 56px 0 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: linear-gradient(90deg, rgba(245, 248, 247, 0.08), rgba(18, 63, 59, 0.08));
+}
+
+.inspector-drawer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(392px, calc(100vw - 80px));
+  height: 100vh;
+  border-left: 1px solid var(--line-strong);
+  background: #fbfdfc;
+  box-shadow: -8px 0 16px rgba(18, 63, 59, 0.1);
+}
+
+.inspector-header {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px;
+  background: #fbfdfc;
+}
+
+.inspector-header h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.inspector-body {
+  min-height: 0;
+  overflow: auto;
+  background: #fbfdfc;
+}
+
+.inspector-body .settings-heading,
+.inspector-body .floating-panel-header {
+  display: none;
+}
+
+.inspector-body .settings-content {
+  padding: 16px 16px 72px;
+}
+
+.inspector-body .floating-panel,
+.inspector-body .dictionary-modal {
+  position: static;
+  display: grid;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.inspector-body .prompt-panel {
+  width: auto;
+}
+
+.inspector-body .history-list,
+.inspector-body .dictionary-list {
+  max-height: none;
+}
+
+.inspector-body .dictionary-add-form,
+.inspector-body .dictionary-entry,
+.inspector-body .dictionary-entry-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inspector-body .dictionary-delete,
+.inspector-body .dictionary-add-button {
+  width: 100%;
+}
+
 .rail-button {
   position: relative;
   display: inline-flex;
@@ -2089,6 +2172,14 @@ h3 {
   padding: 20px;
 }
 
+.setup-modal .settings-heading {
+  display: none;
+}
+
+.setup-modal .connection-card {
+  gap: 10px;
+}
+
 .setup-actions {
   border-color: var(--line);
   background: var(--surface);
@@ -2156,6 +2247,15 @@ h3 {
     border-top: 1px solid #d9e4e2;
     border-left: 0;
     padding: 8px 12px;
+  }
+
+  .inspector-overlay {
+    inset: 0 0 56px;
+  }
+
+  .inspector-drawer {
+    width: min(100vw, 420px);
+    max-width: 100%;
   }
 
   .rail-button > span:not(.rail-count) {
