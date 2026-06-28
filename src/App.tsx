@@ -129,6 +129,7 @@ function App() {
     }
     return !shouldShowSetupModalOnStartup();
   });
+  const [setupModelProvider, setSetupModelProvider] = useState<ModelProvider | null>(() => null);
   const editorViewRef = useRef<EditorView | null>(null);
   const settingsRef = useRef(settings);
   const setupCompleteRef = useRef(setupComplete);
@@ -302,6 +303,7 @@ function App() {
       return;
     }
 
+    setSetupModelProvider(modelProvider);
     const checkId = connectionCheckIdRef.current + 1;
     connectionCheckIdRef.current = checkId;
     const nextSettings = { ...settingsRef.current, modelProvider };
@@ -368,13 +370,17 @@ function App() {
 
     if (!setupComplete) {
       startupCheckStartedRef.current = false;
+      if (setupModelProvider) {
+        return;
+      }
+
       setOllamaConnection({
         kind: "idle",
-        message: "モデルを選択し、Check を実行すると書き始められます。",
+        message: "Provider を選択するとローカルモデル一覧を読み込みます。",
       });
       setStatus({
         kind: "idle",
-        message: "ローカルモデルを選び、Check を実行してセットアップを完了してください。",
+        message: "Provider を選ぶとモデル一覧を読み込みます。入力は今すぐ可能です。",
       });
       return;
     }
@@ -400,6 +406,7 @@ function App() {
     settings.ollamaApiUrl,
     settings.lmStudioApiUrl,
     setupComplete,
+    setupModelProvider,
     handleCheckOllama,
   ]);
 
@@ -1360,7 +1367,11 @@ function App() {
         initialDocument={initialDocument}
         fileName={currentFilePath ? basename(currentFilePath) : "未保存の下書き"}
         isDirty={isDirty}
-        modelStatusLabel={formatModelStatusLabel(settings, ollamaConnection)}
+        modelStatusLabel={
+          !setupComplete && !setupModelProvider
+            ? "Provider未設定 · Model未選択"
+            : formatModelStatusLabel(settings, ollamaConnection)
+        }
         modelStatusKind={ollamaConnection.kind}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
@@ -1440,6 +1451,7 @@ function App() {
           settings={settings}
           ollamaModels={ollamaModels}
           ollamaConnection={ollamaConnection}
+          setupModelProvider={setupModelProvider}
           onChange={setSettings}
           onCheckOllama={handleCheckOllama}
           onProviderSelected={handleSetupProviderSelected}
@@ -1648,6 +1660,7 @@ function SetupModal({
   settings,
   ollamaModels,
   ollamaConnection,
+  setupModelProvider,
   onChange,
   onCheckOllama,
   onProviderSelected,
@@ -1657,6 +1670,7 @@ function SetupModal({
   settings: AppSettings;
   ollamaModels: OllamaModel[];
   ollamaConnection: OllamaConnectionStatus;
+  setupModelProvider: ModelProvider | null;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
   onProviderSelected: (modelProvider: ModelProvider) => void;
@@ -1685,6 +1699,7 @@ function SetupModal({
           onChange={onChange}
           onCheckOllama={onCheckOllama}
           onProviderSelected={onProviderSelected}
+          setupModelProvider={setupModelProvider}
           mode="setup"
         />
         <div className="setup-actions">

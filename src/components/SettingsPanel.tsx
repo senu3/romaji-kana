@@ -48,6 +48,7 @@ export interface SettingsContentProps {
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
   onProviderSelected?: (modelProvider: ModelProvider) => void;
+  setupModelProvider?: ModelProvider | null;
   headingId?: string;
   mode?: SettingsContentMode;
 }
@@ -99,6 +100,7 @@ export function SettingsContent({
   onChange,
   onCheckOllama,
   onProviderSelected,
+  setupModelProvider,
   headingId,
   mode = "full",
 }: SettingsContentProps) {
@@ -138,8 +140,16 @@ export function SettingsContent({
     onProviderSelected?.(modelProvider);
     setModelListOpen(false);
   };
+  const setupMode = mode === "setup";
+  const activeProvider = setupMode ? setupModelProvider : settings.modelProvider;
+  const hasProvider = Boolean(activeProvider);
+
   const updateCurrentApiUrl = (apiUrl: string) => {
-    if (settings.modelProvider === "lmstudio") {
+    if (!activeProvider) {
+      return;
+    }
+
+    if (activeProvider === "lmstudio") {
       update({ lmStudioApiUrl: apiUrl });
       return;
     }
@@ -192,10 +202,13 @@ export function SettingsContent({
     settings.punctuationConversion.periodToJapanese,
     settings.punctuationConversion.commaToJapanese,
   ].filter(Boolean).length;
-  const providerName = providerLabel(settings.modelProvider);
+  const providerName = activeProvider ? providerLabel(activeProvider) : "Provider";
   const currentApiUrl =
-    settings.modelProvider === "lmstudio" ? settings.lmStudioApiUrl : settings.ollamaApiUrl;
-  const setupMode = mode === "setup";
+    activeProvider === "lmstudio"
+      ? settings.lmStudioApiUrl
+      : activeProvider === "ollama"
+        ? settings.ollamaApiUrl
+        : "";
 
   return (
     <div className="settings-content">
@@ -210,22 +223,22 @@ export function SettingsContent({
           <fieldset className="field provider-field">
             <legend>Provider</legend>
             <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
-              <label className={settings.modelProvider === "ollama" ? "selected" : ""}>
+              <label className={activeProvider === "ollama" ? "selected" : ""}>
                 <input
                   type="radio"
                   name={providerRadioName}
                   value="ollama"
-                  checked={settings.modelProvider === "ollama"}
+                  checked={activeProvider === "ollama"}
                   onChange={() => updateProvider("ollama")}
                 />
                 <span>Ollama</span>
               </label>
-              <label className={settings.modelProvider === "lmstudio" ? "selected" : ""}>
+              <label className={activeProvider === "lmstudio" ? "selected" : ""}>
                 <input
                   type="radio"
                   name={providerRadioName}
                   value="lmstudio"
-                  checked={settings.modelProvider === "lmstudio"}
+                  checked={activeProvider === "lmstudio"}
                   onChange={() => updateProvider("lmstudio")}
                 />
                 <span>LM Studio</span>
@@ -237,11 +250,14 @@ export function SettingsContent({
             <span>{providerName} API URL</span>
             <input
               value={currentApiUrl}
+              disabled={!hasProvider}
               onChange={(event) => updateCurrentApiUrl(event.currentTarget.value)}
               placeholder={
-                settings.modelProvider === "lmstudio"
+                activeProvider === "lmstudio"
                   ? "http://localhost:1234"
-                  : "http://localhost:11434"
+                  : activeProvider === "ollama"
+                    ? "http://localhost:11434"
+                    : "Provider を選択してください"
               }
             />
           </label>
@@ -251,7 +267,8 @@ export function SettingsContent({
             <div className="model-combobox">
               <input
                 ref={modelInputRef}
-                value={settings.modelName}
+                value={hasProvider ? settings.modelName : ""}
+                disabled={!hasProvider}
                 onChange={(event) => {
                   update({ modelName: event.currentTarget.value });
                   setModelListOpen(true);
@@ -269,6 +286,7 @@ export function SettingsContent({
                 className="model-list-toggle"
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
+                disabled={!hasProvider}
                 onClick={() => {
                   setModelListOpen((open) => !open);
                   modelInputRef.current?.focus();
@@ -280,7 +298,11 @@ export function SettingsContent({
               {modelListOpen ? (
                 <div className="model-options" id={modelOptionsId} role="listbox">
                   {sortedModelNames.length === 0 ? (
-                    <p>モデルはまだ読み込まれていません。Check で {providerName} のモデルを更新できます。</p>
+                    <p>
+                      {hasProvider
+                        ? `${providerName} のモデルを読み込んでいます。見つからない場合は Check で再確認できます。`
+                        : "Provider を選択するとモデル一覧を読み込みます。"}
+                    </p>
                   ) : (
                     sortedModelNames.map((modelName) => (
                       <button
@@ -322,7 +344,7 @@ export function SettingsContent({
               className="secondary-button"
               type="button"
               onClick={onCheckOllama}
-              disabled={ollamaConnection.kind === "checking"}
+              disabled={!hasProvider || ollamaConnection.kind === "checking"}
             >
               <RefreshCw
                 className={ollamaConnection.kind === "checking" ? "spin" : ""}
