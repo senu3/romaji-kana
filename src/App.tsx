@@ -6,9 +6,11 @@ import {
   History,
   Loader2,
   MessageSquareText,
+  Minus,
   Plus,
   RotateCcw,
   SlidersHorizontal,
+  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,7 +23,6 @@ import {
   removeLoadingDecoration,
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
-import { SettingsContent } from "./components/SettingsPanel";
 import {
   loadDocumentSession,
   saveFileDocumentSession,
@@ -1349,18 +1350,20 @@ function App() {
 
   return (
     <main className="app-shell">
+      <AppTitleBar />
       <MarkdownEditor
         settings={settings}
         pending={pending}
         initialDocument={initialDocument}
-        fileName={currentFilePath ? basename(currentFilePath) : "未保存の下書き"}
+        fileName={currentFilePath ? basename(currentFilePath) : "Untitled.md"}
         isDirty={isDirty}
         modelStatusLabel={
           !setupComplete && !setupModelProvider
-            ? "Provider未設定 · Model未選択"
+            ? "未設定"
             : formatModelStatusLabel(settings, ollamaConnection)
         }
         modelStatusKind={ollamaConnection.kind}
+        onSettingsChange={setSettings}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
         onNewFile={handleNewFile}
@@ -1395,12 +1398,9 @@ function App() {
           onClose={closeActivePanel}
         >
           {activePanel === "settings" ? (
-            <SettingsDrawerContent
+            <WritingControlPanel
               settings={settings}
-              ollamaModels={ollamaModels}
-              ollamaConnection={ollamaConnection}
               onChange={setSettings}
-              onCheckOllama={handleCheckOllama}
             />
           ) : null}
           {activePanel === "history" ? (
@@ -1460,6 +1460,22 @@ function App() {
         onOpenSettings={openSettingsDrawer}
       />
     </main>
+  );
+}
+
+function AppTitleBar() {
+  return (
+    <header className="app-titlebar" aria-label="Application title bar">
+      <div className="app-brand">
+        <span className="app-logo" aria-hidden="true">か</span>
+        <span>Romaji Kana</span>
+      </div>
+      <div className="window-controls" aria-hidden="true">
+        <span><Minus size={18} /></span>
+        <span><Square size={15} /></span>
+        <span><X size={19} /></span>
+      </div>
+    </header>
   );
 }
 
@@ -1538,7 +1554,7 @@ function AppRail({
         title="Settings"
       >
         <SlidersHorizontal size={18} aria-hidden="true" />
-        <span>Settings</span>
+        <span>設定</span>
       </button>
       <button
         className={`rail-button ${activePanel === "history" ? "active" : ""}`}
@@ -1550,7 +1566,7 @@ function AppRail({
       >
         <History size={18} aria-hidden="true" />
         {historyCount > 0 ? <span className="rail-count">{historyCount}</span> : null}
-        <span>History</span>
+        <span>履歴</span>
       </button>
       <button
         className={`rail-button ${activePanel === "dictionary" ? "active" : ""}`}
@@ -1566,7 +1582,7 @@ function AppRail({
       >
         <BookMarked size={18} aria-hidden="true" />
         {dictionaryCount > 0 ? <span className="rail-count">{dictionaryCount}</span> : null}
-        <span>Dictionary</span>
+        <span>辞書</span>
       </button>
       <button
         className={`rail-button ${activePanel === "prompt" ? "active" : ""}`}
@@ -1577,7 +1593,7 @@ function AppRail({
         title="Style"
       >
         <MessageSquareText size={18} aria-hidden="true" />
-        <span>Style</span>
+        <span>スタイル</span>
       </button>
     </nav>
   );
@@ -1648,15 +1664,15 @@ function InspectorDrawer({
 
 function panelTitle(panel: NonNullable<ActivePanel>): string {
   if (panel === "settings") {
-    return "Settings";
+    return "ライティングコントロール";
   }
   if (panel === "history") {
-    return "History";
+    return "履歴";
   }
   if (panel === "dictionary") {
-    return "Dictionary";
+    return "辞書";
   }
-  return "Style";
+  return "スタイル";
 }
 
 function panelEyebrow(panel: NonNullable<ActivePanel>): string {
@@ -1672,27 +1688,75 @@ function panelEyebrow(panel: NonNullable<ActivePanel>): string {
   return "Conversion style";
 }
 
-function SettingsDrawerContent({
+function WritingControlPanel({
   settings,
-  ollamaModels,
-  ollamaConnection,
   onChange,
-  onCheckOllama,
 }: {
   settings: AppSettings;
-  ollamaModels: OllamaModel[];
-  ollamaConnection: OllamaConnectionStatus;
   onChange: (settings: AppSettings) => void;
-  onCheckOllama: () => void;
 }) {
+  const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
+    onChange({ ...settings, triggers: { ...settings.triggers, ...patch } });
+  };
+
   return (
-    <SettingsContent
-      settings={settings}
-      ollamaModels={ollamaModels}
-      ollamaConnection={ollamaConnection}
-      onChange={onChange}
-      onCheckOllama={onCheckOllama}
-    />
+    <section className="writing-control-panel" aria-label="ライティングコントロール">
+      <div className="writing-section">
+        <h3>変換モード（コンパクト）</h3>
+        <div className="writing-mode-grid" role="group" aria-label="出力モード">
+          <button className="selected" type="button">
+            <strong>日本語</strong>
+            <span>ひらがな + カタカナ</span>
+          </button>
+          <button type="button">
+            <strong>カタカナ</strong>
+            <span>カタカナのみ</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="writing-section">
+        <h3>トリガー</h3>
+        <label className="writing-trigger-row">
+          <span><kbd>Ctrl</kbd> + Enter で変換</span>
+          <input
+            type="checkbox"
+            checked={settings.triggers.enter}
+            onChange={(event) => updateTriggers({ enter: event.currentTarget.checked })}
+          />
+        </label>
+        <label className="writing-trigger-row">
+          <span><kbd>Space</kbd> で変換</span>
+          <input
+            type="checkbox"
+            checked={settings.triggers.period}
+            onChange={(event) => updateTriggers({ period: event.currentTarget.checked })}
+          />
+        </label>
+        <label className="writing-trigger-row">
+          <span>入力中に自動変換</span>
+          <input
+            type="checkbox"
+            checked={settings.autoConvert}
+            onChange={(event) => onChange({ ...settings, autoConvert: event.currentTarget.checked })}
+          />
+        </label>
+      </div>
+
+      <div className="writing-section">
+        <h3>ショートカット</h3>
+        <div className="writing-shortcut-row">
+          <span>{settings.triggers.manualShortcut.replace("Mod", "Ctrl")}</span>
+          <button className="secondary-button" type="button">
+            変更
+          </button>
+        </div>
+      </div>
+
+      <p className="writing-help">
+        詳しくはヘルプをご覧ください
+      </p>
+    </section>
   );
 }
 
@@ -1717,6 +1781,32 @@ function SetupModal({
   onComplete: () => void;
   onSkip: () => void;
 }) {
+  const hasProvider = Boolean(setupModelProvider);
+  const currentApiUrl =
+    setupModelProvider === "lmstudio"
+      ? settings.lmStudioApiUrl
+      : setupModelProvider === "ollama"
+        ? settings.ollamaApiUrl
+        : "";
+  const sortedModelNames = ollamaModels
+    .map((model) => model.name)
+    .sort((a, b) => a.localeCompare(b));
+
+  const updateProvider = (modelProvider: ModelProvider) => {
+    onChange({ ...settings, modelProvider });
+    onProviderSelected(modelProvider);
+  };
+
+  const updateApiUrl = (apiUrl: string) => {
+    if (setupModelProvider === "lmstudio") {
+      onChange({ ...settings, lmStudioApiUrl: apiUrl });
+      return;
+    }
+    if (setupModelProvider === "ollama") {
+      onChange({ ...settings, ollamaApiUrl: apiUrl });
+    }
+  };
+
   return (
     <div className="settings-overlay setup-overlay">
       <section
@@ -1725,23 +1815,99 @@ function SetupModal({
         aria-modal="true"
         aria-labelledby="setup-modal-title"
       >
-        <div className="setup-intro">
-          <p className="eyebrow">First run</p>
-          <h2 id="setup-modal-title">最初のモデル設定</h2>
-          <p>
-            Provider と Model を選ぶとすぐ変換できます。設定はあとからでも変更できます。
+        <header className="setup-modal-header">
+          <div>
+            <h2 id="setup-modal-title">最初のモデル設定</h2>
+            <p>ローカル LLM の接続先とモデルを設定します。</p>
+          </div>
+          <button className="icon-button" type="button" onClick={onSkip} aria-label="セットアップを閉じる">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="setup-form">
+          <fieldset className="field provider-field">
+            <legend>Provider</legend>
+            <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
+              <label className={setupModelProvider === "ollama" ? "selected" : ""}>
+                <input
+                  type="radio"
+                  name="setup-provider"
+                  value="ollama"
+                  checked={setupModelProvider === "ollama"}
+                  onChange={() => updateProvider("ollama")}
+                />
+                <span>Ollama</span>
+              </label>
+              <label className={setupModelProvider === "lmstudio" ? "selected" : ""}>
+                <input
+                  type="radio"
+                  name="setup-provider"
+                  value="lmstudio"
+                  checked={setupModelProvider === "lmstudio"}
+                  onChange={() => updateProvider("lmstudio")}
+                />
+                <span>LM Studio</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <label className="field">
+            <span>API URL</span>
+            <div className="setup-inline-control">
+              <input
+                value={currentApiUrl}
+                disabled={!hasProvider}
+                onChange={(event) => updateApiUrl(event.currentTarget.value)}
+                placeholder={
+                  setupModelProvider === "lmstudio"
+                    ? "http://localhost:1234"
+                    : setupModelProvider === "ollama"
+                      ? "http://localhost:11434"
+                      : "Provider を選択してください"
+                }
+              />
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={onCheckOllama}
+                disabled={!hasProvider || ollamaConnection.kind === "checking"}
+              >
+                接続チェック
+              </button>
+            </div>
+            <small>通常は localhost の既定URLのままでOKです。</small>
+          </label>
+
+          <label className="field">
+            <span>Model</span>
+            <div className="setup-inline-control setup-model-row">
+              <select
+                value={hasProvider ? settings.modelName : ""}
+                disabled={!hasProvider}
+                onChange={(event) => onChange({ ...settings, modelName: event.currentTarget.value })}
+              >
+                <option value="">モデルを選択...</option>
+                {sortedModelNames.map((modelName) => (
+                  <option value={modelName} key={modelName}>{modelName}</option>
+                ))}
+              </select>
+              <button
+                className="icon-button setup-refresh"
+                type="button"
+                onClick={onCheckOllama}
+                disabled={!hasProvider || ollamaConnection.kind === "checking"}
+                aria-label="モデル一覧を更新"
+              >
+                <RotateCcw size={18} aria-hidden="true" />
+              </button>
+            </div>
+          </label>
+
+          <p className={`setup-connection-line ${ollamaConnection.kind}`}>
+            <span aria-hidden="true" />
+            {hasProvider ? ollamaConnection.message : "未接続"}
           </p>
         </div>
-        <SettingsContent
-          settings={settings}
-          ollamaModels={ollamaModels}
-          ollamaConnection={ollamaConnection}
-          onChange={onChange}
-          onCheckOllama={onCheckOllama}
-          onProviderSelected={onProviderSelected}
-          setupModelProvider={setupModelProvider}
-          mode="setup"
-        />
         <div className="setup-actions">
           <button className="secondary-button" type="button" onClick={onSkip}>
             あとで設定
@@ -2221,7 +2387,14 @@ function StatusBar({
           ) : null}
           {pendingCount > 0 ? <strong>{pendingCount} 件待機中</strong> : null}
         </div>
-      ) : null}
+      ) : (
+        <div className="status-meta" aria-label="Document status">
+          <span>行 1, 列 1</span>
+          <span>UTF-8</span>
+          <span>LF</span>
+          <span>Markdown</span>
+        </div>
+      )}
     </div>
   );
 }

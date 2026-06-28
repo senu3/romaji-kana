@@ -7,17 +7,23 @@ import {
   EditorView,
   WidgetType,
   keymap,
+  lineNumbers,
   placeholder,
   type DecorationSet,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
+  BookOpen,
   ChevronDown,
+  Clock3,
   FilePlus2,
   FileText,
   FolderOpen,
+  Keyboard,
+  MoreVertical,
   Redo2,
   Save,
+  Terminal,
   Undo2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -44,6 +50,7 @@ interface MarkdownEditorProps {
   isDirty: boolean;
   modelStatusLabel: string;
   modelStatusKind: OllamaConnectionStatus["kind"];
+  onSettingsChange: (settings: AppSettings) => void;
   onConvert: (range: ConversionRange) => boolean;
   onDocumentChanged: (documentText: string) => void;
   onNewFile: () => void;
@@ -285,6 +292,7 @@ export function MarkdownEditor({
   isDirty,
   modelStatusLabel,
   modelStatusKind,
+  onSettingsChange,
   onConvert,
   onDocumentChanged,
   onNewFile,
@@ -378,6 +386,7 @@ export function MarkdownEditor({
       extensions: [
         history(),
         markdown(),
+        lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
         theme,
@@ -619,17 +628,32 @@ export function MarkdownEditor({
     <section className="editor-shell" aria-label="Markdown editor">
       <div className="editor-commandbar">
         <div className="commandbar-left">
+          <button className="toolbar-command" type="button" onClick={onNewFile}>
+            <FilePlus2 size={20} aria-hidden="true" />
+            <span>新規</span>
+          </button>
+          <button className="toolbar-command" type="button" onClick={onOpenFile}>
+            <FolderOpen size={21} aria-hidden="true" />
+            <span>開く</span>
+          </button>
+          <button className="toolbar-command" type="button" onClick={onSaveFile}>
+            <Save size={21} aria-hidden="true" />
+            <span>保存</span>
+          </button>
+          <span className="toolbar-separator" aria-hidden="true" />
           <div className="toolbar-menu" ref={fileMenuRef}>
             <button
               aria-expanded={fileMenuOpen}
               aria-haspopup="menu"
-              className="pill pill-action"
+              className="document-picker"
               type="button"
               onClick={() => setFileMenuOpen((open) => !open)}
+              title={fileName}
             >
-              <FileText size={15} aria-hidden="true" />
-              File
-              <ChevronDown size={14} aria-hidden="true" />
+              <FileText size={20} aria-hidden="true" />
+              <span>{fileName}</span>
+              {isDirty ? <span className="dirty-dot" aria-label="未保存" /> : null}
+              <ChevronDown size={16} aria-hidden="true" />
             </button>
             {fileMenuOpen ? (
               <div className="toolbar-menu-items" role="menu" aria-label="File actions">
@@ -675,21 +699,35 @@ export function MarkdownEditor({
             <Redo2 size={16} aria-hidden="true" />
           </button>
         </div>
-        <div className="commandbar-document" title={fileName}>
-          <h1>Romaji Kana</h1>
-          <span className="document-name">{fileName}</span>
-          <span className={`save-chip ${isDirty ? "dirty" : ""}`}>
-            {isDirty ? "未保存" : "保存済み"}
-          </span>
+        <div className="commandbar-document">
+          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
         </div>
         <div className="commandbar-right">
           {pending.length > 0 ? (
             <span className="queue-chip">{pending.length} 件変換中</span>
           ) : null}
-          <span className="mode-chip">
-            {settings.conversionMode === "ghost" ? "Ghost + Tab" : "Replace"}
-          </span>
-          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
+          <div className="mode-switch" role="group" aria-label="変換モード">
+            <button
+              className={settings.conversionMode === "replace" ? "selected" : ""}
+              type="button"
+              onClick={() => onSettingsChange({ ...settings, conversionMode: "replace" })}
+            >
+              Replace
+            </button>
+            <button
+              className={settings.conversionMode === "ghost" ? "selected" : ""}
+              type="button"
+              onClick={() => onSettingsChange({ ...settings, conversionMode: "ghost" })}
+            >
+              Ghost
+            </button>
+          </div>
+          <span className="toolbar-separator" aria-hidden="true" />
+          <span className="toolbar-icon" aria-hidden="true"><Terminal size={20} /></span>
+          <span className="toolbar-icon" aria-hidden="true"><Clock3 size={20} /></span>
+          <span className="toolbar-icon" aria-hidden="true"><BookOpen size={21} /></span>
+          <span className="toolbar-icon" aria-hidden="true"><Keyboard size={20} /></span>
+          <span className="toolbar-icon" aria-hidden="true"><MoreVertical size={20} /></span>
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />
