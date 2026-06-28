@@ -185,18 +185,18 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    color: "#134e4a",
+    color: "#123f3b",
     backgroundColor: "#ffffff",
   },
   ".cm-scroller": {
     fontFamily:
       'ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
-    fontSize: "15px",
-    lineHeight: "1.75",
+    fontSize: "15.5px",
+    lineHeight: "1.82",
   },
   ".cm-content": {
     minHeight: "100%",
-    padding: "28px 32px",
+    padding: "44px 54px",
     caretColor: "#0d9488",
   },
   ".cm-line": {
@@ -206,29 +206,29 @@ const theme = EditorView.theme({
     outline: "none",
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-    backgroundColor: "#99f6e4",
+    backgroundColor: "#b8ece4",
   },
   ".cm-gutters": {
-    backgroundColor: "#f8fafc",
-    color: "#64748b",
-    borderRight: "1px solid #dbe4e8",
+    backgroundColor: "#fbfdfc",
+    color: "#718782",
+    borderRight: "1px solid #dde9e6",
   },
   ".cm-activeLineGutter": {
-    backgroundColor: "#ccfbf1",
+    backgroundColor: "#e7f8f3",
   },
   ".cm-activeLine": {
-    backgroundColor: "#f0fdfa",
+    backgroundColor: "#f7fbfa",
   },
   ".cm-placeholder": {
-    color: "#64748b",
+    color: "#617872",
   },
   ".cm-conversion-loading": {
-    backgroundColor: "#ccfbf1",
+    backgroundColor: "#d8f7ef",
     borderBottom: "2px solid #0d9488",
     borderRadius: "3px",
   },
   ".cm-ghost-source": {
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f3f8f6",
     borderBottom: "1px dashed #0d9488",
     borderRadius: "3px",
   },

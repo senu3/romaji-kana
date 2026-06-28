@@ -276,7 +276,7 @@ export function SettingsContent({
                 onFocus={() => setModelListOpen(true)}
                 onClick={() => setModelListOpen(true)}
                 onBlur={() => window.setTimeout(() => setModelListOpen(false), 120)}
-                placeholder="gemma3"
+                placeholder={hasProvider ? "gemma3" : "Provider を選択してください"}
                 role="combobox"
                 aria-expanded={modelListOpen}
                 aria-controls={modelOptionsId}

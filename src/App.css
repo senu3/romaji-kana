@@ -2,8 +2,20 @@
   font-family:
     "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  color: #134e4a;
-  background: #f0fdfa;
+  color: #123f3b;
+  background: #f5f8f7;
+  --ink: #123f3b;
+  --ink-muted: #617872;
+  --line: #dbe8e4;
+  --line-strong: #b8d5cf;
+  --chrome: #f5f8f7;
+  --chrome-strong: #eef6f3;
+  --surface: #ffffff;
+  --accent: #0f766e;
+  --accent-strong: #0b655f;
+  --accent-soft: #e7f8f3;
+  --warning: #9a4d09;
+  --warning-soft: #fff7ed;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -46,7 +58,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #5eead4;
+  outline: 3px solid #99f6e4;
   outline-offset: 2px;
 }
 
@@ -63,8 +75,8 @@ button:disabled {
   min-height: 0;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98)),
-    #f8fafc;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(245, 248, 247, 0.92)),
+    var(--chrome);
 }
 
 .editor-shell {
@@ -83,10 +95,10 @@ button:disabled {
   grid-template-columns: auto minmax(180px, 1fr) auto;
   align-items: center;
   gap: 14px;
-  min-height: 56px;
-  border-bottom: 1px solid #d9e4e2;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 10px 16px;
+  min-height: 60px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 253, 252, 0.98);
+  padding: 10px 18px;
 }
 
 .commandbar-left,
@@ -111,7 +123,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  color: #64748b;
+  color: var(--ink-muted);
   font-size: 12px;
   font-weight: 750;
   line-height: 1.35;
@@ -119,8 +131,8 @@ button:disabled {
 
 .commandbar-document h1 {
   flex: 0 0 auto;
-  color: #134e4a;
-  font-size: 15px;
+  color: var(--ink);
+  font-size: 16px;
   font-weight: 850;
   line-height: 1.2;
 }
@@ -141,11 +153,11 @@ button:disabled {
   min-height: 26px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d5e8e5;
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 8px;
-  background: #ffffff;
-  color: #475569;
+  background: var(--surface);
+  color: var(--ink-muted);
   font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
@@ -155,13 +167,13 @@ button:disabled {
 .save-chip.dirty,
 .queue-chip {
   border-color: #f6c453;
-  background: #fffbeb;
-  color: #92400e;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .mode-chip {
-  border-color: #b5d7d1;
-  color: #0f766e;
+  border-color: var(--line-strong);
+  color: var(--accent);
 }
 
 .model-chip.connected {
@@ -191,9 +203,9 @@ button:disabled {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  border-left: 1px solid #d9e4e2;
-  background: #f8fffd;
-  padding: 10px 8px 58px;
+  border-left: 1px solid var(--line);
+  background: var(--chrome-strong);
+  padding: 11px 8px 58px;
 }
 
 .rail-button {
@@ -206,7 +218,7 @@ button:disabled {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: #647a83;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -215,9 +227,9 @@ button:disabled {
 
 .rail-button:hover,
 .rail-button.active {
-  border-color: #b5d7d1;
-  background: #ffffff;
-  color: #0f766e;
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--accent);
 }
 
 .rail-button.attention:not(.active) {
@@ -229,12 +241,12 @@ button:disabled {
   right: 62px;
   z-index: 40;
   transform: translateX(4px);
-  border: 1px solid #d5e8e5;
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 5px 7px;
-  background: #ffffff;
-  color: #134e4a;
-  box-shadow: 0 6px 12px rgba(19, 78, 74, 0.08);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 6px 12px rgba(18, 63, 59, 0.08);
   font-size: 12px;
   font-weight: 750;
   opacity: 0;
@@ -259,11 +271,11 @@ button:disabled {
   height: 14px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #f8fffd;
+  border: 1px solid var(--chrome-strong);
   border-radius: 999px;
   padding: 0 3px;
-  background: #0f766e;
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--surface);
   font-size: 9px;
   font-weight: 850;
   line-height: 1;
@@ -513,11 +525,19 @@ h3 {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #ffffff;
+  background:
+    linear-gradient(90deg, rgba(238, 246, 243, 0.75), rgba(245, 248, 247, 0) 16%, rgba(245, 248, 247, 0) 84%, rgba(238, 246, 243, 0.75)),
+    var(--chrome);
+  padding: 18px 28px 0;
 }
 
 .editor-host .cm-editor {
   height: 100%;
+  width: min(100%, 980px);
+  margin: 0 auto;
+  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .settings-panel {
@@ -1877,6 +1897,215 @@ h3 {
   }
 }
 
+/* Visual refresh: align the app shell with the focused editor probe. */
+.pill,
+.editor-chrome-button,
+.icon-button,
+.secondary-button,
+.primary-button,
+.status-cancel,
+.status-settings {
+  border-radius: 8px;
+}
+
+.pill {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.pill-action:hover,
+.editor-chrome-button:hover,
+.icon-button:hover,
+.status-cancel:hover,
+.status-settings:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.toolbar-menu-items,
+.floating-panel,
+.setup-modal,
+.settings-drawer,
+.dictionary-modal,
+.recent-retry-chip {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: 0 8px 16px rgba(18, 63, 59, 0.1);
+}
+
+.toolbar-menu-items button,
+.accordion-trigger,
+.check-row,
+.history-item,
+.dictionary-entry,
+.recent-retry-chip-main {
+  color: var(--ink);
+}
+
+.toolbar-menu-items button:hover,
+.accordion-trigger:hover,
+.history-item:hover,
+.recent-retry-chip-main:hover,
+.dictionary-tabs button:hover,
+.dictionary-tabs button.selected,
+.preset-options label:hover,
+.preset-options label.selected {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.settings-content {
+  background: #fbfdfc;
+}
+
+.settings-heading,
+.floating-panel-header,
+.setup-intro,
+.dictionary-header {
+  border-color: var(--line);
+  background: #fbfdfc;
+}
+
+.field,
+.shortcut-field > div:first-child,
+.mode-field,
+.dictionary-enable,
+.prompt-editor {
+  color: var(--ink);
+}
+
+.field > input,
+.model-combobox input,
+.dictionary-entry-fields input,
+.prompt-editor textarea {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.field > input:disabled,
+.model-combobox input:disabled {
+  background: #f6faf8;
+  color: #718782;
+}
+
+.field > input:hover,
+.model-combobox input:hover,
+.dictionary-entry-fields input:hover,
+.prompt-editor textarea:hover {
+  border-color: var(--accent);
+}
+
+.segmented-control,
+.connection-card,
+.mode-field,
+.shortcut-field,
+.settings-accordion,
+.advanced-prompt,
+.preset-options label,
+.check-row {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.segmented-control button,
+.segmented-control label,
+.model-list-toggle,
+.secondary-button,
+.shortcut-recorder,
+.shortcut-reset,
+.status-cancel,
+.status-settings {
+  color: var(--accent);
+}
+
+.segmented-control button:hover,
+.segmented-control button.selected,
+.segmented-control label:hover,
+.segmented-control label.selected,
+.shortcut-recorder:hover,
+.shortcut-reset:hover,
+.secondary-button:hover:not(:disabled),
+.model-list-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.model-options {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: 0 8px 16px rgba(18, 63, 59, 0.1);
+}
+
+.model-options button {
+  color: var(--ink);
+}
+
+.model-options button:hover,
+.model-options button.selected {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.connection-card p,
+.accordion-trigger small,
+.shortcut-help,
+.panel-note,
+.setup-settings-note,
+.preset-options small,
+.empty-state {
+  color: var(--ink-muted);
+}
+
+.primary-button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.primary-button:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.setup-overlay {
+  background: rgba(245, 248, 247, 0.7);
+}
+
+.settings-overlay {
+  background: rgba(18, 63, 59, 0.1);
+}
+
+.drawer-overlay {
+  background: linear-gradient(90deg, rgba(245, 248, 247, 0.12), rgba(18, 63, 59, 0.1));
+}
+
+.setup-modal {
+  width: min(590px, calc(100vw - 28px));
+}
+
+.setup-modal .settings-content {
+  padding: 20px;
+}
+
+.setup-actions {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+.status-bar {
+  border-color: var(--line);
+  background: rgba(251, 253, 252, 0.98);
+  color: var(--ink);
+}
+
+.status-actions strong,
+.connection-card span,
+.preset-options strong {
+  color: var(--accent);
+}
+
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
@@ -1886,6 +2115,18 @@ h3 {
   .editor-shell {
     height: calc(100vh - 56px);
     padding-bottom: 120px;
+  }
+
+  .editor-host {
+    padding: 12px 16px 0;
+  }
+
+  .editor-host .cm-editor {
+    width: 100%;
+  }
+
+  .editor-host .cm-editor .cm-content {
+    padding: 34px 28px;
   }
 
   .editor-commandbar {
