@@ -1203,6 +1203,19 @@ function App() {
       createdAt: Date.now(),
       source: "history",
       status: "queued",
+    };
+
+    enqueueConversion(request);
+  }, [enqueueConversion]);
+
+  const handleAlternativeHistory = useCallback((item: ConversionHistoryItem) => {
+    const request: PendingConversion = {
+      id: crypto.randomUUID(),
+      anchor: item.anchor,
+      originalText: item.input,
+      createdAt: Date.now(),
+      source: "history",
+      status: "queued",
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
     };
@@ -1219,9 +1232,9 @@ function App() {
       return false;
     }
 
-    handleRerunHistory(recentRetryItem);
+    handleAlternativeHistory(recentRetryItem);
     return true;
-  }, [handleRerunHistory, recentRetryItem]);
+  }, [handleAlternativeHistory, recentRetryItem]);
 
   useEffect(() => {
     if (!recentRetryItem) {
@@ -1358,6 +1371,7 @@ function App() {
           pending={delayedPending}
           onCancel={cancelConversion}
           onRerun={handleRerunHistory}
+          onAlternative={handleAlternativeHistory}
           onPreview={previewHistoryGhost}
           onPreviewEnd={clearHistoryGhost}
           onClose={closeActivePanel}
@@ -1583,6 +1597,7 @@ function HistoryPanel({
   pending,
   onCancel,
   onRerun,
+  onAlternative,
   onPreview,
   onPreviewEnd,
   onClose,
@@ -1591,6 +1606,7 @@ function HistoryPanel({
   pending: PendingConversion[];
   onCancel: (request: PendingConversion) => void;
   onRerun: (item: ConversionHistoryItem) => void;
+  onAlternative: (item: ConversionHistoryItem) => void;
   onPreview: (item: ConversionHistoryItem) => void;
   onPreviewEnd: (item: ConversionHistoryItem) => void;
   onClose: () => void;
@@ -1638,24 +1654,12 @@ function HistoryPanel({
       ) : (
         <div className="history-list">
           {history.map((item) => (
-            <button
+            <article
               className={`history-item ${item.status}`}
-              type="button"
               key={item.id}
-              onClick={() => {
-                onPreviewEnd(item);
-                onRerun(item);
-                onClose();
-              }}
               onBlur={() => onPreviewEnd(item)}
-              onFocus={() => onPreview(item)}
               onMouseEnter={() => onPreview(item)}
               onMouseLeave={() => onPreviewEnd(item)}
-              title={
-                item.anchor
-                  ? "クリックすると別候補を生成して適用します"
-                  : "クリックするとこの変換を再実行します"
-              }
             >
               <div className="history-meta">
                 <span className={`status-chip ${item.status}`}>{historyStatusLabel(item.status)}</span>
@@ -1673,12 +1677,36 @@ function HistoryPanel({
               </dl>
               <div className="rerun-meta">
                 <span>{item.modelName}</span>
-                <span className="rerun-hint">
+                <button
+                  className="rerun-hint"
+                  type="button"
+                  onFocus={() => onPreview(item)}
+                  onClick={() => {
+                    onPreviewEnd(item);
+                    onRerun(item);
+                    onClose();
+                  }}
+                >
                   <RotateCcw size={13} aria-hidden="true" />
                   再試行
-                </span>
+                </button>
+                <button
+                  className="rerun-hint"
+                  type="button"
+                  disabled={!item.output}
+                  title={item.output ? "前回結果を避けて別候補を生成します" : "出力がないため別候補は生成できません"}
+                  onFocus={() => onPreview(item)}
+                  onClick={() => {
+                    onPreviewEnd(item);
+                    onAlternative(item);
+                    onClose();
+                  }}
+                >
+                  <RotateCcw size={13} aria-hidden="true" />
+                  別候補
+                </button>
               </div>
-            </button>
+            </article>
           ))}
         </div>
       )}
