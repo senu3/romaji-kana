@@ -13,17 +13,12 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
-  BookOpen,
   ChevronDown,
-  Clock3,
   FilePlus2,
   FileText,
   FolderOpen,
-  Keyboard,
-  MoreVertical,
   Redo2,
   Save,
-  Terminal,
   Undo2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -699,13 +694,12 @@ export function MarkdownEditor({
             <Redo2 size={16} aria-hidden="true" />
           </button>
         </div>
-        <div className="commandbar-document">
-          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
-        </div>
+        <div className="commandbar-spacer" aria-hidden="true" />
         <div className="commandbar-right">
           {pending.length > 0 ? (
             <span className="queue-chip">{pending.length} 件変換中</span>
           ) : null}
+          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
           <div className="mode-switch" role="group" aria-label="変換モード">
             <button
               className={settings.conversionMode === "replace" ? "selected" : ""}
@@ -722,12 +716,6 @@ export function MarkdownEditor({
               Ghost
             </button>
           </div>
-          <span className="toolbar-separator" aria-hidden="true" />
-          <span className="toolbar-icon" aria-hidden="true"><Terminal size={20} /></span>
-          <span className="toolbar-icon" aria-hidden="true"><Clock3 size={20} /></span>
-          <span className="toolbar-icon" aria-hidden="true"><BookOpen size={21} /></span>
-          <span className="toolbar-icon" aria-hidden="true"><Keyboard size={20} /></span>
-          <span className="toolbar-icon" aria-hidden="true"><MoreVertical size={20} /></span>
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />

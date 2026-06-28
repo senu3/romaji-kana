@@ -2400,7 +2400,7 @@ h3 {
 }
 
 .editor-commandbar {
-  grid-template-columns: minmax(0, 1fr) minmax(140px, auto) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 58px;
   border: 1px solid #d3dcda;
   border-right: 0;
@@ -2418,6 +2418,10 @@ h3 {
 
 .commandbar-right {
   justify-content: flex-end;
+}
+
+.commandbar-spacer {
+  min-width: 0;
 }
 
 .commandbar-document {

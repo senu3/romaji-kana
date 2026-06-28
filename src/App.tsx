@@ -1702,15 +1702,23 @@ function WritingControlPanel({
   return (
     <section className="writing-control-panel" aria-label="ライティングコントロール">
       <div className="writing-section">
-        <h3>変換モード（コンパクト）</h3>
-        <div className="writing-mode-grid" role="group" aria-label="出力モード">
-          <button className="selected" type="button">
-            <strong>日本語</strong>
-            <span>ひらがな + カタカナ</span>
+        <h3>変換モード</h3>
+        <div className="writing-mode-grid" role="group" aria-label="変換モード">
+          <button
+            className={settings.conversionMode === "replace" ? "selected" : ""}
+            type="button"
+            onClick={() => onChange({ ...settings, conversionMode: "replace" })}
+          >
+            <strong>Replace</strong>
+            <span>本文を置換</span>
           </button>
-          <button type="button">
-            <strong>カタカナ</strong>
-            <span>カタカナのみ</span>
+          <button
+            className={settings.conversionMode === "ghost" ? "selected" : ""}
+            type="button"
+            onClick={() => onChange({ ...settings, conversionMode: "ghost" })}
+          >
+            <strong>Ghost</strong>
+            <span>候補を表示</span>
           </button>
         </div>
       </div>
