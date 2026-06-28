@@ -102,6 +102,7 @@ function App() {
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
@@ -359,6 +360,63 @@ function App() {
     }
   }, []);
 
+  const handleModelSettingsProviderSelected = useCallback(async (modelProvider: ModelProvider) => {
+    const checkId = connectionCheckIdRef.current + 1;
+    connectionCheckIdRef.current = checkId;
+    const nextSettings = { ...settingsRef.current, modelProvider };
+    const label = providerLabel(nextSettings);
+
+    setOllamaModels([]);
+    setOllamaConnection({
+      kind: "checking",
+      message: `${label} のモデルを読み込んでいます...`,
+    });
+    setStatus({
+      kind: "loading",
+      message: `${label} のモデルを読み込んでいます...`,
+    });
+
+    try {
+      const models = await listLocalModels(nextSettings);
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      setOllamaModels(models);
+      setOllamaConnection({
+        kind: models.length > 0 ? "warning" : "idle",
+        message:
+          models.length > 0
+            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで Check してください。`
+            : `${label} に接続しましたが、ローカルモデルが見つかりませんでした。`,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: models.length > 0 ? "warning" : "idle",
+        message:
+          models.length > 0
+            ? "モデルを選択し、Check を実行すると設定を確認できます。"
+            : `${label} のモデルが見つかりませんでした。`,
+      });
+    } catch (error: unknown) {
+      if (connectionCheckIdRef.current !== checkId) {
+        return;
+      }
+
+      const message = formatOllamaConnectionError(error, label);
+      setOllamaModels([]);
+      setOllamaConnection({
+        kind: "error",
+        message,
+        checkedAt: Date.now(),
+      });
+      setStatus({
+        kind: "error",
+        message,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const providerChanged = previousModelProviderRef.current !== settings.modelProvider;
     previousModelProviderRef.current = settings.modelProvider;
@@ -442,6 +500,14 @@ function App() {
 
   const openSettingsDrawer = useCallback(() => {
     setActivePanel("settings");
+  }, []);
+
+  const openModelSettings = useCallback(() => {
+    setModelSettingsOpen(true);
+  }, []);
+
+  const closeModelSettings = useCallback(() => {
+    setModelSettingsOpen(false);
   }, []);
 
   const getEditorDocument = useCallback(() => {
@@ -1364,6 +1430,7 @@ function App() {
         }
         modelStatusKind={ollamaConnection.kind}
         onSettingsChange={setSettings}
+        onOpenModelSettings={openModelSettings}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
         onNewFile={handleNewFile}
@@ -1441,6 +1508,7 @@ function App() {
       ) : null}
       {!setupComplete ? (
         <SetupModal
+          mode="setup"
           settings={settings}
           ollamaModels={ollamaModels}
           ollamaConnection={ollamaConnection}
@@ -1450,6 +1518,20 @@ function App() {
           onProviderSelected={handleSetupProviderSelected}
           onComplete={completeSetup}
           onSkip={completeSetup}
+        />
+      ) : null}
+      {setupComplete && modelSettingsOpen ? (
+        <SetupModal
+          mode="settings"
+          settings={settings}
+          ollamaModels={ollamaModels}
+          ollamaConnection={ollamaConnection}
+          setupModelProvider={null}
+          onChange={setSettings}
+          onCheckOllama={handleCheckOllama}
+          onProviderSelected={handleModelSettingsProviderSelected}
+          onComplete={closeModelSettings}
+          onSkip={closeModelSettings}
         />
       ) : null}
       <StatusBar
@@ -1765,6 +1847,7 @@ function WritingControlPanel({
 }
 
 function SetupModal({
+  mode = "setup",
   settings,
   ollamaModels,
   ollamaConnection,
@@ -1775,6 +1858,7 @@ function SetupModal({
   onComplete,
   onSkip,
 }: {
+  mode?: "setup" | "settings";
   settings: AppSettings;
   ollamaModels: OllamaModel[];
   ollamaConnection: OllamaConnectionStatus;
@@ -1785,11 +1869,13 @@ function SetupModal({
   onComplete: () => void;
   onSkip: () => void;
 }) {
-  const hasProvider = Boolean(setupModelProvider);
+  const isSetupMode = mode === "setup";
+  const activeModelProvider = isSetupMode ? setupModelProvider : settings.modelProvider;
+  const hasProvider = Boolean(activeModelProvider);
   const currentApiUrl =
-    setupModelProvider === "lmstudio"
+    activeModelProvider === "lmstudio"
       ? settings.lmStudioApiUrl
-      : setupModelProvider === "ollama"
+      : activeModelProvider === "ollama"
         ? settings.ollamaApiUrl
         : "";
   const sortedModelNames = ollamaModels
@@ -1802,11 +1888,11 @@ function SetupModal({
   };
 
   const updateApiUrl = (apiUrl: string) => {
-    if (setupModelProvider === "lmstudio") {
+    if (activeModelProvider === "lmstudio") {
       onChange({ ...settings, lmStudioApiUrl: apiUrl });
       return;
     }
-    if (setupModelProvider === "ollama") {
+    if (activeModelProvider === "ollama") {
       onChange({ ...settings, ollamaApiUrl: apiUrl });
     }
   };
@@ -1821,10 +1907,12 @@ function SetupModal({
       >
         <header className="setup-modal-header">
           <div>
-            <h2 id="setup-modal-title">最初のモデル設定</h2>
+            <h2 id="setup-modal-title">
+              {isSetupMode ? "最初のモデル設定" : "モデル設定"}
+            </h2>
             <p>ローカル LLM の接続先とモデルを設定します。</p>
           </div>
-          <button className="icon-button" type="button" onClick={onSkip} aria-label="セットアップを閉じる">
+          <button className="icon-button" type="button" onClick={onSkip} aria-label="モデル設定を閉じる">
             <X size={18} aria-hidden="true" />
           </button>
         </header>
@@ -1832,22 +1920,22 @@ function SetupModal({
           <fieldset className="field provider-field">
             <legend>Provider</legend>
             <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
-              <label className={setupModelProvider === "ollama" ? "selected" : ""}>
+              <label className={activeModelProvider === "ollama" ? "selected" : ""}>
                 <input
                   type="radio"
-                  name="setup-provider"
+                  name={`${mode}-provider`}
                   value="ollama"
-                  checked={setupModelProvider === "ollama"}
+                  checked={activeModelProvider === "ollama"}
                   onChange={() => updateProvider("ollama")}
                 />
                 <span>Ollama</span>
               </label>
-              <label className={setupModelProvider === "lmstudio" ? "selected" : ""}>
+              <label className={activeModelProvider === "lmstudio" ? "selected" : ""}>
                 <input
                   type="radio"
-                  name="setup-provider"
+                  name={`${mode}-provider`}
                   value="lmstudio"
-                  checked={setupModelProvider === "lmstudio"}
+                  checked={activeModelProvider === "lmstudio"}
                   onChange={() => updateProvider("lmstudio")}
                 />
                 <span>LM Studio</span>
@@ -1863,9 +1951,9 @@ function SetupModal({
                 disabled={!hasProvider}
                 onChange={(event) => updateApiUrl(event.currentTarget.value)}
                 placeholder={
-                  setupModelProvider === "lmstudio"
+                  activeModelProvider === "lmstudio"
                     ? "http://localhost:1234"
-                    : setupModelProvider === "ollama"
+                    : activeModelProvider === "ollama"
                       ? "http://localhost:11434"
                       : "Provider を選択してください"
                 }
@@ -1914,14 +2002,14 @@ function SetupModal({
         </div>
         <div className="setup-actions">
           <button className="secondary-button" type="button" onClick={onSkip}>
-            あとで設定
+            {isSetupMode ? "あとで設定" : "キャンセル"}
           </button>
           <button
             className="primary-button"
             type="button"
             onClick={onComplete}
           >
-            書き始める
+            {isSetupMode ? "書き始める" : "完了"}
           </button>
         </div>
       </section>

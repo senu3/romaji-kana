@@ -46,6 +46,7 @@ interface MarkdownEditorProps {
   modelStatusLabel: string;
   modelStatusKind: OllamaConnectionStatus["kind"];
   onSettingsChange: (settings: AppSettings) => void;
+  onOpenModelSettings: () => void;
   onConvert: (range: ConversionRange) => boolean;
   onDocumentChanged: (documentText: string) => void;
   onNewFile: () => void;
@@ -288,6 +289,7 @@ export function MarkdownEditor({
   modelStatusLabel,
   modelStatusKind,
   onSettingsChange,
+  onOpenModelSettings,
   onConvert,
   onDocumentChanged,
   onNewFile,
@@ -699,7 +701,15 @@ export function MarkdownEditor({
           {pending.length > 0 ? (
             <span className="queue-chip">{pending.length} 件変換中</span>
           ) : null}
-          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
+          <button
+            className={`model-chip ${modelStatusKind}`}
+            type="button"
+            onClick={onOpenModelSettings}
+            aria-label="モデル設定を開く"
+            title="モデル設定"
+          >
+            {modelStatusLabel}
+          </button>
           <div className="mode-switch" role="group" aria-label="変換モード">
             <button
               className={settings.conversionMode === "replace" ? "selected" : ""}

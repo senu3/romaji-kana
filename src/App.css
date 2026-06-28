@@ -2538,6 +2538,7 @@ h3 {
 }
 
 .model-chip {
+  gap: 6px;
   min-height: 34px;
   max-width: min(260px, 24vw);
   overflow: hidden;
@@ -2548,6 +2549,11 @@ h3 {
   color: #0b5f55;
   font-size: 13px;
   font-weight: 650;
+}
+
+button.model-chip:hover {
+  background: #f0fdf8;
+  border-color: #86efac;
 }
 
 .model-chip::before,
@@ -2955,6 +2961,13 @@ h3 {
   background: #f0fbfb;
   box-shadow: inset 0 0 0 1px #007782;
   color: #006b70;
+}
+.setup-form .segmented-control label:first-child.selected {
+    border-radius: 7px 0 0 7px;
+}
+
+.setup-form .segmented-control label:last-child.selected {
+    border-radius: 0 7px 7px 0;
 }
 
 .setup-inline-control {
