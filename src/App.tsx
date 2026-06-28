@@ -1710,7 +1710,7 @@ function WritingControlPanel({
             onClick={() => onChange({ ...settings, conversionMode: "replace" })}
           >
             <strong>Replace</strong>
-            <span>本文を置換</span>
+            <span>本文を自動で変換</span>
           </button>
           <button
             className={settings.conversionMode === "ghost" ? "selected" : ""}
@@ -1718,7 +1718,7 @@ function WritingControlPanel({
             onClick={() => onChange({ ...settings, conversionMode: "ghost" })}
           >
             <strong>Ghost</strong>
-            <span>候補を表示</span>
+            <span>候補をTabで確定</span>
           </button>
         </div>
       </div>
@@ -1748,7 +1748,7 @@ function WritingControlPanel({
             checked={settings.autoConvert}
             onChange={(event) => onChange({ ...settings, autoConvert: event.currentTarget.checked })}
           />
-        </label>
+        </label>日本語変換の指示
       </div>
 
       <div className="writing-section">
@@ -1760,10 +1760,6 @@ function WritingControlPanel({
           </button>
         </div>
       </div>
-
-      <p className="writing-help">
-        詳しくはヘルプをご覧ください
-      </p>
     </section>
   );
 }
@@ -2133,7 +2129,7 @@ function PromptPanel({
             </button>
           </div>
           <p className="panel-note">
-            このプロンプトはローカルに保存されます。かな漢字変換の安全ルールと few-shot は自動で追加されます。
+            プロンプトはローカルストレージに自動保存されます。
           </p>
         </details>
       </div>
