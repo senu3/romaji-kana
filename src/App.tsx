@@ -1,8 +1,11 @@
 import type { EditorView } from "@codemirror/view";
 import {
   AlertCircle,
+  BookMarked,
   CheckCircle2,
+  History,
   Loader2,
+  MessageSquareText,
   Plus,
   RotateCcw,
   SlidersHorizontal,
@@ -18,7 +21,7 @@ import {
   removeLoadingDecoration,
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
-import { SettingsContent, SettingsPanel } from "./components/SettingsPanel";
+import { SettingsContent } from "./components/SettingsPanel";
 import {
   loadDocumentSession,
   saveFileDocumentSession,
@@ -57,7 +60,7 @@ const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
-const ENABLE_FIRST_RUN_SETUP_MODAL = false;
+const ENABLE_FIRST_RUN_SETUP_MODAL = true;
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 
 function shouldForceSetupModalFromQuery(): boolean {
@@ -118,7 +121,6 @@ function App() {
     kind: "idle",
     message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
   });
-  const [settingsCollapsed, setSettingsCollapsed] = useState(false);
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
   const [setupComplete, setSetupComplete] = useState(() => {
@@ -406,6 +408,8 @@ function App() {
   }, []);
 
   const toggleHistoryPanel = useCallback(() => {
+    setDictionaryPanelOpen(false);
+    setSettingsDrawerOpen(false);
     setActivePanel((panel) => {
       if (panel === "history") {
         return null;
@@ -415,14 +419,29 @@ function App() {
   }, []);
 
   const togglePromptPanel = useCallback(() => {
+    setDictionaryPanelOpen(false);
+    setSettingsDrawerOpen(false);
     setActivePanel((panel) => {
       return panel === "prompt" ? null : "prompt";
     });
   }, []);
 
-  const openDictionaryPanel = useCallback(() => {
+  const toggleDictionaryPanel = useCallback(() => {
     setActivePanel(null);
-    setDictionaryPanelOpen(true);
+    setSettingsDrawerOpen(false);
+    setDictionaryPanelOpen((open) => !open);
+  }, []);
+
+  const toggleSettingsDrawer = useCallback(() => {
+    setActivePanel(null);
+    setDictionaryPanelOpen(false);
+    setSettingsDrawerOpen((open) => !open);
+  }, []);
+
+  const openSettingsDrawer = useCallback(() => {
+    setActivePanel(null);
+    setDictionaryPanelOpen(false);
+    setSettingsDrawerOpen(true);
   }, []);
 
   const getEditorDocument = useCallback(() => {
@@ -1329,7 +1348,6 @@ function App() {
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
   const settingsAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
-  const canStartWriting = ollamaConnection.kind === "connected";
   const enabledDictionaryCount = settings.userDictionary.filter(
     (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
   ).length;
@@ -1339,24 +1357,33 @@ function App() {
       <MarkdownEditor
         settings={settings}
         pending={pending}
-        historyCount={history.length}
-        dictionaryCount={enabledDictionaryCount}
         initialDocument={initialDocument}
         fileName={currentFilePath ? basename(currentFilePath) : "未保存の下書き"}
         isDirty={isDirty}
+        modelStatusLabel={formatModelStatusLabel(settings, ollamaConnection)}
+        modelStatusKind={ollamaConnection.kind}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
         onNewFile={handleNewFile}
         onOpenFile={handleOpenFile}
         onSaveFile={handleSaveFile}
         onSaveFileAs={handleSaveFileAs}
-        onOpenHistory={toggleHistoryPanel}
-        onOpenPrompt={togglePromptPanel}
-        onOpenDictionary={openDictionaryPanel}
         onAcceptGhost={handleAcceptGhost}
         onRetryGhost={handleRetryGhost}
         onRetryRecent={retryRecentConversion}
         registerView={registerView}
+      />
+      <AppRail
+        historyCount={history.length}
+        dictionaryCount={enabledDictionaryCount}
+        activePanel={activePanel}
+        dictionaryOpen={dictionaryPanelOpen}
+        settingsOpen={settingsDrawerOpen}
+        settingsAttention={settingsAttention}
+        onOpenHistory={toggleHistoryPanel}
+        onOpenPrompt={togglePromptPanel}
+        onOpenDictionary={toggleDictionaryPanel}
+        onOpenSettings={toggleSettingsDrawer}
       />
       {recentRetryItem ? (
         <RecentRetryChip
@@ -1398,24 +1425,6 @@ function App() {
           onClose={() => setDictionaryPanelOpen(false)}
         />
       ) : null}
-      <SettingsPanel
-        settings={settings}
-        ollamaModels={ollamaModels}
-        ollamaConnection={ollamaConnection}
-        collapsed={settingsCollapsed}
-        onToggleCollapsed={() => setSettingsCollapsed((value) => !value)}
-        onChange={setSettings}
-        onCheckOllama={handleCheckOllama}
-      />
-      <button
-        className={`floating-settings-button ${settingsAttention ? "attention" : ""}`}
-        type="button"
-        onClick={() => setSettingsDrawerOpen(true)}
-        aria-label="Settings を開く"
-      >
-        <SlidersHorizontal size={17} aria-hidden="true" />
-        Settings
-      </button>
       {settingsDrawerOpen ? (
         <SettingsDrawer
           settings={settings}
@@ -1431,11 +1440,11 @@ function App() {
           settings={settings}
           ollamaModels={ollamaModels}
           ollamaConnection={ollamaConnection}
-          canStartWriting={canStartWriting}
           onChange={setSettings}
           onCheckOllama={handleCheckOllama}
           onProviderSelected={handleSetupProviderSelected}
           onComplete={completeSetup}
+          onSkip={completeSetup}
         />
       ) : null}
       <StatusBar
@@ -1443,7 +1452,7 @@ function App() {
         pending={delayedPending}
         pendingCount={pending.length}
         onCancel={cancelConversion}
-        onOpenSettings={() => setSettingsDrawerOpen(true)}
+        onOpenSettings={openSettingsDrawer}
       />
     </main>
   );
@@ -1494,6 +1503,107 @@ function RecentRetryChip({
   );
 }
 
+function AppRail({
+  historyCount,
+  dictionaryCount,
+  activePanel,
+  dictionaryOpen,
+  settingsOpen,
+  settingsAttention,
+  onOpenHistory,
+  onOpenPrompt,
+  onOpenDictionary,
+  onOpenSettings,
+}: {
+  historyCount: number;
+  dictionaryCount: number;
+  activePanel: ActivePanel;
+  dictionaryOpen: boolean;
+  settingsOpen: boolean;
+  settingsAttention: boolean;
+  onOpenHistory: () => void;
+  onOpenPrompt: () => void;
+  onOpenDictionary: () => void;
+  onOpenSettings: () => void;
+}) {
+  return (
+    <nav className="app-rail" aria-label="App tools">
+      <button
+        className={`rail-button ${settingsOpen ? "active" : ""} ${settingsAttention ? "attention" : ""}`}
+        type="button"
+        onClick={onOpenSettings}
+        aria-pressed={settingsOpen}
+        aria-label="Settings を開く"
+        title="Settings"
+      >
+        <SlidersHorizontal size={18} aria-hidden="true" />
+        <span>Settings</span>
+      </button>
+      <button
+        className={`rail-button ${activePanel === "history" ? "active" : ""}`}
+        type="button"
+        onClick={onOpenHistory}
+        aria-pressed={activePanel === "history"}
+        aria-label={`History を開く、${historyCount} 件`}
+        title="History"
+      >
+        <History size={18} aria-hidden="true" />
+        {historyCount > 0 ? <span className="rail-count">{historyCount}</span> : null}
+        <span>History</span>
+      </button>
+      <button
+        className={`rail-button ${dictionaryOpen ? "active" : ""}`}
+        type="button"
+        onClick={onOpenDictionary}
+        aria-pressed={dictionaryOpen}
+        aria-label={
+          dictionaryCount > 0
+            ? `Dictionary を開く、${dictionaryCount} 件有効`
+            : "Dictionary を開く"
+        }
+        title="Dictionary"
+      >
+        <BookMarked size={18} aria-hidden="true" />
+        {dictionaryCount > 0 ? <span className="rail-count">{dictionaryCount}</span> : null}
+        <span>Dictionary</span>
+      </button>
+      <button
+        className={`rail-button ${activePanel === "prompt" ? "active" : ""}`}
+        type="button"
+        onClick={onOpenPrompt}
+        aria-pressed={activePanel === "prompt"}
+        aria-label="Style を開く"
+        title="Style"
+      >
+        <MessageSquareText size={18} aria-hidden="true" />
+        <span>Style</span>
+      </button>
+    </nav>
+  );
+}
+
+function formatModelStatusLabel(
+  settings: AppSettings,
+  ollamaConnection: OllamaConnectionStatus,
+): string {
+  const label = providerLabel(settings);
+  const modelName = settings.modelName.trim() || "Model未選択";
+
+  if (ollamaConnection.kind === "connected") {
+    return `${label} · ${modelName} · Ready`;
+  }
+  if (ollamaConnection.kind === "checking") {
+    return `${label} · ${modelName} · 確認中`;
+  }
+  if (ollamaConnection.kind === "error") {
+    return `${label} · ${modelName} · 未接続`;
+  }
+  if (ollamaConnection.kind === "warning") {
+    return `${label} · ${modelName} · 要確認`;
+  }
+  return `${label} · ${modelName} · 未確認`;
+}
+
 function SettingsDrawer({
   settings,
   ollamaModels,
@@ -1538,20 +1648,20 @@ function SetupModal({
   settings,
   ollamaModels,
   ollamaConnection,
-  canStartWriting,
   onChange,
   onCheckOllama,
   onProviderSelected,
   onComplete,
+  onSkip,
 }: {
   settings: AppSettings;
   ollamaModels: OllamaModel[];
   ollamaConnection: OllamaConnectionStatus;
-  canStartWriting: boolean;
   onChange: (settings: AppSettings) => void;
   onCheckOllama: () => void;
   onProviderSelected: (modelProvider: ModelProvider) => void;
   onComplete: () => void;
+  onSkip: () => void;
 }) {
   return (
     <div className="settings-overlay setup-overlay">
@@ -1563,9 +1673,9 @@ function SetupModal({
       >
         <div className="setup-intro">
           <p className="eyebrow">First run</p>
-          <h2 id="setup-modal-title">ローカルモデルのセットアップ</h2>
+          <h2 id="setup-modal-title">最初のモデル設定</h2>
           <p>
-            Provider と API URL を確認し、romaji 変換に使うモデルを選択してください。
+            Provider と Model を選ぶとすぐ変換できます。設定はあとからでも変更できます。
           </p>
         </div>
         <SettingsContent
@@ -1578,10 +1688,12 @@ function SetupModal({
           mode="setup"
         />
         <div className="setup-actions">
+          <button className="secondary-button" type="button" onClick={onSkip}>
+            あとで設定
+          </button>
           <button
             className="primary-button"
             type="button"
-            disabled={!canStartWriting}
             onClick={onComplete}
           >
             書き始める

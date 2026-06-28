@@ -12,13 +12,10 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
-  BookMarked,
   ChevronDown,
   FilePlus2,
   FileText,
   FolderOpen,
-  History,
-  MessageSquareText,
   Redo2,
   Save,
   Undo2,
@@ -35,26 +32,24 @@ import type {
   ConversionRange,
   ConversionTrigger,
   GhostConversionSuggestion,
+  OllamaConnectionStatus,
   PendingConversion,
 } from "../lib/types";
 
 interface MarkdownEditorProps {
   settings: AppSettings;
   pending: PendingConversion[];
-  historyCount: number;
-  dictionaryCount: number;
   initialDocument: string;
   fileName: string;
   isDirty: boolean;
+  modelStatusLabel: string;
+  modelStatusKind: OllamaConnectionStatus["kind"];
   onConvert: (range: ConversionRange) => boolean;
   onDocumentChanged: (documentText: string) => void;
   onNewFile: () => void;
   onOpenFile: () => void;
   onSaveFile: () => void;
   onSaveFileAs: () => void;
-  onOpenHistory: () => void;
-  onOpenPrompt: () => void;
-  onOpenDictionary: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
@@ -225,7 +220,7 @@ const theme = EditorView.theme({
     backgroundColor: "#f0fdfa",
   },
   ".cm-placeholder": {
-    color: "#94a3b8",
+    color: "#64748b",
   },
   ".cm-conversion-loading": {
     backgroundColor: "#ccfbf1",
@@ -285,20 +280,17 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
 export function MarkdownEditor({
   settings,
   pending,
-  historyCount,
-  dictionaryCount,
   initialDocument,
   fileName,
   isDirty,
+  modelStatusLabel,
+  modelStatusKind,
   onConvert,
   onDocumentChanged,
   onNewFile,
   onOpenFile,
   onSaveFile,
   onSaveFileAs,
-  onOpenHistory,
-  onOpenPrompt,
-  onOpenDictionary,
   onAcceptGhost,
   onRetryGhost,
   onRetryRecent,
@@ -625,13 +617,8 @@ export function MarkdownEditor({
 
   return (
     <section className="editor-shell" aria-label="Markdown editor">
-      <div className="editor-toolbar">
-        <div className="editor-title-block">
-          <p className="eyebrow">Markdown</p>
-          <h1>Romaji Kana</h1>
-
-        </div>
-        <div className="editor-actions" aria-label="Editor actions">
+      <div className="editor-commandbar">
+        <div className="commandbar-left">
           <div className="toolbar-menu" ref={fileMenuRef}>
             <button
               aria-expanded={fileMenuOpen}
@@ -669,18 +656,6 @@ export function MarkdownEditor({
               </div>
             ) : null}
           </div>
-          <button className="pill pill-action" type="button" onClick={onOpenHistory}>
-            <History size={15} aria-hidden="true" />
-            {pending.length > 0 ? `${pending.length} 件変換中` : `${historyCount} History`}
-          </button>
-          <button className="pill pill-action" type="button" onClick={onOpenPrompt}>
-            <MessageSquareText size={15} aria-hidden="true" />
-            Style
-          </button>
-        </div>
-      </div>
-      <div className="editor-filebar" aria-label="Editor document bar">
-        <div className="editor-filebar-side">
           <button
             className="editor-chrome-button"
             type="button"
@@ -700,27 +675,21 @@ export function MarkdownEditor({
             <Redo2 size={16} aria-hidden="true" />
           </button>
         </div>
-        <div className="editor-filebar-title" title={fileName}>
-          <span>{fileName}</span>
-          {isDirty ? <span className="dirty-chip">未保存</span> : null}
+        <div className="commandbar-document" title={fileName}>
+          <h1>Romaji Kana</h1>
+          <span className="document-name">{fileName}</span>
+          <span className={`save-chip ${isDirty ? "dirty" : ""}`}>
+            {isDirty ? "未保存" : "保存済み"}
+          </span>
         </div>
-        <div className="editor-filebar-side editor-filebar-side-right">
-          <button
-            className="editor-chrome-button dictionary-filebar-button"
-            type="button"
-            onClick={onOpenDictionary}
-            aria-label={
-              dictionaryCount > 0
-                ? `Dictionary を開く、${dictionaryCount} 件有効`
-                : "Dictionary を開く"
-            }
-            title="Dictionary"
-          >
-            <BookMarked size={16} aria-hidden="true" />
-            {dictionaryCount > 0 ? (
-              <span className="dictionary-filebar-count">{dictionaryCount}</span>
-            ) : null}
-          </button>
+        <div className="commandbar-right">
+          {pending.length > 0 ? (
+            <span className="queue-chip">{pending.length} 件変換中</span>
+          ) : null}
+          <span className="mode-chip">
+            {settings.conversionMode === "ghost" ? "Ghost + Tab" : "Replace"}
+          </span>
+          <span className={`model-chip ${modelStatusKind}`}>{modelStatusLabel}</span>
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />
