@@ -2052,8 +2052,9 @@ function HistoryPanel({
         <div className="pending-list" aria-label="処理中の変換">
           {pending.map((request) => (
             <article className="pending-item" key={request.id}>
-              <div>
-                <strong>
+              <div className="pending-copy">
+                <span className="pending-state">
+                  <Loader2 size={13} className="spin" aria-hidden="true" />
                   {request.retryOf
                     ? request.status === "queued"
                       ? "再試行待ち"
@@ -2063,10 +2064,10 @@ function HistoryPanel({
                     : request.source === "history"
                       ? "再適用中"
                       : "変換中"}
-                </strong>
+                </span>
                 <p>{request.originalText}</p>
               </div>
-              <button className="secondary-button" type="button" onClick={() => onCancel(request)}>
+              <button className="history-action-button" type="button" onClick={() => onCancel(request)}>
                 キャンセル
               </button>
             </article>
@@ -2077,34 +2078,42 @@ function HistoryPanel({
       {history.length === 0 ? (
         <p className="empty-state">変換はまだありません。</p>
       ) : (
-        <div className="history-list">
+        <div className="history-list" role="list">
           {history.map((item) => (
             <article
               className={`history-item ${item.status}`}
               key={item.id}
+              role="listitem"
               onBlur={() => onPreviewEnd(item)}
+              onFocus={() => onPreview(item)}
               onMouseEnter={() => onPreview(item)}
               onMouseLeave={() => onPreviewEnd(item)}
             >
               <div className="history-meta">
-                <span className={`status-chip ${item.status}`}>{historyStatusLabel(item.status)}</span>
-                <span>{new Date(item.createdAt).toLocaleTimeString()}</span>
+                <span className="history-status">
+                  <span className={`history-status-dot ${item.status}`} aria-hidden="true" />
+                  {historyStatusLabel(item.status)}
+                </span>
+                <time dateTime={new Date(item.createdAt).toISOString()}>
+                  {new Date(item.createdAt).toLocaleTimeString()}
+                </time>
               </div>
-              <dl>
-                <div>
-                  <dt>Romaji</dt>
+              <dl className="history-lines">
+                <div className="history-line">
+                  <dt>Input</dt>
                   <dd>{item.input}</dd>
                 </div>
-                <div>
-                  <dt>{item.status === "success" ? "日本語" : "結果"}</dt>
+                <div className="history-line">
+                  <dt>{item.status === "success" ? "Output" : "Result"}</dt>
                   <dd>{item.output ?? item.error ?? "出力はありません。"}</dd>
                 </div>
               </dl>
               <div className="rerun-meta">
-                <span>{item.modelName}</span>
+                <span className="history-model">{item.modelName}</span>
                 <button
-                  className="rerun-hint"
+                  className="history-action-button"
                   type="button"
+                  title="再試行"
                   onFocus={() => onPreview(item)}
                   onClick={() => {
                     onPreviewEnd(item);
@@ -2116,7 +2125,7 @@ function HistoryPanel({
                   再試行
                 </button>
                 <button
-                  className="rerun-hint"
+                  className="history-action-button"
                   type="button"
                   disabled={!item.output}
                   title={item.output ? "前回結果を避けて別候補を生成します" : "出力がないため別候補は生成できません"}
