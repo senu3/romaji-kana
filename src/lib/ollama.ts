@@ -322,7 +322,15 @@ function splitInputForConversion(
     return splitInputByInlineKanjiTerms(part.value);
   });
 
-  return literalParts.flatMap((part): ConversionSplitPart[] => {
+  const boundaryParts = literalParts.flatMap((part) => {
+    if (part.type === "literal") {
+      return [part];
+    }
+
+    return splitInputBySpacedRomajiParticles(part.value);
+  });
+
+  return boundaryParts.flatMap((part): ConversionSplitPart[] => {
     if (part.type === "literal") {
       return [part];
     }
@@ -408,6 +416,74 @@ function splitInputByInlineKanjiTerms(input: string): Array<DictionaryTextPart |
   }
 
   return parts;
+}
+
+function splitInputBySpacedRomajiParticles(
+  input: string,
+): Array<DictionaryTextPart | LiteralNounPart> {
+  const matches = Array.from(
+    input.matchAll(/(?<!\S)(no|ni|wo|o|ha|wa|ga|to|de|e|he|mo|kara|made|yori)(?!\S)/gi),
+  );
+  if (matches.length === 0) {
+    return [{ type: "text", value: input }];
+  }
+
+  const parts: Array<DictionaryTextPart | LiteralNounPart> = [];
+  let lastCopiedIndex = 0;
+  for (const match of matches) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    const leadingText = input.slice(lastCopiedIndex, start).trimEnd();
+    const particle = match[0];
+    if (leadingText.length > 0) {
+      parts.push({ type: "text", value: leadingText });
+    }
+    parts.push({ type: "literal", output: romajiParticleToKana(particle) });
+    lastCopiedIndex = end;
+    while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
+      lastCopiedIndex += 1;
+    }
+  }
+
+  if (lastCopiedIndex < input.length) {
+    parts.push({ type: "text", value: input.slice(lastCopiedIndex) });
+  }
+
+  return parts;
+}
+
+function romajiParticleToKana(particle: string): string {
+  switch (particle.toLowerCase()) {
+    case "no":
+      return "の";
+    case "ni":
+      return "に";
+    case "wo":
+    case "o":
+      return "を";
+    case "ha":
+    case "wa":
+      return "は";
+    case "ga":
+      return "が";
+    case "to":
+      return "と";
+    case "de":
+      return "で";
+    case "e":
+    case "he":
+      return "へ";
+    case "mo":
+      return "も";
+    case "kara":
+      return "から";
+    case "made":
+      return "まで";
+    case "yori":
+      return "より";
+    default:
+      return particle;
+  }
 }
 
 function isJapaneseTermCharacter(character: string): boolean {

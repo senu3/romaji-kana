@@ -336,10 +336,7 @@ describe("convertRomajiToJapanese", () => {
   it("excludes dictionary terms from LLM conversion and joins converted text segments", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "の" })
-        .mockResolvedValueOnce({ response: "を確認します。" }),
+      generate: vi.fn().mockResolvedValue({ response: "確認します。" }),
     };
     const settings = {
       ...defaultSettings,
@@ -364,14 +361,39 @@ describe("convertRomajiToJapanese", () => {
     const result = await convertRomajiToJapanese("openai no api wo kakunin.", settings, transport);
 
     expect(result).toBe("OpenAIのAPIを確認します。");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "かくにん。",
+      }),
+      30_000,
+    );
+    const request = transport.generate.mock.calls[0]?.[2];
+    expect(request.system).not.toContain("openai");
+    expect(request.system).not.toContain("api");
+  });
+
+  it("treats space-delimited romaji particles as explicit particles", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "確認" })
+        .mockResolvedValueOnce({ response: "行く。" }),
+    };
+
+    const result = await convertRomajiToJapanese("kakunin ni iku.", defaultSettings, transport);
+
+    expect(result).toBe("確認に行く。");
     expect(transport.generate).toHaveBeenCalledTimes(2);
     expect(transport.generate).toHaveBeenNthCalledWith(
       1,
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        system: expect.not.stringContaining("openai"),
-        prompt: " の ",
+        prompt: "かくにん",
       }),
       30_000,
     );
@@ -380,8 +402,70 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        system: expect.not.stringContaining("api"),
-        prompt: " を かくにん。",
+        prompt: "いく。",
+      }),
+      30_000,
+    );
+  });
+
+  it("treats consecutive space-delimited romaji particles independently", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "これ" })
+        .mockResolvedValueOnce({ response: "理由" })
+        .mockResolvedValueOnce({ response: "ある。" }),
+    };
+
+    const result = await convertRomajiToJapanese("kore ni ha riyuu ga aru.", defaultSettings, transport);
+
+    expect(result).toBe("これには理由がある。");
+    expect(transport.generate).toHaveBeenCalledTimes(3);
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "これ",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "りゆう",
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      3,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "ある。",
+      }),
+      30_000,
+    );
+  });
+
+  it("keeps connected particle-like romaji convertible", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "について確認します。" }),
+    };
+
+    const result = await convertRomajiToJapanese("nitsuite kakunin.", defaultSettings, transport);
+
+    expect(result).toBe("について確認します。");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        prompt: "について かくにん。",
       }),
       30_000,
     );
@@ -450,7 +534,7 @@ describe("convertRomajiToJapanese", () => {
     };
     const matchedTransport = {
       models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+      generate: vi.fn().mockResolvedValue({ response: "行く。" }),
     };
     const unmatchedTransport = {
       models: vi.fn(),
@@ -474,7 +558,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: " に いく。",
+        prompt: "いく。",
       }),
       30_000,
     );
@@ -501,7 +585,7 @@ describe("convertRomajiToJapanese", () => {
   it("keeps backtick-wrapped unknown nouns out of LLM conversion", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+      generate: vi.fn().mockResolvedValue({ response: "行く。" }),
     };
 
     const result = await convertRomajiToJapanese("`openair` ni iku.", defaultSettings, transport);
@@ -513,7 +597,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.not.stringContaining("openair"),
-        prompt: " に いく。",
+        prompt: "いく。",
       }),
       30_000,
     );
@@ -593,7 +677,7 @@ describe("convertRomajiToJapanese", () => {
   it("re-protects current ASCII terms for history retry without sending them to the LLM", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({ response: "に行く。" }),
+      generate: vi.fn().mockResolvedValue({ response: "行く。" }),
     };
     const protectedDictionaryEntries = buildProtectedDictionaryEntries(
       "openair ni iku.",
@@ -610,7 +694,7 @@ describe("convertRomajiToJapanese", () => {
 
     expect(result).toEqual({
       text: "openairに行く。",
-      reviewKana: "openair に いく。",
+      reviewKana: "openairにいく。",
     });
     expect(protectedDictionaryEntries).toEqual([
       {
@@ -625,7 +709,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.not.stringContaining("openair"),
-        prompt: " に いく。",
+        prompt: "いく。",
       }),
       30_000,
     );
@@ -677,7 +761,6 @@ describe("convertRomajiToJapanese", () => {
       generate: vi
         .fn()
         .mockResolvedValueOnce({ response: "今日は" })
-        .mockResolvedValueOnce({ response: "の" })
         .mockResolvedValueOnce({ response: "を確認します。" }),
     };
 
@@ -688,7 +771,7 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toBe("今日は昨日の予定を確認します。");
-    expect(transport.generate).toHaveBeenCalledTimes(3);
+    expect(transport.generate).toHaveBeenCalledTimes(2);
     expect(transport.generate).toHaveBeenNthCalledWith(
       1,
       "ollama",
@@ -700,15 +783,6 @@ describe("convertRomajiToJapanese", () => {
     );
     expect(transport.generate).toHaveBeenNthCalledWith(
       2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "の",
-      }),
-      30_000,
-    );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      3,
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
