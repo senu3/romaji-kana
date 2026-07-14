@@ -60,6 +60,7 @@ export function extractConversionRange(
   if (
     from >= safeCursor ||
     !text.trim() ||
+    !/[A-Za-z]/.test(text) ||
     (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))
   ) {
     return null;
@@ -92,7 +93,7 @@ export function extractSelectedConversionRange(
   const to = safeTo - trailingWhitespace;
   const text = doc.slice(from, to);
 
-  if (from >= to || !text.trim() || isJapaneseDominant(text)) {
+  if (from >= to || !text.trim() || !/[A-Za-z]/.test(text) || isJapaneseDominant(text)) {
     return null;
   }
 
@@ -201,22 +202,44 @@ function isKanjiMixedRomajiInput(text: string): boolean {
 
 function isInsideFencedCode(doc: string, position: number): boolean {
   const before = doc.slice(0, position).split("\n");
-  let open = false;
+  let openFence: { marker: "`" | "~"; length: number } | null = null;
 
   for (const line of before) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      open = !open;
+    const match = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (!match) {
+      continue;
+    }
+
+    const fence = match[1];
+    const marker = fence[0] as "`" | "~";
+    if (!openFence) {
+      openFence = { marker, length: fence.length };
+      continue;
+    }
+
+    if (openFence.marker === marker && fence.length >= openFence.length) {
+      openFence = null;
     }
   }
 
-  return open;
+  return openFence !== null;
 }
 
 function isInsideInlineCode(doc: string, position: number): boolean {
   const line = getLineAt(doc, position);
   const before = line.text.slice(0, position - line.from);
-  const unescapedBackticks = [...before.matchAll(/(?<!\\)`/g)].length;
-  return unescapedBackticks % 2 === 1;
+  let openRunLength: number | null = null;
+
+  for (const match of before.matchAll(/(?<!\\)(`+)/g)) {
+    const runLength = match[1].length;
+    if (openRunLength === null) {
+      openRunLength = runLength;
+    } else if (openRunLength === runLength) {
+      openRunLength = null;
+    }
+  }
+
+  return openRunLength !== null;
 }
 
 function isInsideUrl(doc: string, position: number): boolean {

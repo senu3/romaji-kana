@@ -378,31 +378,18 @@ describe("convertRomajiToJapanese", () => {
   it("treats space-delimited romaji particles as explicit particles", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "確認" })
-        .mockResolvedValueOnce({ response: "行く。" }),
+      generate: vi.fn().mockResolvedValue({ response: "確認に行く。" }),
     };
 
     const result = await convertRomajiToJapanese("kakunin ni iku.", defaultSettings, transport);
 
     expect(result).toBe("確認に行く。");
-    expect(transport.generate).toHaveBeenCalledTimes(2);
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      1,
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "かくにん",
-      }),
-      30_000,
-    );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "いく。",
+        prompt: "かくにんにいく。",
       }),
       30_000,
     );
@@ -411,41 +398,18 @@ describe("convertRomajiToJapanese", () => {
   it("treats consecutive space-delimited romaji particles independently", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "これ" })
-        .mockResolvedValueOnce({ response: "理由" })
-        .mockResolvedValueOnce({ response: "ある。" }),
+      generate: vi.fn().mockResolvedValue({ response: "これには理由がある。" }),
     };
 
     const result = await convertRomajiToJapanese("kore ni ha riyuu ga aru.", defaultSettings, transport);
 
     expect(result).toBe("これには理由がある。");
-    expect(transport.generate).toHaveBeenCalledTimes(3);
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      1,
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "これ",
-      }),
-      30_000,
-    );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "りゆう",
-      }),
-      30_000,
-    );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      3,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        prompt: "ある。",
+        prompt: "これにはりゆうがある。",
       }),
       30_000,
     );

@@ -9,6 +9,10 @@ import {
 import { defaultSettings } from "./settings";
 
 describe("extractConversionRange", () => {
+  it("skips punctuation-only input", () => {
+    expect(extractConversionRange(".", 1, "period")).toBeNull();
+  });
+
   it("extracts the sentence before a period trigger", () => {
     const doc = "anatahadonnakotogasukidesuka.";
     expect(extractConversionRange(doc, doc.length, "period")).toEqual({
@@ -184,6 +188,11 @@ describe("extractSelectedConversionRange", () => {
     expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")).toBeNull();
   });
 
+  it("skips selections without romaji", () => {
+    const doc = "1234.,";
+    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")).toBeNull();
+  });
+
   it("skips selected text inside excluded markdown", () => {
     const doc = "`anatahadaredesuka.`";
     expect(extractSelectedConversionRange(doc, 1, doc.length - 1, "shortcut")).toBeNull();
@@ -196,9 +205,19 @@ describe("markdown exclusions", () => {
     expect(isInsideExcludedMarkdown(doc, "```txt\nanata".length)).toBe(true);
   });
 
+  it("does not close a fenced block with a different fence marker", () => {
+    const doc = "```txt\n~~~\nanatahadaredesuka.\n```";
+    expect(isInsideExcludedMarkdown(doc, doc.indexOf("anata") + 3)).toBe(true);
+  });
+
   it("excludes inline code", () => {
     const doc = "`anatahadaredesuka.`";
     expect(isInsideExcludedMarkdown(doc, doc.length - 1)).toBe(true);
+  });
+
+  it("excludes inline code delimited by multiple backticks", () => {
+    const doc = "``anata`hadaredesuka.``";
+    expect(isInsideExcludedMarkdown(doc, doc.indexOf("hadare") + 3)).toBe(true);
   });
 
   it("excludes urls", () => {

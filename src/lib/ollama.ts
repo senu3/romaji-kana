@@ -322,20 +322,29 @@ function splitInputForConversion(
     return splitInputByInlineKanjiTerms(part.value);
   });
 
-  const boundaryParts = literalParts.flatMap((part) => {
-    if (part.type === "literal") {
-      return [part];
-    }
-
-    return splitInputBySpacedRomajiParticles(part.value);
-  });
-
-  return boundaryParts.flatMap((part): ConversionSplitPart[] => {
+  const dictionaryParts = literalParts.flatMap((part): ConversionSplitPart[] => {
     if (part.type === "literal") {
       return [part];
     }
 
     return splitInputByDictionary(part.value, entries);
+  });
+
+  const hasProtectedLiteral = dictionaryParts.some((part) => part.type !== "text");
+  if (!hasProtectedLiteral) {
+    return dictionaryParts.map((part) =>
+      part.type === "text"
+        ? { type: "text" as const, value: normalizeSpacedRomajiParticles(part.value) }
+        : part,
+    );
+  }
+
+  return dictionaryParts.flatMap((part): ConversionSplitPart[] => {
+    if (part.type !== "text") {
+      return [part];
+    }
+
+    return splitInputByProtectedSpacedRomajiParticles(part.value);
   });
 }
 
@@ -418,9 +427,36 @@ function splitInputByInlineKanjiTerms(input: string): Array<DictionaryTextPart |
   return parts;
 }
 
-function splitInputBySpacedRomajiParticles(
-  input: string,
-): Array<DictionaryTextPart | LiteralNounPart> {
+function normalizeSpacedRomajiParticles(input: string): string {
+  const matches = Array.from(
+    input.matchAll(/(?<!\S)(no|ni|wo|o|ha|wa|ga|to|de|e|he|mo|kara|made|yori)(?!\S)/gi),
+  );
+  if (matches.length === 0) {
+    return input;
+  }
+
+  let normalized = "";
+  let lastCopiedIndex = 0;
+  for (const match of matches) {
+    const start = match.index ?? 0;
+    const end = start + match[0].length;
+    const leadingText = input.slice(lastCopiedIndex, start).trimEnd();
+    normalized += leadingText;
+    normalized += romajiParticleToKana(match[0]);
+    lastCopiedIndex = end;
+    while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
+      lastCopiedIndex += 1;
+    }
+  }
+
+  if (lastCopiedIndex < input.length) {
+    normalized += input.slice(lastCopiedIndex);
+  }
+
+  return normalized;
+}
+
+function splitInputByProtectedSpacedRomajiParticles(input: string): ConversionSplitPart[] {
   const matches = Array.from(
     input.matchAll(/(?<!\S)(no|ni|wo|o|ha|wa|ga|to|de|e|he|mo|kara|made|yori)(?!\S)/gi),
   );
@@ -428,17 +464,16 @@ function splitInputBySpacedRomajiParticles(
     return [{ type: "text", value: input }];
   }
 
-  const parts: Array<DictionaryTextPart | LiteralNounPart> = [];
+  const parts: ConversionSplitPart[] = [];
   let lastCopiedIndex = 0;
   for (const match of matches) {
     const start = match.index ?? 0;
     const end = start + match[0].length;
     const leadingText = input.slice(lastCopiedIndex, start).trimEnd();
-    const particle = match[0];
     if (leadingText.length > 0) {
       parts.push({ type: "text", value: leadingText });
     }
-    parts.push({ type: "literal", output: romajiParticleToKana(particle) });
+    parts.push({ type: "literal", output: romajiParticleToKana(match[0]) });
     lastCopiedIndex = end;
     while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
       lastCopiedIndex += 1;
