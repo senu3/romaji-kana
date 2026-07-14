@@ -3,7 +3,7 @@ const DOCUMENT_SESSION_STORAGE_KEY = "romaji-kana-document-session";
 
 export type DocumentSession =
   | { kind: "new"; content: string }
-  | { kind: "file"; path: string };
+  | { kind: "file"; path: string; content: string; dirty: boolean };
 
 export function loadDocumentSession(): DocumentSession {
   try {
@@ -27,8 +27,12 @@ export function saveNewDocumentSession(content: string): void {
   saveDocumentSession({ kind: "new", content });
 }
 
-export function saveFileDocumentSession(path: string): void {
-  saveDocumentSession({ kind: "file", path });
+export function saveFileDocumentSession(
+  path: string,
+  content = "",
+  dirty = false,
+): void {
+  saveDocumentSession({ kind: "file", path, content, dirty });
 }
 
 export function clearDocumentSession(): void {
@@ -48,7 +52,12 @@ function normalizeDocumentSession(value: unknown): DocumentSession {
 
   const record = value as Record<string, unknown>;
   if (record.kind === "file" && typeof record.path === "string" && record.path.trim()) {
-    return { kind: "file", path: record.path };
+    return {
+      kind: "file",
+      path: record.path,
+      content: typeof record.content === "string" ? record.content : "",
+      dirty: record.dirty === true,
+    };
   }
   if (record.kind === "new" && typeof record.content === "string") {
     return { kind: "new", content: record.content };

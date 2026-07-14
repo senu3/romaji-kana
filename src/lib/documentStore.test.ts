@@ -35,10 +35,40 @@ describe("documentStore", () => {
     });
   });
 
-  it("restores the previous file path without storing file content as a draft", () => {
-    saveFileDocumentSession("C:\\notes\\memo.md");
+  it("restores a clean file session", () => {
+    saveFileDocumentSession("C:\\notes\\memo.md", "# saved", false);
 
-    expect(loadDocumentSession()).toEqual({ kind: "file", path: "C:\\notes\\memo.md" });
+    expect(loadDocumentSession()).toEqual({
+      kind: "file",
+      path: "C:\\notes\\memo.md",
+      content: "# saved",
+      dirty: false,
+    });
+  });
+
+  it("restores unsaved edits for a file-backed document", () => {
+    saveFileDocumentSession("C:\\notes\\memo.md", "# edited draft", true);
+
+    expect(loadDocumentSession()).toEqual({
+      kind: "file",
+      path: "C:\\notes\\memo.md",
+      content: "# edited draft",
+      dirty: true,
+    });
+  });
+
+  it("migrates a legacy path-only file session", () => {
+    storage.set(
+      "romaji-kana-document-session",
+      JSON.stringify({ kind: "file", path: "C:\\notes\\memo.md" }),
+    );
+
+    expect(loadDocumentSession()).toEqual({
+      kind: "file",
+      path: "C:\\notes\\memo.md",
+      content: "",
+      dirty: false,
+    });
   });
 
   it("falls back from the legacy document snapshot as an unsaved new document", () => {
