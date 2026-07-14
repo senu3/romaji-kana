@@ -36,6 +36,12 @@ export default defineConfig(async () => ({
           if (!id.includes("node_modules")) {
             return undefined;
           }
+          if (id.includes("@codemirror/search")) {
+            return "editor-search";
+          }
+          if (id.includes("@codemirror/lang-markdown") || id.includes("@lezer/markdown")) {
+            return "editor-markdown";
+          }
           if (id.includes("@codemirror") || id.includes("@lezer")) {
             return "editor";
           }
