@@ -6,11 +6,9 @@ import {
   History,
   Loader2,
   MessageSquareText,
-  Minus,
   Plus,
   RotateCcw,
   SlidersHorizontal,
-  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -19,10 +17,13 @@ import "./App.css";
 import {
   addLoadingDecoration,
   clearGhostSuggestion,
+  type EditorDocumentStatus,
+  ghostSuggestionField,
   MarkdownEditor,
   removeLoadingDecoration,
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
+import { SettingsContent } from "./components/SettingsPanel";
 import {
   loadDocumentSession,
   saveFileDocumentSession,
@@ -61,8 +62,9 @@ const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
-const ENABLE_FIRST_RUN_SETUP_MODAL = true;
+const ENABLE_FIRST_RUN_SETUP_MODAL = false;
 const MAX_USER_DICTIONARY_ENTRIES = 50;
+const MAX_CONVERSION_HISTORY_ITEMS = 100;
 
 function shouldForceSetupModalFromQuery(): boolean {
   if (typeof window === "undefined") {
@@ -108,21 +110,28 @@ function App() {
     initialSession.kind === "file" ? initialSession.path : null,
   );
   const [isDirty, setIsDirty] = useState(
-    initialSession.kind === "new" && initialSession.content.length > 0,
+    initialSession.kind === "new"
+      ? initialSession.content.length > 0
+      : initialSession.dirty,
   );
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
     message: "ローカルモデル Provider はまだ確認されていません。",
   });
-  const [initialDocument] = useState(() =>
-    initialSession.kind === "new" ? initialSession.content : "",
-  );
+  const [initialDocument] = useState(() => initialSession.content);
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
   });
   const [editorReady, setEditorReady] = useState(false);
+  const [editorStatus, setEditorStatus] = useState<EditorDocumentStatus>({
+    line: 1,
+    column: 1,
+    lineCount: 1,
+    characterCount: initialDocument.length,
+    selectionCount: 0,
+  });
   const [setupComplete, setSetupComplete] = useState(() => {
     if (typeof localStorage === "undefined") {
       return true;
@@ -136,7 +145,9 @@ function App() {
   const currentFilePathRef = useRef<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
   );
-  const isDirtyRef = useRef(initialSession.kind === "new" && initialSession.content.length > 0);
+  const isDirtyRef = useRef(
+    initialSession.kind === "new" ? initialSession.content.length > 0 : initialSession.dirty,
+  );
   const initialFileRestoreStartedRef = useRef(false);
   const docVersionRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,7 +228,7 @@ function App() {
     saveTimerRef.current = setTimeout(() => {
       const filePath = currentFilePathRef.current;
       if (filePath) {
-        saveFileDocumentSession(filePath);
+        saveFileDocumentSession(filePath, documentText, true);
       } else {
         saveNewDocumentSession(documentText);
       }
@@ -568,12 +579,30 @@ function App() {
   const saveCurrentDocumentSession = useCallback((documentText: string) => {
     const filePath = currentFilePathRef.current;
     if (filePath) {
-      saveFileDocumentSession(filePath);
+      saveFileDocumentSession(filePath, documentText, isDirtyRef.current);
       return;
     }
 
     saveNewDocumentSession(documentText);
   }, []);
+
+  useEffect(() => {
+    const persistCurrentDraft = () => {
+      saveCurrentDocumentSession(getEditorDocument());
+    };
+    const persistWhenHidden = () => {
+      if (document.visibilityState === "hidden") {
+        persistCurrentDraft();
+      }
+    };
+
+    window.addEventListener("beforeunload", persistCurrentDraft);
+    document.addEventListener("visibilitychange", persistWhenHidden);
+    return () => {
+      window.removeEventListener("beforeunload", persistCurrentDraft);
+      document.removeEventListener("visibilitychange", persistWhenHidden);
+    };
+  }, [getEditorDocument, saveCurrentDocumentSession]);
 
   const handleNewFile = useCallback(() => {
     if (!confirmDiscardUnsavedChanges()) {
@@ -603,7 +632,7 @@ function App() {
       replaceEditorDocument(file.content);
       setCurrentFilePath(file.path);
       markDocumentClean();
-      saveFileDocumentSession(file.path);
+      saveFileDocumentSession(file.path, file.content, false);
       setStatus({ kind: "success", message: `${basename(file.path)} を開きました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
@@ -620,7 +649,7 @@ function App() {
       currentFilePathRef.current = savedPath;
       setCurrentFilePath(savedPath);
       markDocumentClean();
-      saveFileDocumentSession(savedPath);
+      saveFileDocumentSession(savedPath, getEditorDocument(), false);
       setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
@@ -637,7 +666,7 @@ function App() {
       currentFilePathRef.current = savedPath;
       setCurrentFilePath(savedPath);
       markDocumentClean();
-      saveFileDocumentSession(savedPath);
+      saveFileDocumentSession(savedPath, getEditorDocument(), false);
       setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
@@ -646,6 +675,12 @@ function App() {
 
   useEffect(() => {
     if (!editorReady || initialSession.kind !== "file" || initialFileRestoreStartedRef.current) {
+      return;
+    }
+
+    if (initialSession.dirty) {
+      initialFileRestoreStartedRef.current = true;
+      setStatus({ kind: "warning", message: `${basename(initialSession.path)} の未保存の編集内容を復元しました。` });
       return;
     }
 
@@ -658,7 +693,7 @@ function App() {
         replaceEditorDocument(file.content);
         setCurrentFilePath(file.path);
         markDocumentClean();
-        saveFileDocumentSession(file.path);
+        saveFileDocumentSession(file.path, file.content, false);
         setStatus({ kind: "success", message: `${basename(file.path)} を再度開きました。` });
       })
       .catch((error: unknown) => {
@@ -706,8 +741,8 @@ function App() {
   }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs]);
 
   const recordCanceledConversion = useCallback((request: PendingConversion) => {
-    setHistory((items) => [
-      {
+    setHistory((items) =>
+      prependConversionHistory(items, {
         id: request.id,
         status: "canceled",
         input: request.originalText,
@@ -718,15 +753,14 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
-      },
-      ...items,
-    ]);
+      }),
+    );
     setStatus({ kind: "warning", message: "変換をキャンセルしました。" });
   }, []);
 
   const skipQueuedConversion = useCallback((request: PendingConversion, message: string) => {
-    setHistory((items) => [
-      {
+    setHistory((items) =>
+      prependConversionHistory(items, {
         id: request.id,
         status: "skipped",
         input: request.originalText,
@@ -737,9 +771,8 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
-      },
-      ...items,
-    ]);
+      }),
+    );
     setStatus({ kind: "warning", message });
   }, []);
 
@@ -818,8 +851,8 @@ function App() {
           kind: "success",
           message:
             conversion.conversionStrategy === "completion"
-              ? "補完変換で Ghost suggestion を生成しました。Tab で確定、Ctrl+/ で別候補を試せます。"
-              : "Ghost suggestion の準備ができました。Tab で確定、Ctrl+/ で別候補を試せます。",
+              ? "補完変換候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
+              : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。",
         });
         return;
       }
@@ -855,14 +888,14 @@ function App() {
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
-      setHistory((items) => [historyItem, ...items]);
+      setHistory((items) => prependConversionHistory(items, historyItem));
       setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
         message:
           conversion.conversionStrategy === "completion"
-            ? "補完変換で変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。"
-            : "変換しました。Ctrl+/ で別候補を試せます。Undo で romaji に戻せます。",
+            ? "補完変換で変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。"
+            : "変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。",
       });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
@@ -878,7 +911,7 @@ function App() {
       if (request.anchor && currentView && !resolved) {
         skipQueuedConversion(
           request,
-          "適用位置を解決できなかったため、History からの変換を適用しませんでした。",
+          "適用位置を解決できなかったため、履歴からの変換を適用しませんでした。",
         );
         return;
       }
@@ -905,8 +938,8 @@ function App() {
       const converted = conversion.text;
       const latestView = editorViewRef.current;
       if (!latestView || !request.anchor || !resolved) {
-        setHistory((items) => [
-          {
+        setHistory((items) =>
+          prependConversionHistory(items, {
             id: request.id,
             status: "success",
             input: request.originalText,
@@ -918,15 +951,14 @@ function App() {
             conversionStrategy: conversion.conversionStrategy,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
-          },
-          ...items,
-        ]);
+          }),
+        );
         setStatus({
           kind: "success",
           message:
             conversion.conversionStrategy === "completion"
-              ? "補完変換で History から再変換しました。適用先がないため結果のみ保存しました。"
-              : "History から再変換しました。適用先がないため結果のみ保存しました。",
+              ? "補完変換で履歴から再変換しました。適用先がないため結果のみ保存しました。"
+              : "履歴から再変換しました。適用先がないため結果のみ保存しました。",
         });
         return;
       }
@@ -940,35 +972,12 @@ function App() {
       if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
         skipQueuedConversion(
           request,
-          "適用前に位置が変わったため、History からの変換を適用しませんでした。",
+          "適用前に位置が変わったため、履歴からの変換を適用しませんでした。",
         );
         return;
       }
 
       if (settingsRef.current.conversionMode === "ghost") {
-        const nextAnchor: ConversionAnchor = {
-          from: latestResolved.from,
-          to: latestResolved.to,
-          originalText: latestResolved.matchedText,
-          appliedText: converted,
-          docVersion: docVersionRef.current,
-        };
-
-        setHistory((items) =>
-          upsertConversionHistory(items, {
-            id: request.id,
-            status: "success",
-            input: request.originalText,
-            output: converted,
-            modelName: settingsRef.current.modelName,
-            createdAt: Date.now(),
-            source: "history",
-            anchor: nextAnchor,
-            conversionStrategy: conversion.conversionStrategy,
-            retryOf: request.retryOf,
-            avoidOutputs: request.avoidOutputs,
-          }),
-        );
         latestView.dispatch({
           effects: showGhostSuggestion.of({
             id: request.id,
@@ -984,12 +993,13 @@ function App() {
             avoidOutputs: request.avoidOutputs,
           }),
         });
+        latestView.focus();
         setStatus({
           kind: "success",
           message:
             conversion.conversionStrategy === "completion"
-              ? "補完変換で History suggestion を生成しました。Tab で適用、Ctrl+/ で別候補を試せます。"
-              : "History suggestion の準備ができました。Tab で適用、Ctrl+/ で別候補を試せます。",
+              ? "履歴から補完変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
+              : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。",
         });
         return;
       }
@@ -1026,16 +1036,16 @@ function App() {
         avoidOutputs: request.avoidOutputs,
       };
 
-      setHistory((items) => [historyItem, ...items]);
+      setHistory((items) => prependConversionHistory(items, historyItem));
       setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
         message:
           conversion.conversionStrategy === "completion"
-            ? "補完変換で History の変換を適用しました。Ctrl+/ で別候補を試せます。"
+            ? "補完変換で履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
             : latestResolved.matchedBy === "nearby"
-            ? "近くの一致位置に History の変換を適用しました。Ctrl+/ で別候補を試せます。"
-            : "History の変換を適用しました。Ctrl+/ で別候補を試せます。",
+            ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
+            : "履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。",
       });
     },
     [saveCurrentDocumentSession, skipQueuedConversion],
@@ -1079,8 +1089,8 @@ function App() {
         } catch (error: unknown) {
           if (!canceledRequestsRef.current.has(request.id)) {
             const message = formatConversionError(error);
-            setHistory((items) => [
-              {
+            setHistory((items) =>
+              prependConversionHistory(items, {
                 id: request.id,
                 status: "error",
                 input: request.originalText,
@@ -1091,9 +1101,8 @@ function App() {
                 anchor: request.anchor,
                 retryOf: request.retryOf,
                 avoidOutputs: request.avoidOutputs,
-              },
-              ...items,
-            ]);
+              }),
+            );
             setStatus({ kind: "error", message });
           }
         } finally {
@@ -1117,6 +1126,14 @@ function App() {
 
   const enqueueConversion = useCallback(
     (request: PendingConversion) => {
+      if (
+        request.source === "history" &&
+        hasDuplicatePendingHistoryConversion(conversionQueueRef.current, request)
+      ) {
+        setStatus({ kind: "warning", message: "同じ再変換はすでに処理待ちです。" });
+        return false;
+      }
+
       setRecentRetryItem(null);
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
@@ -1124,6 +1141,7 @@ function App() {
         setStatus({ kind: "loading", message: `"${request.originalText}" をキューに追加しました` });
       }
       void processConversionQueue();
+      return true;
     },
     [processConversionQueue],
   );
@@ -1185,8 +1203,8 @@ function App() {
       kind: "success",
       message:
         suggestion.conversionStrategy === "completion"
-          ? "補完変換の Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。"
-          : "Ghost suggestion を確定しました。Ctrl+/ で別候補を試せます。",
+          ? "補完変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+          : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
     });
   }, [saveCurrentDocumentSession]);
 
@@ -1250,6 +1268,11 @@ function App() {
       return;
     }
 
+    const activeSuggestion = view.state.field(ghostSuggestionField).suggestion;
+    if (activeSuggestion && !activeSuggestion.id.startsWith("history-preview-")) {
+      return;
+    }
+
     const resolved = resolveConversionAnchor(view.state.doc.toString(), item.anchor);
     if (!resolved) {
       return;
@@ -1267,6 +1290,7 @@ function App() {
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
+        previewOnly: resolved.matchedText === item.output,
       }),
     });
   }, []);
@@ -1290,7 +1314,7 @@ function App() {
       status: "queued",
     };
 
-    enqueueConversion(request);
+    return enqueueConversion(request);
   }, [enqueueConversion]);
 
   const handleAlternativeHistory = useCallback((item: ConversionHistoryItem) => {
@@ -1305,7 +1329,7 @@ function App() {
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
     };
 
-    enqueueConversion(request);
+    return enqueueConversion(request);
   }, [enqueueConversion]);
 
   const dismissRecentRetryChip = useCallback(() => {
@@ -1317,8 +1341,7 @@ function App() {
       return false;
     }
 
-    handleAlternativeHistory(recentRetryItem);
-    return true;
+    return handleAlternativeHistory(recentRetryItem);
   }, [handleAlternativeHistory, recentRetryItem]);
 
   useEffect(() => {
@@ -1433,6 +1456,7 @@ function App() {
         onOpenModelSettings={openModelSettings}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
+        onEditorStatusChange={setEditorStatus}
         onNewFile={handleNewFile}
         onOpenFile={handleOpenFile}
         onSaveFile={handleSaveFile}
@@ -1465,9 +1489,13 @@ function App() {
           onClose={closeActivePanel}
         >
           {activePanel === "settings" ? (
-            <WritingControlPanel
+            <SettingsContent
               settings={settings}
+              ollamaModels={ollamaModels}
+              ollamaConnection={ollamaConnection}
               onChange={setSettings}
+              onCheckOllama={handleCheckOllama}
+              onProviderSelected={handleModelSettingsProviderSelected}
             />
           ) : null}
           {activePanel === "history" ? (
@@ -1501,7 +1529,6 @@ function App() {
               onReset={() =>
                 setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
               }
-              onClose={closeActivePanel}
             />
           ) : null}
         </InspectorDrawer>
@@ -1538,6 +1565,7 @@ function App() {
         status={status}
         pending={delayedPending}
         pendingCount={pending.length}
+        editorStatus={editorStatus}
         onCancel={cancelConversion}
         onOpenSettings={openSettingsDrawer}
       />
@@ -1547,15 +1575,10 @@ function App() {
 
 function AppTitleBar() {
   return (
-    <header className="app-titlebar" aria-label="Application title bar">
+    <header className="app-titlebar" aria-label="アプリケーションヘッダー">
       <div className="app-brand">
         <span className="app-logo" aria-hidden="true">か</span>
         <span>Romaji Kana</span>
-      </div>
-      <div className="window-controls" aria-hidden="true">
-        <span><Minus size={18} /></span>
-        <span><Square size={15} /></span>
-        <span><X size={19} /></span>
       </div>
     </header>
   );
@@ -1591,7 +1614,7 @@ function RecentRetryChip({
               ? `${item.output} の別候補を試す`
               : "別候補を試す"}
         </span>
-        <kbd>Ctrl+/</kbd>
+        <kbd>Ctrl/Cmd+/</kbd>
       </button>
       <button
         className="recent-retry-chip-dismiss"
@@ -1626,14 +1649,14 @@ function AppRail({
   onOpenSettings: () => void;
 }) {
   return (
-    <nav className="app-rail" aria-label="App tools">
+    <nav className="app-rail" aria-label="アプリのツール">
       <button
         className={`rail-button ${activePanel === "settings" ? "active" : ""} ${settingsAttention ? "attention" : ""}`}
         type="button"
         onClick={onOpenSettings}
         aria-pressed={activePanel === "settings"}
-        aria-label="Settings を開く"
-        title="Settings"
+        aria-label="設定を開く"
+        title="設定"
       >
         <SlidersHorizontal size={18} aria-hidden="true" />
         <span>設定</span>
@@ -1643,8 +1666,8 @@ function AppRail({
         type="button"
         onClick={onOpenHistory}
         aria-pressed={activePanel === "history"}
-        aria-label={`History を開く、${historyCount} 件`}
-        title="History"
+        aria-label={`履歴を開く、${historyCount} 件`}
+        title="履歴"
       >
         <History size={18} aria-hidden="true" />
         {historyCount > 0 ? <span className="rail-count">{historyCount}</span> : null}
@@ -1657,10 +1680,10 @@ function AppRail({
         aria-pressed={activePanel === "dictionary"}
         aria-label={
           dictionaryCount > 0
-            ? `Dictionary を開く、${dictionaryCount} 件有効`
-            : "Dictionary を開く"
+            ? `辞書を開く、${dictionaryCount} 件有効`
+            : "辞書を開く"
         }
-        title="Dictionary"
+        title="辞書"
       >
         <BookMarked size={18} aria-hidden="true" />
         {dictionaryCount > 0 ? <span className="rail-count">{dictionaryCount}</span> : null}
@@ -1671,8 +1694,8 @@ function AppRail({
         type="button"
         onClick={onOpenPrompt}
         aria-pressed={activePanel === "prompt"}
-        aria-label="Style を開く"
-        title="Style"
+        aria-label="変換スタイルを開く"
+        title="変換スタイル"
       >
         <MessageSquareText size={18} aria-hidden="true" />
         <span>スタイル</span>
@@ -1686,10 +1709,10 @@ function formatModelStatusLabel(
   ollamaConnection: OllamaConnectionStatus,
 ): string {
   const label = providerLabel(settings);
-  const modelName = settings.modelName.trim() || "Model未選択";
+  const modelName = settings.modelName.trim() || "モデル未選択";
 
   if (ollamaConnection.kind === "connected") {
-    return `${label} · ${modelName} · Ready`;
+    return `${label} · ${modelName} · 接続済み`;
   }
   if (ollamaConnection.kind === "checking") {
     return `${label} · ${modelName} · 確認中`;
@@ -1720,7 +1743,6 @@ function InspectorDrawer({
       <aside
         className="inspector-drawer"
         role="dialog"
-        aria-modal="true"
         aria-labelledby="inspector-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -1746,7 +1768,7 @@ function InspectorDrawer({
 
 function panelTitle(panel: NonNullable<ActivePanel>): string {
   if (panel === "settings") {
-    return "ライティングコントロール";
+    return "設定";
   }
   if (panel === "history") {
     return "履歴";
@@ -1759,7 +1781,7 @@ function panelTitle(panel: NonNullable<ActivePanel>): string {
 
 function panelEyebrow(panel: NonNullable<ActivePanel>): string {
   if (panel === "settings") {
-    return "Model setup";
+    return "App settings";
   }
   if (panel === "history") {
     return "Conversion log";
@@ -1768,82 +1790,6 @@ function panelEyebrow(panel: NonNullable<ActivePanel>): string {
     return "User terms";
   }
   return "Conversion style";
-}
-
-function WritingControlPanel({
-  settings,
-  onChange,
-}: {
-  settings: AppSettings;
-  onChange: (settings: AppSettings) => void;
-}) {
-  const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
-    onChange({ ...settings, triggers: { ...settings.triggers, ...patch } });
-  };
-
-  return (
-    <section className="writing-control-panel" aria-label="ライティングコントロール">
-      <div className="writing-section">
-        <h3>変換モード</h3>
-        <div className="writing-mode-grid" role="group" aria-label="変換モード">
-          <button
-            className={settings.conversionMode === "replace" ? "selected" : ""}
-            type="button"
-            onClick={() => onChange({ ...settings, conversionMode: "replace" })}
-          >
-            <strong>Replace</strong>
-            <span>本文を自動で変換</span>
-          </button>
-          <button
-            className={settings.conversionMode === "ghost" ? "selected" : ""}
-            type="button"
-            onClick={() => onChange({ ...settings, conversionMode: "ghost" })}
-          >
-            <strong>Ghost</strong>
-            <span>候補をTabで確定</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="writing-section">
-        <h3>トリガー</h3>
-        <label className="writing-trigger-row">
-          <span><kbd>Ctrl</kbd> + Enter で変換</span>
-          <input
-            type="checkbox"
-            checked={settings.triggers.enter}
-            onChange={(event) => updateTriggers({ enter: event.currentTarget.checked })}
-          />
-        </label>
-        <label className="writing-trigger-row">
-          <span><kbd>Space</kbd> で変換</span>
-          <input
-            type="checkbox"
-            checked={settings.triggers.period}
-            onChange={(event) => updateTriggers({ period: event.currentTarget.checked })}
-          />
-        </label>
-        <label className="writing-trigger-row">
-          <span>入力中に自動変換</span>
-          <input
-            type="checkbox"
-            checked={settings.autoConvert}
-            onChange={(event) => onChange({ ...settings, autoConvert: event.currentTarget.checked })}
-          />
-        </label>日本語変換の指示
-      </div>
-
-      <div className="writing-section">
-        <h3>ショートカット</h3>
-        <div className="writing-shortcut-row">
-          <span>{settings.triggers.manualShortcut.replace("Mod", "Ctrl")}</span>
-          <button className="secondary-button" type="button">
-            変更
-          </button>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 function SetupModal({
@@ -2037,17 +1983,7 @@ function HistoryPanel({
   onClose: () => void;
 }) {
   return (
-    <section className="floating-panel history-panel" aria-label="History">
-      <div className="floating-panel-header">
-        <div>
-          <p className="eyebrow">Conversion log</p>
-          <h2>History</h2>
-        </div>
-        <button className="icon-button" type="button" onClick={onClose} aria-label="History を閉じる">
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
-
+    <section className="floating-panel history-panel" aria-label="変換履歴">
       {pending.length > 0 ? (
         <div className="pending-list" aria-label="処理中の変換">
           {pending.map((request) => (
@@ -2076,7 +2012,9 @@ function HistoryPanel({
       ) : null}
 
       {history.length === 0 ? (
-        <p className="empty-state">変換はまだありません。</p>
+        <p className="empty-state">
+          この起動中に確定・適用した変換が最大100件残ります。選択範囲またはカーソルのある行は Ctrl/Cmd + Enter で変換できます。
+        </p>
       ) : (
         <div className="history-list" role="list">
           {history.map((item) => (
@@ -2100,11 +2038,11 @@ function HistoryPanel({
               </div>
               <dl className="history-lines">
                 <div className="history-line">
-                  <dt>Input</dt>
+                  <dt>入力</dt>
                   <dd>{item.input}</dd>
                 </div>
                 <div className="history-line">
-                  <dt>{item.status === "success" ? "Output" : "Result"}</dt>
+                  <dt>{item.status === "success" ? "出力" : "結果"}</dt>
                   <dd>{item.output ?? item.error ?? "出力はありません。"}</dd>
                 </div>
               </dl>
@@ -2113,7 +2051,7 @@ function HistoryPanel({
                 <button
                   className="history-action-button"
                   type="button"
-                  title="再試行"
+                  title="同じ入力をもう一度変換します"
                   onFocus={() => onPreview(item)}
                   onClick={() => {
                     onPreviewEnd(item);
@@ -2167,29 +2105,18 @@ function PromptPanel({
   onPresetChange,
   onChange,
   onReset,
-  onClose,
 }: {
   prompt: string;
   preset: ConversionPreset;
   onPresetChange: (preset: ConversionPreset) => void;
   onChange: (prompt: string) => void;
   onReset: () => void;
-  onClose: () => void;
 }) {
   return (
     <section className="floating-panel prompt-panel" aria-label="変換スタイル">
-      <div className="floating-panel-header">
-        <div>
-          <p className="eyebrow">Conversion style</p>
-          <h2>Preset</h2>
-        </div>
-        <button className="icon-button" type="button" onClick={onClose} aria-label="Preset を閉じる">
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
       <div className="preset-panel-content">
         <fieldset className="preset-options">
-          <legend className="sr-only">変換 Preset</legend>
+          <legend className="sr-only">変換プリセット</legend>
           {CONVERSION_PRESET_OPTIONS.map((option) => (
             <label
               className={preset === option ? "selected" : ""}
@@ -2294,7 +2221,7 @@ function DictionaryModal({
   };
 
   return (
-      <section className="dictionary-modal inspector-panel" aria-label="Dictionary entries">
+      <section className="dictionary-modal inspector-panel" aria-label="辞書項目">
         <form className="dictionary-add-form" onSubmit={addEntry}>
           <label className="field">
             <span>Romaji reading</span>
@@ -2349,7 +2276,7 @@ function DictionaryModal({
           <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
         </div>
         {entries.length === 0 ? (
-          <p className="empty-state">Dictionary の登録はまだありません。</p>
+          <p className="empty-state">辞書の登録はまだありません。</p>
         ) : (
           <div className="dictionary-list">
             {entries.map((entry, index) => (
@@ -2366,7 +2293,7 @@ function DictionaryModal({
                 </label>
                 <div className="dictionary-entry-fields">
                   <input
-                    aria-label={`Dictionary reading ${index + 1}`}
+                    aria-label={`辞書の読み ${index + 1}`}
                     value={entry.reading}
                     maxLength={80}
                     onChange={(event) =>
@@ -2374,7 +2301,7 @@ function DictionaryModal({
                     }
                   />
                   <input
-                    aria-label={`Dictionary output ${index + 1}`}
+                    aria-label={`辞書の出力 ${index + 1}`}
                     value={entry.output}
                     maxLength={80}
                     onChange={(event) =>
@@ -2382,7 +2309,7 @@ function DictionaryModal({
                     }
                   />
                   <input
-                    aria-label={`Dictionary note ${index + 1}`}
+                    aria-label={`辞書のメモ ${index + 1}`}
                     value={entry.note}
                     maxLength={120}
                     placeholder="メモ"
@@ -2439,23 +2366,51 @@ function collectAvoidOutputs(existing: string[] | undefined, next: string | unde
   );
 }
 
+function hasDuplicatePendingHistoryConversion(
+  requests: PendingConversion[],
+  next: PendingConversion,
+): boolean {
+  const nextAvoidOutputs = next.avoidOutputs?.join("\u0000") ?? "";
+  return requests.some((request) =>
+    request.source === "history" &&
+    request.originalText === next.originalText &&
+    request.retryOf === next.retryOf &&
+    (request.avoidOutputs?.join("\u0000") ?? "") === nextAvoidOutputs &&
+    request.anchor?.from === next.anchor?.from &&
+    request.anchor?.to === next.anchor?.to &&
+    request.anchor?.originalText === next.anchor?.originalText
+  );
+}
+
+function prependConversionHistory(
+  items: ConversionHistoryItem[],
+  nextItem: ConversionHistoryItem,
+): ConversionHistoryItem[] {
+  return [nextItem, ...items].slice(0, MAX_CONVERSION_HISTORY_ITEMS);
+}
+
 function upsertConversionHistory(
   items: ConversionHistoryItem[],
   nextItem: ConversionHistoryItem,
 ): ConversionHistoryItem[] {
-  return [nextItem, ...items.filter((item) => item.id !== nextItem.id)];
+  return [nextItem, ...items.filter((item) => item.id !== nextItem.id)].slice(
+    0,
+    MAX_CONVERSION_HISTORY_ITEMS,
+  );
 }
 
 function StatusBar({
   status,
   pending,
   pendingCount,
+  editorStatus,
   onCancel,
   onOpenSettings,
 }: {
   status: ConversionStatus;
   pending: PendingConversion[];
   pendingCount: number;
+  editorStatus: EditorDocumentStatus;
   onCancel: (request: PendingConversion) => void;
   onOpenSettings: () => void;
 }) {
@@ -2465,20 +2420,17 @@ function StatusBar({
   const hasStatusActions = canOpenSettings || Boolean(pending[0]) || pendingCount > 0;
 
   return (
-    <div
-      className={`status-bar ${status.kind} ${hasStatusActions ? "has-actions" : ""}`}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="status-main">
+    <div className={`status-bar ${status.kind} ${hasStatusActions ? "has-actions" : ""}`}>
+      <div className="status-main" role="status" aria-live="polite">
         <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
         <span className="status-message">{status.message}</span>
       </div>
-      {hasStatusActions ? (
+      <div className="status-side">
+        {hasStatusActions ? (
         <div className="status-actions">
           {canOpenSettings ? (
             <button className="status-settings" type="button" onClick={onOpenSettings}>
-              Settings を開く
+              設定を開く
             </button>
           ) : null}
           {pending[0] ? (
@@ -2488,14 +2440,18 @@ function StatusBar({
           ) : null}
           {pendingCount > 0 ? <strong>{pendingCount} 件待機中</strong> : null}
         </div>
-      ) : (
-        <div className="status-meta" aria-label="Document status">
-          <span>行 1, 列 1</span>
+        ) : null}
+        <div className="status-meta" aria-label="文書情報">
+          <span>行 {editorStatus.line}, 列 {editorStatus.column}</span>
+          <span>
+            {editorStatus.selectionCount > 0
+              ? `${editorStatus.selectionCount} 文字選択`
+              : `${editorStatus.characterCount} 文字`}
+          </span>
           <span>UTF-8</span>
-          <span>LF</span>
           <span>Markdown</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }

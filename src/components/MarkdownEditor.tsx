@@ -1,7 +1,21 @@
-import { defaultKeymap, history, historyKeymap, redo, undo } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  redo,
+  redoDepth,
+  undo,
+  undoDepth,
+} from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
 import { Compartment, EditorState, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import {
+  highlightSelectionMatches,
+  openSearchPanel,
+  search,
+  searchKeymap,
+} from "@codemirror/search";
 import {
   Decoration,
   EditorView,
@@ -19,6 +33,7 @@ import {
   FolderOpen,
   Redo2,
   Save,
+  Search,
   Undo2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -49,6 +64,7 @@ interface MarkdownEditorProps {
   onOpenModelSettings: () => void;
   onConvert: (range: ConversionRange) => boolean;
   onDocumentChanged: (documentText: string) => void;
+  onEditorStatusChange: (status: EditorDocumentStatus) => void;
   onNewFile: () => void;
   onOpenFile: () => void;
   onSaveFile: () => void;
@@ -57,6 +73,14 @@ interface MarkdownEditorProps {
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
+}
+
+export interface EditorDocumentStatus {
+  line: number;
+  column: number;
+  lineCount: number;
+  characterCount: number;
+  selectionCount: number;
 }
 
 export const addLoadingDecoration = StateEffect.define<{ id: string; from: number; to: number }>();
@@ -113,8 +137,8 @@ class GhostTextWidget extends WidgetType {
     element.className = "cm-ghost-text";
     element.title =
       this.conversionStrategy === "completion"
-        ? "補完変換候補。Tab で確定、Ctrl+/ で別候補を試す"
-        : "Tab で確定、Ctrl+/ で別候補を試す";
+        ? "補完変換候補。Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+        : "Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
 
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
@@ -124,8 +148,8 @@ class GhostTextWidget extends WidgetType {
     hint.className = "cm-ghost-text-hint";
     hint.textContent =
       this.conversionStrategy === "completion"
-        ? "補完変換  Tabで確定  Ctrl+/で再試行"
-        : "Tabで確定  Ctrl+/で再試行";
+        ? "補完変換  Tabで確定  Ctrl/Cmd+/で別候補"
+        : "Tabで確定  Ctrl/Cmd+/で別候補";
 
     element.append(suggestion, hint);
     return element;
@@ -176,8 +200,16 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
     return Decoration.none;
   }
 
+  const sourceDecoration = Decoration.mark({
+    class: suggestion.previewOnly ? "cm-history-preview" : "cm-ghost-source",
+  }).range(suggestion.from, suggestion.to);
+
+  if (suggestion.previewOnly) {
+    return Decoration.set([sourceDecoration]);
+  }
+
   return Decoration.set([
-    Decoration.mark({ class: "cm-ghost-source" }).range(suggestion.from, suggestion.to),
+    sourceDecoration,
     Decoration.widget({
       widget: new GhostTextWidget(suggestion.convertedText, suggestion.conversionStrategy),
       side: 1,
@@ -263,6 +295,67 @@ const theme = EditorView.theme({
     verticalAlign: "middle",
     whiteSpace: "nowrap",
   },
+  ".cm-history-preview": {
+    backgroundColor: "#e8f5f2",
+    borderBottom: "1px solid #5aa79d",
+    borderRadius: "3px",
+  },
+  ".cm-panels": {
+    backgroundColor: "#fbfdfc",
+    color: "#123f3b",
+    fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
+    fontSize: "13px",
+  },
+  ".cm-panels.cm-panels-top": {
+    borderBottom: "1px solid #dbe8e4",
+  },
+  ".cm-search": {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "6px",
+    padding: "8px 12px",
+  },
+  ".cm-search br": {
+    display: "none",
+  },
+  ".cm-search .cm-textfield": {
+    width: "min(180px, 34vw)",
+    minHeight: "32px",
+    border: "1px solid #b8d5cf",
+    borderRadius: "6px",
+    padding: "5px 8px",
+    backgroundColor: "#ffffff",
+    color: "#123f3b",
+    outline: "none",
+  },
+  ".cm-search .cm-textfield:focus": {
+    borderColor: "#0f766e",
+    boxShadow: "0 0 0 2px #ccfbf1",
+  },
+  ".cm-search .cm-button": {
+    minHeight: "32px",
+    border: "1px solid #b8d5cf",
+    borderRadius: "6px",
+    padding: "5px 9px",
+    backgroundImage: "none",
+    backgroundColor: "#ffffff",
+    color: "#0f766e",
+    fontSize: "12px",
+    fontWeight: "700",
+  },
+  ".cm-search label": {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    whiteSpace: "nowrap",
+  },
+  '.cm-search button[name="close"]': {
+    position: "static",
+    marginLeft: "auto",
+    color: "#617872",
+    fontSize: "18px",
+  },
 });
 
 const highlightStyle = HighlightStyle.define([
@@ -274,6 +367,21 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 const COMPOSITION_END_GRACE_MS = 120;
+const editorPhrases = EditorState.phrases.of({
+  Find: "検索",
+  Replace: "置換",
+  next: "次へ",
+  previous: "前へ",
+  all: "すべて選択",
+  "match case": "大文字・小文字を区別",
+  regexp: "正規表現",
+  "by word": "単語単位",
+  replace: "置換",
+  "replace all": "すべて置換",
+  close: "閉じる",
+  "Go to line": "行へ移動",
+  go: "移動",
+});
 const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
@@ -292,6 +400,7 @@ export function MarkdownEditor({
   onOpenModelSettings,
   onConvert,
   onDocumentChanged,
+  onEditorStatusChange,
   onNewFile,
   onOpenFile,
   onSaveFile,
@@ -306,6 +415,7 @@ export function MarkdownEditor({
   const viewRef = useRef<EditorView | null>(null);
   const onConvertRef = useRef(onConvert);
   const onDocumentChangedRef = useRef(onDocumentChanged);
+  const onEditorStatusChangeRef = useRef(onEditorStatusChange);
   const onAcceptGhostRef = useRef(onAcceptGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
@@ -314,10 +424,18 @@ export function MarkdownEditor({
   const composingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
+      if (update.docChanged || update.selectionSet) {
+        onEditorStatusChangeRef.current(editorDocumentStatus(update.state));
+        setCanUndo(undoDepth(update.state) > 0);
+        setCanRedo(redoDepth(update.state) > 0);
+      }
+
       if (!update.docChanged) {
         return;
       }
@@ -367,11 +485,20 @@ export function MarkdownEditor({
   useEffect(() => {
     onConvertRef.current = onConvert;
     onDocumentChangedRef.current = onDocumentChanged;
+    onEditorStatusChangeRef.current = onEditorStatusChange;
     onAcceptGhostRef.current = onAcceptGhost;
     onRetryGhostRef.current = onRetryGhost;
     onRetryRecentRef.current = onRetryRecent;
     settingsRef.current = settings;
-  }, [onAcceptGhost, onConvert, onDocumentChanged, onRetryGhost, onRetryRecent, settings]);
+  }, [
+    onAcceptGhost,
+    onConvert,
+    onDocumentChanged,
+    onEditorStatusChange,
+    onRetryGhost,
+    onRetryRecent,
+    settings,
+  ]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -383,19 +510,25 @@ export function MarkdownEditor({
       extensions: [
         history(),
         markdown(),
+        editorPhrases,
+        search({ top: true }),
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
         theme,
         syntaxHighlighting(highlightStyle),
+        highlightSelectionMatches(),
         placeholder("romaji で日本語を書いてください..."),
         updateListener,
         compositionHandler,
         shortcutCompartment.of(
           Prec.highest(keymap.of([
             {
-              key: "Enter",
-              run: runEnterConversion,
+              any: runPlainEnterConversion,
+            },
+            {
+              key: settingsRef.current.triggers.manualShortcut,
+              run: runManualConversion,
             },
             {
               key: "Tab",
@@ -417,13 +550,9 @@ export function MarkdownEditor({
               key: "Escape",
               run: dismissGhostSuggestion,
             },
-            {
-              key: settingsRef.current.triggers.manualShortcut,
-              run: runManualConversion,
-            },
           ])),
         ),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
       ],
     });
@@ -435,6 +564,9 @@ export function MarkdownEditor({
 
     viewRef.current = view;
     registerView(view);
+    onEditorStatusChangeRef.current(editorDocumentStatus(view.state));
+    setCanUndo(undoDepth(view.state) > 0);
+    setCanRedo(redoDepth(view.state) > 0);
 
     return () => {
       registerView(null);
@@ -479,8 +611,7 @@ export function MarkdownEditor({
       effects: shortcutCompartment.reconfigure(
         Prec.highest(keymap.of([
           {
-            key: "Enter",
-            run: runEnterConversion,
+            any: runPlainEnterConversion,
           },
           {
             key: settings.triggers.manualShortcut,
@@ -529,6 +660,19 @@ export function MarkdownEditor({
     }
 
     onConvertRef.current(range);
+    return false;
+  }
+
+  function runPlainEnterConversion(view: EditorView, event: KeyboardEvent) {
+    if (
+      event.key === "Enter" &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey
+    ) {
+      runEnterConversion(view);
+    }
     return false;
   }
 
@@ -622,7 +766,7 @@ export function MarkdownEditor({
   };
 
   return (
-    <section className="editor-shell" aria-label="Markdown editor">
+    <section className="editor-shell" aria-label="Markdownエディター">
       <div className="editor-commandbar">
         <div className="commandbar-left">
           <button className="toolbar-command" type="button" onClick={onNewFile}>
@@ -681,8 +825,9 @@ export function MarkdownEditor({
             className="editor-chrome-button"
             type="button"
             onClick={() => runEditorCommand(undo)}
-            aria-label="Undo"
+            aria-label="元に戻す"
             title="元に戻す"
+            disabled={!canUndo}
           >
             <Undo2 size={16} aria-hidden="true" />
           </button>
@@ -690,10 +835,20 @@ export function MarkdownEditor({
             className="editor-chrome-button"
             type="button"
             onClick={() => runEditorCommand(redo)}
-            aria-label="Redo"
+            aria-label="やり直し"
             title="やり直し"
+            disabled={!canRedo}
           >
             <Redo2 size={16} aria-hidden="true" />
+          </button>
+          <button
+            className="editor-chrome-button"
+            type="button"
+            onClick={() => runEditorCommand(openSearchPanel)}
+            aria-label="検索と置換"
+            title="検索と置換 (Ctrl/Cmd + F)"
+          >
+            <Search size={16} aria-hidden="true" />
           </button>
         </div>
         <div className="commandbar-spacer" aria-hidden="true" />
@@ -731,6 +886,18 @@ export function MarkdownEditor({
       <div className="editor-host" ref={hostRef} />
     </section>
   );
+}
+
+function editorDocumentStatus(state: EditorState): EditorDocumentStatus {
+  const selection = state.selection.main;
+  const line = state.doc.lineAt(selection.head);
+  return {
+    line: line.number,
+    column: selection.head - line.from + 1,
+    lineCount: state.doc.lines,
+    characterCount: state.doc.length,
+    selectionCount: Math.abs(selection.to - selection.from),
+  };
 }
 
 function shouldSuppressAutoTriggerForUserEvent(userEvent: string | undefined): boolean {

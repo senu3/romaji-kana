@@ -69,7 +69,7 @@ export function SettingsPanel({
         className="panel-toggle"
         type="button"
         onClick={onToggleCollapsed}
-        aria-label={collapsed ? "Settings を開く" : "Settings を閉じる"}
+        aria-label={collapsed ? "設定を開く" : "設定を閉じる"}
       >
         {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </button>
@@ -77,7 +77,7 @@ export function SettingsPanel({
       {collapsed ? (
         <div className="collapsed-mark" aria-hidden="true">
           <SlidersHorizontal size={19} />
-          <span>Settings</span>
+          <span>設定</span>
         </div>
       ) : (
         <SettingsContent
@@ -357,7 +357,7 @@ export function SettingsContent({
 
           {setupMode ? (
             <p className="setup-settings-note">
-              変換スタイルとトリガー動作は、あとから Settings で変更できます。
+              変換スタイルとトリガー動作は、あとから設定で変更できます。
             </p>
           ) : (
             <>

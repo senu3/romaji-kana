@@ -101,6 +101,7 @@ export interface GhostConversionSuggestion {
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
+  previewOnly?: boolean;
 }
 
 export interface PendingConversion {
