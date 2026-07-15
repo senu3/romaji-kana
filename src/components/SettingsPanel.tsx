@@ -202,7 +202,7 @@ export function SettingsContent({
     settings.punctuationConversion.periodToJapanese,
     settings.punctuationConversion.commaToJapanese,
   ].filter(Boolean).length;
-  const providerName = activeProvider ? providerLabel(activeProvider) : "Provider";
+  const providerName = activeProvider ? providerLabel(activeProvider) : "プロバイダー";
   const currentApiUrl =
     activeProvider === "lmstudio"
       ? settings.lmStudioApiUrl
@@ -215,14 +215,14 @@ export function SettingsContent({
           <div className="settings-heading">
             <SlidersHorizontal size={20} aria-hidden="true" />
             <div>
-              <p className="eyebrow">Local AI</p>
-              <h2 id={headingId}>{setupMode ? "Model settings" : "Settings"}</h2>
+              <p className="eyebrow">ローカルAI</p>
+              <h2 id={headingId}>{setupMode ? "モデル設定" : "設定"}</h2>
             </div>
           </div>
 
           <fieldset className="field provider-field">
-            <legend>Provider</legend>
-            <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
+            <legend>プロバイダー</legend>
+            <div className="segmented-control provider-control" role="radiogroup" aria-label="モデルプロバイダー">
               <label className={activeProvider === "ollama" ? "selected" : ""}>
                 <input
                   type="radio"
@@ -257,13 +257,13 @@ export function SettingsContent({
                   ? "http://localhost:1234"
                   : activeProvider === "ollama"
                     ? "http://localhost:11434"
-                    : "Provider を選択してください"
+                    : "プロバイダーを選択してください"
               }
             />
           </label>
 
           <div className="field model-field">
-            <span>Model</span>
+            <span>モデル</span>
             <div className="model-combobox">
               <input
                 ref={modelInputRef}
@@ -276,7 +276,7 @@ export function SettingsContent({
                 onFocus={() => setModelListOpen(true)}
                 onClick={() => setModelListOpen(true)}
                 onBlur={() => window.setTimeout(() => setModelListOpen(false), 120)}
-                placeholder={hasProvider ? "gemma3" : "Provider を選択してください"}
+                placeholder={hasProvider ? "gemma3" : "プロバイダーを選択してください"}
                 role="combobox"
                 aria-expanded={modelListOpen}
                 aria-controls={modelOptionsId}
@@ -300,8 +300,8 @@ export function SettingsContent({
                   {sortedModelNames.length === 0 ? (
                     <p>
                       {hasProvider
-                        ? `${providerName} のモデルを読み込んでいます。見つからない場合は Check で再確認できます。`
-                        : "Provider を選択するとモデル一覧を読み込みます。"}
+                        ? `${providerName} のモデルを読み込んでいます。見つからない場合は接続チェックで再確認できます。`
+                        : "プロバイダーを選択するとモデル一覧を読み込みます。"}
                     </p>
                   ) : (
                     sortedModelNames.map((modelName) => (
@@ -326,7 +326,7 @@ export function SettingsContent({
               ) : null}
             </div>
             <CheckRow
-              label={settings.think ? "Think mode" : "Think off（推奨）"}
+              label={settings.think ? "Thinkingモード" : "Thinkingモード（OFF推奨）"}
               checked={settings.think}
               onChange={(checked) => update({ think: checked })}
             />
@@ -351,47 +351,58 @@ export function SettingsContent({
                 size={15}
                 aria-hidden="true"
               />
-              Check
+              接続チェック
             </button>
           </div>
 
           {setupMode ? (
             <p className="setup-settings-note">
-              変換スタイルとトリガー動作は、あとから設定で変更できます。
+              変換結果の適用方法と自動変換の動作は、あとから設定で変更できます。
             </p>
           ) : (
             <>
               <div className="settings-group">
-                <h3>Conversion</h3>
+                <h3>変換</h3>
                 <div className="mode-field">
-                  <span>変換モード</span>
-                  <div className="segmented-control" role="group" aria-label="変換モード">
+                  <span>変換結果の適用方法</span>
+                  <div
+                    className="segmented-control"
+                    role="group"
+                    aria-label="変換結果の適用方法"
+                  >
                     <button
                       className={settings.conversionMode === "replace" ? "selected" : ""}
                       type="button"
+                      aria-pressed={settings.conversionMode === "replace"}
                       onClick={() => update({ conversionMode: "replace" })}
                     >
-                      自動置換
+                      直接置換
                     </button>
                     <button
                       className={settings.conversionMode === "ghost" ? "selected" : ""}
                       type="button"
+                      aria-pressed={settings.conversionMode === "ghost"}
                       onClick={() => update({ conversionMode: "ghost" })}
                     >
-                      ゴースト + Tab
+                      候補を表示
                     </button>
                   </div>
+                  <small>
+                    {settings.conversionMode === "ghost"
+                      ? "候補をインライン表示し、Tabで確定します。"
+                      : "変換後の日本語でローマ字をすぐに置き換えます。"}
+                  </small>
                 </div>
               </div>
 
               <AccordionSection
-                title="Triggers"
-                summary={settings.autoConvert ? `${enabledTriggerCount}/3 有効` : "Auto off"}
+                title="自動変換"
+                summary={settings.autoConvert ? `ON · ${enabledTriggerCount}/3 トリガー` : "OFF"}
                 open={openAccordions.triggers}
                 onToggle={() => toggleAccordion("triggers")}
               >
                 <CheckRow
-                  label="自動変換トリガー"
+                  label="自動変換"
                   checked={settings.autoConvert}
                   onChange={(checked) => update({ autoConvert: checked })}
                 />
@@ -457,7 +468,7 @@ export function SettingsContent({
               </AccordionSection>
 
               <AccordionSection
-                title="Punctuation"
+                title="句読点"
                 summary={`${punctuationCount}/2 有効`}
                 open={openAccordions.punctuation}
                 onToggle={() => toggleAccordion("punctuation")}

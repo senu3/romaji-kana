@@ -117,7 +117,7 @@ function App() {
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaConnection, setOllamaConnection] = useState<OllamaConnectionStatus>({
     kind: "idle",
-    message: "ローカルモデル Provider はまだ確認されていません。",
+    message: "ローカルモデルプロバイダーはまだ確認されていません。",
   });
   const [initialDocument] = useState(() => initialSession.content);
   const [status, setStatus] = useState<ConversionStatus>({
@@ -341,7 +341,7 @@ function App() {
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで Check してください。`
+            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで接続チェックしてください。`
             : `${label} に接続しましたが、ローカルモデルが見つかりませんでした。`,
         checkedAt: Date.now(),
       });
@@ -349,7 +349,7 @@ function App() {
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? "モデルを選択し、Check を実行するとセットアップが完了します。"
+            ? "モデルを選択し、接続チェックを実行するとセットアップが完了します。"
             : `${label} のモデルが見つかりませんでした。`,
       });
     } catch (error: unknown) {
@@ -398,7 +398,7 @@ function App() {
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで Check してください。`
+            ? `${label} のモデルを ${models.length} 件読み込みました。モデルを選んで接続チェックしてください。`
             : `${label} に接続しましたが、ローカルモデルが見つかりませんでした。`,
         checkedAt: Date.now(),
       });
@@ -406,7 +406,7 @@ function App() {
         kind: models.length > 0 ? "warning" : "idle",
         message:
           models.length > 0
-            ? "モデルを選択し、Check を実行すると設定を確認できます。"
+            ? "モデルを選択し、接続チェックを実行すると設定を確認できます。"
             : `${label} のモデルが見つかりませんでした。`,
       });
     } catch (error: unknown) {
@@ -444,11 +444,11 @@ function App() {
 
       setOllamaConnection({
         kind: "idle",
-        message: "Provider を選択するとローカルモデル一覧を読み込みます。",
+        message: "プロバイダーを選択するとローカルモデル一覧を読み込みます。",
       });
       setStatus({
         kind: "idle",
-        message: "Provider を選ぶとモデル一覧を読み込みます。入力は今すぐ可能です。",
+        message: "プロバイダーを選ぶとモデル一覧を読み込みます。入力は今すぐ可能です。",
       });
       return;
     }
@@ -1781,15 +1781,15 @@ function panelTitle(panel: NonNullable<ActivePanel>): string {
 
 function panelEyebrow(panel: NonNullable<ActivePanel>): string {
   if (panel === "settings") {
-    return "App settings";
+    return "アプリ設定";
   }
   if (panel === "history") {
-    return "Conversion log";
+    return "変換履歴";
   }
   if (panel === "dictionary") {
-    return "User terms";
+    return "ユーザー辞書";
   }
-  return "Conversion style";
+  return "変換スタイル";
 }
 
 function SetupModal({
@@ -1864,8 +1864,8 @@ function SetupModal({
         </header>
         <div className="setup-form">
           <fieldset className="field provider-field">
-            <legend>Provider</legend>
-            <div className="segmented-control provider-control" role="radiogroup" aria-label="Model provider">
+            <legend>プロバイダー</legend>
+            <div className="segmented-control provider-control" role="radiogroup" aria-label="モデルプロバイダー">
               <label className={activeModelProvider === "ollama" ? "selected" : ""}>
                 <input
                   type="radio"
@@ -1901,7 +1901,7 @@ function SetupModal({
                     ? "http://localhost:1234"
                     : activeModelProvider === "ollama"
                       ? "http://localhost:11434"
-                      : "Provider を選択してください"
+                      : "プロバイダーを選択してください"
                 }
               />
               <button
@@ -1913,11 +1913,11 @@ function SetupModal({
                 接続チェック
               </button>
             </div>
-            <small>通常は localhost の既定URLのままでOKです。</small>
+            <small>通常は localhost の既定URLのままで問題ありません。</small>
           </label>
 
           <label className="field">
-            <span>Model</span>
+            <span>モデル</span>
             <div className="setup-inline-control setup-model-row">
               <select
                 value={hasProvider ? settings.modelName : ""}
@@ -2459,7 +2459,7 @@ function StatusBar({
 function formatConversionError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/fetch|network|failed|ECONNREFUSED|Load failed/i.test(message)) {
-    return "選択中のローカルモデル Provider に接続できません。設定した URL で起動しているか確認してください。";
+    return "選択中のローカルモデルプロバイダーに接続できません。設定した URL で起動しているか確認してください。";
   }
   return message || "変換に失敗しました。";
 }

@@ -96,7 +96,7 @@ try {
   await page.getByRole("button", { name: "設定を開く", exact: true }).click();
   await page
     .locator(".inspector-drawer .accordion-trigger")
-    .filter({ hasText: "Triggers" })
+    .filter({ hasText: "自動変換" })
     .click();
   await page.getByLabel("Enter（IME 変換中は無視）").check();
   assert.equal(
@@ -138,6 +138,28 @@ try {
 
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
+  await page.getByRole("button", { name: "自動変換をオフにする", exact: true }).click();
+  await page.waitForFunction(() => {
+    const rawSettings = localStorage.getItem("romaji-kana-settings");
+    return rawSettings ? JSON.parse(rawSettings).autoConvert === false : false;
+  });
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ichi.");
+  await page.waitForTimeout(300);
+  assert.equal(conversionRequestCount, 0, "Auto conversion should stop while the toolbar toggle is off.");
+  await page.keyboard.press("Control+Enter");
+  await waitForEditorText(page, "一。");
+  assert.equal(conversionRequestCount, 1, "Manual conversion should remain available while auto conversion is off.");
+  await page.getByRole("button", { name: "自動変換をオンにする", exact: true }).click();
+  await page.waitForFunction(() => {
+    const rawSettings = localStorage.getItem("romaji-kana-settings");
+    return rawSettings ? JSON.parse(rawSettings).autoConvert === true : false;
+  });
+
+  conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
   await page.keyboard.type("ichi.");
   await page.keyboard.press("Enter");
@@ -255,7 +277,12 @@ try {
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
-  await page.getByRole("button", { name: "Ghost", exact: true }).click();
+  await page.getByRole("button", { name: "設定を開く", exact: true }).click();
+  await page
+    .getByRole("group", { name: "変換結果の適用方法" })
+    .getByRole("button", { name: "候補を表示", exact: true })
+    .click();
+  await page.getByRole("button", { name: "設定 を閉じる" }).click();
   await page.waitForFunction(() => {
     const rawSettings = localStorage.getItem("romaji-kana-settings");
     if (!rawSettings) {
@@ -327,6 +354,10 @@ try {
   assert.ok(
     await page.getByRole("button", { name: "変換スタイルを開く" }).isVisible(),
     "Style action should remain visible on a narrow viewport.",
+  );
+  assert.ok(
+    await page.getByRole("button", { name: "自動変換をオフにする", exact: true }).isVisible(),
+    "Auto conversion toggle should remain visible on a narrow viewport.",
   );
 } finally {
   await browser?.close();
