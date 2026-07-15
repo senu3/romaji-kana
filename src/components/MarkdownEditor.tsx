@@ -35,6 +35,7 @@ import {
   Save,
   Search,
   Undo2,
+  Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -865,22 +866,24 @@ export function MarkdownEditor({
           >
             {modelStatusLabel}
           </button>
-          <div className="mode-switch" role="group" aria-label="変換モード">
-            <button
-              className={settings.conversionMode === "replace" ? "selected" : ""}
-              type="button"
-              onClick={() => onSettingsChange({ ...settings, conversionMode: "replace" })}
-            >
-              Replace
-            </button>
-            <button
-              className={settings.conversionMode === "ghost" ? "selected" : ""}
-              type="button"
-              onClick={() => onSettingsChange({ ...settings, conversionMode: "ghost" })}
-            >
-              Ghost
-            </button>
-          </div>
+          <button
+            className={`auto-convert-toggle ${settings.autoConvert ? "enabled" : ""}`}
+            type="button"
+            aria-pressed={settings.autoConvert}
+            aria-label={settings.autoConvert ? "自動変換をオフにする" : "自動変換をオンにする"}
+            title={
+              settings.autoConvert
+                ? "句読点・Enterによる自動変換を停止します。手動変換は引き続き利用できます"
+                : "句読点・Enterによる自動変換を有効にします"
+            }
+            onClick={() => onSettingsChange({ ...settings, autoConvert: !settings.autoConvert })}
+          >
+            <Zap size={15} aria-hidden="true" />
+            <span>自動変換</span>
+            <span className="auto-convert-state" aria-hidden="true">
+              {settings.autoConvert ? "ON" : "OFF"}
+            </span>
+          </button>
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />

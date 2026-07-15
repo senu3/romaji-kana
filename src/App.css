@@ -1741,6 +1741,13 @@ h3 {
   font-weight: 700;
 }
 
+.mode-field > small {
+  color: #607470;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
 .history-model {
   min-width: 0;
   overflow: hidden;
@@ -2516,32 +2523,45 @@ h3 {
   height: 18px;
 }
 
-.mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 180px;
+.auto-convert-toggle {
+  display: inline-flex;
   min-height: 34px;
-  overflow: hidden;
+  align-items: center;
+  gap: 7px;
   border: 1px solid #c6d1cf;
   border-radius: 7px;
-  background: #ffffff;
-}
-
-.mode-switch button {
-  border: 0;
-  border-right: 1px solid #d7dfdd;
+  padding: 0 10px;
   background: #ffffff;
   color: #182532;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 660;
 }
 
-.mode-switch button:last-child {
-  border-right: 0;
+.auto-convert-toggle:hover {
+  border-color: #8cbcb5;
+  background: #f4fbf9;
 }
 
-.mode-switch button.selected {
-  background: linear-gradient(135deg, #08777f, #006970);
+.auto-convert-toggle.enabled {
+  border-color: #7fc4ba;
+  background: #effbf8;
+  color: #075f58;
+}
+
+.auto-convert-state {
+  min-width: 29px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: #edf1f0;
+  color: #5c6c69;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.auto-convert-toggle.enabled .auto-convert-state {
+  background: #08777f;
   color: #ffffff;
 }
 
@@ -2961,10 +2981,6 @@ button.model-chip:hover {
 
   .document-picker {
     max-width: 42vw;
-  }
-
-  .mode-switch {
-    width: 180px;
   }
 
   .app-rail {
