@@ -129,6 +129,7 @@ class GhostTextWidget extends WidgetType {
   constructor(
     private readonly text: string,
     private readonly conversionStrategy: GhostConversionSuggestion["conversionStrategy"],
+    private readonly inputCompletionApplied: boolean,
   ) {
     super();
   }
@@ -137,7 +138,9 @@ class GhostTextWidget extends WidgetType {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
     element.title =
-      this.conversionStrategy === "completion"
+      this.inputCompletionApplied
+        ? "入力補完候補。Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+        : this.conversionStrategy === "completion"
         ? "補完変換候補。Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
         : "Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
 
@@ -148,7 +151,9 @@ class GhostTextWidget extends WidgetType {
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
     hint.textContent =
-      this.conversionStrategy === "completion"
+      this.inputCompletionApplied
+        ? "入力補完  Tabで確定  Ctrl/Cmd+/で別候補"
+        : this.conversionStrategy === "completion"
         ? "補完変換  Tabで確定  Ctrl/Cmd+/で別候補"
         : "Tabで確定  Ctrl/Cmd+/で別候補";
 
@@ -212,7 +217,11 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
   return Decoration.set([
     sourceDecoration,
     Decoration.widget({
-      widget: new GhostTextWidget(suggestion.convertedText, suggestion.conversionStrategy),
+      widget: new GhostTextWidget(
+        suggestion.convertedText,
+        suggestion.conversionStrategy,
+        Boolean(suggestion.inputCompletionApplied),
+      ),
       side: 1,
     }).range(suggestion.to),
   ]);

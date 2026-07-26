@@ -6,6 +6,7 @@ export type ConversionTrigger =
 
 export type ModelProvider = "ollama" | "lmstudio";
 export type ConversionPreset = "none" | "conversation" | "businessEmail";
+export type InputCompletionLevel = "none" | "word" | "sentence";
 
 export interface UserDictionaryEntry {
   id: string;
@@ -34,6 +35,7 @@ export interface AppSettings {
   };
   conversionPrompt: string;
   conversionPreset: ConversionPreset;
+  inputCompletionLevel: InputCompletionLevel;
   userDictionary: UserDictionaryEntry[];
   think: boolean;
 }
@@ -98,6 +100,9 @@ export interface GhostConversionSuggestion {
   inputText: string;
   reviewKana?: string;
   conversionStrategy?: "completion";
+  inputCompletionLevel?: InputCompletionLevel;
+  inputCompletionApplied?: boolean;
+  inputCompletionSourceKana?: string;
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
@@ -115,6 +120,7 @@ export interface PendingConversion {
   status: "queued" | "running";
   retryOf?: string;
   avoidOutputs?: string[];
+  inputCompletionLevel?: InputCompletionLevel;
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
@@ -130,6 +136,9 @@ export interface ConversionHistoryItem {
   source: "editor" | "history";
   anchor?: ConversionAnchor;
   conversionStrategy?: "completion";
+  inputCompletionLevel?: InputCompletionLevel;
+  inputCompletionApplied?: boolean;
+  inputCompletionSourceKana?: string;
   retryOf?: string;
   avoidOutputs?: string[];
 }

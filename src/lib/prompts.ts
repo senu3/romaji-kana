@@ -1,4 +1,4 @@
-import type { ConversionPreset } from "./types";
+import type { ConversionPreset, InputCompletionLevel } from "./types";
 
 export const defaultConversionPrompt = [
   "You are an advanced Japanese kana-to-kanji conversion engine.",
@@ -120,6 +120,41 @@ export const conversionPresetLabels: Record<ConversionPreset, string> = {
   conversation: "会話",
   businessEmail: "ビジネスメール",
 };
+
+export const inputCompletionLabels: Record<InputCompletionLevel, string> = {
+  none: "なし",
+  word: "単語",
+  sentence: "文章",
+};
+
+export function buildInputCompletionSystemPrompt(
+  level: Exclude<InputCompletionLevel, "none">,
+): string {
+  const levelRules =
+    level === "word"
+      ? [
+          "Complete only an unfinished final Japanese word.",
+          "You may append at most a few kana immediately before terminal punctuation.",
+          "Do not add particles, predicates, politeness, or a new phrase.",
+        ]
+      : [
+          "Turn rough notes into the smallest complete Japanese sentence supported by the input.",
+          "You may insert missing particles, inflectional endings, punctuation, and a minimal sentence ending.",
+          "You may add a neutral です or ます ending only when it is the minimum completion needed.",
+          "Do not add content words, claims, intentions, requests, honorific wording, dates, times, places, people, or objects that are not present in the input.",
+        ];
+
+  return [
+    "You restore omitted kana in rough romaji typing before kana-to-kanji conversion.",
+    "Return only completed Japanese kana text. Do not explain and do not use kanji.",
+    "The read-only context is not part of the target. Use it only to understand the target, and never repeat or rewrite it.",
+    "Preserve every existing kana, digit, Latin term, symbol, Markdown marker, and punctuation mark in the same order.",
+    "Never delete, replace, reorder, or reinterpret existing content.",
+    "Never invent facts or resolve an ambiguity by adding new meaning.",
+    ...levelRules,
+    "If no safe completion is clear, return the mechanical kana unchanged.",
+  ].join("\n");
+}
 
 const conversionPresetInstructions: Record<ConversionPreset, string> = {
   none: [

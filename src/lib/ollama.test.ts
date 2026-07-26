@@ -3,6 +3,7 @@ import {
   buildProtectedDictionaryEntries,
   convertRomajiToJapanese,
   convertRomajiToJapaneseDetailed,
+  isAllowedInputCompletion,
   normalizeRomajiReadingCandidate,
 } from "./ollama";
 import {
@@ -373,6 +374,172 @@ describe("convertRomajiToJapanese", () => {
     const request = transport.generate.mock.calls[0]?.[2];
     expect(request.system).not.toContain("openai");
     expect(request.system).not.toContain("api");
+  });
+
+  it("completes an unfinished final word before kana-kanji conversion", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "ありがとう。" })
+        .mockResolvedValueOnce({ response: "ありがとう。" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ariga.",
+      { ...defaultSettings, inputCompletionLevel: "word" },
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "ありがとう。",
+      reviewKana: "ありがとう。",
+      inputCompletionApplied: true,
+      inputCompletionSourceKana: "ありが。",
+    });
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      1,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("Complete only an unfinished final Japanese word."),
+        prompt: expect.stringContaining("Mechanical kana:\nありが。"),
+        options: { temperature: 0.05 },
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({ prompt: "ありがとう。" }),
+      30_000,
+    );
+  });
+
+  it("falls back to faithful conversion when word completion rewrites the input", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "どうもありがとう。" })
+        .mockResolvedValueOnce({ response: "ありが。" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ariga.",
+      { ...defaultSettings, inputCompletionLevel: "word" },
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "ありが。",
+      reviewKana: "ありが。",
+    });
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({ prompt: "ありが。" }),
+      30_000,
+    );
+  });
+
+  it("runs input completion only for the final convertible segment", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "ありが" })
+        .mockResolvedValueOnce({ response: "かくにん。" })
+        .mockResolvedValueOnce({ response: "確認。" }),
+    };
+
+    await convertRomajiToJapaneseDetailed(
+      "ariga openai kakuni.",
+      {
+        ...defaultSettings,
+        inputCompletionLevel: "word",
+        userDictionary: [
+          {
+            id: "openai",
+            reading: "openai",
+            output: "OpenAI",
+            note: "",
+            enabled: true,
+          },
+        ],
+      },
+      transport,
+    );
+
+    const completionCalls = transport.generate.mock.calls.filter((call) =>
+      String(call[2].system).includes("restore omitted kana"),
+    );
+    expect(completionCalls).toHaveLength(1);
+    expect(completionCalls[0]?.[2].prompt).toContain(
+      "Read-only context before the target:\nありが OpenAI",
+    );
+    expect(completionCalls[0]?.[2].prompt).toContain("Original romaji input:\n kakuni。");
+  });
+
+  it("does not complete a segment that is followed by a protected term", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({ response: "明日" }),
+    };
+
+    await convertRomajiToJapaneseDetailed(
+      "asita 東京",
+      { ...defaultSettings, inputCompletionLevel: "sentence" },
+      transport,
+    );
+
+    const completionCalls = transport.generate.mock.calls.filter((call) =>
+      String(call[2].system).includes("restore omitted kana"),
+    );
+    expect(completionCalls).toHaveLength(0);
+  });
+
+  it("allows sentence completion only when the original content remains in order", () => {
+    expect(
+      isAllowedInputCompletion("あした かいぎ 10じ", "あしたのかいぎは10じです", "sentence"),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion("あした かいぎ", "あしたのかいぎは10じです", "sentence"),
+    ).toBe(false);
+    expect(
+      isAllowedInputCompletion("OpenAI かくにん", "OpenAIをかくにんします", "sentence"),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion("かくにん", "かくにんします", "sentence"),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion(
+        "あした かいぎ 10じ",
+        "あしたのかいぎは10じです。",
+        "sentence",
+      ),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion("ありが", "ありがとう", "sentence"),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion("OpenAI かくにん", "Geminiをかくにんします", "sentence"),
+    ).toBe(false);
+    expect(
+      isAllowedInputCompletion(
+        "あした かいぎ",
+        "あしたはとうきょうでかいぎ",
+        "sentence",
+      ),
+    ).toBe(false);
+    expect(
+      isAllowedInputCompletion("あした かいぎ", "# あしたのかいぎです", "sentence"),
+    ).toBe(false);
+    expect(
+      isAllowedInputCompletion("あした", "あしたねこ", "sentence"),
+    ).toBe(false);
   });
 
   it("treats space-delimited romaji particles as explicit particles", async () => {

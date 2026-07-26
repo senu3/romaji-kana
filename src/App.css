@@ -1750,9 +1750,26 @@ h3 {
 
 .history-model {
   min-width: 0;
+  margin-right: auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history-completion-level {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: #edf3f2;
+  color: #546966;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.history-completion-level.applied {
+  background: #dff7f1;
+  color: #087068;
 }
 
 .history-action-button {
@@ -1790,6 +1807,101 @@ h3 {
   display: grid;
   gap: 14px;
   padding: 16px;
+}
+
+.input-completion-options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 0;
+  padding: 0 0 15px;
+  border-bottom: 1px solid #d5e8e5;
+}
+
+.input-completion-options legend {
+  padding: 0;
+  color: #123f3b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.input-completion-intro,
+.input-completion-safety {
+  margin: 0;
+  color: #536966;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.input-completion-levels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #b9d8d3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.input-completion-levels label {
+  position: relative;
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border-right: 1px solid #d5e8e5;
+  color: #385b57;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.input-completion-levels label:last-child {
+  border-right: 0;
+}
+
+.input-completion-levels label:hover {
+  background: #f3fbf9;
+}
+
+.input-completion-levels label.selected {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.input-completion-levels input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.input-completion-levels label:has(input:focus-visible) {
+  z-index: 1;
+  outline: 3px solid #5eead4;
+  outline-offset: -3px;
+}
+
+.input-completion-preview {
+  display: grid;
+  gap: 6px;
+  min-height: 58px;
+  border-radius: 7px;
+  padding: 10px 11px;
+  background: #f2f8f7;
+  color: #365a56;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.input-completion-preview code {
+  width: fit-content;
+  color: #0b6b64;
+  font:
+    700 12px/1.45 ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    monospace;
+}
+
+.input-completion-safety {
+  color: #72520f;
 }
 
 .preset-options {

@@ -1,4 +1,4 @@
-import type { AppSettings, UserDictionaryEntry } from "./types";
+import type { AppSettings, InputCompletionLevel, UserDictionaryEntry } from "./types";
 import { defaultConversionPrompt } from "./prompts";
 
 const STORAGE_KEY = "romaji-kana-settings";
@@ -23,6 +23,7 @@ export const defaultSettings: AppSettings = {
   },
   conversionPrompt: defaultConversionPrompt,
   conversionPreset: "none",
+  inputCompletionLevel: "none",
   userDictionary: [],
   think: false,
 };
@@ -60,6 +61,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     ...currentSettings,
     conversionPrompt,
     think,
+    inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,
@@ -70,6 +72,10 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     },
     userDictionary: normalizeUserDictionary(settings.userDictionary),
   };
+}
+
+function normalizeInputCompletionLevel(value: unknown): InputCompletionLevel {
+  return value === "word" || value === "sentence" ? value : "none";
 }
 
 function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {

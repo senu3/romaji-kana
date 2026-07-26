@@ -64,4 +64,26 @@ describe("loadSettings", () => {
       },
     ]);
   });
+
+  it("defaults unknown or missing input completion settings to faithful conversion", () => {
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ ...defaultSettings, inputCompletionLevel: "creative" }),
+    );
+    expect(loadSettings().inputCompletionLevel).toBe("none");
+
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ modelName: "local-model" }),
+    );
+    expect(loadSettings().inputCompletionLevel).toBe("none");
+  });
+
+  it("restores supported input completion levels", () => {
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ ...defaultSettings, inputCompletionLevel: "sentence" }),
+    );
+    expect(loadSettings().inputCompletionLevel).toBe("sentence");
+  });
 });

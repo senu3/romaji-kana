@@ -270,8 +270,33 @@ try {
 
   await page.getByRole("button", { name: "変換スタイルを開く" }).click();
   await page.getByRole("region", { name: "変換スタイル" }).waitFor();
+  assert.equal(await page.getByLabel("なし", { exact: true }).isChecked(), true);
+  await page.getByLabel("単語", { exact: true }).check();
+  await page.getByText("ariga → ありがとう", { exact: true }).waitFor();
+  await page.waitForFunction(() => {
+    const rawSettings = localStorage.getItem("romaji-kana-settings");
+    return rawSettings
+      ? JSON.parse(rawSettings).inputCompletionLevel === "word"
+      : false;
+  });
   await page.getByLabel("ビジネスメール").check();
   await page.getByText("仕事の連絡やメール下書き向け。").waitFor();
+  await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+
+  conversionRequestCount = 0;
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ariga.");
+  const completionGhost = page.locator(".cm-ghost-text-suggestion");
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  assert.equal(
+    await page.locator(".cm-ghost-source").textContent(),
+    "ariga.",
+    "Input completion should stay as a ghost candidate even when direct replacement is selected.",
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "変換スタイルを開く" }).click();
+  await page.getByLabel("なし", { exact: true }).check();
   await page.getByRole("button", { name: "スタイル を閉じる" }).click();
 
   conversionRequestCount = 0;
@@ -402,6 +427,12 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (
+    system.includes("Complete only an unfinished final Japanese word.") &&
+    prompt.includes("Mechanical kana:\nありが。")
+  ) {
+    return "ありがとう。";
+  }
   if (system.includes("Avoid returning these previous outputs exactly:")) {
     if (prompt === "いち。") {
       return "壱。";
@@ -424,6 +455,9 @@ function conversionResponseForPrompt(prompt, system = "") {
   }
   if (prompt === "あしたのよてい") {
     return "明日の予定";
+  }
+  if (prompt === "ありがとう。") {
+    return "ありがとう。";
   }
   return prompt ? "あなたは誰ですか。" : "";
 }

@@ -1,6 +1,10 @@
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
-import { buildKanaKanjiSystemPrompt, buildKanaRepairSystemPrompt } from "./prompts";
+import {
+  buildInputCompletionSystemPrompt,
+  buildKanaKanjiSystemPrompt,
+  buildKanaRepairSystemPrompt,
+} from "./prompts";
 import {
   defaultOllamaTransport,
   normalizeLmStudioBaseUrl,
@@ -13,6 +17,7 @@ import type {
   RomajiKanaResult,
   RomajiKanaSpan,
   RomajiKanaToken,
+  InputCompletionLevel,
   UserDictionaryEntry,
 } from "./types";
 
@@ -41,6 +46,60 @@ interface DictionaryCandidate {
 
 const MAX_ALTERNATIVE_CONVERSION_ATTEMPTS = 2;
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
+const ALLOWED_SENTENCE_INSERTIONS = new Set([
+  "は",
+  "が",
+  "を",
+  "に",
+  "で",
+  "と",
+  "も",
+  "の",
+  "へ",
+  "や",
+  "か",
+  "ね",
+  "よ",
+  "から",
+  "まで",
+  "より",
+  "ので",
+  "のに",
+  "なら",
+  "では",
+  "には",
+  "とは",
+  "です",
+  "でした",
+  "でしょう",
+  "ます",
+  "ました",
+  "ません",
+  "ましょう",
+  "する",
+  "します",
+  "した",
+  "しました",
+  "しない",
+  "しません",
+  "だ",
+  "だった",
+  "ではない",
+  "。",
+  "、",
+  "！",
+  "？",
+  "!",
+  "?",
+]);
+const SAFE_SENTENCE_WORD_COMPLETIONS: ReadonlyArray<readonly [string, string]> = [
+  ["ありが", "ありがとう"],
+  ["おはよ", "おはよう"],
+  ["こんにち", "こんにちは"],
+  ["すみませ", "すみません"],
+  ["おねが", "おねがい"],
+  ["よろし", "よろしく"],
+];
 
 export type ProtectedDictionaryEntry = Pick<
   UserDictionaryEntry,
@@ -51,6 +110,8 @@ export interface JapaneseConversionResult {
   text: string;
   reviewKana: string;
   conversionStrategy?: "completion";
+  inputCompletionApplied?: boolean;
+  inputCompletionSourceKana?: string;
 }
 
 export interface JapaneseConversionOptions {
@@ -127,25 +188,51 @@ async function convertRomajiToJapaneseDetailedOnce(
   ]);
   const convertedParts: string[] = [];
   const reviewKanaParts: string[] = [];
+  const inputCompletionSourceParts: string[] = [];
+  let inputCompletionApplied = false;
+  let finalMeaningfulPartIndex = -1;
+  parts.forEach((part, index) => {
+    const value = part.type === "text" ? part.value : part.output;
+    if (value.trim()) {
+      finalMeaningfulPartIndex = index;
+    }
+  });
+  const finalPart = parts[finalMeaningfulPartIndex];
+  const inputCompletionPartIndex =
+    finalPart?.type === "text" && hasConvertibleRomaji(finalPart.value)
+      ? finalMeaningfulPartIndex
+      : -1;
 
-  for (const part of parts) {
+  for (const [partIndex, part] of parts.entries()) {
     if (part.type === "dictionary" || part.type === "literal") {
       convertedParts.push(part.output);
       reviewKanaParts.push(part.output);
+      inputCompletionSourceParts.push(part.output);
       continue;
     }
 
     if (!hasConvertibleRomaji(part.value)) {
       convertedParts.push(part.value);
       reviewKanaParts.push(part.value);
+      inputCompletionSourceParts.push(part.value);
       continue;
     }
 
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
     const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
-    reviewKanaParts.push(repaired.kana);
+    const completedKana = await completeKanaInput(
+      part.value,
+      repaired.kana,
+      partIndex === inputCompletionPartIndex ? settings.inputCompletionLevel : "none",
+      inputCompletionSourceParts.join(""),
+      settings,
+      transport,
+    );
+    inputCompletionSourceParts.push(repaired.kana);
+    reviewKanaParts.push(completedKana);
+    inputCompletionApplied ||= completedKana !== repaired.kana;
     convertedParts.push(
-      await kanjiizeKana(repaired.kana, settings, transport, {
+      await kanjiizeKana(completedKana, settings, transport, {
         ...options,
         completionSourceRomaji: options.completionMode
           ? part.value
@@ -154,10 +241,203 @@ async function convertRomajiToJapaneseDetailedOnce(
     );
   }
 
-  return {
+  const result: JapaneseConversionResult = {
     text: convertedParts.join(""),
     reviewKana: reviewKanaParts.join(""),
   };
+  if (inputCompletionApplied) {
+    result.inputCompletionApplied = true;
+    result.inputCompletionSourceKana = inputCompletionSourceParts.join("");
+  }
+  return result;
+}
+
+async function completeKanaInput(
+  originalRomaji: string,
+  mechanicalKana: string,
+  level: InputCompletionLevel,
+  contextBefore: string,
+  settings: AppSettings,
+  transport: OllamaTransport,
+): Promise<string> {
+  if (level === "none" || !mechanicalKana.trim()) {
+    return mechanicalKana;
+  }
+
+  const result = await transport.generate(
+    settings.modelProvider,
+    currentProviderBaseUrl(settings),
+    {
+      model: settings.modelName,
+      system: buildInputCompletionSystemPrompt(level),
+      prompt: [
+        "Read-only context before the target:",
+        contextBefore.trim() || "(none)",
+        "",
+        "Original romaji input:",
+        originalRomaji,
+        "",
+        "Mechanical kana:",
+        mechanicalKana,
+      ].join("\n"),
+      stream: false,
+      think: settings.think,
+      options: {
+        temperature: level === "word" ? 0.05 : 0.15,
+      },
+      keep_alive: "5m",
+    },
+    30_000,
+  );
+
+  const candidate = cleanCompletionText(generatedText(result));
+  return isAllowedInputCompletion(mechanicalKana, candidate, level)
+    ? candidate
+    : mechanicalKana;
+}
+
+export function isAllowedInputCompletion(
+  source: string,
+  candidate: string,
+  level: Exclude<InputCompletionLevel, "none">,
+): boolean {
+  const normalizedSource = source.trim();
+  const normalizedCandidate = candidate.trim();
+  if (!normalizedCandidate || normalizedCandidate === normalizedSource) {
+    return normalizedCandidate === normalizedSource;
+  }
+
+  if (!preservesProtectedAsciiTokens(normalizedSource, normalizedCandidate)) {
+    return false;
+  }
+
+  if (level === "word") {
+    const sourceParts = splitTerminalPunctuation(normalizedSource);
+    const candidateParts = splitTerminalPunctuation(normalizedCandidate);
+    const addedLength = Array.from(candidateParts.body).length - Array.from(sourceParts.body).length;
+    return (
+      sourceParts.punctuation === candidateParts.punctuation &&
+      candidateParts.body.startsWith(sourceParts.body) &&
+      addedLength > 0 &&
+      addedLength <= 4
+    );
+  }
+
+  const sourceCharacters = comparableCharacters(normalizedSource);
+  const candidateCharacters = comparableCharacters(normalizedCandidate);
+  const addedLength = candidateCharacters.length - sourceCharacters.length;
+  const maximumAddedLength = Math.max(12, Math.ceil(sourceCharacters.length * 0.75));
+  if (
+    addedLength <= 0 ||
+    addedLength > maximumAddedLength ||
+    !isSubsequence(sourceCharacters, candidateCharacters)
+  ) {
+    return false;
+  }
+
+  if (isSafeSentenceWordCompletion(normalizedSource, normalizedCandidate)) {
+    return true;
+  }
+
+  const insertedSpans = collectInsertedSpans(sourceCharacters, candidateCharacters);
+  return (
+    insertedSpans.length > 0 &&
+    insertedSpans.every(isAllowedSentenceInsertionSequence)
+  );
+}
+
+function cleanCompletionText(text: string): string {
+  return stripThinkBlock(text)
+    .trim()
+    .replace(/^["'「『]|["'」』]$/g, "")
+    .trim();
+}
+
+function splitTerminalPunctuation(value: string): { body: string; punctuation: string } {
+  const match = value.match(/^(.*?)([。、.!?！？]*)$/u);
+  return {
+    body: match?.[1] ?? value,
+    punctuation: match?.[2] ?? "",
+  };
+}
+
+function isSafeSentenceWordCompletion(source: string, candidate: string): boolean {
+  const sourceParts = splitTerminalPunctuation(source);
+  const candidateParts = splitTerminalPunctuation(candidate);
+  if (sourceParts.punctuation !== candidateParts.punctuation) {
+    return false;
+  }
+
+  return SAFE_SENTENCE_WORD_COMPLETIONS.some(([partial, completed]) => {
+    if (!sourceParts.body.endsWith(partial)) {
+      return false;
+    }
+    return (
+      candidateParts.body ===
+      `${sourceParts.body.slice(0, -partial.length)}${completed}`
+    );
+  });
+}
+
+function preservesProtectedAsciiTokens(source: string, candidate: string): boolean {
+  const sourceTokens = source.match(/[A-Za-z0-9][A-Za-z0-9._:/-]*/g) ?? [];
+  const candidateTokens = candidate.match(/[A-Za-z0-9][A-Za-z0-9._:/-]*/g) ?? [];
+  return (
+    sourceTokens.length === candidateTokens.length &&
+    sourceTokens.every((token, index) => candidateTokens[index] === token)
+  );
+}
+
+function comparableCharacters(value: string): string[] {
+  return Array.from(value).filter((character) => !/\s/u.test(character));
+}
+
+function isSubsequence(source: string[], candidate: string[]): boolean {
+  let sourceIndex = 0;
+  for (const character of candidate) {
+    if (character === source[sourceIndex]) {
+      sourceIndex += 1;
+    }
+  }
+  return sourceIndex === source.length;
+}
+
+function collectInsertedSpans(source: string[], candidate: string[]): string[] {
+  const insertions: string[] = [];
+  let sourceIndex = 0;
+  let pendingInsertion = "";
+
+  for (const character of candidate) {
+    if (character === source[sourceIndex]) {
+      if (pendingInsertion) {
+        insertions.push(pendingInsertion);
+        pendingInsertion = "";
+      }
+      sourceIndex += 1;
+      continue;
+    }
+    pendingInsertion += character;
+  }
+
+  if (pendingInsertion) {
+    insertions.push(pendingInsertion);
+  }
+  return insertions;
+}
+
+function isAllowedSentenceInsertionSequence(insertion: string): boolean {
+  const reachable = new Set([0]);
+  for (let index = 0; index < insertion.length; index += 1) {
+    if (!reachable.has(index)) {
+      continue;
+    }
+    for (const token of ALLOWED_SENTENCE_INSERTIONS) {
+      if (insertion.startsWith(token, index)) {
+        reachable.add(index + token.length);
+      }
+    }
+  }
+  return reachable.has(insertion.length);
 }
 
 function isAvoidedConversionOutput(output: string, avoidOutputs: string[] | undefined): boolean {

@@ -37,7 +37,11 @@ import {
   providerLabel,
 } from "./lib/ollama";
 import { checkOllamaConnection, listLocalModels } from "./lib/ollamaConnection";
-import { conversionPresetLabels, defaultConversionPrompt } from "./lib/prompts";
+import {
+  conversionPresetLabels,
+  defaultConversionPrompt,
+  inputCompletionLabels,
+} from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import { appShortcutFromKeyboardEvent } from "./lib/shortcuts";
 import type {
@@ -48,6 +52,7 @@ import type {
   ConversionRange,
   ConversionStatus,
   GhostConversionSuggestion,
+  InputCompletionLevel,
   ModelProvider,
   OllamaConnectionStatus,
   OllamaModel,
@@ -60,6 +65,7 @@ const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
 const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
+const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
 const ENABLE_FIRST_RUN_SETUP_MODAL = false;
@@ -753,6 +759,8 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
+        inputCompletionLevel:
+          request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
       }),
     );
     setStatus({ kind: "warning", message: "変換をキャンセルしました。" });
@@ -771,6 +779,8 @@ function App() {
         anchor: request.anchor,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
+        inputCompletionLevel:
+          request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
       }),
     );
     setStatus({ kind: "warning", message });
@@ -794,9 +804,11 @@ function App() {
         return;
       }
 
+      const inputCompletionLevel =
+        request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel;
       const conversion = await convertRomajiToJapaneseDetailed(
         resolved.matchedText,
-        settingsRef.current,
+        { ...settingsRef.current, inputCompletionLevel },
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
@@ -828,7 +840,7 @@ function App() {
       }
 
       const converted = conversion.text;
-      if (settingsRef.current.conversionMode === "ghost") {
+      if (settingsRef.current.conversionMode === "ghost" || conversion.inputCompletionApplied) {
         currentView.dispatch({
           effects: [
             removeLoadingDecoration.of(request.id),
@@ -841,6 +853,9 @@ function App() {
               inputText: request.originalText,
               reviewKana: conversion.reviewKana,
               conversionStrategy: conversion.conversionStrategy,
+              inputCompletionLevel,
+              inputCompletionApplied: conversion.inputCompletionApplied,
+              inputCompletionSourceKana: conversion.inputCompletionSourceKana,
               source: "editor",
               retryOf: request.retryOf,
               avoidOutputs: request.avoidOutputs,
@@ -849,8 +864,9 @@ function App() {
         });
         setStatus({
           kind: "success",
-          message:
-            conversion.conversionStrategy === "completion"
+          message: conversion.inputCompletionApplied
+            ? "入力補完候補を生成しました。Tab で確定、Esc で破棄できます。"
+            : conversion.conversionStrategy === "completion"
               ? "補完変換候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
               : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。",
         });
@@ -885,6 +901,9 @@ function App() {
         source: "editor",
         anchor: nextAnchor,
         conversionStrategy: conversion.conversionStrategy,
+        inputCompletionLevel,
+        inputCompletionApplied: conversion.inputCompletionApplied,
+        inputCompletionSourceKana: conversion.inputCompletionSourceKana,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -892,8 +911,9 @@ function App() {
       setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
-        message:
-          conversion.conversionStrategy === "completion"
+        message: conversion.inputCompletionApplied
+          ? "入力補完を適用しました。元に戻すとローマ字に戻ります。"
+          : conversion.conversionStrategy === "completion"
             ? "補完変換で変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。"
             : "変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。",
       });
@@ -916,9 +936,11 @@ function App() {
         return;
       }
 
+      const inputCompletionLevel =
+        request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel;
       const conversion = await convertRomajiToJapaneseDetailed(
         request.originalText,
-        settingsRef.current,
+        { ...settingsRef.current, inputCompletionLevel },
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
@@ -949,14 +971,18 @@ function App() {
             source: "history",
             anchor: request.anchor,
             conversionStrategy: conversion.conversionStrategy,
+            inputCompletionLevel,
+            inputCompletionApplied: conversion.inputCompletionApplied,
+            inputCompletionSourceKana: conversion.inputCompletionSourceKana,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
           }),
         );
         setStatus({
           kind: "success",
-          message:
-            conversion.conversionStrategy === "completion"
+          message: conversion.inputCompletionApplied
+            ? "入力補完で履歴から再変換しました。適用先がないため結果のみ保存しました。"
+            : conversion.conversionStrategy === "completion"
               ? "補完変換で履歴から再変換しました。適用先がないため結果のみ保存しました。"
               : "履歴から再変換しました。適用先がないため結果のみ保存しました。",
         });
@@ -977,7 +1003,7 @@ function App() {
         return;
       }
 
-      if (settingsRef.current.conversionMode === "ghost") {
+      if (settingsRef.current.conversionMode === "ghost" || conversion.inputCompletionApplied) {
         latestView.dispatch({
           effects: showGhostSuggestion.of({
             id: request.id,
@@ -988,6 +1014,9 @@ function App() {
             inputText: request.originalText,
             reviewKana: conversion.reviewKana,
             conversionStrategy: conversion.conversionStrategy,
+            inputCompletionLevel,
+            inputCompletionApplied: conversion.inputCompletionApplied,
+            inputCompletionSourceKana: conversion.inputCompletionSourceKana,
             source: "history",
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
@@ -996,8 +1025,9 @@ function App() {
         latestView.focus();
         setStatus({
           kind: "success",
-          message:
-            conversion.conversionStrategy === "completion"
+          message: conversion.inputCompletionApplied
+            ? "履歴から入力補完候補を生成しました。Tab で適用、Esc で破棄できます。"
+            : conversion.conversionStrategy === "completion"
               ? "履歴から補完変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
               : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。",
         });
@@ -1032,6 +1062,9 @@ function App() {
         source: "history",
         anchor: nextAnchor,
         conversionStrategy: conversion.conversionStrategy,
+        inputCompletionLevel,
+        inputCompletionApplied: conversion.inputCompletionApplied,
+        inputCompletionSourceKana: conversion.inputCompletionSourceKana,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -1040,8 +1073,9 @@ function App() {
       setRecentRetryItem(historyItem);
       setStatus({
         kind: "success",
-        message:
-          conversion.conversionStrategy === "completion"
+        message: conversion.inputCompletionApplied
+          ? "入力補完で履歴の変換を適用しました。"
+          : conversion.conversionStrategy === "completion"
             ? "補完変換で履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
             : latestResolved.matchedBy === "nearby"
             ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
@@ -1101,6 +1135,8 @@ function App() {
                 anchor: request.anchor,
                 retryOf: request.retryOf,
                 avoidOutputs: request.avoidOutputs,
+                inputCompletionLevel:
+                  request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
               }),
             );
             setStatus({ kind: "error", message });
@@ -1191,6 +1227,9 @@ function App() {
       source: suggestion.source,
       anchor: nextAnchor,
       conversionStrategy: suggestion.conversionStrategy,
+      inputCompletionLevel: suggestion.inputCompletionLevel,
+      inputCompletionApplied: suggestion.inputCompletionApplied,
+      inputCompletionSourceKana: suggestion.inputCompletionSourceKana,
       retryOf: suggestion.retryOf,
       avoidOutputs: suggestion.avoidOutputs,
     };
@@ -1201,8 +1240,9 @@ function App() {
     setRecentRetryItem(historyItem);
     setStatus({
       kind: "success",
-      message:
-        suggestion.conversionStrategy === "completion"
+      message: suggestion.inputCompletionApplied
+        ? "入力補完候補を確定しました。"
+        : suggestion.conversionStrategy === "completion"
           ? "補完変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
           : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
     });
@@ -1240,6 +1280,8 @@ function App() {
         status: "queued",
         retryOf: suggestion.retryOf ?? suggestion.id,
         avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
+        inputCompletionLevel:
+          suggestion.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
       };
 
       view.dispatch({
@@ -1287,6 +1329,9 @@ function App() {
         convertedText: item.output,
         inputText: item.input,
         conversionStrategy: item.conversionStrategy,
+        inputCompletionLevel: item.inputCompletionLevel,
+        inputCompletionApplied: item.inputCompletionApplied,
+        inputCompletionSourceKana: item.inputCompletionSourceKana,
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
@@ -1312,6 +1357,7 @@ function App() {
       createdAt: Date.now(),
       source: "history",
       status: "queued",
+      inputCompletionLevel: item.inputCompletionLevel,
     };
 
     return enqueueConversion(request);
@@ -1327,6 +1373,7 @@ function App() {
       status: "queued",
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
+      inputCompletionLevel: item.inputCompletionLevel,
     };
 
     return enqueueConversion(request);
@@ -1417,6 +1464,7 @@ function App() {
       docVersion: docVersionRef.current,
       source: "editor",
       status: "queued",
+      inputCompletionLevel: settingsRef.current.inputCompletionLevel,
     };
 
     view.dispatch({
@@ -1520,6 +1568,10 @@ function App() {
             <PromptPanel
               prompt={settings.conversionPrompt}
               preset={settings.conversionPreset}
+              inputCompletionLevel={settings.inputCompletionLevel}
+              onInputCompletionLevelChange={(inputCompletionLevel) =>
+                setSettings((value) => ({ ...value, inputCompletionLevel }))
+              }
               onPresetChange={(conversionPreset) =>
                 setSettings((value) => ({ ...value, conversionPreset }))
               }
@@ -1595,7 +1647,11 @@ function RecentRetryChip({
 }) {
   return (
     <aside
-      className={`recent-retry-chip ${item.conversionStrategy === "completion" ? "completion" : ""}`}
+      className={`recent-retry-chip ${
+        item.conversionStrategy === "completion" || item.inputCompletionApplied
+          ? "completion"
+          : ""
+      }`}
       aria-label="別候補への再変換"
     >
       <button
@@ -1606,7 +1662,11 @@ function RecentRetryChip({
       >
         <RotateCcw size={15} aria-hidden="true" />
         <span className="recent-retry-chip-text">
-          {item.conversionStrategy === "completion"
+          {item.inputCompletionApplied
+            ? item.output
+              ? `入力補完: ${item.output}`
+              : "入力補完で生成しました"
+            : item.conversionStrategy === "completion"
             ? item.output
               ? `補完変換: ${item.output}`
               : "補完変換で生成しました"
@@ -2048,6 +2108,21 @@ function HistoryPanel({
               </dl>
               <div className="rerun-meta">
                 <span className="history-model">{item.modelName}</span>
+                <span
+                  className={`history-completion-level ${
+                    item.inputCompletionApplied ? "applied" : ""
+                  }`}
+                  title={
+                    item.inputCompletionApplied && item.inputCompletionSourceKana
+                      ? `補完前: ${item.inputCompletionSourceKana}`
+                      : "この変換で使用した入力補完レベル"
+                  }
+                >
+                  {historyInputCompletionLabel(
+                    item.inputCompletionLevel,
+                    item.inputCompletionApplied,
+                  )}
+                </span>
                 <button
                   className="history-action-button"
                   type="button"
@@ -2099,15 +2174,32 @@ function historyStatusLabel(status: ConversionHistoryItem["status"]): string {
   return "キャンセル";
 }
 
+function historyInputCompletionLabel(
+  level: InputCompletionLevel | undefined,
+  applied: boolean | undefined,
+): string {
+  if (level === "word") {
+    return applied ? "単語補完・適用" : "単語補完・変更なし";
+  }
+  if (level === "sentence") {
+    return applied ? "文章補完・適用" : "文章補完・変更なし";
+  }
+  return "入力どおり";
+}
+
 function PromptPanel({
   prompt,
   preset,
+  inputCompletionLevel,
+  onInputCompletionLevelChange,
   onPresetChange,
   onChange,
   onReset,
 }: {
   prompt: string;
   preset: ConversionPreset;
+  inputCompletionLevel: InputCompletionLevel;
+  onInputCompletionLevelChange: (level: InputCompletionLevel) => void;
   onPresetChange: (preset: ConversionPreset) => void;
   onChange: (prompt: string) => void;
   onReset: () => void;
@@ -2115,6 +2207,39 @@ function PromptPanel({
   return (
     <section className="floating-panel prompt-panel" aria-label="変換スタイル">
       <div className="preset-panel-content">
+        <fieldset className="input-completion-options">
+          <legend>入力補完</legend>
+          <p className="input-completion-intro">
+            入力にない文字を、どこまでAIに補わせるかを選びます。
+          </p>
+          <div className="input-completion-levels">
+            {INPUT_COMPLETION_OPTIONS.map((option) => (
+              <label
+                className={inputCompletionLevel === option ? "selected" : ""}
+                key={option}
+              >
+                <input
+                  type="radio"
+                  name="input-completion-level"
+                  value={option}
+                  checked={inputCompletionLevel === option}
+                  onChange={() => onInputCompletionLevelChange(option)}
+                />
+                <span>{inputCompletionLabels[option]}</span>
+              </label>
+            ))}
+          </div>
+          <div className="input-completion-preview" aria-live="polite">
+            <span>{inputCompletionDescription(inputCompletionLevel)}</span>
+            <code>{inputCompletionExample(inputCompletionLevel)}</code>
+          </div>
+          {inputCompletionLevel !== "none" ? (
+            <p className="input-completion-safety">
+              補完が発生した場合は、直接置換の設定でも候補として表示します。
+            </p>
+          ) : null}
+        </fieldset>
+
         <fieldset className="preset-options">
           <legend className="sr-only">変換プリセット</legend>
           {CONVERSION_PRESET_OPTIONS.map((option) => (
@@ -2169,6 +2294,26 @@ function presetDescription(preset: ConversionPreset): string {
     return "仕事の連絡やメール下書き向け。標準的なビジネス漢字と丁寧な表記を優先します。";
   }
   return "汎用の変換。読みと一般的な日本語表記を優先します。";
+}
+
+function inputCompletionDescription(level: InputCompletionLevel): string {
+  if (level === "word") {
+    return "途中で切れた最後の単語だけを補います。";
+  }
+  if (level === "sentence") {
+    return "助詞や文末を最小限補い、文章として整えます。";
+  }
+  return "入力の読みを変えず、そのまま変換します。";
+}
+
+function inputCompletionExample(level: InputCompletionLevel): string {
+  if (level === "word") {
+    return "ariga → ありがとう";
+  }
+  if (level === "sentence") {
+    return "asita kaigi 10ji → 明日の会議は10時です";
+  }
+  return "ariga → ありが";
 }
 
 function DictionaryModal({
