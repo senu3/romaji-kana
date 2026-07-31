@@ -121,6 +121,7 @@ export interface JapaneseConversionOptions {
   completionMode?: boolean;
   completionSourceRomaji?: string;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
+  documentVocabulary?: string[];
 }
 
 export async function convertRomajiToJapanese(
@@ -511,6 +512,7 @@ export async function kanjiizeKana(
         options.strictAlternative ?? false,
         options.alternativeAttempt ?? 0,
         options.completionMode ?? false,
+        options.completionMode ? [] : options.documentVocabulary ?? [],
       ),
       prompt: buildKanaKanjiUserPrompt(kana, options),
       stream: false,

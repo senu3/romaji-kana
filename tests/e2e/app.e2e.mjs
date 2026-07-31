@@ -268,15 +268,27 @@ try {
   );
   await modelSettingsDialog.getByRole("button", { name: "モデル設定を閉じる" }).click();
 
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.insertText(
+    "要件定義を確認します。\n要件定義を更新します。\nローカルモデルを確認します。\n",
+  );
   await page.getByRole("button", { name: "変換スタイルを開く" }).click();
   await page.getByRole("region", { name: "変換スタイル" }).waitFor();
+  await page.locator(".document-vocabulary-terms").getByText("要件定義", { exact: true }).waitFor();
+  await page
+    .locator(".document-vocabulary-terms")
+    .getByText("ローカルモデル", { exact: true })
+    .waitFor();
+  await page.getByLabel("文書の語彙に合わせる").check();
   assert.equal(await page.getByLabel("なし", { exact: true }).isChecked(), true);
   await page.getByLabel("単語", { exact: true }).check();
   await page.getByText("ariga → ありがとう", { exact: true }).waitFor();
   await page.waitForFunction(() => {
     const rawSettings = localStorage.getItem("romaji-kana-settings");
     return rawSettings
-      ? JSON.parse(rawSettings).inputCompletionLevel === "word"
+      ? JSON.parse(rawSettings).inputCompletionLevel === "word" &&
+          JSON.parse(rawSettings).useDocumentVocabulary === true
       : false;
   });
   await page.getByLabel("ビジネスメール").check();
@@ -284,8 +296,10 @@ try {
   await page.getByRole("button", { name: "スタイル を閉じる" }).click();
 
   conversionRequestCount = 0;
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
   await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+A");
+  await page.keyboard.press("Control+End");
   await page.keyboard.type("ariga.");
   const completionGhost = page.locator(".cm-ghost-text-suggestion");
   await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
@@ -294,10 +308,71 @@ try {
     "ariga.",
     "Input completion should stay as a ghost candidate even when direct replacement is selected.",
   );
-  await page.keyboard.press("Escape");
+  const vocabularySystem = conversionSystems.find((system) =>
+    system.includes("Document vocabulary reference:"),
+  );
+  assert.ok(
+    vocabularySystem?.includes('- "要件定義"') &&
+      vocabularySystem.includes('- "ローカルモデル"'),
+    "Kana-kanji conversion should receive the queued document vocabulary snapshot.",
+  );
+  const completionSystem = conversionSystems.find((system) =>
+    system.includes("Complete only an unfinished final Japanese word."),
+  );
+  assert.ok(
+    completionSystem && !completionSystem.includes("Document vocabulary reference:"),
+    "Document vocabulary must not influence the input-completion layer.",
+  );
+  await page.getByRole("button", { name: "変換スタイルを開く" }).click();
+  await page.getByLabel("文書の語彙に合わせる").uncheck();
+  await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+/");
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  const ghostRetryVocabularySystem = conversionSystems.find((system) =>
+    system.includes("Document vocabulary reference:"),
+  );
+  assert.ok(
+    ghostRetryVocabularySystem?.includes('- "要件定義"') &&
+      ghostRetryVocabularySystem.includes('- "ローカルモデル"'),
+    "Ghost retry should preserve the vocabulary snapshot after the setting is disabled.",
+  );
+  await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: /履歴を開く/ }).click();
+  await page
+    .locator(".history-item")
+    .filter({ hasText: "ariga." })
+    .first()
+    .getByText(/文書語彙 \d+/)
+    .waitFor();
+  await page.getByRole("button", { name: "履歴 を閉じる" }).click();
   await page.getByRole("button", { name: "変換スタイルを開く" }).click();
   await page.getByLabel("なし", { exact: true }).check();
   await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.insertText("\n新用語を確認します。");
+  conversionPrompts.length = 0;
+  conversionSystems.length = 0;
+  await page.getByRole("button", { name: /履歴を開く/ }).click();
+  await page
+    .locator(".history-item")
+    .filter({ hasText: "ariga." })
+    .first()
+    .getByRole("button", { name: "再試行" })
+    .click();
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  const historyRetryVocabularySystem = conversionSystems.find((system) =>
+    system.includes("Document vocabulary reference:"),
+  );
+  assert.ok(
+    historyRetryVocabularySystem?.includes('- "要件定義"') &&
+      !historyRetryVocabularySystem.includes("新用語"),
+    "History retry should use the original snapshot instead of the current document vocabulary.",
+  );
+  await page.keyboard.press("Escape");
 
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
@@ -442,6 +517,9 @@ function conversionResponseForPrompt(prompt, system = "") {
         return "三。";
       }
       return "参。";
+    }
+    if (prompt === "ありがとう。") {
+      return "有難う。";
     }
   }
   if (prompt === "いち。") {

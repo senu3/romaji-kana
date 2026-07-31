@@ -1669,6 +1669,18 @@ h3 {
   color: #475569;
 }
 
+.history-vocabulary-badge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 2px 6px;
+  background: #e6f5f2;
+  color: #0f766e;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .history-status-dot {
   width: 7px;
   height: 7px;
@@ -1902,6 +1914,113 @@ h3 {
 
 .input-completion-safety {
   color: #72520f;
+}
+
+.document-vocabulary-options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid #d5e8e5;
+  padding: 0 0 15px;
+}
+
+.document-vocabulary-options legend {
+  padding: 0;
+  color: #123f3b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.document-vocabulary-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid #d5e8e5;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.document-vocabulary-toggle:hover,
+.document-vocabulary-toggle.selected {
+  border-color: #8bc7bf;
+  background: #ecfeff;
+}
+
+.document-vocabulary-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: #0d9488;
+}
+
+.document-vocabulary-toggle input:focus-visible {
+  outline: 3px solid #5eead4;
+  outline-offset: 2px;
+}
+
+.document-vocabulary-toggle > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.document-vocabulary-toggle strong {
+  color: #0f766e;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.document-vocabulary-toggle small {
+  color: #475569;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.document-vocabulary-summary {
+  display: grid;
+  gap: 7px;
+  min-height: 43px;
+  border-radius: 7px;
+  padding: 10px 11px;
+  background: #f2f8f7;
+  color: #365a56;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.document-vocabulary-summary p,
+.document-vocabulary-safety {
+  margin: 0;
+}
+
+.document-vocabulary-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.document-vocabulary-terms span {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid #c9e4df;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #ffffff;
+  color: #0b6b64;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-vocabulary-safety {
+  color: #536966;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .preset-options {

@@ -86,4 +86,18 @@ describe("loadSettings", () => {
     );
     expect(loadSettings().inputCompletionLevel).toBe("sentence");
   });
+
+  it("keeps document vocabulary opt-in and restores an explicit choice", () => {
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ modelName: "local-model" }),
+    );
+    expect(loadSettings().useDocumentVocabulary).toBe(false);
+
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ ...defaultSettings, useDocumentVocabulary: true }),
+    );
+    expect(loadSettings().useDocumentVocabulary).toBe(true);
+  });
 });

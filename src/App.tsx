@@ -29,6 +29,10 @@ import {
   saveFileDocumentSession,
   saveNewDocumentSession,
 } from "./lib/documentStore";
+import {
+  buildDocumentVocabularyProfile,
+  type DocumentVocabularyProfile,
+} from "./lib/documentVocabulary";
 import { basename, openMarkdownFile, reopenMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
 import {
@@ -126,6 +130,10 @@ function App() {
     message: "ローカルモデルプロバイダーはまだ確認されていません。",
   });
   const [initialDocument] = useState(() => initialSession.content);
+  const [documentVocabularyProfile, setDocumentVocabularyProfile] =
+    useState<DocumentVocabularyProfile>(() =>
+      buildDocumentVocabularyProfile(initialSession.content),
+    );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
@@ -157,6 +165,7 @@ function App() {
   const initialFileRestoreStartedRef = useRef(false);
   const docVersionRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vocabularyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionCheckIdRef = useRef(0);
   const startupCheckStartedRef = useRef(false);
   const previousModelProviderRef = useRef(settings.modelProvider);
@@ -179,6 +188,9 @@ function App() {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
+      }
+      if (vocabularyTimerRef.current) {
+        clearTimeout(vocabularyTimerRef.current);
       }
     };
   }, []);
@@ -240,6 +252,15 @@ function App() {
       }
       saveTimerRef.current = null;
     }, 250);
+
+    if (vocabularyTimerRef.current) {
+      clearTimeout(vocabularyTimerRef.current);
+    }
+    vocabularyTimerRef.current = setTimeout(() => {
+      const profile = buildDocumentVocabularyProfile(documentText);
+      setDocumentVocabularyProfile(profile);
+      vocabularyTimerRef.current = null;
+    }, 350);
   }, []);
 
   const handleCheckOllama = useCallback(async () => {
@@ -498,6 +519,11 @@ function App() {
   }, []);
 
   const togglePromptPanel = useCallback(() => {
+    const documentText = editorViewRef.current?.state.doc.toString();
+    if (documentText !== undefined) {
+      const profile = buildDocumentVocabularyProfile(documentText);
+      setDocumentVocabularyProfile(profile);
+    }
     setActivePanel((panel) => {
       return panel === "prompt" ? null : "prompt";
     });
@@ -761,6 +787,8 @@ function App() {
         avoidOutputs: request.avoidOutputs,
         inputCompletionLevel:
           request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
+        documentVocabulary: request.documentVocabulary,
+        documentVocabularyRevision: request.documentVocabularyRevision,
       }),
     );
     setStatus({ kind: "warning", message: "変換をキャンセルしました。" });
@@ -781,6 +809,8 @@ function App() {
         avoidOutputs: request.avoidOutputs,
         inputCompletionLevel:
           request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
+        documentVocabulary: request.documentVocabulary,
+        documentVocabularyRevision: request.documentVocabularyRevision,
       }),
     );
     setStatus({ kind: "warning", message });
@@ -812,6 +842,7 @@ function App() {
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
+          documentVocabulary: request.documentVocabulary,
         },
       );
       if (canceledRequestsRef.current.has(request.id)) {
@@ -856,6 +887,8 @@ function App() {
               inputCompletionLevel,
               inputCompletionApplied: conversion.inputCompletionApplied,
               inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+              documentVocabulary: request.documentVocabulary,
+              documentVocabularyRevision: request.documentVocabularyRevision,
               source: "editor",
               retryOf: request.retryOf,
               avoidOutputs: request.avoidOutputs,
@@ -904,6 +937,8 @@ function App() {
         inputCompletionLevel,
         inputCompletionApplied: conversion.inputCompletionApplied,
         inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+        documentVocabulary: request.documentVocabulary,
+        documentVocabularyRevision: request.documentVocabularyRevision,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -944,6 +979,7 @@ function App() {
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
+          documentVocabulary: request.documentVocabulary,
           protectedDictionaryEntries: resolved
             ? buildProtectedDictionaryEntries(
                 request.originalText,
@@ -974,6 +1010,8 @@ function App() {
             inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+            documentVocabulary: request.documentVocabulary,
+            documentVocabularyRevision: request.documentVocabularyRevision,
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
           }),
@@ -1017,6 +1055,8 @@ function App() {
             inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+            documentVocabulary: request.documentVocabulary,
+            documentVocabularyRevision: request.documentVocabularyRevision,
             source: "history",
             retryOf: request.retryOf,
             avoidOutputs: request.avoidOutputs,
@@ -1065,6 +1105,8 @@ function App() {
         inputCompletionLevel,
         inputCompletionApplied: conversion.inputCompletionApplied,
         inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+        documentVocabulary: request.documentVocabulary,
+        documentVocabularyRevision: request.documentVocabularyRevision,
         retryOf: request.retryOf,
         avoidOutputs: request.avoidOutputs,
       };
@@ -1137,6 +1179,8 @@ function App() {
                 avoidOutputs: request.avoidOutputs,
                 inputCompletionLevel:
                   request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
+                documentVocabulary: request.documentVocabulary,
+                documentVocabularyRevision: request.documentVocabularyRevision,
               }),
             );
             setStatus({ kind: "error", message });
@@ -1230,6 +1274,8 @@ function App() {
       inputCompletionLevel: suggestion.inputCompletionLevel,
       inputCompletionApplied: suggestion.inputCompletionApplied,
       inputCompletionSourceKana: suggestion.inputCompletionSourceKana,
+      documentVocabulary: suggestion.documentVocabulary,
+      documentVocabularyRevision: suggestion.documentVocabularyRevision,
       retryOf: suggestion.retryOf,
       avoidOutputs: suggestion.avoidOutputs,
     };
@@ -1282,6 +1328,8 @@ function App() {
         avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
         inputCompletionLevel:
           suggestion.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
+        documentVocabulary: suggestion.documentVocabulary,
+        documentVocabularyRevision: suggestion.documentVocabularyRevision,
       };
 
       view.dispatch({
@@ -1332,6 +1380,8 @@ function App() {
         inputCompletionLevel: item.inputCompletionLevel,
         inputCompletionApplied: item.inputCompletionApplied,
         inputCompletionSourceKana: item.inputCompletionSourceKana,
+        documentVocabulary: item.documentVocabulary,
+        documentVocabularyRevision: item.documentVocabularyRevision,
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
@@ -1358,6 +1408,8 @@ function App() {
       source: "history",
       status: "queued",
       inputCompletionLevel: item.inputCompletionLevel,
+      documentVocabulary: item.documentVocabulary,
+      documentVocabularyRevision: item.documentVocabularyRevision,
     };
 
     return enqueueConversion(request);
@@ -1374,6 +1426,8 @@ function App() {
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
       inputCompletionLevel: item.inputCompletionLevel,
+      documentVocabulary: item.documentVocabulary,
+      documentVocabularyRevision: item.documentVocabularyRevision,
     };
 
     return enqueueConversion(request);
@@ -1450,6 +1504,9 @@ function App() {
       return false;
     }
 
+    const vocabularyProfile = settingsRef.current.useDocumentVocabulary
+      ? buildDocumentVocabularyProfile(view.state.doc.toString())
+      : null;
     const request: PendingConversion = {
       id: crypto.randomUUID(),
       range,
@@ -1465,6 +1522,12 @@ function App() {
       source: "editor",
       status: "queued",
       inputCompletionLevel: settingsRef.current.inputCompletionLevel,
+      documentVocabulary: vocabularyProfile?.terms.length
+        ? [...vocabularyProfile.terms]
+        : undefined,
+      documentVocabularyRevision: vocabularyProfile?.terms.length
+        ? vocabularyProfile.revision
+        : undefined,
     };
 
     view.dispatch({
@@ -1569,8 +1632,13 @@ function App() {
               prompt={settings.conversionPrompt}
               preset={settings.conversionPreset}
               inputCompletionLevel={settings.inputCompletionLevel}
+              useDocumentVocabulary={settings.useDocumentVocabulary}
+              documentVocabularyProfile={documentVocabularyProfile}
               onInputCompletionLevelChange={(inputCompletionLevel) =>
                 setSettings((value) => ({ ...value, inputCompletionLevel }))
+              }
+              onUseDocumentVocabularyChange={(useDocumentVocabulary) =>
+                setSettings((value) => ({ ...value, useDocumentVocabulary }))
               }
               onPresetChange={(conversionPreset) =>
                 setSettings((value) => ({ ...value, conversionPreset }))
@@ -2092,6 +2160,14 @@ function HistoryPanel({
                   <span className={`history-status-dot ${item.status}`} aria-hidden="true" />
                   {historyStatusLabel(item.status)}
                 </span>
+                {item.documentVocabulary?.length ? (
+                  <span
+                    className="history-vocabulary-badge"
+                    title="この変換で参照した文書語彙"
+                  >
+                    文書語彙 {item.documentVocabulary.length}
+                  </span>
+                ) : null}
                 <time dateTime={new Date(item.createdAt).toISOString()}>
                   {new Date(item.createdAt).toLocaleTimeString()}
                 </time>
@@ -2191,7 +2267,10 @@ function PromptPanel({
   prompt,
   preset,
   inputCompletionLevel,
+  useDocumentVocabulary,
+  documentVocabularyProfile,
   onInputCompletionLevelChange,
+  onUseDocumentVocabularyChange,
   onPresetChange,
   onChange,
   onReset,
@@ -2199,7 +2278,10 @@ function PromptPanel({
   prompt: string;
   preset: ConversionPreset;
   inputCompletionLevel: InputCompletionLevel;
+  useDocumentVocabulary: boolean;
+  documentVocabularyProfile: DocumentVocabularyProfile;
   onInputCompletionLevelChange: (level: InputCompletionLevel) => void;
+  onUseDocumentVocabularyChange: (enabled: boolean) => void;
   onPresetChange: (preset: ConversionPreset) => void;
   onChange: (prompt: string) => void;
   onReset: () => void;
@@ -2236,6 +2318,55 @@ function PromptPanel({
           {inputCompletionLevel !== "none" ? (
             <p className="input-completion-safety">
               補完が発生した場合は、直接置換の設定でも候補として表示します。
+            </p>
+          ) : null}
+        </fieldset>
+
+        <fieldset className="document-vocabulary-options">
+          <legend>文書語彙</legend>
+          <label
+            className={`document-vocabulary-toggle ${
+              useDocumentVocabulary ? "selected" : ""
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={useDocumentVocabulary}
+              onChange={(event) =>
+                onUseDocumentVocabularyChange(event.currentTarget.checked)
+              }
+            />
+            <span>
+              <strong>文書の語彙に合わせる</strong>
+              <small>
+                文書内の用語を、同じ読みの表記候補を選ぶときだけ参照します。
+              </small>
+            </span>
+          </label>
+          <div className="document-vocabulary-summary" aria-live="polite">
+            {documentVocabularyProfile.terms.length > 0 ? (
+              <>
+                <p>
+                  文書から {documentVocabularyProfile.terms.length} 語を自動抽出しました。
+                </p>
+                <div className="document-vocabulary-terms" aria-label="抽出した文書語彙">
+                  {documentVocabularyProfile.terms.slice(0, 8).map((term) => (
+                    <span key={term}>{term}</span>
+                  ))}
+                  {documentVocabularyProfile.terms.length > 8 ? (
+                    <span>ほか {documentVocabularyProfile.terms.length - 8} 語</span>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <p>
+                漢字・カタカナ・製品名などが文書に増えると、ここに候補が表示されます。
+              </p>
+            )}
+          </div>
+          {useDocumentVocabulary ? (
+            <p className="document-vocabulary-safety">
+              入力にない語の追加や、読みの変更には使いません。
             </p>
           ) : null}
         </fieldset>

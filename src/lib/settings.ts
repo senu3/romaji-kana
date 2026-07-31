@@ -24,6 +24,7 @@ export const defaultSettings: AppSettings = {
   conversionPrompt: defaultConversionPrompt,
   conversionPreset: "none",
   inputCompletionLevel: "none",
+  useDocumentVocabulary: false,
   userDictionary: [],
   think: false,
 };
@@ -62,6 +63,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     conversionPrompt,
     think,
     inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
+    useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,

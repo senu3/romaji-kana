@@ -36,6 +36,7 @@ export interface AppSettings {
   conversionPrompt: string;
   conversionPreset: ConversionPreset;
   inputCompletionLevel: InputCompletionLevel;
+  useDocumentVocabulary: boolean;
   userDictionary: UserDictionaryEntry[];
   think: boolean;
 }
@@ -103,6 +104,8 @@ export interface GhostConversionSuggestion {
   inputCompletionLevel?: InputCompletionLevel;
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
   source: "editor" | "history";
   retryOf?: string;
   avoidOutputs?: string[];
@@ -121,6 +124,8 @@ export interface PendingConversion {
   retryOf?: string;
   avoidOutputs?: string[];
   inputCompletionLevel?: InputCompletionLevel;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
 }
 
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
@@ -139,6 +144,8 @@ export interface ConversionHistoryItem {
   inputCompletionLevel?: InputCompletionLevel;
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
   retryOf?: string;
   avoidOutputs?: string[];
 }
