@@ -15,8 +15,10 @@
         "title": "Romaji Kana",
         "width": 1440,
         "height": 860,
-        "minWidth": 1180,
-        "minHeight": 720
+        "minWidth": 390,
+        "minHeight": 520,
+        "resizable": true,
+        "maximizable": true
       }
     ],
     "security": {

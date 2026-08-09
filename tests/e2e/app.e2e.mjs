@@ -442,10 +442,15 @@ try {
     .waitFor();
   await page.getByRole("button", { name: "履歴 を閉じる" }).click();
 
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 390, height: 520 });
   assert.ok(
     await page.locator(".editor-shell").evaluate((element) => element.getBoundingClientRect().width >= 380),
     "Editor should retain the full viewport width on a narrow screen.",
+  );
+  assert.equal(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    true,
+    "Minimum window size should not create horizontal page overflow.",
   );
   await page.getByRole("button", { name: "設定を開く", exact: true }).click();
   await page.getByRole("dialog", { name: "設定" }).waitFor();
