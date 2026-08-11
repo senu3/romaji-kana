@@ -93,7 +93,7 @@ try {
   await waitForVisibleText(page, 'Ollama に接続しました。"gemma4:latest" を読み込みました。利用可能なモデル: 2 件。');
   await page.getByRole("button", { name: "書き始める" }).click();
   await setupDialog.waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "設定を開く", exact: true }).click();
+  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
   await page
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "自動変換" })
@@ -112,9 +112,11 @@ try {
     return JSON.parse(rawSettings).triggers?.enter === true;
   });
 
-  const modelInput = page.getByRole("combobox");
-  await assertLocatorValue(modelInput, "gemma4:latest");
-  await page.getByRole("button", { name: "設定 を閉じる" }).click();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
+  await page.getByRole("button", { name: "モデルを開く", exact: true }).click();
+  const modelDrawer = page.getByRole("dialog", { name: "モデル" });
+  await assertLocatorValue(modelDrawer.getByRole("combobox"), "gemma4:latest");
+  await page.getByRole("button", { name: "モデル を閉じる" }).click();
 
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
@@ -273,8 +275,8 @@ try {
   await page.keyboard.insertText(
     "要件定義を確認します。\n要件定義を更新します。\nローカルモデルを確認します。\n",
   );
-  await page.getByRole("button", { name: "変換スタイルを開く" }).click();
-  await page.getByRole("region", { name: "変換スタイル" }).waitFor();
+  await page.getByRole("button", { name: "変換を開く" }).click();
+  await page.getByRole("region", { name: "変換設定" }).waitFor();
   await page.locator(".document-vocabulary-terms").getByText("要件定義", { exact: true }).waitFor();
   await page
     .locator(".document-vocabulary-terms")
@@ -291,9 +293,7 @@ try {
           JSON.parse(rawSettings).useDocumentVocabulary === true
       : false;
   });
-  await page.getByLabel("ビジネスメール").check();
-  await page.getByText("仕事の連絡やメール下書き向け。").waitFor();
-  await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
@@ -323,9 +323,9 @@ try {
     completionSystem && !completionSystem.includes("Document vocabulary reference:"),
     "Document vocabulary must not influence the input-completion layer.",
   );
-  await page.getByRole("button", { name: "変換スタイルを開く" }).click();
+  await page.getByRole("button", { name: "変換を開く" }).click();
   await page.getByLabel("文書の語彙に合わせる").uncheck();
-  await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.locator(".cm-content").click();
@@ -348,9 +348,9 @@ try {
     .getByText(/文書語彙 \d+/)
     .waitFor();
   await page.getByRole("button", { name: "履歴 を閉じる" }).click();
-  await page.getByRole("button", { name: "変換スタイルを開く" }).click();
+  await page.getByRole("button", { name: "変換を開く" }).click();
   await page.getByLabel("なし", { exact: true }).check();
-  await page.getByRole("button", { name: "スタイル を閉じる" }).click();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+End");
   await page.keyboard.insertText("\n新用語を確認します。");
@@ -377,12 +377,12 @@ try {
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
-  await page.getByRole("button", { name: "設定を開く", exact: true }).click();
+  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
   await page
     .getByRole("group", { name: "変換結果の適用方法" })
     .getByRole("button", { name: "候補を表示", exact: true })
     .click();
-  await page.getByRole("button", { name: "設定 を閉じる" }).click();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
   await page.waitForFunction(() => {
     const rawSettings = localStorage.getItem("romaji-kana-settings");
     if (!rawSettings) {
@@ -452,13 +452,13 @@ try {
     true,
     "Minimum window size should not create horizontal page overflow.",
   );
-  await page.getByRole("button", { name: "設定を開く", exact: true }).click();
-  await page.getByRole("dialog", { name: "設定" }).waitFor();
+  await page.getByRole("button", { name: "モデルを開く", exact: true }).click();
+  await page.getByRole("dialog", { name: "モデル" }).waitFor();
   await assertVisibleText(page, "接続済み");
-  await page.getByRole("button", { name: "設定 を閉じる" }).click();
+  await page.getByRole("button", { name: "モデル を閉じる" }).click();
   assert.ok(
-    await page.getByRole("button", { name: "変換スタイルを開く" }).isVisible(),
-    "Style action should remain visible on a narrow viewport.",
+    await page.getByRole("button", { name: "変換を開く" }).isVisible(),
+    "Conversion action should remain visible on a narrow viewport.",
   );
   assert.ok(
     await page.getByRole("button", { name: "自動変換をオフにする", exact: true }).isVisible(),

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultSettings, loadSettings } from "./settings";
+import {
+  defaultSettings,
+  loadSettings,
+  mergeSharedConversionSettings,
+  sharedConversionSettings,
+} from "./settings";
 
 const storage = new Map<string, string>();
 
@@ -99,5 +104,27 @@ describe("loadSettings", () => {
       JSON.stringify({ ...defaultSettings, useDocumentVocabulary: true }),
     );
     expect(loadSettings().useDocumentVocabulary).toBe(true);
+  });
+
+  it("shares conversion preferences without replacing PC model settings", () => {
+    const mobileSettings = {
+      ...defaultSettings,
+      modelName: "mobile-copy",
+      conversionMode: "ghost" as const,
+      inputCompletionLevel: "word" as const,
+    };
+    const desktopSettings = {
+      ...defaultSettings,
+      modelName: "desktop-model",
+    };
+
+    const merged = mergeSharedConversionSettings(
+      desktopSettings,
+      sharedConversionSettings(mobileSettings),
+    );
+
+    expect(merged.modelName).toBe("desktop-model");
+    expect(merged.conversionMode).toBe("ghost");
+    expect(merged.inputCompletionLevel).toBe("word");
   });
 });

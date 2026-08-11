@@ -48,6 +48,7 @@ pub struct CompanionDocument {
 pub struct CompanionSnapshot {
     document: CompanionDocument,
     settings: Value,
+    settings_updated_by: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -62,6 +63,7 @@ struct ModelSettings {
 struct SharedState {
     document: CompanionDocument,
     settings: Value,
+    settings_updated_by: String,
     model_settings: Option<ModelSettings>,
 }
 
@@ -98,6 +100,7 @@ impl Default for CompanionManager {
                     updated_by: "desktop".to_string(),
                 },
                 settings: Value::Null,
+                settings_updated_by: "desktop".to_string(),
                 model_settings: None,
             })),
         }
@@ -123,6 +126,13 @@ pub struct StartRequest {
 pub struct UpdateDocumentRequest {
     content: String,
     file_name: String,
+    client_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateSettingsRequest {
+    settings: Value,
     client_id: String,
 }
 
@@ -156,7 +166,7 @@ pub async fn companion_start(
         }
     }
 
-    update_shared_settings(&manager.shared, request.settings)?;
+    update_shared_settings(&manager.shared, request.settings, "desktop")?;
     {
         let mut shared = manager.shared.write().map_err(lock_error)?;
         shared.document.content = request.content;
@@ -193,6 +203,7 @@ pub async fn companion_start(
         .route("/api/pair", post(pair))
         .route("/api/state", get(get_state))
         .route("/api/document", put(update_document_http))
+        .route("/api/settings", put(update_settings_http))
         .route("/api/models", get(models))
         .route("/api/generate", post(generate))
         .route("/assets/{*path}", get(static_asset))
@@ -242,9 +253,10 @@ pub fn companion_status(
 #[tauri::command]
 pub fn companion_update_settings(
     settings: Value,
+    client_id: String,
     manager: TauriState<'_, CompanionManager>,
 ) -> Result<(), String> {
-    update_shared_settings(&manager.shared, settings)
+    update_shared_settings(&manager.shared, settings, &client_id)
 }
 
 #[tauri::command]
@@ -313,6 +325,20 @@ async fn update_document_http(
     match update_shared_document(&state.shared, request) {
         Ok(value) => (StatusCode::OK, Json(serde_json::json!(value))).into_response(),
         Err(message) => api_error(StatusCode::INTERNAL_SERVER_ERROR, &message),
+    }
+}
+
+async fn update_settings_http(
+    State(state): State<WebState>,
+    headers: HeaderMap,
+    Json(request): Json<UpdateSettingsRequest>,
+) -> impl IntoResponse {
+    if !is_authorized(&state, &headers) {
+        return api_error(StatusCode::UNAUTHORIZED, "再度ペアリングしてください。");
+    }
+    match update_shared_conversion_settings(&state.shared, request) {
+        Ok(value) => (StatusCode::OK, Json(serde_json::json!(value))).into_response(),
+        Err(message) => api_error(StatusCode::BAD_REQUEST, &message),
     }
 }
 
@@ -411,13 +437,55 @@ fn asset_response(path: &str, immutable: bool) -> Response<Body> {
 fn update_shared_settings(
     shared: &Arc<RwLock<SharedState>>,
     settings: Value,
+    updated_by: &str,
 ) -> Result<(), String> {
     let model_settings = serde_json::from_value::<ModelSettings>(settings.clone())
         .map_err(|error| format!("モデル設定を連携できません: {error}"))?;
     let mut shared = shared.write().map_err(lock_error)?;
     shared.settings = settings;
+    shared.settings_updated_by = updated_by.to_string();
     shared.model_settings = Some(model_settings);
     Ok(())
+}
+
+fn update_shared_conversion_settings(
+    shared: &Arc<RwLock<SharedState>>,
+    request: UpdateSettingsRequest,
+) -> Result<CompanionSnapshot, String> {
+    const SHARED_KEYS: [&str; 8] = [
+        "autoConvert",
+        "conversionMode",
+        "triggers",
+        "punctuationConversion",
+        "conversionPrompt",
+        "inputCompletionLevel",
+        "useDocumentVocabulary",
+        "userDictionary",
+    ];
+
+    let incoming = request
+        .settings
+        .as_object()
+        .ok_or_else(|| "変換設定の形式が正しくありません。".to_string())?;
+    let mut shared = shared.write().map_err(lock_error)?;
+    let current = shared
+        .settings
+        .as_object_mut()
+        .ok_or_else(|| "PC側の設定をまだ受け取っていません。".to_string())?;
+
+    for key in SHARED_KEYS {
+        let value = incoming
+            .get(key)
+            .ok_or_else(|| format!("変換設定に {key} がありません。"))?;
+        current.insert(key.to_string(), value.clone());
+    }
+    shared.settings_updated_by = request.client_id;
+
+    Ok(CompanionSnapshot {
+        document: shared.document.clone(),
+        settings: shared.settings.clone(),
+        settings_updated_by: shared.settings_updated_by.clone(),
+    })
 }
 
 fn update_shared_document(
@@ -435,6 +503,7 @@ fn update_shared_document(
     Ok(CompanionSnapshot {
         document: shared.document.clone(),
         settings: shared.settings.clone(),
+        settings_updated_by: shared.settings_updated_by.clone(),
     })
 }
 
@@ -443,6 +512,7 @@ fn snapshot(shared: &Arc<RwLock<SharedState>>) -> Result<CompanionSnapshot, Stri
     Ok(CompanionSnapshot {
         document: shared.document.clone(),
         settings: shared.settings.clone(),
+        settings_updated_by: shared.settings_updated_by.clone(),
     })
 }
 
@@ -559,7 +629,7 @@ mod tests {
             "modelName": "test-model"
         });
 
-        update_shared_settings(&manager.shared, settings.clone())
+        update_shared_settings(&manager.shared, settings.clone(), "desktop")
             .expect("settings update should succeed");
         let snapshot = snapshot(&manager.shared).expect("snapshot should succeed");
         let model = model_settings(&manager.shared).expect("model settings should exist");
@@ -567,6 +637,52 @@ mod tests {
         assert_eq!(snapshot.settings, settings);
         assert_eq!(model.model_provider, "lmstudio");
         assert_eq!(model.lm_studio_api_url, "http://localhost:1234");
+    }
+
+    #[test]
+    fn mobile_settings_update_only_shared_conversion_fields() {
+        let manager = CompanionManager::default();
+        let desktop_settings = serde_json::json!({
+            "modelProvider": "lmstudio",
+            "ollamaApiUrl": "http://localhost:11434",
+            "lmStudioApiUrl": "http://localhost:1234",
+            "modelName": "desktop-model",
+            "autoConvert": true,
+            "conversionMode": "replace",
+            "triggers": { "period": true, "comma": true, "enter": false, "manualShortcut": "Mod-Enter" },
+            "punctuationConversion": { "periodToJapanese": true, "commaToJapanese": true },
+            "conversionPrompt": "desktop prompt",
+            "inputCompletionLevel": "none",
+            "useDocumentVocabulary": false,
+            "userDictionary": [],
+            "think": false
+        });
+        update_shared_settings(&manager.shared, desktop_settings, "desktop")
+            .expect("desktop settings should initialize shared state");
+
+        let snapshot = update_shared_conversion_settings(
+            &manager.shared,
+            UpdateSettingsRequest {
+                settings: serde_json::json!({
+                    "autoConvert": false,
+                    "conversionMode": "ghost",
+                    "triggers": { "period": false, "comma": true, "enter": true, "manualShortcut": "Mod-Enter" },
+                    "punctuationConversion": { "periodToJapanese": false, "commaToJapanese": true },
+                    "conversionPrompt": "mobile prompt",
+                    "inputCompletionLevel": "word",
+                    "useDocumentVocabulary": true,
+                    "userDictionary": []
+                }),
+                client_id: "mobile-test".to_string(),
+            },
+        )
+        .expect("mobile conversion settings should update shared state");
+
+        assert_eq!(snapshot.settings["modelName"], "desktop-model");
+        assert_eq!(snapshot.settings["conversionMode"], "ghost");
+        assert_eq!(snapshot.settings["conversionPrompt"], "mobile prompt");
+        assert_eq!(snapshot.settings_updated_by, "mobile-test");
+        assert_eq!(model_settings(&manager.shared).unwrap().model_provider, "lmstudio");
     }
 
     #[test]

@@ -1,0 +1,388 @@
+import { ChevronDown, Keyboard, RotateCcw } from "lucide-react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useId,
+  useState,
+} from "react";
+import type { DocumentVocabularyProfile } from "../lib/documentVocabulary";
+import { inputCompletionLabels } from "../lib/prompts";
+import { defaultSettings } from "../lib/settings";
+import {
+  formatShortcutLabel,
+  isReservedAppShortcut,
+  shortcutFromKeyboardEvent,
+} from "../lib/shortcuts";
+import type { AppSettings, InputCompletionLevel } from "../lib/types";
+
+const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
+
+interface ConversionPanelProps {
+  settings: AppSettings;
+  documentVocabularyProfile: DocumentVocabularyProfile;
+  remoteMode: boolean;
+  onChange: (settings: AppSettings) => void;
+  onResetPrompt: () => void;
+}
+
+export function ConversionPanel({
+  settings,
+  documentVocabularyProfile,
+  remoteMode,
+  onChange,
+  onResetPrompt,
+}: ConversionPanelProps) {
+  const [capturingShortcut, setCapturingShortcut] = useState(false);
+  const [shortcutError, setShortcutError] = useState("");
+  const [openAccordions, setOpenAccordions] = useState({
+    triggers: false,
+    punctuation: false,
+  });
+  const resultHeadingId = useId();
+
+  const update = (patch: Partial<AppSettings>) => {
+    onChange({ ...settings, ...patch });
+  };
+
+  const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
+    update({ triggers: { ...settings.triggers, ...patch } });
+  };
+
+  const updatePunctuation = (patch: Partial<AppSettings["punctuationConversion"]>) => {
+    update({
+      punctuationConversion: {
+        ...settings.punctuationConversion,
+        ...patch,
+      },
+    });
+  };
+
+  const toggleAccordion = (section: keyof typeof openAccordions) => {
+    setOpenAccordions((current) => ({
+      ...current,
+      [section]: !current[section],
+    }));
+  };
+
+  const handleShortcutKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!capturingShortcut) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.key === "Escape") {
+      setCapturingShortcut(false);
+      setShortcutError("");
+      return;
+    }
+
+    const nextShortcut = shortcutFromKeyboardEvent(event.nativeEvent);
+    if (!nextShortcut) {
+      setShortcutError("Ctrl/Cmd、Alt、Shift とキーの組み合わせ、またはファンクションキーを使ってください。");
+      return;
+    }
+    if (isReservedAppShortcut(nextShortcut)) {
+      setShortcutError("そのショートカットはファイル操作に予約されています。");
+      return;
+    }
+
+    updateTriggers({ manualShortcut: nextShortcut });
+    setCapturingShortcut(false);
+    setShortcutError("");
+  };
+
+  const enabledTriggerCount = [
+    settings.triggers.period,
+    settings.triggers.comma,
+    settings.triggers.enter,
+  ].filter(Boolean).length;
+  const punctuationCount = [
+    settings.punctuationConversion.periodToJapanese,
+    settings.punctuationConversion.commaToJapanese,
+  ].filter(Boolean).length;
+
+  return (
+    <section className="floating-panel prompt-panel conversion-panel" aria-label="変換設定">
+      <div className="conversion-panel-content">
+        <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
+          <h3 id={resultHeadingId}>変換結果</h3>
+          <div className="mode-field">
+            <span>適用方法</span>
+            <div className="segmented-control" role="group" aria-label="変換結果の適用方法">
+              <button
+                className={settings.conversionMode === "replace" ? "selected" : ""}
+                type="button"
+                aria-pressed={settings.conversionMode === "replace"}
+                onClick={() => update({ conversionMode: "replace" })}
+              >
+                直接置換
+              </button>
+              <button
+                className={settings.conversionMode === "ghost" ? "selected" : ""}
+                type="button"
+                aria-pressed={settings.conversionMode === "ghost"}
+                onClick={() => update({ conversionMode: "ghost" })}
+              >
+                候補を表示
+              </button>
+            </div>
+            <small>
+              {settings.conversionMode === "ghost"
+                ? "候補をインライン表示し、Tabで確定します。"
+                : "変換後の日本語ですぐに置き換えます。"}
+            </small>
+          </div>
+        </section>
+
+        <AccordionSection
+          title="自動変換"
+          summary={settings.autoConvert ? `ON · ${enabledTriggerCount}/3 トリガー` : "OFF"}
+          open={openAccordions.triggers}
+          onToggle={() => toggleAccordion("triggers")}
+        >
+          <CheckRow
+            label="自動変換"
+            checked={settings.autoConvert}
+            onChange={(checked) => update({ autoConvert: checked })}
+          />
+          <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
+            <CheckRow
+              label="ピリオド ."
+              checked={settings.triggers.period}
+              disabled={!settings.autoConvert}
+              onChange={(checked) => updateTriggers({ period: checked })}
+            />
+            <CheckRow
+              label="カンマ ,"
+              checked={settings.triggers.comma}
+              disabled={!settings.autoConvert}
+              onChange={(checked) => updateTriggers({ comma: checked })}
+            />
+            <CheckRow
+              label="Enter（IME 変換中は無視）"
+              checked={settings.triggers.enter}
+              disabled={!settings.autoConvert}
+              onChange={(checked) => updateTriggers({ enter: checked })}
+            />
+          </div>
+          {!remoteMode ? (
+            <div className="shortcut-field">
+              <div>
+                <span>手動ショートカット</span>
+                <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
+              </div>
+              <div className="shortcut-controls">
+                <button
+                  className={`shortcut-recorder ${capturingShortcut ? "recording" : ""}`}
+                  type="button"
+                  onClick={() => {
+                    setCapturingShortcut(true);
+                    setShortcutError("");
+                  }}
+                  onKeyDown={handleShortcutKeyDown}
+                  onBlur={() => setCapturingShortcut(false)}
+                  data-ignore-app-shortcuts="true"
+                >
+                  <Keyboard size={15} aria-hidden="true" />
+                  {capturingShortcut
+                    ? "ショートカットを押してください..."
+                    : formatShortcutLabel(settings.triggers.manualShortcut)}
+                </button>
+                <button
+                  className="shortcut-reset"
+                  type="button"
+                  onClick={() =>
+                    updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
+                  }
+                  aria-label="手動ショートカットをリセット"
+                  title="手動ショートカットをリセット"
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                </button>
+              </div>
+              <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
+                {shortcutError || "自動変換がオフでも手動変換は使えます。"}
+              </p>
+            </div>
+          ) : null}
+        </AccordionSection>
+
+        <AccordionSection
+          title="句読点"
+          summary={`${punctuationCount}/2 有効`}
+          open={openAccordions.punctuation}
+          onToggle={() => toggleAccordion("punctuation")}
+        >
+          <CheckRow
+            label=". を 。へ"
+            checked={settings.punctuationConversion.periodToJapanese}
+            onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
+          />
+          <CheckRow
+            label=", を 、へ"
+            checked={settings.punctuationConversion.commaToJapanese}
+            onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
+          />
+        </AccordionSection>
+
+        <fieldset className="input-completion-options">
+          <legend>入力補完</legend>
+          <p className="input-completion-intro">
+            入力にない文字を、どこまでAIに補わせるかを選びます。
+          </p>
+          <div className="input-completion-levels">
+            {INPUT_COMPLETION_OPTIONS.map((option) => (
+              <label className={settings.inputCompletionLevel === option ? "selected" : ""} key={option}>
+                <input
+                  type="radio"
+                  name="input-completion-level"
+                  value={option}
+                  checked={settings.inputCompletionLevel === option}
+                  onChange={() => update({ inputCompletionLevel: option })}
+                />
+                <span>{inputCompletionLabels[option]}</span>
+              </label>
+            ))}
+          </div>
+          <div className="input-completion-preview" aria-live="polite">
+            <span>{inputCompletionDescription(settings.inputCompletionLevel)}</span>
+            <code>{inputCompletionExample(settings.inputCompletionLevel)}</code>
+          </div>
+          {settings.inputCompletionLevel !== "none" ? (
+            <p className="input-completion-safety">
+              補完が発生した場合は、直接置換でも候補として表示します。
+            </p>
+          ) : null}
+        </fieldset>
+
+        <fieldset className="document-vocabulary-options">
+          <legend>文書語彙</legend>
+          <label className={`document-vocabulary-toggle ${settings.useDocumentVocabulary ? "selected" : ""}`}>
+            <input
+              type="checkbox"
+              checked={settings.useDocumentVocabulary}
+              onChange={(event) => update({ useDocumentVocabulary: event.currentTarget.checked })}
+            />
+            <span>
+              <strong>文書の語彙に合わせる</strong>
+              <small>文書内の用語を、同じ読みの表記候補を選ぶときだけ参照します。</small>
+            </span>
+          </label>
+          <div className="document-vocabulary-summary" aria-live="polite">
+            {documentVocabularyProfile.terms.length > 0 ? (
+              <>
+                <p>文書から {documentVocabularyProfile.terms.length} 語を自動抽出しました。</p>
+                <div className="document-vocabulary-terms" aria-label="抽出した文書語彙">
+                  {documentVocabularyProfile.terms.slice(0, 8).map((term) => (
+                    <span key={term}>{term}</span>
+                  ))}
+                  {documentVocabularyProfile.terms.length > 8 ? (
+                    <span>ほか {documentVocabularyProfile.terms.length - 8} 語</span>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <p>漢字・カタカナ・製品名などが文書に増えると、ここに候補が表示されます。</p>
+            )}
+          </div>
+          {settings.useDocumentVocabulary ? (
+            <p className="document-vocabulary-safety">
+              入力にない語の追加や、読みの変更には使いません。
+            </p>
+          ) : null}
+        </fieldset>
+
+        <details className="advanced-prompt">
+          <summary>詳細な変換指示</summary>
+          <label className="prompt-editor">
+            <span>日本語変換の指示</span>
+            <textarea
+              value={settings.conversionPrompt}
+              onChange={(event) => update({ conversionPrompt: event.currentTarget.value })}
+              spellCheck={false}
+            />
+          </label>
+          <div className="panel-actions">
+            <button className="secondary-button" type="button" onClick={onResetPrompt}>
+              デフォルトに戻す
+            </button>
+          </div>
+          <p className="panel-note">変更は自動保存されます。</p>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+function AccordionSection({
+  title,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`settings-accordion ${open ? "open" : ""}`}>
+      <button className="accordion-trigger" type="button" onClick={onToggle} aria-expanded={open}>
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </button>
+      {open ? <div className="accordion-content">{children}</div> : null}
+    </section>
+  );
+}
+
+function CheckRow({
+  label,
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={`check-row ${disabled ? "disabled" : ""}`}>
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+      />
+    </label>
+  );
+}
+
+function inputCompletionDescription(level: InputCompletionLevel): string {
+  if (level === "word") {
+    return "途中で切れた最後の単語だけを補います。";
+  }
+  if (level === "sentence") {
+    return "助詞や文末を最小限補い、文章として整えます。";
+  }
+  return "入力の読みを変えず、そのまま変換します。";
+}
+
+function inputCompletionExample(level: InputCompletionLevel): string {
+  if (level === "word") {
+    return "ariga → ありがとう";
+  }
+  if (level === "sentence") {
+    return "asita kaigi 10ji → 明日の会議は10時です";
+  }
+  return "ariga → ありが";
+}

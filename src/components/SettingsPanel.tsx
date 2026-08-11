@@ -1,26 +1,10 @@
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Keyboard,
   RefreshCw,
-  RotateCcw,
   SlidersHorizontal,
 } from "lucide-react";
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { defaultSettings } from "../lib/settings";
-import {
-  formatShortcutLabel,
-  isReservedAppShortcut,
-  shortcutFromKeyboardEvent,
-} from "../lib/shortcuts";
+import { useId, useMemo, useRef, useState } from "react";
 import type {
   AppSettings,
   ModelProvider,
@@ -69,7 +53,7 @@ export function SettingsPanel({
         className="panel-toggle"
         type="button"
         onClick={onToggleCollapsed}
-        aria-label={collapsed ? "設定を開く" : "設定を閉じる"}
+        aria-label={collapsed ? "モデルを開く" : "モデルを閉じる"}
       >
         {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
       </button>
@@ -77,7 +61,7 @@ export function SettingsPanel({
       {collapsed ? (
         <div className="collapsed-mark" aria-hidden="true">
           <SlidersHorizontal size={19} />
-          <span>設定</span>
+          <span>モデル</span>
         </div>
       ) : (
         <SettingsContent
@@ -105,12 +89,6 @@ export function SettingsContent({
   mode = "full",
 }: SettingsContentProps) {
   const [modelListOpen, setModelListOpen] = useState(false);
-  const [capturingShortcut, setCapturingShortcut] = useState(false);
-  const [shortcutError, setShortcutError] = useState("");
-  const [openAccordions, setOpenAccordions] = useState({
-    triggers: false,
-    punctuation: false,
-  });
   const modelOptionsId = useId();
   const providerRadioName = `${useId()}-provider`;
   const modelInputRef = useRef<HTMLInputElement | null>(null);
@@ -123,18 +101,6 @@ export function SettingsContent({
     onChange({ ...settings, ...patch });
   };
 
-  const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
-    update({ triggers: { ...settings.triggers, ...patch } });
-  };
-
-  const updatePunctuation = (patch: Partial<AppSettings["punctuationConversion"]>) => {
-    update({
-      punctuationConversion: {
-        ...settings.punctuationConversion,
-        ...patch,
-      },
-    });
-  };
   const updateProvider = (modelProvider: ModelProvider) => {
     update({ modelProvider });
     onProviderSelected?.(modelProvider);
@@ -157,51 +123,6 @@ export function SettingsContent({
     update({ ollamaApiUrl: apiUrl });
   };
 
-  const handleShortcutKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (!capturingShortcut) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (event.key === "Escape") {
-      setCapturingShortcut(false);
-      setShortcutError("");
-      return;
-    }
-
-    const nextShortcut = shortcutFromKeyboardEvent(event.nativeEvent);
-    if (!nextShortcut) {
-      setShortcutError("Ctrl/Cmd、Alt、Shift とキーの組み合わせ、またはファンクションキーを使ってください。");
-      return;
-    }
-    if (isReservedAppShortcut(nextShortcut)) {
-      setShortcutError("そのショートカットは File 操作用に予約されています。");
-      return;
-    }
-
-    updateTriggers({ manualShortcut: nextShortcut });
-    setCapturingShortcut(false);
-    setShortcutError("");
-  };
-
-  const toggleAccordion = (section: keyof typeof openAccordions) => {
-    setOpenAccordions((current) => ({
-      ...current,
-      [section]: !current[section],
-    }));
-  };
-
-  const enabledTriggerCount = [
-    settings.triggers.period,
-    settings.triggers.comma,
-    settings.triggers.enter,
-  ].filter(Boolean).length;
-  const punctuationCount = [
-    settings.punctuationConversion.periodToJapanese,
-    settings.punctuationConversion.commaToJapanese,
-  ].filter(Boolean).length;
   const providerName = activeProvider ? providerLabel(activeProvider) : "プロバイダー";
   const currentApiUrl =
     activeProvider === "lmstudio"
@@ -216,7 +137,7 @@ export function SettingsContent({
             <SlidersHorizontal size={20} aria-hidden="true" />
             <div>
               <p className="eyebrow">ローカルAI</p>
-              <h2 id={headingId}>{setupMode ? "モデル設定" : "設定"}</h2>
+              <h2 id={headingId}>モデル設定</h2>
             </div>
           </div>
 
@@ -357,135 +278,9 @@ export function SettingsContent({
 
           {setupMode ? (
             <p className="setup-settings-note">
-              変換結果の適用方法と自動変換の動作は、あとから設定で変更できます。
+              変換結果の適用方法や自動変換は、あとから「変換」で変更できます。
             </p>
-          ) : (
-            <>
-              <div className="settings-group">
-                <h3>変換</h3>
-                <div className="mode-field">
-                  <span>変換結果の適用方法</span>
-                  <div
-                    className="segmented-control"
-                    role="group"
-                    aria-label="変換結果の適用方法"
-                  >
-                    <button
-                      className={settings.conversionMode === "replace" ? "selected" : ""}
-                      type="button"
-                      aria-pressed={settings.conversionMode === "replace"}
-                      onClick={() => update({ conversionMode: "replace" })}
-                    >
-                      直接置換
-                    </button>
-                    <button
-                      className={settings.conversionMode === "ghost" ? "selected" : ""}
-                      type="button"
-                      aria-pressed={settings.conversionMode === "ghost"}
-                      onClick={() => update({ conversionMode: "ghost" })}
-                    >
-                      候補を表示
-                    </button>
-                  </div>
-                  <small>
-                    {settings.conversionMode === "ghost"
-                      ? "候補をインライン表示し、Tabで確定します。"
-                      : "変換後の日本語でローマ字をすぐに置き換えます。"}
-                  </small>
-                </div>
-              </div>
-
-              <AccordionSection
-                title="自動変換"
-                summary={settings.autoConvert ? `ON · ${enabledTriggerCount}/3 トリガー` : "OFF"}
-                open={openAccordions.triggers}
-                onToggle={() => toggleAccordion("triggers")}
-              >
-                <CheckRow
-                  label="自動変換"
-                  checked={settings.autoConvert}
-                  onChange={(checked) => update({ autoConvert: checked })}
-                />
-                <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
-                  <CheckRow
-                    label="ピリオド ."
-                    checked={settings.triggers.period}
-                    disabled={!settings.autoConvert}
-                    onChange={(checked) => updateTriggers({ period: checked })}
-                  />
-                  <CheckRow
-                    label="カンマ ,"
-                    checked={settings.triggers.comma}
-                    disabled={!settings.autoConvert}
-                    onChange={(checked) => updateTriggers({ comma: checked })}
-                  />
-                  <CheckRow
-                    label="Enter（IME 変換中は無視）"
-                    checked={settings.triggers.enter}
-                    disabled={!settings.autoConvert}
-                    onChange={(checked) => updateTriggers({ enter: checked })}
-                  />
-                </div>
-                <div className="shortcut-field">
-                  <div>
-                    <span>手動ショートカット</span>
-                    <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
-                  </div>
-                  <div className="shortcut-controls">
-                    <button
-                      className={`shortcut-recorder ${capturingShortcut ? "recording" : ""}`}
-                      type="button"
-                      onClick={() => {
-                        setCapturingShortcut(true);
-                        setShortcutError("");
-                      }}
-                      onKeyDown={handleShortcutKeyDown}
-                      onBlur={() => setCapturingShortcut(false)}
-                      data-ignore-app-shortcuts="true"
-                    >
-                      <Keyboard size={15} aria-hidden="true" />
-                      {capturingShortcut
-                        ? "ショートカットを押してください..."
-                        : formatShortcutLabel(settings.triggers.manualShortcut)}
-                    </button>
-                    <button
-                      className="shortcut-reset"
-                      type="button"
-                      onClick={() =>
-                        updateTriggers({ manualShortcut: defaultSettings.triggers.manualShortcut })
-                      }
-                      aria-label="手動ショートカットをリセット"
-                      title="手動ショートカットをリセット"
-                    >
-                      <RotateCcw size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                  <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
-                    {shortcutError ||
-                      "自動変換がオフでも手動変換は使えます。"}
-                  </p>
-                </div>
-              </AccordionSection>
-
-              <AccordionSection
-                title="句読点"
-                summary={`${punctuationCount}/2 有効`}
-                open={openAccordions.punctuation}
-                onToggle={() => toggleAccordion("punctuation")}
-              >
-                <CheckRow
-                  label=". を 。へ"
-                  checked={settings.punctuationConversion.periodToJapanese}
-                  onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
-                />
-                <CheckRow
-                  label=", を 、へ"
-                  checked={settings.punctuationConversion.commaToJapanese}
-                  onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
-                />
-              </AccordionSection>
-            </>
-          )}
+          ) : null}
         </div>
   );
 }
@@ -508,38 +303,6 @@ function connectionTitle(kind: OllamaConnectionStatus["kind"]): string {
 
 function providerLabel(provider: ModelProvider): string {
   return provider === "lmstudio" ? "LM Studio" : "Ollama";
-}
-
-function AccordionSection({
-  title,
-  summary,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  summary: string;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className={`settings-accordion ${open ? "open" : ""}`}>
-      <button
-        className="accordion-trigger"
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span>
-          <strong>{title}</strong>
-          <small>{summary}</small>
-        </span>
-        <ChevronDown size={16} aria-hidden="true" />
-      </button>
-      {open ? <div className="accordion-content">{children}</div> : null}
-    </section>
-  );
 }
 
 function CheckRow({

@@ -37,6 +37,7 @@ import {
   removeLoadingDecoration,
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
+import { ConversionPanel } from "./components/ConversionPanel";
 import { SettingsContent } from "./components/SettingsPanel";
 import {
   clearRemoteCompanionToken,
@@ -47,6 +48,7 @@ import {
   pairRemoteCompanion,
   startCompanion,
   stopCompanion,
+  updateCompanionConversionSettings,
   updateCompanionDocument,
   updateCompanionSettings,
   type CompanionSnapshot,
@@ -71,17 +73,20 @@ import {
 } from "./lib/ollama";
 import { checkOllamaConnection, listLocalModels } from "./lib/ollamaConnection";
 import {
-  conversionPresetLabels,
   defaultConversionPrompt,
-  inputCompletionLabels,
 } from "./lib/prompts";
-import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
+import {
+  defaultSettings,
+  loadSettings,
+  mergeSharedConversionSettings,
+  saveSettings,
+  sharedConversionSettings,
+} from "./lib/settings";
 import { appShortcutFromKeyboardEvent } from "./lib/shortcuts";
 import type {
   AppSettings,
   ConversionAnchor,
   ConversionHistoryItem,
-  ConversionPreset,
   ConversionRange,
   ConversionStatus,
   GhostConversionSuggestion,
@@ -93,12 +98,10 @@ import type {
   UserDictionaryEntry,
 } from "./lib/types";
 
-type ActivePanel = "settings" | "history" | "dictionary" | "prompt" | "companion" | null;
+type ActivePanel = "model" | "history" | "dictionary" | "conversion" | "companion" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
-const CONVERSION_PRESET_OPTIONS: ConversionPreset[] = ["none", "conversation", "businessEmail"];
-const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
 const SETUP_COMPLETE_STORAGE_KEY = "romaji-kana-setup-complete";
 const FORCE_SETUP_QUERY_PARAM = "setup";
 const ENABLE_FIRST_RUN_SETUP_MODAL = false;
@@ -294,12 +297,39 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const companionPushPendingRef = useRef(false);
   const suppressNextCompanionPushRef = useRef(false);
   const companionClientIdRef = useRef(remoteMode ? createId("mobile") : "desktop");
+  const remoteSettingsReadyRef = useRef(false);
+  const companionSettingsPushPendingRef = useRef(false);
+  const suppressNextCompanionSettingsPushRef = useRef(false);
 
   useEffect(() => {
     settingsRef.current = settings;
     saveSettings(settings);
-    if (!remoteMode && companionStatusRef.current.running) {
-      void updateCompanionSettings(settings);
+    if (remoteMode) {
+      if (!remoteSettingsReadyRef.current) {
+        return;
+      }
+      if (suppressNextCompanionSettingsPushRef.current) {
+        suppressNextCompanionSettingsPushRef.current = false;
+        return;
+      }
+      companionSettingsPushPendingRef.current = true;
+      void updateCompanionConversionSettings(
+        sharedConversionSettings(settings),
+        companionClientIdRef.current,
+      )
+        .catch((error: unknown) => {
+          setStatus({
+            kind: "error",
+            message: `変換設定をPCへ同期できませんでした。${error instanceof Error ? error.message : String(error)}`,
+          });
+        })
+        .finally(() => {
+          companionSettingsPushPendingRef.current = false;
+        });
+      return;
+    }
+    if (companionStatusRef.current.running) {
+      void updateCompanionSettings(settings, companionClientIdRef.current);
     }
   }, [remoteMode, settings]);
 
@@ -697,14 +727,14 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     });
   }, []);
 
-  const togglePromptPanel = useCallback(() => {
+  const toggleConversionPanel = useCallback(() => {
     const documentText = editorViewRef.current?.state.doc.toString();
     if (documentText !== undefined) {
       const profile = buildDocumentVocabularyProfile(documentText);
       setDocumentVocabularyProfile(profile);
     }
     setActivePanel((panel) => {
-      return panel === "prompt" ? null : "prompt";
+      return panel === "conversion" ? null : "conversion";
     });
   }, []);
 
@@ -714,14 +744,14 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     });
   }, []);
 
-  const toggleSettingsDrawer = useCallback(() => {
+  const toggleModelDrawer = useCallback(() => {
     setActivePanel((panel) => {
-      return panel === "settings" ? null : "settings";
+      return panel === "model" ? null : "model";
     });
   }, []);
 
-  const openSettingsDrawer = useCallback(() => {
-    setActivePanel("settings");
+  const openModelDrawer = useCallback(() => {
+    setActivePanel("model");
   }, []);
 
   const openModelSettings = useCallback(() => {
@@ -776,8 +806,23 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, [clearPendingConversions]);
 
   const applyCompanionSnapshot = useCallback((snapshot: CompanionSnapshot) => {
-    if (remoteMode && JSON.stringify(snapshot.settings) !== JSON.stringify(settingsRef.current)) {
-      setSettings(snapshot.settings);
+    if (remoteMode) {
+      remoteSettingsReadyRef.current = true;
+      if (
+        !companionSettingsPushPendingRef.current &&
+        JSON.stringify(snapshot.settings) !== JSON.stringify(settingsRef.current)
+      ) {
+        suppressNextCompanionSettingsPushRef.current = true;
+        setSettings(snapshot.settings);
+      }
+    } else if (snapshot.settingsUpdatedBy !== companionClientIdRef.current) {
+      const nextSettings = mergeSharedConversionSettings(
+        settingsRef.current,
+        sharedConversionSettings(snapshot.settings),
+      );
+      if (JSON.stringify(nextSettings) !== JSON.stringify(settingsRef.current)) {
+        setSettings(nextSettings);
+      }
     }
     if (remoteMode) {
       setRemoteFileName(snapshot.document.fileName || "PCの文書");
@@ -1873,7 +1918,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, [enqueueConversion]);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
-  const settingsAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
+  const modelAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
   const enabledDictionaryCount = settings.userDictionary.filter(
     (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
   ).length;
@@ -1914,13 +1959,13 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         historyCount={history.length}
         dictionaryCount={enabledDictionaryCount}
         activePanel={activePanel}
-        settingsAttention={settingsAttention}
+        modelAttention={modelAttention}
         remoteMode={remoteMode}
         companionRunning={companionStatus.running}
         onOpenHistory={toggleHistoryPanel}
-        onOpenPrompt={togglePromptPanel}
+        onOpenConversion={toggleConversionPanel}
         onOpenDictionary={toggleDictionaryPanel}
-        onOpenSettings={toggleSettingsDrawer}
+        onOpenModel={toggleModelDrawer}
         onOpenCompanion={() => setActivePanel((panel) => panel === "companion" ? null : "companion")}
       />
       {recentRetryItem ? (
@@ -1935,7 +1980,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           panel={activePanel}
           onClose={closeActivePanel}
         >
-          {activePanel === "settings" ? (
+          {activePanel === "model" ? (
             <SettingsContent
               settings={settings}
               ollamaModels={ollamaModels}
@@ -1963,26 +2008,13 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
               onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
             />
           ) : null}
-          {activePanel === "prompt" ? (
-            <PromptPanel
-              prompt={settings.conversionPrompt}
-              preset={settings.conversionPreset}
-              inputCompletionLevel={settings.inputCompletionLevel}
-              useDocumentVocabulary={settings.useDocumentVocabulary}
+          {activePanel === "conversion" ? (
+            <ConversionPanel
+              settings={settings}
               documentVocabularyProfile={documentVocabularyProfile}
-              onInputCompletionLevelChange={(inputCompletionLevel) =>
-                setSettings((value) => ({ ...value, inputCompletionLevel }))
-              }
-              onUseDocumentVocabularyChange={(useDocumentVocabulary) =>
-                setSettings((value) => ({ ...value, useDocumentVocabulary }))
-              }
-              onPresetChange={(conversionPreset) =>
-                setSettings((value) => ({ ...value, conversionPreset }))
-              }
-              onChange={(conversionPrompt) =>
-                setSettings((value) => ({ ...value, conversionPrompt }))
-              }
-              onReset={() =>
+              remoteMode={remoteMode}
+              onChange={setSettings}
+              onResetPrompt={() =>
                 setSettings((value) => ({ ...value, conversionPrompt: defaultConversionPrompt }))
               }
             />
@@ -2031,7 +2063,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         pendingCount={pending.length}
         editorStatus={editorStatus}
         onCancel={cancelConversion}
-        onOpenSettings={openSettingsDrawer}
+        onOpenModel={openModelDrawer}
       />
     </main>
   );
@@ -2256,40 +2288,42 @@ function AppRail({
   historyCount,
   dictionaryCount,
   activePanel,
-  settingsAttention,
+  modelAttention,
   remoteMode,
   companionRunning,
   onOpenHistory,
-  onOpenPrompt,
+  onOpenConversion,
   onOpenDictionary,
-  onOpenSettings,
+  onOpenModel,
   onOpenCompanion,
 }: {
   historyCount: number;
   dictionaryCount: number;
   activePanel: ActivePanel;
-  settingsAttention: boolean;
+  modelAttention: boolean;
   remoteMode: boolean;
   companionRunning: boolean;
   onOpenHistory: () => void;
-  onOpenPrompt: () => void;
+  onOpenConversion: () => void;
   onOpenDictionary: () => void;
-  onOpenSettings: () => void;
+  onOpenModel: () => void;
   onOpenCompanion: () => void;
 }) {
   return (
     <nav className="app-rail" aria-label="アプリのツール">
-      <button
-        className={`rail-button ${activePanel === "settings" ? "active" : ""} ${settingsAttention ? "attention" : ""}`}
-        type="button"
-        onClick={onOpenSettings}
-        aria-pressed={activePanel === "settings"}
-        aria-label="設定を開く"
-        title="設定"
-      >
-        <SlidersHorizontal size={18} aria-hidden="true" />
-        <span>設定</span>
-      </button>
+      {!remoteMode ? (
+        <button
+          className={`rail-button ${activePanel === "model" ? "active" : ""} ${modelAttention ? "attention" : ""}`}
+          type="button"
+          onClick={onOpenModel}
+          aria-pressed={activePanel === "model"}
+          aria-label="モデルを開く"
+          title="モデル"
+        >
+          <SlidersHorizontal size={18} aria-hidden="true" />
+          <span>モデル</span>
+        </button>
+      ) : null}
       <button
         className={`rail-button ${activePanel === "history" ? "active" : ""}`}
         type="button"
@@ -2319,15 +2353,15 @@ function AppRail({
         <span>辞書</span>
       </button>
       <button
-        className={`rail-button ${activePanel === "prompt" ? "active" : ""}`}
+        className={`rail-button ${activePanel === "conversion" ? "active" : ""}`}
         type="button"
-        onClick={onOpenPrompt}
-        aria-pressed={activePanel === "prompt"}
-        aria-label="変換スタイルを開く"
-        title="変換スタイル"
+        onClick={onOpenConversion}
+        aria-pressed={activePanel === "conversion"}
+        aria-label="変換を開く"
+        title="変換"
       >
         <MessageSquareText size={18} aria-hidden="true" />
-        <span>スタイル</span>
+        <span>変換</span>
       </button>
       {!remoteMode ? (
         <button
@@ -2410,8 +2444,8 @@ function InspectorDrawer({
 }
 
 function panelTitle(panel: NonNullable<ActivePanel>): string {
-  if (panel === "settings") {
-    return "設定";
+  if (panel === "model") {
+    return "モデル";
   }
   if (panel === "history") {
     return "履歴";
@@ -2422,12 +2456,12 @@ function panelTitle(panel: NonNullable<ActivePanel>): string {
   if (panel === "companion") {
     return "スマホ連携";
   }
-  return "スタイル";
+  return "変換";
 }
 
 function panelEyebrow(panel: NonNullable<ActivePanel>): string {
-  if (panel === "settings") {
-    return "アプリ設定";
+  if (panel === "model") {
+    return "ローカルAI";
   }
   if (panel === "history") {
     return "変換履歴";
@@ -2438,7 +2472,7 @@ function panelEyebrow(panel: NonNullable<ActivePanel>): string {
   if (panel === "companion") {
     return "同じWi-Fiで接続";
   }
-  return "変換スタイル";
+  return "入力と変換";
 }
 
 function SetupModal({
@@ -2784,190 +2818,6 @@ function historyInputCompletionLabel(
   return "入力どおり";
 }
 
-function PromptPanel({
-  prompt,
-  preset,
-  inputCompletionLevel,
-  useDocumentVocabulary,
-  documentVocabularyProfile,
-  onInputCompletionLevelChange,
-  onUseDocumentVocabularyChange,
-  onPresetChange,
-  onChange,
-  onReset,
-}: {
-  prompt: string;
-  preset: ConversionPreset;
-  inputCompletionLevel: InputCompletionLevel;
-  useDocumentVocabulary: boolean;
-  documentVocabularyProfile: DocumentVocabularyProfile;
-  onInputCompletionLevelChange: (level: InputCompletionLevel) => void;
-  onUseDocumentVocabularyChange: (enabled: boolean) => void;
-  onPresetChange: (preset: ConversionPreset) => void;
-  onChange: (prompt: string) => void;
-  onReset: () => void;
-}) {
-  return (
-    <section className="floating-panel prompt-panel" aria-label="変換スタイル">
-      <div className="preset-panel-content">
-        <fieldset className="input-completion-options">
-          <legend>入力補完</legend>
-          <p className="input-completion-intro">
-            入力にない文字を、どこまでAIに補わせるかを選びます。
-          </p>
-          <div className="input-completion-levels">
-            {INPUT_COMPLETION_OPTIONS.map((option) => (
-              <label
-                className={inputCompletionLevel === option ? "selected" : ""}
-                key={option}
-              >
-                <input
-                  type="radio"
-                  name="input-completion-level"
-                  value={option}
-                  checked={inputCompletionLevel === option}
-                  onChange={() => onInputCompletionLevelChange(option)}
-                />
-                <span>{inputCompletionLabels[option]}</span>
-              </label>
-            ))}
-          </div>
-          <div className="input-completion-preview" aria-live="polite">
-            <span>{inputCompletionDescription(inputCompletionLevel)}</span>
-            <code>{inputCompletionExample(inputCompletionLevel)}</code>
-          </div>
-          {inputCompletionLevel !== "none" ? (
-            <p className="input-completion-safety">
-              補完が発生した場合は、直接置換の設定でも候補として表示します。
-            </p>
-          ) : null}
-        </fieldset>
-
-        <fieldset className="document-vocabulary-options">
-          <legend>文書語彙</legend>
-          <label
-            className={`document-vocabulary-toggle ${
-              useDocumentVocabulary ? "selected" : ""
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={useDocumentVocabulary}
-              onChange={(event) =>
-                onUseDocumentVocabularyChange(event.currentTarget.checked)
-              }
-            />
-            <span>
-              <strong>文書の語彙に合わせる</strong>
-              <small>
-                文書内の用語を、同じ読みの表記候補を選ぶときだけ参照します。
-              </small>
-            </span>
-          </label>
-          <div className="document-vocabulary-summary" aria-live="polite">
-            {documentVocabularyProfile.terms.length > 0 ? (
-              <>
-                <p>
-                  文書から {documentVocabularyProfile.terms.length} 語を自動抽出しました。
-                </p>
-                <div className="document-vocabulary-terms" aria-label="抽出した文書語彙">
-                  {documentVocabularyProfile.terms.slice(0, 8).map((term) => (
-                    <span key={term}>{term}</span>
-                  ))}
-                  {documentVocabularyProfile.terms.length > 8 ? (
-                    <span>ほか {documentVocabularyProfile.terms.length - 8} 語</span>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <p>
-                漢字・カタカナ・製品名などが文書に増えると、ここに候補が表示されます。
-              </p>
-            )}
-          </div>
-          {useDocumentVocabulary ? (
-            <p className="document-vocabulary-safety">
-              入力にない語の追加や、読みの変更には使いません。
-            </p>
-          ) : null}
-        </fieldset>
-
-        <fieldset className="preset-options">
-          <legend className="sr-only">変換プリセット</legend>
-          {CONVERSION_PRESET_OPTIONS.map((option) => (
-            <label
-              className={preset === option ? "selected" : ""}
-              key={option}
-            >
-              <input
-                type="radio"
-                name="conversion-preset"
-                value={option}
-                checked={preset === option}
-                onChange={() => onPresetChange(option)}
-              />
-              <span>
-                <strong>{conversionPresetLabels[option]}</strong>
-                <small>{presetDescription(option)}</small>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-
-        <details className="advanced-prompt">
-          <summary>Advanced prompt</summary>
-          <label className="prompt-editor">
-            <span>日本語変換の指示</span>
-            <textarea
-              value={prompt}
-              onChange={(event) => onChange(event.currentTarget.value)}
-              spellCheck={false}
-            />
-          </label>
-          <div className="panel-actions">
-            <button className="secondary-button" type="button" onClick={onReset}>
-              デフォルトに戻す
-            </button>
-          </div>
-          <p className="panel-note">
-            プロンプトはローカルストレージに自動保存されます。
-          </p>
-        </details>
-      </div>
-    </section>
-  );
-}
-
-function presetDescription(preset: ConversionPreset): string {
-  if (preset === "conversation") {
-    return "チャットや口語メモ向け。ビジネス表現に寄せすぎず、自然な言い回しを優先します。";
-  }
-  if (preset === "businessEmail") {
-    return "仕事の連絡やメール下書き向け。標準的なビジネス漢字と丁寧な表記を優先します。";
-  }
-  return "汎用の変換。読みと一般的な日本語表記を優先します。";
-}
-
-function inputCompletionDescription(level: InputCompletionLevel): string {
-  if (level === "word") {
-    return "途中で切れた最後の単語だけを補います。";
-  }
-  if (level === "sentence") {
-    return "助詞や文末を最小限補い、文章として整えます。";
-  }
-  return "入力の読みを変えず、そのまま変換します。";
-}
-
-function inputCompletionExample(level: InputCompletionLevel): string {
-  if (level === "word") {
-    return "ariga → ありがとう";
-  }
-  if (level === "sentence") {
-    return "asita kaigi 10ji → 明日の会議は10時です";
-  }
-  return "ariga → ありが";
-}
-
 function DictionaryModal({
   entries,
   onChange,
@@ -3198,14 +3048,14 @@ function StatusBar({
   pendingCount,
   editorStatus,
   onCancel,
-  onOpenSettings,
+  onOpenModel,
 }: {
   status: ConversionStatus;
   pending: PendingConversion[];
   pendingCount: number;
   editorStatus: EditorDocumentStatus;
   onCancel: (request: PendingConversion) => void;
-  onOpenSettings: () => void;
+  onOpenModel: () => void;
 }) {
   const Icon =
     status.kind === "loading" ? Loader2 : status.kind === "error" ? AlertCircle : CheckCircle2;
@@ -3222,8 +3072,8 @@ function StatusBar({
         {hasStatusActions ? (
         <div className="status-actions">
           {canOpenSettings ? (
-            <button className="status-settings" type="button" onClick={onOpenSettings}>
-              設定を開く
+            <button className="status-settings" type="button" onClick={onOpenModel}>
+              モデルを開く
             </button>
           ) : null}
           {pending[0] ? (

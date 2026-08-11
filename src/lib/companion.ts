@@ -1,5 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import type { AppSettings } from "./types";
+import type { AppSettings, SharedConversionSettings } from "./types";
 
 const REMOTE_TOKEN_KEY = "romaji-kana-companion-token";
 
@@ -21,6 +21,7 @@ export interface CompanionDocument {
 export interface CompanionSnapshot {
   document: CompanionDocument;
   settings: AppSettings;
+  settingsUpdatedBy: string;
 }
 
 export function isRemoteCompanionClient(): boolean {
@@ -70,8 +71,22 @@ export async function getCompanionStatus(): Promise<CompanionStatus> {
   return invoke<CompanionStatus>("companion_status");
 }
 
-export async function updateCompanionSettings(settings: AppSettings): Promise<void> {
-  return invoke<void>("companion_update_settings", { settings });
+export async function updateCompanionSettings(
+  settings: AppSettings,
+  clientId: string,
+): Promise<void> {
+  return invoke<void>("companion_update_settings", { settings, clientId });
+}
+
+export async function updateCompanionConversionSettings(
+  settings: SharedConversionSettings,
+  clientId: string,
+): Promise<CompanionSnapshot> {
+  return remoteJson<CompanionSnapshot>("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings, clientId }),
+  });
 }
 
 export async function getCompanionState(): Promise<CompanionSnapshot> {

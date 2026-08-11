@@ -2145,10 +2145,15 @@ h3 {
   width: min(560px, calc(100vw - 360px));
 }
 
-.preset-panel-content {
+.conversion-panel-content {
   display: grid;
   gap: 14px;
   padding: 16px;
+}
+
+.conversion-result-settings {
+  border-bottom: 1px solid #d5e8e5;
+  padding-bottom: 15px;
 }
 
 .input-completion-options {
@@ -2353,68 +2358,6 @@ h3 {
   line-height: 1.55;
 }
 
-.preset-options {
-  display: grid;
-  gap: 9px;
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.preset-options label {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  min-height: 54px;
-  border: 1px solid #d5e8e5;
-  border-radius: 8px;
-  padding: 10px 11px;
-  background: #ffffff;
-  color: #134e4a;
-  cursor: pointer;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
-}
-
-.preset-options label:hover,
-.preset-options label.selected {
-  border-color: #8bc7bf;
-  background: #ecfeff;
-}
-
-.preset-options input {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
-  accent-color: #0d9488;
-}
-
-.preset-options input:focus-visible {
-  outline: 3px solid #5eead4;
-  outline-offset: 2px;
-}
-
-.preset-options span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.preset-options strong {
-  color: #0f766e;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.preset-options small {
-  color: #475569;
-  font-weight: 650;
-  line-height: 1.45;
-}
-
 .advanced-prompt {
   border: 1px solid #d5e8e5;
   border-radius: 8px;
@@ -2427,8 +2370,6 @@ h3 {
   color: #134e4a;
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .advanced-prompt[open] summary {
@@ -2627,8 +2568,8 @@ h3 {
 .recent-retry-chip-main:hover,
 .dictionary-tabs button:hover,
 .dictionary-tabs button.selected,
-.preset-options label:hover,
-.preset-options label.selected {
+.document-vocabulary-toggle:hover,
+.document-vocabulary-toggle.selected {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -2681,7 +2622,6 @@ h3 {
 .shortcut-field,
 .settings-accordion,
 .advanced-prompt,
-.preset-options label,
 .check-row {
   border-color: var(--line);
   background: var(--surface);
@@ -2731,7 +2671,6 @@ h3 {
 .shortcut-help,
 .panel-note,
 .setup-settings-note,
-.preset-options small,
 .empty-state {
   color: var(--ink-muted);
 }
@@ -2787,8 +2726,7 @@ h3 {
 }
 
 .status-actions strong,
-.connection-card span,
-.preset-options strong {
+.connection-card span {
   color: var(--accent);
 }
 

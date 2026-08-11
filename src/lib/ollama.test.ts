@@ -934,16 +934,16 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("adds business email preset instructions without allowing over-polite rewrites", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "businessEmail");
+  it("does not add writing-style rewrite presets", () => {
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt);
 
-    expect(prompt).toContain("Purpose preset: business email or work message.");
-    expect(prompt).toContain("When the input is よろしくおねがいします, prefer よろしくお願いします.");
-    expect(prompt).toContain("Do not rewrite します or しました to いたします or いたしました");
+    expect(prompt).not.toContain("Purpose preset:");
+    expect(prompt).not.toContain("business email");
+    expect(prompt).not.toContain("conversation or chat");
   });
 
   it("adds kana-kanji fidelity rules and examples", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt);
 
     expect(prompt).toContain("Japanese kana-to-kanji conversion engine");
     expect(prompt).toContain("Japanese kana text produced from romaji typing");
@@ -961,7 +961,7 @@ describe("convertRomajiToJapanese", () => {
   });
 
   it("adds alternative conversion instructions only when previous outputs are provided", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none", ["一。"]);
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, ["一。"]);
 
     expect(prompt).toContain("Generate a different valid conversion candidate");
     expect(prompt).toContain("Avoid returning these previous outputs exactly:");
@@ -973,7 +973,6 @@ describe("convertRomajiToJapanese", () => {
   it("adds lightweight typo completion instructions and examples only in completion mode", () => {
     const prompt = buildKanaKanjiSystemPrompt(
       defaultConversionPrompt,
-      "none",
       ["失費のテストです"],
       true,
       0,
@@ -989,7 +988,7 @@ describe("convertRomajiToJapanese", () => {
   });
 
   it("keeps kana-kanji prompts independent from user dictionary entries", () => {
-    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt, "none");
+    const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt);
 
     expect(prompt).not.toContain("User dictionary:");
     expect(prompt).not.toContain("Protected dictionary placeholders");
@@ -999,7 +998,6 @@ describe("convertRomajiToJapanese", () => {
   it("treats document vocabulary as untrusted same-reading spelling hints", () => {
     const prompt = buildKanaKanjiSystemPrompt(
       defaultConversionPrompt,
-      "none",
       [],
       false,
       0,

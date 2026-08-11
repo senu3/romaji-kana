@@ -5,7 +5,6 @@ export type ConversionTrigger =
   | "shortcut";
 
 export type ModelProvider = "ollama" | "lmstudio";
-export type ConversionPreset = "none" | "conversation" | "businessEmail";
 export type InputCompletionLevel = "none" | "word" | "sentence";
 
 export interface UserDictionaryEntry {
@@ -34,12 +33,23 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
-  conversionPreset: ConversionPreset;
   inputCompletionLevel: InputCompletionLevel;
   useDocumentVocabulary: boolean;
   userDictionary: UserDictionaryEntry[];
   think: boolean;
 }
+
+export type SharedConversionSettings = Pick<
+  AppSettings,
+  | "autoConvert"
+  | "conversionMode"
+  | "triggers"
+  | "punctuationConversion"
+  | "conversionPrompt"
+  | "inputCompletionLevel"
+  | "useDocumentVocabulary"
+  | "userDictionary"
+>;
 
 export interface ConversionRange {
   from: number;

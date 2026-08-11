@@ -1,5 +1,5 @@
-import type { AppSettings, InputCompletionLevel, UserDictionaryEntry } from "./types";
 import { defaultConversionPrompt } from "./prompts";
+import type { AppSettings, InputCompletionLevel, SharedConversionSettings, UserDictionaryEntry } from "./types";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
@@ -22,7 +22,6 @@ export const defaultSettings: AppSettings = {
     commaToJapanese: true,
   },
   conversionPrompt: defaultConversionPrompt,
-  conversionPreset: "none",
   inputCompletionLevel: "none",
   useDocumentVocabulary: false,
   userDictionary: [],
@@ -46,14 +45,42 @@ export function saveSettings(settings: AppSettings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
+export function sharedConversionSettings(settings: AppSettings): SharedConversionSettings {
+  return {
+    autoConvert: settings.autoConvert,
+    conversionMode: settings.conversionMode,
+    triggers: settings.triggers,
+    punctuationConversion: settings.punctuationConversion,
+    conversionPrompt: settings.conversionPrompt,
+    inputCompletionLevel: settings.inputCompletionLevel,
+    useDocumentVocabulary: settings.useDocumentVocabulary,
+    userDictionary: settings.userDictionary,
+  };
+}
+
+export function mergeSharedConversionSettings(
+  settings: AppSettings,
+  shared: SharedConversionSettings,
+): AppSettings {
+  return {
+    ...settings,
+    ...shared,
+    triggers: { ...shared.triggers },
+    punctuationConversion: { ...shared.punctuationConversion },
+    userDictionary: [...shared.userDictionary],
+  };
+}
+
 type LegacySettings = Partial<AppSettings> & {
   thinkingMode?: "auto" | "on" | "off";
   userHomophones?: unknown;
+  conversionPreset?: unknown;
 };
 
 function mergeSettings(settings: LegacySettings): AppSettings {
-  const { thinkingMode, userHomophones, ...currentSettings } = settings;
+  const { thinkingMode, userHomophones, conversionPreset, ...currentSettings } = settings;
   void userHomophones;
+  void conversionPreset;
   const conversionPrompt = settings.conversionPrompt || defaultConversionPrompt;
   const think = settings.think ?? thinkingMode === "on";
 

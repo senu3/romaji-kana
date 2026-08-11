@@ -507,7 +507,6 @@ export async function kanjiizeKana(
       model: settings.modelName,
       system: buildKanaKanjiSystemPrompt(
         settings.conversionPrompt,
-        settings.conversionPreset,
         options.avoidOutputs ?? [],
         options.strictAlternative ?? false,
         options.alternativeAttempt ?? 0,

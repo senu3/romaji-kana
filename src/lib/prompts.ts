@@ -1,4 +1,4 @@
-import type { ConversionPreset, InputCompletionLevel } from "./types";
+import type { InputCompletionLevel } from "./types";
 
 export const defaultConversionPrompt = [
   "You are an advanced Japanese kana-to-kanji conversion engine.",
@@ -115,12 +115,6 @@ export const completionKanaKanjiFewShotExamples = [
   "おじいさんご自慢の時計さ",
 ].join("\n");
 
-export const conversionPresetLabels: Record<ConversionPreset, string> = {
-  none: "指定なし",
-  conversation: "会話",
-  businessEmail: "ビジネスメール",
-};
-
 export const inputCompletionLabels: Record<InputCompletionLevel, string> = {
   none: "なし",
   word: "単語",
@@ -156,27 +150,6 @@ export function buildInputCompletionSystemPrompt(
   ].join("\n");
 }
 
-const conversionPresetInstructions: Record<ConversionPreset, string> = {
-  none: [
-    "Purpose preset: none.",
-    "Prefer faithful kana-to-kanji conversion for the kana input.",
-    "Do not add casualness or politeness that is not already present in the reading.",
-  ].join("\n"),
-  conversation: [
-    "Purpose preset: conversation or chat.",
-    "Prefer natural conversational notation, common everyday kanji, and readable hiragana.",
-    "Do not force slang, do not add new meaning, and preserve the input reading.",
-  ].join("\n"),
-  businessEmail: [
-    "Purpose preset: business email or work message.",
-    "Prefer stable business notation, common kanji, and standard work-message expressions when the reading supports them.",
-    "Preserve the kana reading strictly. Do not add, remove, or change readings to make the sentence more polite.",
-    "Do not rewrite します or しました to いたします or いたしました unless いた is present in the input.",
-    "Do not rewrite お願いします to お願いいたします unless いたします is present in the input.",
-    "When the input is よろしくおねがいします, prefer よろしくお願いします.",
-  ].join("\n"),
-};
-
 export function buildKanaRepairSystemPrompt(): string {
   return [
     "You repair only the uncertain kana fragment in a mechanical romaji-to-kana conversion.",
@@ -189,7 +162,6 @@ export function buildKanaRepairSystemPrompt(): string {
 
 export function buildKanaKanjiSystemPrompt(
   userPrompt: string,
-  preset: ConversionPreset = "none",
   avoidOutputs: string[] = [],
   strictAlternative = false,
   alternativeAttempt = 0,
@@ -232,9 +204,6 @@ export function buildKanaKanjiSystemPrompt(
     "",
     "Document vocabulary reference:",
     formatDocumentVocabularyInstructions(documentVocabulary),
-    "",
-    "Purpose preset:",
-    conversionPresetInstructions[preset],
     "",
     "Context few-shot examples:",
     completionMode ? completionKanaKanjiFewShotExamples : kanaKanjiFewShotExamples,
