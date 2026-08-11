@@ -2835,7 +2835,7 @@ function DictionaryModal({
   onUseDocumentVocabularyChange: (enabled: boolean) => void;
   onChange: (entries: UserDictionaryEntry[]) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"registered" | "detected">("registered");
+  const [activeTab, setActiveTab] = useState<"registered" | "detected">("detected");
   const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
   const [detectedDraft, setDetectedDraft] = useState<{
     reading: string;

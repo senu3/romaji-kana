@@ -96,11 +96,11 @@ try {
   await page.getByRole("button", { name: "変換を開く", exact: true }).click();
   await page
     .locator(".inspector-drawer .accordion-trigger")
-    .filter({ hasText: "自動変換" })
+    .filter({ hasText: "変換タイミング" })
     .click();
-  await page.getByLabel("Enter（IME 変換中は無視）").check();
+  await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
-    await page.getByLabel("Enter（IME 変換中は無視）").isChecked(),
+    await page.getByLabel("Enterで変換（IME 変換中は無視）").isChecked(),
     true,
     "Enter trigger checkbox should be enabled before editor input.",
   );
@@ -251,6 +251,7 @@ try {
 
   await page.getByRole("button", { name: "辞書を開く" }).click();
   await page.getByRole("dialog", { name: "辞書" }).waitFor();
+  await page.getByRole("tab", { name: /登録済み/ }).click();
   const dictionaryInputs = page.locator(".dictionary-add-form input");
   await dictionaryInputs.nth(0).fill("openai");
   await dictionaryInputs.nth(1).fill("OpenAI");

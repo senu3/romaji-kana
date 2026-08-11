@@ -134,31 +134,31 @@ export function ConversionPanel({
         </section>
 
         <AccordionSection
-          title="自動変換"
-          summary={settings.autoConvert ? `ON · ${enabledTriggerCount}/3 トリガー` : "OFF"}
+          title="変換タイミング"
+          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/3 条件` : "手動のみ"}
           open={openAccordions.triggers}
           onToggle={() => toggleAccordion("triggers")}
         >
           <CheckRow
-            label="自動変換"
+            label="入力中に自動変換"
             checked={settings.autoConvert}
             onChange={(checked) => update({ autoConvert: checked })}
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="ピリオド ."
+              label="ピリオドで変換"
               checked={settings.triggers.period}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ period: checked })}
             />
             <CheckRow
-              label="カンマ ,"
+              label="カンマで変換"
               checked={settings.triggers.comma}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ comma: checked })}
             />
             <CheckRow
-              label="Enter（IME 変換中は無視）"
+              label="Enterで変換（IME 変換中は無視）"
               checked={settings.triggers.enter}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ enter: checked })}
@@ -207,18 +207,18 @@ export function ConversionPanel({
         </AccordionSection>
 
         <AccordionSection
-          title="句読点"
+          title="句読点変換"
           summary={`${punctuationCount}/2 有効`}
           open={openAccordions.punctuation}
           onToggle={() => toggleAccordion("punctuation")}
         >
           <CheckRow
-            label=". を 。へ"
+            label=". を 。に変換"
             checked={settings.punctuationConversion.periodToJapanese}
             onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
           />
           <CheckRow
-            label=", を 、へ"
+            label=", を 、に変換"
             checked={settings.punctuationConversion.commaToJapanese}
             onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
           />
