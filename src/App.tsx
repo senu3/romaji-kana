@@ -17,7 +17,16 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Component,
+  type ErrorInfo,
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import "./App.css";
 import {
   addLoadingDecoration,
@@ -54,6 +63,7 @@ import {
 } from "./lib/documentVocabulary";
 import { basename, openMarkdownFile, reopenMarkdownFile, saveMarkdownFile } from "./lib/fileSystem";
 import { resolveConversionAnchor } from "./lib/historyAnchor";
+import { createId } from "./lib/id";
 import {
   buildProtectedDictionaryEntries,
   convertRomajiToJapaneseDetailed,
@@ -127,6 +137,14 @@ function shouldShowSetupModalOnStartup(): boolean {
 }
 
 function App() {
+  return (
+    <AppErrorBoundary>
+      <AppRouter />
+    </AppErrorBoundary>
+  );
+}
+
+function AppRouter() {
   const remoteMode = isRemoteCompanionClient();
   const [paired, setPaired] = useState(() => !remoteMode || hasRemoteCompanionToken());
 
@@ -135,6 +153,56 @@ function App() {
   }
 
   return <EditorApp remoteMode={remoteMode} />;
+}
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Romaji Kana stopped unexpectedly.", error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.failed) {
+      return this.props.children;
+    }
+
+    const remoteMode = isRemoteCompanionClient();
+    const reconnect = () => {
+      clearRemoteCompanionToken();
+      window.location.reload();
+    };
+
+    return (
+      <main className="app-error-page">
+        <section className="app-error-sheet" role="alert" aria-labelledby="app-error-title">
+          <span className="app-error-mark" aria-hidden="true">
+            <AlertCircle size={28} />
+          </span>
+          <h1 id="app-error-title">画面を読み込めませんでした</h1>
+          <p>
+            {remoteMode
+              ? "スマホ連携を読み込み直してください。直らない場合は、PCに表示された接続コードでもう一度つなぎます。"
+              : "アプリを読み込み直してください。編集中の下書きは自動退避されています。"}
+          </p>
+          <div className="app-error-actions">
+            <button className="primary-button" type="button" onClick={() => window.location.reload()}>
+              読み込み直す
+            </button>
+            {remoteMode ? (
+              <button className="secondary-button" type="button" onClick={reconnect}>
+                もう一度つなぐ
+              </button>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    );
+  }
 }
 
 function EditorApp({ remoteMode }: { remoteMode: boolean }) {
@@ -225,7 +293,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const companionPushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const companionPushPendingRef = useRef(false);
   const suppressNextCompanionPushRef = useRef(false);
-  const companionClientIdRef = useRef(remoteMode ? `mobile-${crypto.randomUUID()}` : "desktop");
+  const companionClientIdRef = useRef(remoteMode ? createId("mobile") : "desktop");
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -1574,7 +1642,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       }
 
       const request: PendingConversion = {
-        id: crypto.randomUUID(),
+        id: createId("conversion"),
         anchor: {
           from: suggestion.from,
           to: suggestion.to,
@@ -1663,7 +1731,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const handleRerunHistory = useCallback((item: ConversionHistoryItem) => {
     const request: PendingConversion = {
-      id: crypto.randomUUID(),
+      id: createId("conversion"),
       anchor: item.anchor,
       originalText: item.input,
       createdAt: Date.now(),
@@ -1679,7 +1747,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const handleAlternativeHistory = useCallback((item: ConversionHistoryItem) => {
     const request: PendingConversion = {
-      id: crypto.randomUUID(),
+      id: createId("conversion"),
       anchor: item.anchor,
       originalText: item.input,
       createdAt: Date.now(),
@@ -1770,7 +1838,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       ? buildDocumentVocabularyProfile(view.state.doc.toString())
       : null;
     const request: PendingConversion = {
-      id: crypto.randomUUID(),
+      id: createId("conversion"),
       range,
       anchor: {
         from: range.from,
@@ -3064,11 +3132,7 @@ function DictionaryModal({
 }
 
 function createDictionaryEntryId(prefix = "dictionary"): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return createId(prefix);
 }
 
 function hasMatchingPendingEditorConversion(
