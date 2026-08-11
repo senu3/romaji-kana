@@ -1,15 +1,20 @@
 import type { EditorView } from "@codemirror/view";
+import { Transaction } from "@codemirror/state";
 import {
   AlertCircle,
   BookMarked,
   CheckCircle2,
   History,
   Loader2,
+  Link2,
   MessageSquareText,
   Plus,
   RotateCcw,
+  Smartphone,
   SlidersHorizontal,
   Trash2,
+  Wifi,
+  WifiOff,
   X,
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -24,6 +29,20 @@ import {
   showGhostSuggestion,
 } from "./components/MarkdownEditor";
 import { SettingsContent } from "./components/SettingsPanel";
+import {
+  clearRemoteCompanionToken,
+  getCompanionState,
+  getCompanionStatus,
+  hasRemoteCompanionToken,
+  isRemoteCompanionClient,
+  pairRemoteCompanion,
+  startCompanion,
+  stopCompanion,
+  updateCompanionDocument,
+  updateCompanionSettings,
+  type CompanionSnapshot,
+  type CompanionStatus,
+} from "./lib/companion";
 import {
   loadDocumentSession,
   saveFileDocumentSession,
@@ -64,7 +83,7 @@ import type {
   UserDictionaryEntry,
 } from "./lib/types";
 
-type ActivePanel = "settings" | "history" | "dictionary" | "prompt" | null;
+type ActivePanel = "settings" | "history" | "dictionary" | "prompt" | "companion" | null;
 const CANCEL_UI_DELAY_MS = 1_200;
 const AUTO_CONNECTION_CHECK_DELAY_MS = 550;
 const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
@@ -75,6 +94,16 @@ const FORCE_SETUP_QUERY_PARAM = "setup";
 const ENABLE_FIRST_RUN_SETUP_MODAL = false;
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 const MAX_CONVERSION_HISTORY_ITEMS = 100;
+const COMPANION_SYNC_DELAY_MS = 180;
+const COMPANION_POLL_INTERVAL_MS = 650;
+
+const stoppedCompanionStatus: CompanionStatus = {
+  running: false,
+  port: 18_321,
+  urls: [],
+  pairCode: null,
+  pairedClients: 0,
+};
 
 function shouldForceSetupModalFromQuery(): boolean {
   if (typeof window === "undefined") {
@@ -98,7 +127,21 @@ function shouldShowSetupModalOnStartup(): boolean {
 }
 
 function App() {
+  const remoteMode = isRemoteCompanionClient();
+  const [paired, setPaired] = useState(() => !remoteMode || hasRemoteCompanionToken());
+
+  if (remoteMode && !paired) {
+    return <RemotePairingScreen onPaired={() => setPaired(true)} />;
+  }
+
+  return <EditorApp remoteMode={remoteMode} />;
+}
+
+function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const [initialSession] = useState(() => {
+    if (remoteMode) {
+      return { kind: "new" as const, content: "" };
+    }
     if (typeof localStorage === "undefined") {
       return { kind: "new" as const, content: "" };
     }
@@ -115,6 +158,9 @@ function App() {
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
+  const [companionStatus, setCompanionStatus] = useState<CompanionStatus>(stoppedCompanionStatus);
+  const [companionBusy, setCompanionBusy] = useState(false);
+  const [remoteFileName, setRemoteFileName] = useState("PCの文書");
   const [now, setNow] = useState(() => Date.now());
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(
     initialSession.kind === "file" ? initialSession.path : null,
@@ -174,11 +220,24 @@ function App() {
   const processingQueueRef = useRef(false);
   const runningRequestIdRef = useRef<string | null>(null);
   const suppressNextDirtyRef = useRef(false);
+  const companionStatusRef = useRef(companionStatus);
+  const companionRevisionRef = useRef(0);
+  const companionPushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const companionPushPendingRef = useRef(false);
+  const suppressNextCompanionPushRef = useRef(false);
+  const companionClientIdRef = useRef(remoteMode ? `mobile-${crypto.randomUUID()}` : "desktop");
 
   useEffect(() => {
     settingsRef.current = settings;
     saveSettings(settings);
-  }, [settings]);
+    if (!remoteMode && companionStatusRef.current.running) {
+      void updateCompanionSettings(settings);
+    }
+  }, [remoteMode, settings]);
+
+  useEffect(() => {
+    companionStatusRef.current = companionStatus;
+  }, [companionStatus]);
 
   useEffect(() => {
     setupCompleteRef.current = setupComplete;
@@ -191,6 +250,9 @@ function App() {
       }
       if (vocabularyTimerRef.current) {
         clearTimeout(vocabularyTimerRef.current);
+      }
+      if (companionPushTimerRef.current) {
+        clearTimeout(companionPushTimerRef.current);
       }
     };
   }, []);
@@ -261,7 +323,45 @@ function App() {
       setDocumentVocabularyProfile(profile);
       vocabularyTimerRef.current = null;
     }, 350);
-  }, []);
+
+    const syncEnabled = remoteMode || companionStatusRef.current.running;
+    if (!syncEnabled) {
+      return;
+    }
+    if (suppressNextCompanionPushRef.current) {
+      suppressNextCompanionPushRef.current = false;
+      return;
+    }
+    if (companionPushTimerRef.current) {
+      clearTimeout(companionPushTimerRef.current);
+    }
+    companionPushTimerRef.current = setTimeout(async () => {
+      companionPushPendingRef.current = true;
+      try {
+        const snapshot = await updateCompanionDocument(
+          documentText,
+          remoteMode
+            ? remoteFileName
+            : currentFilePathRef.current
+              ? basename(currentFilePathRef.current)
+              : "Untitled.md",
+          companionClientIdRef.current,
+        );
+        companionRevisionRef.current = Math.max(
+          companionRevisionRef.current,
+          snapshot.document.revision,
+        );
+      } catch (error: unknown) {
+        setStatus({
+          kind: "error",
+          message: `スマホ連携の同期に失敗しました。${error instanceof Error ? error.message : String(error)}`,
+        });
+      } finally {
+        companionPushPendingRef.current = false;
+        companionPushTimerRef.current = null;
+      }
+    }, COMPANION_SYNC_DELAY_MS);
+  }, [remoteFileName, remoteMode]);
 
   const handleCheckOllama = useCallback(async () => {
     const checkId = connectionCheckIdRef.current + 1;
@@ -456,6 +556,16 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (remoteMode) {
+      startupCheckStartedRef.current = true;
+      setOllamaConnection({
+        kind: "connected",
+        message: "PC経由でローカルモデルに接続しています。",
+        checkedAt: Date.now(),
+      });
+      return;
+    }
+
     const providerChanged = previousModelProviderRef.current !== settings.modelProvider;
     previousModelProviderRef.current = settings.modelProvider;
 
@@ -503,6 +613,7 @@ function App() {
     setupComplete,
     setupModelProvider,
     handleCheckOllama,
+    remoteMode,
   ]);
 
   const closeActivePanel = useCallback(() => {
@@ -592,8 +703,132 @@ function App() {
       },
       selection: { anchor: 0 },
       userEvent: "document.open",
+      annotations: Transaction.addToHistory.of(false),
     });
   }, [clearPendingConversions]);
+
+  const applyCompanionSnapshot = useCallback((snapshot: CompanionSnapshot) => {
+    if (remoteMode && JSON.stringify(snapshot.settings) !== JSON.stringify(settingsRef.current)) {
+      setSettings(snapshot.settings);
+    }
+    if (remoteMode) {
+      setRemoteFileName(snapshot.document.fileName || "PCの文書");
+    }
+    if (snapshot.document.revision <= companionRevisionRef.current) {
+      return;
+    }
+
+    companionRevisionRef.current = snapshot.document.revision;
+    const currentContent = editorViewRef.current?.state.doc.toString() ?? "";
+    if (snapshot.document.content === currentContent) {
+      return;
+    }
+    suppressNextCompanionPushRef.current = true;
+    replaceEditorDocument(snapshot.document.content);
+    isDirtyRef.current = true;
+    setIsDirty(true);
+    const filePath = currentFilePathRef.current;
+    if (filePath) {
+      saveFileDocumentSession(filePath, snapshot.document.content, true);
+    } else {
+      saveNewDocumentSession(snapshot.document.content);
+    }
+    setStatus({
+      kind: "success",
+      message: remoteMode
+        ? "PCの文書を同期しました。"
+        : "スマホからの変更を反映しました。保存するとファイルへ書き込まれます。",
+    });
+  }, [remoteMode, replaceEditorDocument]);
+
+  const handleStartCompanion = useCallback(async () => {
+    setCompanionBusy(true);
+    try {
+      const nextStatus = await startCompanion(
+        getEditorDocument(),
+        currentFilePathRef.current ? basename(currentFilePathRef.current) : "Untitled.md",
+        settingsRef.current,
+      );
+      companionRevisionRef.current = 0;
+      setCompanionStatus(nextStatus);
+      setStatus({
+        kind: "success",
+        message: "スマホ連携を開始しました。同じWi-Fiのスマホで接続URLを開いてください。",
+      });
+    } catch (error: unknown) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setCompanionBusy(false);
+    }
+  }, [getEditorDocument]);
+
+  const handleStopCompanion = useCallback(async () => {
+    setCompanionBusy(true);
+    try {
+      setCompanionStatus(await stopCompanion());
+      setStatus({ kind: "success", message: "スマホ連携を停止しました。" });
+    } catch (error: unknown) {
+      setStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setCompanionBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (remoteMode) {
+      return;
+    }
+    const refreshStatus = () => {
+      void getCompanionStatus().then(setCompanionStatus).catch(() => undefined);
+    };
+    refreshStatus();
+    if (!companionStatus.running) {
+      return;
+    }
+    const interval = window.setInterval(refreshStatus, 2_000);
+    return () => window.clearInterval(interval);
+  }, [companionStatus.running, remoteMode]);
+
+  useEffect(() => {
+    if (!editorReady || (!remoteMode && !companionStatus.running)) {
+      return;
+    }
+
+    let disposed = false;
+    const poll = async () => {
+      if (companionPushPendingRef.current || companionPushTimerRef.current) {
+        return;
+      }
+      try {
+        const snapshot = await getCompanionState();
+        if (!disposed) {
+          applyCompanionSnapshot(snapshot);
+        }
+      } catch (error: unknown) {
+        if (disposed) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus({ kind: "error", message: `PCとの同期が止まりました。${message}` });
+        if (remoteMode && !hasRemoteCompanionToken()) {
+          window.location.reload();
+        }
+      }
+    };
+
+    void poll();
+    const interval = window.setInterval(() => void poll(), COMPANION_POLL_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [applyCompanionSnapshot, companionStatus.running, editorReady, remoteMode]);
 
   const markDocumentClean = useCallback(() => {
     isDirtyRef.current = false;
@@ -682,6 +917,18 @@ function App() {
       setCurrentFilePath(savedPath);
       markDocumentClean();
       saveFileDocumentSession(savedPath, getEditorDocument(), false);
+      if (companionStatusRef.current.running) {
+        void updateCompanionDocument(
+          getEditorDocument(),
+          basename(savedPath),
+          companionClientIdRef.current,
+        ).then((snapshot) => {
+          companionRevisionRef.current = Math.max(
+            companionRevisionRef.current,
+            snapshot.document.revision,
+          );
+        }).catch(() => undefined);
+      }
       setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
@@ -699,6 +946,18 @@ function App() {
       setCurrentFilePath(savedPath);
       markDocumentClean();
       saveFileDocumentSession(savedPath, getEditorDocument(), false);
+      if (companionStatusRef.current.running) {
+        void updateCompanionDocument(
+          getEditorDocument(),
+          basename(savedPath),
+          companionClientIdRef.current,
+        ).then((snapshot) => {
+          companionRevisionRef.current = Math.max(
+            companionRevisionRef.current,
+            snapshot.document.revision,
+          );
+        }).catch(() => undefined);
+      }
       setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
     } catch (error: unknown) {
       setStatus({ kind: "error", message: formatFileError(error) });
@@ -739,6 +998,9 @@ function App() {
   }, [editorReady, initialSession, markDocumentClean, replaceEditorDocument]);
 
   useEffect(() => {
+    if (remoteMode) {
+      return;
+    }
     const handleAppShortcut = (event: KeyboardEvent) => {
       if (
         event.target instanceof HTMLElement &&
@@ -770,7 +1032,7 @@ function App() {
 
     document.addEventListener("keydown", handleAppShortcut);
     return () => document.removeEventListener("keydown", handleAppShortcut);
-  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs]);
+  }, [handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs, remoteMode]);
 
   const recordCanceledConversion = useCallback((request: PendingConversion) => {
     setHistory((items) =>
@@ -1555,10 +1817,13 @@ function App() {
         settings={settings}
         pending={pending}
         initialDocument={initialDocument}
-        fileName={currentFilePath ? basename(currentFilePath) : "Untitled.md"}
+        fileName={remoteMode ? remoteFileName : currentFilePath ? basename(currentFilePath) : "Untitled.md"}
         isDirty={isDirty}
+        remoteMode={remoteMode}
         modelStatusLabel={
-          !setupComplete && !setupModelProvider
+          remoteMode
+            ? `PC · ${settings.modelName.trim() || "モデル"} · 同期中`
+            : !setupComplete && !setupModelProvider
             ? "未設定"
             : formatModelStatusLabel(settings, ollamaConnection)
         }
@@ -1582,10 +1847,13 @@ function App() {
         dictionaryCount={enabledDictionaryCount}
         activePanel={activePanel}
         settingsAttention={settingsAttention}
+        remoteMode={remoteMode}
+        companionRunning={companionStatus.running}
         onOpenHistory={toggleHistoryPanel}
         onOpenPrompt={togglePromptPanel}
         onOpenDictionary={toggleDictionaryPanel}
         onOpenSettings={toggleSettingsDrawer}
+        onOpenCompanion={() => setActivePanel((panel) => panel === "companion" ? null : "companion")}
       />
       {recentRetryItem ? (
         <RecentRetryChip
@@ -1651,6 +1919,14 @@ function App() {
               }
             />
           ) : null}
+          {activePanel === "companion" && !remoteMode ? (
+            <CompanionPanel
+              status={companionStatus}
+              busy={companionBusy}
+              onStart={handleStartCompanion}
+              onStop={handleStopCompanion}
+            />
+          ) : null}
         </InspectorDrawer>
       ) : null}
       {!setupComplete ? (
@@ -1667,7 +1943,7 @@ function App() {
           onSkip={completeSetup}
         />
       ) : null}
-      {setupComplete && modelSettingsOpen ? (
+      {setupComplete && modelSettingsOpen && !remoteMode ? (
         <SetupModal
           mode="settings"
           settings={settings}
@@ -1690,6 +1966,157 @@ function App() {
         onOpenSettings={openSettingsDrawer}
       />
     </main>
+  );
+}
+
+function RemotePairingScreen({ onPaired }: { onPaired: () => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(code)) {
+      setError("PCに表示されている6桁の接続コードを入力してください。");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await pairRemoteCompanion(code);
+      onPaired();
+    } catch (pairingError: unknown) {
+      clearRemoteCompanionToken();
+      setError(pairingError instanceof Error ? pairingError.message : String(pairingError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="pairing-page">
+      <section className="pairing-sheet" aria-labelledby="pairing-title">
+        <div className="pairing-brand" aria-hidden="true">
+          <span className="app-logo">か</span>
+          <span>Romaji Kana</span>
+        </div>
+        <div className="pairing-device-mark" aria-hidden="true">
+          <Smartphone size={34} />
+          <Link2 size={22} />
+        </div>
+        <h1 id="pairing-title">PCとつなぐ</h1>
+        <p>PC版の「スマホ連携」に表示されている接続コードを入力してください。</p>
+        <form onSubmit={submit} className="pairing-form">
+          <label htmlFor="pairing-code">6桁の接続コード</label>
+          <input
+            id="pairing-code"
+            value={code}
+            onChange={(event) => setCode(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="000000"
+            maxLength={6}
+            autoFocus
+          />
+          {error ? <p className="pairing-error" role="alert">{error}</p> : null}
+          <button className="primary-button pairing-submit" type="submit" disabled={busy || code.length !== 6}>
+            {busy ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Link2 size={18} aria-hidden="true" />}
+            {busy ? "接続しています..." : "PCに接続"}
+          </button>
+        </form>
+        <small>文章と変換要求は同じWi-Fi内のPCとの間だけで送受信されます。</small>
+      </section>
+    </main>
+  );
+}
+
+function CompanionPanel({
+  status,
+  busy,
+  onStart,
+  onStop,
+}: {
+  status: CompanionStatus;
+  busy: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  const copyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      window.setTimeout(() => setCopiedUrl((current) => current === url ? null : current), 1_800);
+    } catch {
+      setCopiedUrl(null);
+    }
+  };
+
+  return (
+    <div className="companion-panel">
+      <div className={`companion-state ${status.running ? "running" : "stopped"}`}>
+        <span className="companion-state-icon" aria-hidden="true">
+          {status.running ? <Wifi size={22} /> : <WifiOff size={22} />}
+        </span>
+        <div>
+          <strong>{status.running ? "スマホから接続できます" : "スマホ連携は停止中です"}</strong>
+          <p>
+            {status.running
+              ? `ペアリング済み ${status.pairedClients} 回。PCが文書と変換処理を担当します。`
+              : "必要なときだけ開始できます。モデルAPIを直接ネットワークへ公開しません。"}
+          </p>
+        </div>
+      </div>
+
+      {status.running ? (
+        <>
+          <section className="companion-section" aria-labelledby="companion-url-title">
+            <h3 id="companion-url-title">スマホで開くURL</h3>
+            {status.urls.length > 0 ? (
+              <div className="companion-url-list">
+                {status.urls.map((url) => (
+                  <div className="companion-url" key={url}>
+                    <input value={url} readOnly aria-label="スマホ接続URL" />
+                    <button className="secondary-button" type="button" onClick={() => void copyUrl(url)}>
+                      {copiedUrl === url ? <CheckCircle2 size={16} aria-hidden="true" /> : null}
+                      {copiedUrl === url ? "コピー済み" : "コピー"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="companion-note">LAN内のIPアドレスを取得できませんでした。Wi-Fi接続を確認してください。</p>
+            )}
+          </section>
+
+          <section className="companion-code" aria-labelledby="companion-code-title">
+            <div>
+              <h3 id="companion-code-title">接続コード</h3>
+              <p>スマホの接続画面に入力します。</p>
+            </div>
+            <output aria-label="6桁の接続コード">{status.pairCode ?? "------"}</output>
+          </section>
+
+          <ol className="companion-steps">
+            <li>PCとスマホを同じWi-Fiへ接続</li>
+            <li>スマホで上のURLを開く</li>
+            <li>6桁の接続コードを入力</li>
+          </ol>
+        </>
+      ) : null}
+
+      <button
+        className={status.running ? "secondary-button companion-toggle" : "primary-button companion-toggle"}
+        type="button"
+        disabled={busy}
+        onClick={status.running ? onStop : onStart}
+      >
+        {busy ? <Loader2 className="spin" size={18} aria-hidden="true" /> : status.running ? <WifiOff size={18} aria-hidden="true" /> : <Wifi size={18} aria-hidden="true" />}
+        {busy ? "処理しています..." : status.running ? "スマホ連携を停止" : "スマホ連携を開始"}
+      </button>
+      <p className="companion-security-note">公共Wi-Fiでは使用せず、利用後は連携を停止してください。</p>
+    </div>
   );
 }
 
@@ -1762,19 +2189,25 @@ function AppRail({
   dictionaryCount,
   activePanel,
   settingsAttention,
+  remoteMode,
+  companionRunning,
   onOpenHistory,
   onOpenPrompt,
   onOpenDictionary,
   onOpenSettings,
+  onOpenCompanion,
 }: {
   historyCount: number;
   dictionaryCount: number;
   activePanel: ActivePanel;
   settingsAttention: boolean;
+  remoteMode: boolean;
+  companionRunning: boolean;
   onOpenHistory: () => void;
   onOpenPrompt: () => void;
   onOpenDictionary: () => void;
   onOpenSettings: () => void;
+  onOpenCompanion: () => void;
 }) {
   return (
     <nav className="app-rail" aria-label="アプリのツール">
@@ -1828,6 +2261,20 @@ function AppRail({
         <MessageSquareText size={18} aria-hidden="true" />
         <span>スタイル</span>
       </button>
+      {!remoteMode ? (
+        <button
+          className={`rail-button ${activePanel === "companion" ? "active" : ""} ${companionRunning ? "connected" : ""}`}
+          type="button"
+          onClick={onOpenCompanion}
+          aria-pressed={activePanel === "companion"}
+          aria-label={companionRunning ? "スマホ連携を開く、連携中" : "スマホ連携を開く"}
+          title="スマホ連携"
+        >
+          <Smartphone size={18} aria-hidden="true" />
+          {companionRunning ? <span className="connection-dot" aria-hidden="true" /> : null}
+          <span>スマホ</span>
+        </button>
+      ) : null}
     </nav>
   );
 }
@@ -1904,6 +2351,9 @@ function panelTitle(panel: NonNullable<ActivePanel>): string {
   if (panel === "dictionary") {
     return "辞書";
   }
+  if (panel === "companion") {
+    return "スマホ連携";
+  }
   return "スタイル";
 }
 
@@ -1916,6 +2366,9 @@ function panelEyebrow(panel: NonNullable<ActivePanel>): string {
   }
   if (panel === "dictionary") {
     return "ユーザー辞書";
+  }
+  if (panel === "companion") {
+    return "同じWi-Fiで接続";
   }
   return "変換スタイル";
 }

@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
 
+mod companion;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OllamaRequest {
@@ -32,7 +34,13 @@ async fn ollama_tags(request: OllamaRequest) -> Result<Value, String> {
 
 #[tauri::command]
 async fn ollama_generate(request: OllamaGenerateRequest) -> Result<Value, String> {
-    post_json(&request.base_url, "generate", request.body, request.timeout_ms).await
+    post_json(
+        &request.base_url,
+        "generate",
+        request.body,
+        request.timeout_ms,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -91,7 +99,10 @@ async fn reopen_markdown_file(path: String) -> Result<OpenFileResult, String> {
 }
 
 #[tauri::command]
-async fn save_markdown_file(path: Option<String>, content: String) -> Result<Option<String>, String> {
+async fn save_markdown_file(
+    path: Option<String>,
+    content: String,
+) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = match path {
             Some(path) if !path.trim().is_empty() => PathBuf::from(path),
@@ -244,6 +255,7 @@ fn path_to_string(path: PathBuf) -> Result<String, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(companion::CompanionManager::default())
         .invoke_handler(tauri::generate_handler![
             ollama_tags,
             ollama_generate,
@@ -251,7 +263,13 @@ pub fn run() {
             lmstudio_chat_completions,
             open_markdown_file,
             reopen_markdown_file,
-            save_markdown_file
+            save_markdown_file,
+            companion::companion_start,
+            companion::companion_stop,
+            companion::companion_status,
+            companion::companion_update_settings,
+            companion::companion_update_document,
+            companion::companion_get_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

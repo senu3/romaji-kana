@@ -31,6 +31,7 @@ import {
   FilePlus2,
   FileText,
   FolderOpen,
+  Link2,
   Redo2,
   Save,
   Search,
@@ -61,6 +62,7 @@ interface MarkdownEditorProps {
   isDirty: boolean;
   modelStatusLabel: string;
   modelStatusKind: OllamaConnectionStatus["kind"];
+  remoteMode?: boolean;
   onSettingsChange: (settings: AppSettings) => void;
   onOpenModelSettings: () => void;
   onConvert: (range: ConversionRange) => boolean;
@@ -406,6 +408,7 @@ export function MarkdownEditor({
   isDirty,
   modelStatusLabel,
   modelStatusKind,
+  remoteMode = false,
   onSettingsChange,
   onOpenModelSettings,
   onConvert,
@@ -779,34 +782,46 @@ export function MarkdownEditor({
     <section className="editor-shell" aria-label="Markdownエディター">
       <div className="editor-commandbar">
         <div className="commandbar-left">
-          <button className="toolbar-command" type="button" onClick={onNewFile}>
-            <FilePlus2 size={20} aria-hidden="true" />
-            <span>新規</span>
-          </button>
-          <button className="toolbar-command" type="button" onClick={onOpenFile}>
-            <FolderOpen size={21} aria-hidden="true" />
-            <span>開く</span>
-          </button>
-          <button className="toolbar-command" type="button" onClick={onSaveFile}>
-            <Save size={21} aria-hidden="true" />
-            <span>保存</span>
-          </button>
-          <span className="toolbar-separator" aria-hidden="true" />
+          {!remoteMode ? (
+            <>
+              <button className="toolbar-command" type="button" onClick={onNewFile}>
+                <FilePlus2 size={20} aria-hidden="true" />
+                <span>新規</span>
+              </button>
+              <button className="toolbar-command" type="button" onClick={onOpenFile}>
+                <FolderOpen size={21} aria-hidden="true" />
+                <span>開く</span>
+              </button>
+              <button className="toolbar-command" type="button" onClick={onSaveFile}>
+                <Save size={21} aria-hidden="true" />
+                <span>保存</span>
+              </button>
+              <span className="toolbar-separator" aria-hidden="true" />
+            </>
+          ) : null}
           <div className="toolbar-menu" ref={fileMenuRef}>
-            <button
-              aria-expanded={fileMenuOpen}
-              aria-haspopup="menu"
-              className="document-picker"
-              type="button"
-              onClick={() => setFileMenuOpen((open) => !open)}
-              title={fileName}
-            >
-              <FileText size={20} aria-hidden="true" />
-              <span>{fileName}</span>
-              {isDirty ? <span className="dirty-dot" aria-label="未保存" /> : null}
-              <ChevronDown size={16} aria-hidden="true" />
-            </button>
-            {fileMenuOpen ? (
+            {remoteMode ? (
+              <div className="document-picker remote-document" title={fileName}>
+                <Link2 size={18} aria-hidden="true" />
+                <span>{fileName}</span>
+                <span className="sync-dot" aria-label="PCと同期中" />
+              </div>
+            ) : (
+              <button
+                aria-expanded={fileMenuOpen}
+                aria-haspopup="menu"
+                className="document-picker"
+                type="button"
+                onClick={() => setFileMenuOpen((open) => !open)}
+                title={fileName}
+              >
+                <FileText size={20} aria-hidden="true" />
+                <span>{fileName}</span>
+                {isDirty ? <span className="dirty-dot" aria-label="未保存" /> : null}
+                <ChevronDown size={16} aria-hidden="true" />
+              </button>
+            )}
+            {!remoteMode && fileMenuOpen ? (
               <div className="toolbar-menu-items" role="menu" aria-label="File actions">
                 <button type="button" role="menuitem" onClick={() => runFileAction(onNewFile)}>
                   <FilePlus2 size={15} aria-hidden="true" />
@@ -870,8 +885,9 @@ export function MarkdownEditor({
             className={`model-chip ${modelStatusKind}`}
             type="button"
             onClick={onOpenModelSettings}
+            disabled={remoteMode}
             aria-label="モデル設定を開く"
-            title="モデル設定"
+            title={remoteMode ? "モデル設定はPC版で変更できます" : "モデル設定"}
           >
             {modelStatusLabel}
           </button>

@@ -24,3 +24,10 @@ reqwest = { version = "0.12", features = ["json"] }
 rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+axum = "0.8"
+local-ip-address = "0.6"
+mime_guess = "2"
+rand = "0.9"
+rust-embed = "8"
+tokio = { version = "1", features = ["net", "sync"] }
+uuid = { version = "1", features = ["v4"] }

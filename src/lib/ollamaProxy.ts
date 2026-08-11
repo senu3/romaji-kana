@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isRemoteCompanionClient, remoteModelRequest } from "./companion";
 import type { ModelProvider } from "./types";
 
 export interface OllamaTagsResponse {
@@ -81,6 +82,9 @@ export interface OllamaTransport {
 
 export const defaultOllamaTransport: OllamaTransport = {
   async models(provider, baseUrl, timeoutMs) {
+    if (isRemoteCompanionClient()) {
+      return remoteModelRequest<LocalModelsResponse>("models", null, timeoutMs);
+    }
     if (provider === "lmstudio") {
       if (isTauri()) {
         return invoke<LmStudioModelsResponse>("lmstudio_models", {
@@ -160,6 +164,9 @@ async function requestOllamaGenerate(
   body: Record<string, unknown>,
   timeoutMs: number,
 ): Promise<OllamaGenerateResponse> {
+  if (isRemoteCompanionClient()) {
+    return remoteModelRequest<OllamaGenerateResponse>("generate", body, timeoutMs);
+  }
   if (isTauri()) {
     return invoke<OllamaGenerateResponse>("ollama_generate", {
       request: { baseUrl, body, timeoutMs },
@@ -247,6 +254,9 @@ async function requestLmStudioChat(
   body: Record<string, unknown>,
   timeoutMs: number,
 ): Promise<LmStudioChatResponse> {
+  if (isRemoteCompanionClient()) {
+    return remoteModelRequest<LmStudioChatResponse>("generate", body, timeoutMs);
+  }
   if (isTauri()) {
     return invoke<LmStudioChatResponse>("lmstudio_chat_completions", {
       request: { baseUrl, body, timeoutMs },
