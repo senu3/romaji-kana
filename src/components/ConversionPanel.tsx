@@ -5,7 +5,6 @@ import {
   useId,
   useState,
 } from "react";
-import type { DocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { inputCompletionLabels } from "../lib/prompts";
 import { defaultSettings } from "../lib/settings";
 import {
@@ -19,7 +18,6 @@ const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sente
 
 interface ConversionPanelProps {
   settings: AppSettings;
-  documentVocabularyProfile: DocumentVocabularyProfile;
   remoteMode: boolean;
   onChange: (settings: AppSettings) => void;
   onResetPrompt: () => void;
@@ -27,7 +25,6 @@ interface ConversionPanelProps {
 
 export function ConversionPanel({
   settings,
-  documentVocabularyProfile,
   remoteMode,
   onChange,
   onResetPrompt,
@@ -253,43 +250,6 @@ export function ConversionPanel({
           {settings.inputCompletionLevel !== "none" ? (
             <p className="input-completion-safety">
               補完が発生した場合は、直接置換でも候補として表示します。
-            </p>
-          ) : null}
-        </fieldset>
-
-        <fieldset className="document-vocabulary-options">
-          <legend>文書語彙</legend>
-          <label className={`document-vocabulary-toggle ${settings.useDocumentVocabulary ? "selected" : ""}`}>
-            <input
-              type="checkbox"
-              checked={settings.useDocumentVocabulary}
-              onChange={(event) => update({ useDocumentVocabulary: event.currentTarget.checked })}
-            />
-            <span>
-              <strong>文書の語彙に合わせる</strong>
-              <small>文書内の用語を、同じ読みの表記候補を選ぶときだけ参照します。</small>
-            </span>
-          </label>
-          <div className="document-vocabulary-summary" aria-live="polite">
-            {documentVocabularyProfile.terms.length > 0 ? (
-              <>
-                <p>文書から {documentVocabularyProfile.terms.length} 語を自動抽出しました。</p>
-                <div className="document-vocabulary-terms" aria-label="抽出した文書語彙">
-                  {documentVocabularyProfile.terms.slice(0, 8).map((term) => (
-                    <span key={term}>{term}</span>
-                  ))}
-                  {documentVocabularyProfile.terms.length > 8 ? (
-                    <span>ほか {documentVocabularyProfile.terms.length - 8} 語</span>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <p>漢字・カタカナ・製品名などが文書に増えると、ここに候補が表示されます。</p>
-            )}
-          </div>
-          {settings.useDocumentVocabulary ? (
-            <p className="document-vocabulary-safety">
-              入力にない語の追加や、読みの変更には使いません。
             </p>
           ) : null}
         </fieldset>

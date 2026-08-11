@@ -275,14 +275,21 @@ try {
   await page.keyboard.insertText(
     "要件定義を確認します。\n要件定義を更新します。\nローカルモデルを確認します。\n",
   );
+  await page.getByRole("button", { name: "辞書を開く、1 件有効" }).click();
+  await page.getByRole("tab", { name: /文書から検出/ }).click();
+  await page.getByRole("button", { name: "要件定義 を辞書に追加" }).waitFor();
+  await page.getByRole("button", { name: "ローカルモデル を辞書に追加" }).waitFor();
+  await page.getByLabel("文書の語彙に合わせる").check();
+  await page.getByRole("button", { name: "要件定義 を辞書に追加" }).click();
+  await page.getByLabel("検出語彙の Romaji reading").fill("youkenteigi");
+  await page.getByLabel("検出語彙のメモ").fill("文書で検出");
+  await assertLocatorValue(page.getByLabel("検出語彙の Romaji reading"), "youkenteigi");
+  await page.getByRole("button", { name: "辞書に追加", exact: true }).click();
+  await page.getByText("要件定義 を辞書に追加しました。").waitFor();
+  await page.getByRole("button", { name: "辞書 を閉じる" }).click();
+
   await page.getByRole("button", { name: "変換を開く" }).click();
   await page.getByRole("region", { name: "変換設定" }).waitFor();
-  await page.locator(".document-vocabulary-terms").getByText("要件定義", { exact: true }).waitFor();
-  await page
-    .locator(".document-vocabulary-terms")
-    .getByText("ローカルモデル", { exact: true })
-    .waitFor();
-  await page.getByLabel("文書の語彙に合わせる").check();
   assert.equal(await page.getByLabel("なし", { exact: true }).isChecked(), true);
   await page.getByLabel("単語", { exact: true }).check();
   await page.getByText("ariga → ありがとう", { exact: true }).waitFor();
@@ -323,9 +330,10 @@ try {
     completionSystem && !completionSystem.includes("Document vocabulary reference:"),
     "Document vocabulary must not influence the input-completion layer.",
   );
-  await page.getByRole("button", { name: "変換を開く" }).click();
+  await page.getByRole("button", { name: "辞書を開く、2 件有効" }).click();
+  await page.getByRole("tab", { name: /文書から検出/ }).click();
   await page.getByLabel("文書の語彙に合わせる").uncheck();
-  await page.getByRole("button", { name: "変換 を閉じる" }).click();
+  await page.getByRole("button", { name: "辞書 を閉じる" }).click();
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.locator(".cm-content").click();
