@@ -3184,6 +3184,8 @@ button.model-chip:hover {
 }
 
 .editor-host .cm-editor {
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   margin: 0;
   border: 0;
@@ -3191,11 +3193,16 @@ button.model-chip:hover {
 }
 
 .editor-host .cm-editor .cm-scroller {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   font-size: 16px;
   line-height: 1.78;
 }
 
 .editor-host .cm-editor .cm-content {
+  min-width: 0;
+  max-width: 100%;
   padding: 24px 46px 64px 16px;
 }
 
@@ -3309,6 +3316,10 @@ button.model-chip:hover {
 
 .inspector-body .settings-content {
   gap: 18px;
+  padding: 22px 20px 78px;
+}
+
+.inspector-body > .companion-panel {
   padding: 22px 20px 78px;
 }
 

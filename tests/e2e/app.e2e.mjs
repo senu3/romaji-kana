@@ -461,6 +461,56 @@ try {
     true,
     "Minimum window size should not create horizontal page overflow.",
   );
+  const longUnbrokenText = "romajikana".repeat(48);
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.insertText(longUnbrokenText);
+  await waitForEditorText(page, longUnbrokenText);
+  const editorWrapLayout = await page.locator(".cm-editor").evaluate((editor) => {
+    const scroller = editor.querySelector(".cm-scroller");
+    const line = editor.querySelector(".cm-line");
+    if (!(scroller instanceof HTMLElement) || !(line instanceof HTMLElement)) {
+      return null;
+    }
+    const lineHeight = Number.parseFloat(getComputedStyle(line).lineHeight);
+    return {
+      hasHorizontalOverflow: scroller.scrollWidth > scroller.clientWidth + 1,
+      lineHeight: line.getBoundingClientRect().height,
+      singleRowHeight: lineHeight,
+    };
+  });
+  assert.ok(editorWrapLayout, "Editor wrapping layout should be measurable.");
+  assert.equal(
+    editorWrapLayout.hasHorizontalOverflow,
+    false,
+    "A long unbroken line should wrap instead of overflowing past the editor's right edge.",
+  );
+  assert.ok(
+    editorWrapLayout.lineHeight > editorWrapLayout.singleRowHeight * 2,
+    "A long unbroken line should occupy multiple visual rows.",
+  );
+  await page.getByRole("button", { name: "スマホ連携を開く", exact: true }).click();
+  const companionPanel = page.locator(".inspector-body > .companion-panel");
+  await companionPanel.waitFor();
+  const companionInsets = await companionPanel.evaluate((panel) => {
+    const body = panel.parentElement;
+    const firstSection = panel.querySelector(".companion-state");
+    if (!body || !(firstSection instanceof HTMLElement)) {
+      return null;
+    }
+    const firstSectionRect = firstSection.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    return {
+      left: firstSectionRect.left - bodyRect.left,
+      right: bodyRect.right - firstSectionRect.right,
+    };
+  });
+  assert.ok(companionInsets, "Smartphone panel spacing should be measurable.");
+  assert.ok(
+    companionInsets.left >= 18 && companionInsets.right >= 18,
+    "Smartphone panel should keep comfortable horizontal padding inside the drawer.",
+  );
+  await page.getByRole("button", { name: "スマホ連携 を閉じる" }).click();
   await page.getByRole("button", { name: "モデルを開く", exact: true }).click();
   await page.getByRole("dialog", { name: "モデル" }).waitFor();
   await assertVisibleText(page, "接続済み");
