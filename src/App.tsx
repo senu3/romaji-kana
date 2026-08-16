@@ -110,6 +110,20 @@ const MAX_CONVERSION_HISTORY_ITEMS = 100;
 const COMPANION_SYNC_DELAY_MS = 180;
 const COMPANION_POLL_INTERVAL_MS = 650;
 
+interface PredictiveSuggestionRequest {
+  id: string;
+  revision: number;
+  epoch: number;
+  range: ConversionRange;
+  settings: AppSettings;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
+}
+
+function isPredictiveSuggestionTrigger(trigger: ConversionRange["trigger"] | undefined): boolean {
+  return trigger === "typing" || trigger === "space";
+}
+
 const stoppedCompanionStatus: CompanionStatus = {
   running: false,
   port: 18_321,
@@ -253,7 +267,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
-    message: "準備完了。スペースで候補を確認するか、句読点または Ctrl+Enter で変換できます。",
+    message: "準備完了。入力中の候補を先読みします。Tab で確定できます。",
   });
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorDocumentStatus>({
@@ -290,7 +304,11 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const conversionQueueRef = useRef<PendingConversion[]>([]);
   const processingQueueRef = useRef(false);
   const runningRequestIdRef = useRef<string | null>(null);
-  const latestSuggestionAbortRef = useRef<AbortController | null>(null);
+  const predictiveSuggestionQueueRef = useRef<PredictiveSuggestionRequest | null>(null);
+  const processingPredictiveSuggestionRef = useRef(false);
+  const predictiveSuggestionRevisionRef = useRef(0);
+  const displayedSuggestionRevisionRef = useRef(0);
+  const predictiveSuggestionEpochRef = useRef(0);
   const suppressNextDirtyRef = useRef(false);
   const companionStatusRef = useRef(companionStatus);
   const companionRevisionRef = useRef(0);
@@ -302,7 +320,20 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const companionSettingsPushPendingRef = useRef(false);
   const suppressNextCompanionSettingsPushRef = useRef(false);
 
+  const invalidatePredictiveSuggestions = useCallback((clearVisible = true) => {
+    predictiveSuggestionEpochRef.current += 1;
+    predictiveSuggestionQueueRef.current = null;
+    displayedSuggestionRevisionRef.current = 0;
+    if (clearVisible) {
+      const view = editorViewRef.current;
+      if (view) {
+        view.dispatch({ effects: clearGhostSuggestion.of(null) });
+      }
+    }
+  }, []);
+
   useEffect(() => {
+    invalidatePredictiveSuggestions();
     settingsRef.current = settings;
     saveSettings(settings);
     if (remoteMode) {
@@ -332,7 +363,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     if (companionStatusRef.current.running) {
       void updateCompanionSettings(settings, companionClientIdRef.current);
     }
-  }, [remoteMode, settings]);
+  }, [invalidatePredictiveSuggestions, remoteMode, settings]);
 
   useEffect(() => {
     companionStatusRef.current = companionStatus;
@@ -344,7 +375,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   useEffect(() => {
     return () => {
-      latestSuggestionAbortRef.current?.abort();
+      predictiveSuggestionEpochRef.current += 1;
+      predictiveSuggestionQueueRef.current = null;
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
@@ -394,14 +426,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, []);
 
   const handleDocumentChanged = useCallback((documentText: string) => {
-    if (latestSuggestionAbortRef.current) {
-      latestSuggestionAbortRef.current.abort();
-      latestSuggestionAbortRef.current = null;
-      setStatus({
-        kind: "idle",
-        message: "入力を続けています。次のスペースで最新候補を表示します。",
-      });
-    }
     docVersionRef.current += 1;
     if (suppressNextDirtyRef.current) {
       suppressNextDirtyRef.current = false;
@@ -777,6 +801,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, []);
 
   const clearPendingConversions = useCallback(() => {
+    invalidatePredictiveSuggestions();
     const requests = conversionQueueRef.current;
     const runningId = runningRequestIdRef.current;
     for (const request of requests) {
@@ -793,7 +818,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
       }
     }
-  }, []);
+  }, [invalidatePredictiveSuggestions]);
 
   const replaceEditorDocument = useCallback((content: string) => {
     const view = editorViewRef.current;
@@ -1259,7 +1284,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       if (
         settingsRef.current.conversionMode === "ghost" ||
         conversion.inputCompletionApplied ||
-        request.range?.trigger === "space"
+        isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
         currentView.dispatch({
           effects: [
@@ -1435,7 +1460,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       if (
         settingsRef.current.conversionMode === "ghost" ||
         conversion.inputCompletionApplied ||
-        request.range?.trigger === "space"
+        isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
         latestView.dispatch({
           effects: showGhostSuggestion.of({
@@ -1645,6 +1670,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   );
 
   const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
+    invalidatePredictiveSuggestions(false);
     const view = editorViewRef.current;
     const nextAnchor: ConversionAnchor = {
       from: suggestion.from,
@@ -1689,10 +1715,19 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           ? "補完変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
           : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
     });
-  }, [saveCurrentDocumentSession]);
+  }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
+
+  const handleDismissGhost = useCallback(() => {
+    invalidatePredictiveSuggestions(false);
+    setStatus({
+      kind: "idle",
+      message: "候補を破棄しました。入力を続けると新しい候補を先読みします。",
+    });
+  }, [invalidatePredictiveSuggestions]);
 
   const handleRetryGhost = useCallback(
     (suggestion: GhostConversionSuggestion) => {
+      invalidatePredictiveSuggestions(false);
       const view = editorViewRef.current;
       if (!view) {
         return;
@@ -1750,7 +1785,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
       enqueueConversion(request);
     },
-    [enqueueConversion],
+    [enqueueConversion, invalidatePredictiveSuggestions],
   );
 
   const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
@@ -1899,99 +1934,121 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     setupComplete,
   ]);
 
-  const processLatestSpaceSuggestion = useCallback(async (range: ConversionRange) => {
-    const view = editorViewRef.current;
-    if (!view) {
+  const processPredictiveSuggestionRequest = useCallback(
+    async (request: PredictiveSuggestionRequest) => {
+      try {
+        const conversion = await convertRomajiToJapaneseDetailed(
+          request.range.text,
+          request.settings,
+          undefined,
+          { documentVocabulary: request.documentVocabulary },
+        );
+        if (
+          request.epoch !== predictiveSuggestionEpochRef.current ||
+          request.revision <= displayedSuggestionRevisionRef.current
+        ) {
+          return;
+        }
+
+        const currentView = editorViewRef.current;
+        const currentSource = currentView?.state.doc.sliceString(
+          request.range.from,
+          request.range.to,
+        );
+        if (!currentView || currentSource !== request.range.text) {
+          return;
+        }
+
+        displayedSuggestionRevisionRef.current = request.revision;
+        currentView.dispatch({
+          effects: showGhostSuggestion.of({
+            id: request.id,
+            from: request.range.from,
+            to: request.range.to,
+            originalText: request.range.text,
+            convertedText: conversion.text,
+            inputText: request.range.text,
+            reviewKana: conversion.reviewKana,
+            conversionStrategy: conversion.conversionStrategy,
+            inputCompletionLevel: request.settings.inputCompletionLevel,
+            inputCompletionApplied: conversion.inputCompletionApplied,
+            inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+            inputCompletionAdditions: conversion.inputCompletionAdditions,
+            trigger: request.range.trigger,
+            documentVocabulary: request.documentVocabulary,
+            documentVocabularyRevision: request.documentVocabularyRevision,
+            source: "editor",
+          }),
+        });
+        setStatus({
+          kind: predictiveSuggestionQueueRef.current ? "loading" : "success",
+          message: conversion.inputCompletionAdditions?.length
+            ? `補完差分 ${conversion.inputCompletionAdditions.map((text) => `+「${text}」`).join(" ")}。Tab で確定できます。`
+            : predictiveSuggestionQueueRef.current
+              ? "候補を表示しました。より新しい入力の候補を更新しています。"
+              : "先読み候補を表示しました。Tab で確定、Esc で破棄できます。",
+        });
+      } catch (error: unknown) {
+        if (request.epoch === predictiveSuggestionEpochRef.current) {
+          setStatus({ kind: "error", message: formatConversionError(error) });
+        }
+      }
+    },
+    [],
+  );
+
+  const processPredictiveSuggestionQueue = useCallback(async () => {
+    if (processingPredictiveSuggestionRef.current) {
       return;
     }
 
-    latestSuggestionAbortRef.current?.abort();
-    const controller = new AbortController();
-    latestSuggestionAbortRef.current = controller;
-    const requestId = createId("suggestion");
-    const requestDocVersion = docVersionRef.current;
-    const settingsSnapshot = {
-      ...settingsRef.current,
-      triggers: { ...settingsRef.current.triggers },
-      punctuationConversion: { ...settingsRef.current.punctuationConversion },
-      userDictionary: [...settingsRef.current.userDictionary],
-    };
-    const vocabularyProfile = settingsSnapshot.useDocumentVocabulary
-      ? buildDocumentVocabularyProfile(view.state.doc.toString())
-      : null;
-
-    setStatus({
-      kind: "loading",
-      message: `「${range.text.trim()}」の最新候補を生成しています`,
-    });
-
+    processingPredictiveSuggestionRef.current = true;
     try {
-      const conversion = await convertRomajiToJapaneseDetailed(
-        range.text,
-        settingsSnapshot,
-        undefined,
-        {
-          documentVocabulary: vocabularyProfile?.terms,
-          signal: controller.signal,
-        },
-      );
-      if (
-        controller.signal.aborted ||
-        latestSuggestionAbortRef.current !== controller ||
-        docVersionRef.current !== requestDocVersion
-      ) {
-        return;
+      while (predictiveSuggestionQueueRef.current) {
+        const request = predictiveSuggestionQueueRef.current;
+        predictiveSuggestionQueueRef.current = null;
+        setStatus({
+          kind: "loading",
+          message: `「${request.range.text.trim()}」の候補を先読みしています`,
+        });
+        await processPredictiveSuggestionRequest(request);
       }
-
-      const currentView = editorViewRef.current;
-      if (
-        !currentView ||
-        currentView.state.doc.sliceString(range.from, range.to) !== range.text
-      ) {
-        return;
-      }
-
-      currentView.dispatch({
-        effects: showGhostSuggestion.of({
-          id: requestId,
-          from: range.from,
-          to: range.to,
-          originalText: range.text,
-          convertedText: conversion.text,
-          inputText: range.text,
-          reviewKana: conversion.reviewKana,
-          conversionStrategy: conversion.conversionStrategy,
-          inputCompletionLevel: settingsSnapshot.inputCompletionLevel,
-          inputCompletionApplied: conversion.inputCompletionApplied,
-          inputCompletionSourceKana: conversion.inputCompletionSourceKana,
-          inputCompletionAdditions: conversion.inputCompletionAdditions,
-          trigger: "space",
-          documentVocabulary: vocabularyProfile?.terms,
-          documentVocabularyRevision: vocabularyProfile?.revision,
-          source: "editor",
-        }),
-      });
-      setStatus({
-        kind: "success",
-        message: conversion.inputCompletionAdditions?.length
-          ? `補完差分 ${conversion.inputCompletionAdditions.map((text) => `+「${text}」`).join(" ")}。Tab で確定、Esc で破棄できます。`
-          : "最新の変換候補を表示しました。Tab で確定、Esc で破棄できます。",
-      });
-    } catch (error: unknown) {
-      if (
-        controller.signal.aborted ||
-        latestSuggestionAbortRef.current !== controller ||
-        (error instanceof DOMException && error.name === "AbortError")
-      ) {
-        return;
-      }
-      setStatus({ kind: "error", message: formatConversionError(error) });
     } finally {
-      if (latestSuggestionAbortRef.current === controller) {
-        latestSuggestionAbortRef.current = null;
-      }
+      processingPredictiveSuggestionRef.current = false;
     }
-  }, []);
+  }, [processPredictiveSuggestionRequest]);
+
+  const enqueuePredictiveSuggestion = useCallback(
+    (range: ConversionRange) => {
+      const view = editorViewRef.current;
+      if (!view) {
+        return false;
+      }
+
+      const settingsSnapshot: AppSettings = {
+        ...settingsRef.current,
+        triggers: { ...settingsRef.current.triggers },
+        punctuationConversion: { ...settingsRef.current.punctuationConversion },
+        userDictionary: [...settingsRef.current.userDictionary],
+      };
+      const vocabularyProfile = settingsSnapshot.useDocumentVocabulary
+        ? buildDocumentVocabularyProfile(view.state.doc.toString())
+        : null;
+      predictiveSuggestionRevisionRef.current += 1;
+      predictiveSuggestionQueueRef.current = {
+        id: createId("suggestion"),
+        revision: predictiveSuggestionRevisionRef.current,
+        epoch: predictiveSuggestionEpochRef.current,
+        range,
+        settings: settingsSnapshot,
+        documentVocabulary: vocabularyProfile?.terms,
+        documentVocabularyRevision: vocabularyProfile?.revision,
+      };
+      void processPredictiveSuggestionQueue();
+      return true;
+    },
+    [processPredictiveSuggestionQueue],
+  );
 
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
@@ -1999,9 +2056,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       return false;
     }
 
-    if (range.trigger === "space") {
-      void processLatestSpaceSuggestion(range);
-      return true;
+    if (isPredictiveSuggestionTrigger(range.trigger)) {
+      return enqueuePredictiveSuggestion(range);
     }
 
     if (hasMatchingPendingEditorConversion(conversionQueueRef.current, range)) {
@@ -2044,7 +2100,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
     enqueueConversion(request);
     return true;
-  }, [enqueueConversion, processLatestSpaceSuggestion]);
+  }, [enqueueConversion, enqueuePredictiveSuggestion]);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
   const modelAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
@@ -2080,6 +2136,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onSaveFile={handleSaveFile}
         onSaveFileAs={handleSaveFileAs}
         onAcceptGhost={handleAcceptGhost}
+        onDismissGhost={handleDismissGhost}
         onRetryGhost={handleRetryGhost}
         onRetryRecent={retryRecentConversion}
         registerView={registerView}

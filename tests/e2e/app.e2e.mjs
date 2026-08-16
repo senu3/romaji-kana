@@ -64,7 +64,11 @@ try {
       conversionSystems.push(body.system ?? "");
       activeConversionRequests += 1;
       maxActiveConversionRequests = Math.max(maxActiveConversionRequests, activeConversionRequests);
-      if (body.prompt === "いち。" || body.prompt?.trim() === "あした") {
+      if (
+        body.prompt === "いち。" ||
+        body.prompt?.trim() === "あした" ||
+        body.prompt?.trim() === "あしたかいぎ"
+      ) {
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
     }
@@ -132,9 +136,9 @@ try {
     .filter({ hasText: "変換タイミング" })
     .click();
   assert.equal(
-    await page.getByLabel("スペースで候補を表示").isChecked(),
+    await page.getByLabel("入力中の候補を常時先読み").isChecked(),
     true,
-    "Space suggestions should be enabled by default.",
+    "Predictive suggestions should be enabled by default.",
   );
   await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
@@ -164,26 +168,33 @@ try {
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
-  await page.keyboard.type("ashita ");
-  await page.keyboard.type("no ");
-  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日の" }).waitFor();
+  await page.keyboard.type("ashita");
+  await page.waitForTimeout(380);
+  await page.keyboard.type("kaigi");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日" }).waitFor();
   assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
-    "ashita no ",
-    "Only the newest space-triggered source should remain as a ghost.",
+    "ashita",
+    "A completed candidate should remain visible after input continues.",
+  );
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日会議" }).waitFor();
+  assert.equal(
+    await page.locator(".cm-ghost-source").textContent(),
+    "ashitakaigi",
+    "The displayed candidate should update to the newest queued source.",
   );
   await page.keyboard.press("Tab");
-  await waitForEditorText(page, "明日の");
+  await waitForEditorText(page, "明日会議");
   await page.waitForTimeout(400);
-  assert.equal(await editorText(page), "明日の", "A stale response must not replace the latest result.");
-  assert.equal(conversionRequestCount, 2, "Each typed space should refresh the latest suggestion.");
+  assert.equal(await editorText(page), "明日会議", "A stale response must not replace the latest result.");
+  assert.equal(conversionRequestCount, 2, "Continuous input should keep only one latest queued request.");
 
   await page.getByRole("button", { name: "変換を開く", exact: true }).click();
   await page
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "変換タイミング" })
     .click();
-  await page.getByLabel("スペースで候補を表示").uncheck();
+  await page.getByLabel("入力中の候補を常時先読み").uncheck();
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;
@@ -400,10 +411,6 @@ try {
     completionSystem && !completionSystem.includes("Document vocabulary reference:"),
     "Document vocabulary must not influence the input-completion layer.",
   );
-  await page.getByRole("button", { name: "辞書を開く、2 件有効" }).click();
-  await page.getByRole("tab", { name: /文書から検出/ }).click();
-  await page.getByLabel("文書の語彙に合わせる").uncheck();
-  await page.getByRole("button", { name: "辞書 を閉じる" }).click();
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.locator(".cm-content").click();
@@ -415,9 +422,13 @@ try {
   assert.ok(
     ghostRetryVocabularySystem?.includes('- "要件定義"') &&
       ghostRetryVocabularySystem.includes('- "ローカルモデル"'),
-    "Ghost retry should preserve the vocabulary snapshot after the setting is disabled.",
+    "Ghost retry should preserve the original vocabulary snapshot.",
   );
   await page.keyboard.press("Tab");
+  await page.getByRole("button", { name: "辞書を開く、2 件有効" }).click();
+  await page.getByRole("tab", { name: /文書から検出/ }).click();
+  await page.getByLabel("文書の語彙に合わせる").uncheck();
+  await page.getByRole("button", { name: "辞書 を閉じる" }).click();
   await page.getByRole("button", { name: /履歴を開く/ }).click();
   await page
     .locator(".history-item")
@@ -645,6 +656,9 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (prompt?.trim() === "あしたかいぎ") {
+    return "明日会議";
+  }
   if (prompt?.trim() === "あしたの") {
     return "明日の";
   }

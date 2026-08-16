@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractConversionRange,
   extractSelectedConversionRange,
+  isTriggerEnabled,
   isInsideExcludedMarkdown,
   isJapaneseDominant,
   normalizeInputForPrompt,
@@ -10,6 +11,16 @@ import {
 import { defaultSettings } from "./settings";
 
 describe("extractConversionRange", () => {
+  it("extracts an unfinished phrase for predictive typing", () => {
+    const doc = "ashita no yotei";
+    expect(extractConversionRange(doc, doc.length, "typing")).toEqual({
+      from: 0,
+      to: doc.length,
+      text: doc,
+      trigger: "typing",
+    });
+  });
+
   it("extracts the current phrase including a space trigger", () => {
     const doc = "ashita no yotei ";
     expect(extractConversionRange(doc, doc.length, "space")).toEqual({
@@ -169,6 +180,18 @@ describe("extractConversionRange", () => {
 describe("triggerFromCharacter", () => {
   it("uses a typed space as a conversion suggestion trigger", () => {
     expect(triggerFromCharacter(" ")).toBe("space");
+  });
+});
+
+describe("isTriggerEnabled", () => {
+  it("uses the predictive suggestion setting for typing previews", () => {
+    expect(isTriggerEnabled("typing", defaultSettings)).toBe(true);
+    expect(
+      isTriggerEnabled("typing", {
+        ...defaultSettings,
+        triggers: { ...defaultSettings.triggers, space: false },
+      }),
+    ).toBe(false);
   });
 });
 

@@ -25,6 +25,9 @@ export function isTriggerEnabled(
   if (trigger === "shortcut") {
     return true;
   }
+  if (trigger === "typing") {
+    return settings.triggers.space;
+  }
   return settings.triggers[trigger];
 }
 

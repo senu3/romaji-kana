@@ -73,6 +73,7 @@ interface MarkdownEditorProps {
   onSaveFile: () => void;
   onSaveFileAs: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
+  onDismissGhost: () => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
@@ -193,7 +194,11 @@ export const ghostSuggestionField = StateField.define<GhostState>({
     let suggestion = value.suggestion;
 
     if (suggestion && transaction.docChanged) {
-      suggestion = null;
+      const from = transaction.changes.mapPos(suggestion.from, 1);
+      const to = transaction.changes.mapPos(suggestion.to, -1);
+      const mapped = { ...suggestion, from, to };
+      const currentText = transaction.state.doc.sliceString(from, to);
+      suggestion = currentText === mapped.originalText ? mapped : null;
     }
 
     for (const effect of transaction.effects) {
@@ -408,6 +413,9 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 const COMPOSITION_END_GRACE_MS = 120;
+const PREDICTIVE_SUGGESTION_DEBOUNCE_MS = 320;
+const PREDICTIVE_SUGGESTION_MAX_WAIT_MS = 1_000;
+const MIN_PREDICTIVE_ROMAJI_CHARACTERS = 4;
 const editorPhrases = EditorState.phrases.of({
   Find: "検索",
   Replace: "置換",
@@ -448,6 +456,7 @@ export function MarkdownEditor({
   onSaveFile,
   onSaveFileAs,
   onAcceptGhost,
+  onDismissGhost,
   onRetryGhost,
   onRetryRecent,
   registerView,
@@ -459,16 +468,78 @@ export function MarkdownEditor({
   const onDocumentChangedRef = useRef(onDocumentChanged);
   const onEditorStatusChangeRef = useRef(onEditorStatusChange);
   const onAcceptGhostRef = useRef(onAcceptGhost);
+  const onDismissGhostRef = useRef(onDismissGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
   const composingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
+  const suggestionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
+
+  function clearPredictiveSuggestionTimers() {
+    if (suggestionDebounceTimerRef.current) {
+      window.clearTimeout(suggestionDebounceTimerRef.current);
+      suggestionDebounceTimerRef.current = null;
+    }
+    if (suggestionMaxWaitTimerRef.current) {
+      window.clearTimeout(suggestionMaxWaitTimerRef.current);
+      suggestionMaxWaitTimerRef.current = null;
+    }
+  }
+
+  function requestPredictiveSuggestion(
+    view: EditorView,
+    trigger: Extract<ConversionTrigger, "typing" | "space">,
+  ) {
+    clearPredictiveSuggestionTimers();
+    if (
+      composingRef.current ||
+      !settingsRef.current.autoConvert ||
+      !settingsRef.current.triggers.space ||
+      !view.state.selection.main.empty
+    ) {
+      return;
+    }
+
+    const cursor = view.state.selection.main.head;
+    const range = extractConversionRange(view.state.doc.toString(), cursor, trigger);
+    const romajiCharacterCount = range?.text.match(/[A-Za-z]/g)?.length ?? 0;
+    if (!range || romajiCharacterCount < MIN_PREDICTIVE_ROMAJI_CHARACTERS) {
+      return;
+    }
+    onConvertRef.current(range);
+  }
+
+  function schedulePredictiveSuggestion(view: EditorView) {
+    if (
+      composingRef.current ||
+      !settingsRef.current.autoConvert ||
+      !settingsRef.current.triggers.space
+    ) {
+      clearPredictiveSuggestionTimers();
+      return;
+    }
+
+    if (suggestionDebounceTimerRef.current) {
+      window.clearTimeout(suggestionDebounceTimerRef.current);
+    }
+    suggestionDebounceTimerRef.current = window.setTimeout(
+      () => requestPredictiveSuggestion(view, "typing"),
+      PREDICTIVE_SUGGESTION_DEBOUNCE_MS,
+    );
+    if (!suggestionMaxWaitTimerRef.current) {
+      suggestionMaxWaitTimerRef.current = window.setTimeout(
+        () => requestPredictiveSuggestion(view, "typing"),
+        PREDICTIVE_SUGGESTION_MAX_WAIT_MS,
+      );
+    }
+  }
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
@@ -487,27 +558,36 @@ export function MarkdownEditor({
         .map((transaction) => transaction.annotation(Transaction.userEvent))
         .find(Boolean);
       if (userEvent?.startsWith("document.")) {
+        clearPredictiveSuggestionTimers();
         return;
       }
       if (shouldSuppressAutoTriggerForUserEvent(userEvent)) {
+        clearPredictiveSuggestionTimers();
         return;
       }
 
       if (!settingsRef.current.autoConvert) {
+        clearPredictiveSuggestionTimers();
         return;
       }
 
       const cursor = update.state.selection.main.head;
       const previousChar = update.state.doc.sliceString(cursor - 1, cursor);
       const trigger = triggerFromCharacter(previousChar);
-      if (!trigger || !isTriggerEnabled(trigger, settingsRef.current)) {
+      if (trigger && isTriggerEnabled(trigger, settingsRef.current)) {
+        if (trigger === "space") {
+          requestPredictiveSuggestion(update.view, "space");
+          return;
+        }
+        clearPredictiveSuggestionTimers();
+        const range = extractConversionRange(update.state.doc.toString(), cursor, trigger);
+        if (range) {
+          onConvertRef.current(range);
+        }
         return;
       }
 
-      const range = extractConversionRange(update.state.doc.toString(), cursor, trigger);
-      if (range) {
-        onConvertRef.current(range);
-      }
+      schedulePredictiveSuggestion(update.view);
     });
   }, []);
 
@@ -529,11 +609,13 @@ export function MarkdownEditor({
     onDocumentChangedRef.current = onDocumentChanged;
     onEditorStatusChangeRef.current = onEditorStatusChange;
     onAcceptGhostRef.current = onAcceptGhost;
+    onDismissGhostRef.current = onDismissGhost;
     onRetryGhostRef.current = onRetryGhost;
     onRetryRecentRef.current = onRetryRecent;
     settingsRef.current = settings;
   }, [
     onAcceptGhost,
+    onDismissGhost,
     onConvert,
     onDocumentChanged,
     onEditorStatusChange,
@@ -541,6 +623,12 @@ export function MarkdownEditor({
     onRetryRecent,
     settings,
   ]);
+
+  useEffect(() => {
+    if (!settings.autoConvert || !settings.triggers.space) {
+      clearPredictiveSuggestionTimers();
+    }
+  }, [settings.autoConvert, settings.triggers.space]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -611,6 +699,7 @@ export function MarkdownEditor({
     setCanRedo(redoDepth(view.state) > 0);
 
     return () => {
+      clearPredictiveSuggestionTimers();
       registerView(null);
       view.destroy();
       viewRef.current = null;
@@ -787,10 +876,12 @@ export function MarkdownEditor({
     const state = view.state.field(ghostSuggestionField);
     const suggestion = state.suggestion;
     if (!suggestion) {
+      onDismissGhostRef.current();
       return false;
     }
 
     view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+    onDismissGhostRef.current();
     return true;
   }
 

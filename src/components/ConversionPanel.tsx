@@ -147,7 +147,7 @@ export function ConversionPanel({
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="スペースで候補を表示"
+              label="入力中の候補を常時先読み"
               checked={settings.triggers.space}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ space: checked })}
