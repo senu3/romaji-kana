@@ -14,17 +14,17 @@ import {
 } from "../lib/shortcuts";
 import type {
   AppSettings,
+  InputPauseTiming,
   InputCompletionLevel,
-  PredictiveSuggestionTiming,
 } from "../lib/types";
 
 const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
-const PREDICTIVE_TIMING_OPTIONS: PredictiveSuggestionTiming[] = [
+const INPUT_PAUSE_TIMING_OPTIONS: InputPauseTiming[] = [
   "early",
   "auto",
   "deliberate",
 ];
-const PREDICTIVE_TIMING_LABELS: Record<PredictiveSuggestionTiming, string> = {
+const INPUT_PAUSE_TIMING_LABELS: Record<InputPauseTiming, string> = {
   early: "早め",
   auto: "自動",
   deliberate: "長め",
@@ -161,40 +161,40 @@ export function ConversionPanel({
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="入力中の候補を先読み"
+              label="入力停止後に候補を生成"
               checked={settings.triggers.space}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ space: checked })}
             />
             <div
-              className={`mode-field compact-mode-field predictive-timing-field ${
+              className={`mode-field compact-mode-field input-pause-field ${
                 settings.autoConvert && settings.triggers.space ? "" : "disabled"
               }`}
             >
-              <span>先読み開始</span>
+              <span>入力停止の判定</span>
               <div
                 className="segmented-control"
                 role="radiogroup"
-                aria-label="候補の先読み開始"
+                aria-label="入力停止の判定"
               >
-                {PREDICTIVE_TIMING_OPTIONS.map((option) => (
+                {INPUT_PAUSE_TIMING_OPTIONS.map((option) => (
                   <label
-                    className={settings.predictiveSuggestionTiming === option ? "selected" : ""}
+                    className={settings.inputPauseTiming === option ? "selected" : ""}
                     key={option}
                   >
                     <input
                       type="radio"
-                      name="predictive-suggestion-timing"
+                      name="input-pause-timing"
                       value={option}
-                      checked={settings.predictiveSuggestionTiming === option}
+                      checked={settings.inputPauseTiming === option}
                       disabled={!settings.autoConvert || !settings.triggers.space}
-                      onChange={() => update({ predictiveSuggestionTiming: option })}
+                      onChange={() => update({ inputPauseTiming: option })}
                     />
-                    <span>{PREDICTIVE_TIMING_LABELS[option]}</span>
+                    <span>{INPUT_PAUSE_TIMING_LABELS[option]}</span>
                   </label>
                 ))}
               </div>
-              <small>{predictiveTimingDescription(settings.predictiveSuggestionTiming)}</small>
+              <small>{inputPauseTimingDescription(settings.inputPauseTiming)}</small>
             </div>
             <CheckRow
               label="ピリオドで変換"
@@ -331,14 +331,14 @@ export function ConversionPanel({
   );
 }
 
-function predictiveTimingDescription(timing: PredictiveSuggestionTiming): string {
+function inputPauseTimingDescription(timing: InputPauseTiming): string {
   if (timing === "early") {
-    return "短い文脈から候補を出します。入力の遅い方にも向いています。";
+    return "短い停止を入力の区切りとして、早めに生成します。";
   }
   if (timing === "deliberate") {
-    return "文脈を長めに待ち、候補の安定性を優先します。";
+    return "長めの停止を待ち、入力途中の生成を抑えます。";
   }
-  return "入力速度に合わせ、最初は6〜12文字を目安に調整します。";
+  return "入力速度に合わせて、連続入力が終わるまでの待ち時間を調整します。";
 }
 
 function AccordionSection({

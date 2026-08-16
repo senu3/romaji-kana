@@ -1,8 +1,8 @@
 import { defaultConversionPrompt } from "./prompts";
 import type {
   AppSettings,
+  InputPauseTiming,
   InputCompletionLevel,
-  PredictiveSuggestionTiming,
   SharedConversionSettings,
   UserDictionaryEntry,
 } from "./types";
@@ -30,7 +30,7 @@ export const defaultSettings: AppSettings = {
   },
   conversionPrompt: defaultConversionPrompt,
   inputCompletionLevel: "none",
-  predictiveSuggestionTiming: "auto",
+  inputPauseTiming: "auto",
   useDocumentVocabulary: false,
   userDictionary: [],
   think: false,
@@ -61,7 +61,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
     punctuationConversion: settings.punctuationConversion,
     conversionPrompt: settings.conversionPrompt,
     inputCompletionLevel: settings.inputCompletionLevel,
-    predictiveSuggestionTiming: settings.predictiveSuggestionTiming,
+    inputPauseTiming: settings.inputPauseTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
     userDictionary: settings.userDictionary,
   };
@@ -84,12 +84,20 @@ type LegacySettings = Partial<AppSettings> & {
   thinkingMode?: "auto" | "on" | "off";
   userHomophones?: unknown;
   conversionPreset?: unknown;
+  predictiveSuggestionTiming?: unknown;
 };
 
 function mergeSettings(settings: LegacySettings): AppSettings {
-  const { thinkingMode, userHomophones, conversionPreset, ...currentSettings } = settings;
+  const {
+    thinkingMode,
+    userHomophones,
+    conversionPreset,
+    predictiveSuggestionTiming,
+    ...currentSettings
+  } = settings;
   void userHomophones;
   void conversionPreset;
+  void predictiveSuggestionTiming;
   const conversionPrompt = settings.conversionPrompt || defaultConversionPrompt;
   const think = settings.think ?? thinkingMode === "on";
 
@@ -99,9 +107,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     conversionPrompt,
     think,
     inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
-    predictiveSuggestionTiming: normalizePredictiveSuggestionTiming(
-      settings.predictiveSuggestionTiming,
-    ),
+    inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: {
       ...defaultSettings.triggers,
@@ -116,10 +122,12 @@ function mergeSettings(settings: LegacySettings): AppSettings {
 }
 
 function normalizeInputCompletionLevel(value: unknown): InputCompletionLevel {
-  return value === "word" || value === "sentence" ? value : "none";
+  return value === "none" || value === "word" || value === "sentence"
+    ? value
+    : defaultSettings.inputCompletionLevel;
 }
 
-function normalizePredictiveSuggestionTiming(value: unknown): PredictiveSuggestionTiming {
+function normalizeInputPauseTiming(value: unknown): InputPauseTiming {
   return value === "early" || value === "deliberate" ? value : "auto";
 }
 

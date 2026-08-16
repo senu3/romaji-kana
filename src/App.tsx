@@ -267,7 +267,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
-    message: "準備完了。入力中の候補を先読みします。Tab で確定できます。",
+    message: "準備完了。入力が止まると変換候補を生成します。Tab で確定できます。",
   });
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorDocumentStatus>({
@@ -1721,7 +1721,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     invalidatePredictiveSuggestions(false);
     setStatus({
       kind: "idle",
-      message: "候補を破棄しました。入力を続けると新しい候補を先読みします。",
+      message: "候補を破棄しました。入力を止めると新しい候補を生成します。",
     });
   }, [invalidatePredictiveSuggestions]);
 
@@ -1986,7 +1986,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
             ? `補完差分 ${conversion.inputCompletionAdditions.map((text) => `+「${text}」`).join(" ")}。Tab で確定できます。`
             : predictiveSuggestionQueueRef.current
               ? "候補を表示しました。より新しい入力の候補を更新しています。"
-              : "先読み候補を表示しました。Tab で確定、Esc で破棄できます。",
+              : "変換候補を表示しました。Tab で確定、Esc で破棄できます。",
         });
       } catch (error: unknown) {
         if (request.epoch === predictiveSuggestionEpochRef.current) {
@@ -2009,7 +2009,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         predictiveSuggestionQueueRef.current = null;
         setStatus({
           kind: "loading",
-          message: `「${request.range.text.trim()}」の候補を先読みしています`,
+          message: `「${request.range.text.trim()}」の候補を生成しています`,
         });
         await processPredictiveSuggestionRequest(request);
       }

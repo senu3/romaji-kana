@@ -17,31 +17,36 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
-  it("enables space suggestions for new and legacy settings", () => {
+  it("uses pause-based suggestions and discards the previous timing field", () => {
     expect(loadSettings().triggers.space).toBe(true);
-    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
+    expect(loadSettings().inputPauseTiming).toBe("auto");
+    expect(loadSettings().inputCompletionLevel).toBe("none");
 
     storage.set(
       "romaji-kana-settings",
-      JSON.stringify({ triggers: { period: false } }),
+      JSON.stringify({
+        triggers: { period: false },
+        predictiveSuggestionTiming: "early",
+      }),
     );
     expect(loadSettings().triggers.space).toBe(true);
     expect(loadSettings().triggers.period).toBe(false);
-    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
+    expect(loadSettings().inputPauseTiming).toBe("auto");
+    expect(loadSettings()).not.toHaveProperty("predictiveSuggestionTiming");
   });
 
-  it("restores only supported predictive suggestion timing", () => {
+  it("restores only supported input pause timing", () => {
     storage.set(
       "romaji-kana-settings",
-      JSON.stringify({ ...defaultSettings, predictiveSuggestionTiming: "early" }),
+      JSON.stringify({ ...defaultSettings, inputPauseTiming: "early" }),
     );
-    expect(loadSettings().predictiveSuggestionTiming).toBe("early");
+    expect(loadSettings().inputPauseTiming).toBe("early");
 
     storage.set(
       "romaji-kana-settings",
-      JSON.stringify({ ...defaultSettings, predictiveSuggestionTiming: "instant" }),
+      JSON.stringify({ ...defaultSettings, inputPauseTiming: "instant" }),
     );
-    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
+    expect(loadSettings().inputPauseTiming).toBe("auto");
   });
 
   it("drops removed homophone settings while preserving dictionary entries", () => {
@@ -153,5 +158,6 @@ describe("loadSettings", () => {
     expect(merged.modelName).toBe("desktop-model");
     expect(merged.conversionMode).toBe("ghost");
     expect(merged.inputCompletionLevel).toBe("word");
+    expect(merged.inputPauseTiming).toBe("auto");
   });
 });

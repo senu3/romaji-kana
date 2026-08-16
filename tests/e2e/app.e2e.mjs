@@ -137,14 +137,19 @@ try {
     .filter({ hasText: "変換タイミング" })
     .click();
   assert.equal(
-    await page.getByLabel("入力中の候補を先読み").isChecked(),
+    await page.getByLabel("入力停止後に候補を生成").isChecked(),
     true,
-    "Predictive suggestions should be enabled by default.",
+    "Pause-triggered suggestions should be enabled by default.",
   );
   assert.equal(
     await page.getByRole("radio", { name: "自動", exact: true }).isChecked(),
     true,
-    "Predictive timing should adapt to typing speed by default.",
+    "Input pause timing should adapt to typing speed by default.",
+  );
+  assert.equal(
+    await page.getByRole("radio", { name: "なし", exact: true }).isChecked(),
+    true,
+    "Faithful conversion should remain the default to avoid an extra model request.",
   );
   await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
@@ -174,17 +179,32 @@ try {
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
-  await page.keyboard.type("ashitakaig");
+  await page.keyboard.type("ai");
   await page.waitForTimeout(180);
   assert.equal(
     conversionRequestCount,
     0,
-    "The first predictive request should wait for a natural boundary after 10 characters.",
+    "Even a short input burst should wait for the pause threshold.",
   );
-  await page.keyboard.type("i");
   await waitForCondition(
     () => conversionRequestCount === 1,
-    "The first predictive request should start at the next vowel.",
+    "A short input burst should generate after input stops without a character minimum.",
+  );
+  await page.locator(".cm-ghost-source").waitFor();
+  await page.keyboard.press("Escape");
+
+  conversionRequestCount = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ashitakaigi");
+  await page.waitForTimeout(180);
+  assert.equal(
+    conversionRequestCount,
+    0,
+    "A predictive request should not start while the input burst is still active.",
+  );
+  await waitForCondition(
+    () => conversionRequestCount === 1,
+    "The first predictive request should start after input stops.",
   );
   await page.keyboard.type("note");
   await page.waitForFunction(
@@ -216,7 +236,7 @@ try {
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "変換タイミング" })
     .click();
-  await page.getByLabel("入力中の候補を先読み").uncheck();
+  await page.getByLabel("入力停止後に候補を生成").uncheck();
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;

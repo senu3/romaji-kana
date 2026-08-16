@@ -8,7 +8,7 @@ export type ConversionTrigger =
 
 export type ModelProvider = "ollama" | "lmstudio";
 export type InputCompletionLevel = "none" | "word" | "sentence";
-export type PredictiveSuggestionTiming = "early" | "auto" | "deliberate";
+export type InputPauseTiming = "early" | "auto" | "deliberate";
 
 export interface UserDictionaryEntry {
   id: string;
@@ -38,7 +38,7 @@ export interface AppSettings {
   };
   conversionPrompt: string;
   inputCompletionLevel: InputCompletionLevel;
-  predictiveSuggestionTiming: PredictiveSuggestionTiming;
+  inputPauseTiming: InputPauseTiming;
   useDocumentVocabulary: boolean;
   userDictionary: UserDictionaryEntry[];
   think: boolean;
@@ -52,7 +52,7 @@ export type SharedConversionSettings = Pick<
   | "punctuationConversion"
   | "conversionPrompt"
   | "inputCompletionLevel"
-  | "predictiveSuggestionTiming"
+  | "inputPauseTiming"
   | "useDocumentVocabulary"
   | "userDictionary"
 >;

@@ -47,14 +47,9 @@ import {
   triggerFromCharacter,
 } from "../lib/conversion";
 import {
-  countRomajiCharacters,
-  estimateTypingSpeedCps,
-  isNaturalRomajiBoundary,
+  inputPauseDurationMs,
   MAX_TYPING_INTERVAL_MS,
-  MIN_SPACE_TRIGGER_ROMAJI_CHARACTERS,
   MIN_TYPING_INTERVAL_MS,
-  PREDICTIVE_PAUSE_MS,
-  predictiveSuggestionThresholds,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
 import type {
@@ -449,10 +444,9 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
 interface PredictiveRequestMarker {
   from: number;
   text: string;
-  romajiCharacterCount: number;
 }
 
-type PredictiveRequestReason = "boundary" | "pause" | "space";
+type PredictiveRequestReason = "pause" | "space";
 
 function singleInsertedCharacter(update: ViewUpdate): string | null {
   let changedRangeCount = 0;
@@ -555,28 +549,6 @@ export function MarkdownEditor({
     ];
   }
 
-  function predictiveRequirement(range: ConversionRange) {
-    const romajiCharacterCount = countRomajiCharacters(range.text);
-    const thresholds = predictiveSuggestionThresholds(
-      estimateTypingSpeedCps(typingIntervalsRef.current),
-      settingsRef.current.predictiveSuggestionTiming,
-    );
-    const previous = lastPredictiveRequestRef.current;
-    const isContinuation = Boolean(
-      previous &&
-        previous.from === range.from &&
-        range.text.startsWith(previous.text) &&
-        romajiCharacterCount >= previous.romajiCharacterCount,
-    );
-
-    return {
-      romajiCharacterCount,
-      requiredCharacterCount: isContinuation
-        ? previous!.romajiCharacterCount + thresholds.continuation
-        : thresholds.initial,
-    };
-  }
-
   function requestPredictiveSuggestion(
     view: EditorView,
     reason: PredictiveRequestReason,
@@ -599,15 +571,6 @@ export function MarkdownEditor({
       return false;
     }
 
-    const { romajiCharacterCount, requiredCharacterCount } = predictiveRequirement(range);
-    if (
-      (reason === "space" && romajiCharacterCount < MIN_SPACE_TRIGGER_ROMAJI_CHARACTERS) ||
-      (reason !== "space" && romajiCharacterCount < requiredCharacterCount) ||
-      (reason === "boundary" && !isNaturalRomajiBoundary(range.text))
-    ) {
-      return false;
-    }
-
     const previous = lastPredictiveRequestRef.current;
     if (previous?.from === range.from && previous.text === range.text) {
       return false;
@@ -620,7 +583,6 @@ export function MarkdownEditor({
     lastPredictiveRequestRef.current = {
       from: range.from,
       text: range.text,
-      romajiCharacterCount,
     };
     return true;
   }
@@ -647,19 +609,12 @@ export function MarkdownEditor({
       return;
     }
 
-    const { romajiCharacterCount, requiredCharacterCount } = predictiveRequirement(range);
-    if (romajiCharacterCount < requiredCharacterCount) {
-      return;
-    }
-
-    if (isNaturalRomajiBoundary(range.text)) {
-      requestPredictiveSuggestion(view, "boundary");
-      return;
-    }
-
     suggestionPauseTimerRef.current = window.setTimeout(
       () => requestPredictiveSuggestion(view, "pause"),
-      PREDICTIVE_PAUSE_MS,
+      inputPauseDurationMs(
+        typingIntervalsRef.current,
+        settingsRef.current.inputPauseTiming,
+      ),
     );
   }
 
@@ -757,7 +712,7 @@ export function MarkdownEditor({
     }
   }, [
     settings.autoConvert,
-    settings.predictiveSuggestionTiming,
+    settings.inputPauseTiming,
     settings.triggers.space,
   ]);
 
