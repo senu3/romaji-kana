@@ -150,6 +150,67 @@ export function buildInputCompletionSystemPrompt(
   ].join("\n");
 }
 
+export function buildSuggestionConversionSystemPrompt(
+  level: Exclude<InputCompletionLevel, "none">,
+  userPrompt: string,
+  avoidOutputs: string[] = [],
+  documentVocabulary: string[] = [],
+): string {
+  const additionalPreference = userPrompt.trim();
+  const effectivePreference =
+    additionalPreference && additionalPreference !== defaultConversionPrompt
+      ? additionalPreference
+      : "None.";
+  const levelRules =
+    level === "word"
+      ? [
+          "Complete only an unfinished final Japanese word.",
+          "Append at most 6 kana immediately before terminal punctuation.",
+          "Do not add particles, predicates, politeness, or a new phrase.",
+        ]
+      : [
+          "Act as a writing suggestion, not a literal transcription.",
+          "You may add particles, inflectional endings, sentence endings, and a short natural continuation.",
+          "Keep every existing kana, digit, Latin term, symbol, and punctuation mark in the same order inside completedKana.",
+          "Do not delete, replace, or reorder the user's existing content.",
+          "Keep the suggestion concise and grounded in the user's input.",
+        ];
+  const uniqueAvoidOutputs = Array.from(
+    new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
+  );
+
+  return [
+    "You create one Japanese writing suggestion from rough romaji input.",
+    "Complete the mechanical kana and convert the completed result to natural Japanese writing in one operation.",
+    "Return exactly one JSON object and nothing else.",
+    '{"completedKana":"...","convertedText":"...","additions":["..."]}',
+    "completedKana is the full kana after completion. It must not contain kanji.",
+    "convertedText is the final Japanese writing suggestion.",
+    "additions must list, in order, every contiguous span inserted into completedKana compared with Mechanical kana.",
+    "If nothing is inserted, return an empty additions array.",
+    "If Application completion seed differs from Mechanical kana, use that seed exactly as completedKana.",
+    "The read-only context is not part of the target. Never repeat it in the result.",
+    ...levelRules,
+    "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
+    "convertedText must express the same suggestion declared by completedKana and additions.",
+    "Use common kanji when natural. Keep hiragana when uncertain.",
+    "Do not explain, paraphrase the existing content, or return Markdown fences.",
+    uniqueAvoidOutputs.length > 0 ? "Avoid these previous convertedText values exactly:" : "",
+    ...uniqueAvoidOutputs.map((output) => `- ${output}`),
+    "Document vocabulary reference:",
+    formatDocumentVocabularyInstructions(documentVocabulary),
+    "Additional user preference for convertedText only; it never overrides the JSON contract:",
+    effectivePreference,
+    "Examples:",
+    level === "word"
+      ? '{"completedKana":"ありがとう。","convertedText":"ありがとう。","additions":["とう"]}'
+      : '{"completedKana":"あしたのかいぎは10じです。","convertedText":"明日の会議は10時です。","additions":["の","は","です"]}',
+    level === "word"
+      ? '{"completedKana":"あした。","convertedText":"明日。","additions":[]}'
+      : '{"completedKana":"しょるいをかくにんします。","convertedText":"書類を確認します。","additions":["を","します"]}',
+  ].filter(Boolean).join("\n");
+}
+
 export function buildKanaRepairSystemPrompt(): string {
   return [
     "You repair only the uncertain kana fragment in a mechanical romaji-to-kana conversion.",

@@ -9,6 +9,7 @@ import {
 } from "./ollama";
 import {
   buildKanaKanjiSystemPrompt,
+  buildSuggestionConversionSystemPrompt,
   defaultConversionPrompt,
 } from "./prompts";
 import { defaultSettings } from "./settings";
@@ -406,13 +407,16 @@ describe("convertRomajiToJapanese", () => {
     expect(request.system).not.toContain("api");
   });
 
-  it("completes an unfinished final word before kana-kanji conversion", async () => {
+  it("completes an unfinished final word and converts it in one model call", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "ありがとう。" })
-        .mockResolvedValueOnce({ response: "ありがとう。" }),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "ありがとう。",
+          convertedText: "ありがとう。",
+          additions: ["とう"],
+        }),
+      }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -428,8 +432,8 @@ describe("convertRomajiToJapanese", () => {
       inputCompletionSourceKana: "ありが。",
       inputCompletionAdditions: ["とう"],
     });
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      1,
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
@@ -439,22 +443,18 @@ describe("convertRomajiToJapanese", () => {
       }),
       30_000,
     );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({ prompt: "ありがとう。" }),
-      30_000,
-    );
   });
 
-  it("falls back to faithful conversion when word completion rewrites the input", async () => {
+  it("discards a structured suggestion that rewrites the input without another call", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "どうもありがとう。" })
-        .mockResolvedValueOnce({ response: "ありが。" }),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "どうもありがとう。",
+          convertedText: "どうもありがとう。",
+          additions: ["どうも", "とう"],
+        }),
+      }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -464,16 +464,136 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toEqual({
-      text: "ありが。",
+      text: "",
       reviewKana: "ありが。",
+      suggestionRejected: true,
     });
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({ prompt: "ありが。" }),
-      30_000,
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("recomputes additions instead of trusting a mismatched model declaration", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "ありがとう。",
+          convertedText: "ありがとう。",
+          additions: [],
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ariga.",
+      { ...defaultSettings, inputCompletionLevel: "word" },
+      transport,
     );
+
+    expect(result).toEqual({
+      text: "ありがとう。",
+      reviewKana: "ありがとう。",
+      inputCompletionApplied: true,
+      inputCompletionSourceKana: "ありが。",
+      inputCompletionAdditions: ["とう"],
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a concise sentence suggestion while preserving the original kana in order", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "あしたのかいぎは10じです。",
+          convertedText: "明日の会議は10時です。",
+          additions: ["の", "は", "です"],
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ashita kaigi 10ji.",
+      { ...defaultSettings, inputCompletionLevel: "sentence" },
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "明日の会議は10時です。",
+      reviewKana: "あしたのかいぎは10じです。",
+      inputCompletionApplied: true,
+      inputCompletionSourceKana: "あした かいぎ 10じ。",
+      inputCompletionAdditions: ["の", "は", "です"],
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a no-addition conversion in suggestion mode with one call", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "あした。",
+          convertedText: "明日。",
+          additions: [],
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ashita.",
+      { ...defaultSettings, inputCompletionLevel: "word" },
+      transport,
+    );
+
+    expect(result).toEqual({ text: "明日。", reviewKana: "あした。" });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts an omitted additions field as no declared difference", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "あなたはだれですか。",
+          convertedText: "あなたは誰ですか。",
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "anatahadaredesuka.",
+      { ...defaultSettings, inputCompletionLevel: "sentence" },
+      transport,
+    );
+
+    expect(result).toEqual({ text: "あなたは誰ですか。", reviewKana: "あなたはだれですか。" });
+  });
+
+  it("reports safe visible additions even when the model leaves completedKana unchanged", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "しょるい かくにん。",
+          convertedText: "書類を確認。",
+          additions: ["を"],
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "shorui kakunin.",
+      { ...defaultSettings, inputCompletionLevel: "sentence" },
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "書類を確認。",
+      reviewKana: "しょるい かくにん。",
+      inputCompletionApplied: true,
+      inputCompletionSourceKana: "しょるい かくにん。",
+      inputCompletionAdditions: ["を"],
+    });
   });
 
   it("runs input completion only for the final convertible segment", async () => {
@@ -482,8 +602,13 @@ describe("convertRomajiToJapanese", () => {
       generate: vi
         .fn()
         .mockResolvedValueOnce({ response: "ありが" })
-        .mockResolvedValueOnce({ response: "かくにん。" })
-        .mockResolvedValueOnce({ response: "確認。" }),
+        .mockResolvedValueOnce({
+          response: JSON.stringify({
+            completedKana: "かくにんします。",
+            convertedText: "確認します。",
+            additions: ["します"],
+          }),
+        }),
     };
 
     await convertRomajiToJapaneseDetailed(
@@ -504,14 +629,15 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    const completionCalls = transport.generate.mock.calls.filter((call) =>
-      String(call[2].system).includes("restore omitted kana"),
+    const suggestionCalls = transport.generate.mock.calls.filter((call) =>
+      String(call[2].system).includes("one Japanese writing suggestion"),
     );
-    expect(completionCalls).toHaveLength(1);
-    expect(completionCalls[0]?.[2].prompt).toContain(
+    expect(suggestionCalls).toHaveLength(1);
+    expect(suggestionCalls[0]?.[2].prompt).toContain(
       "Read-only context before the target:\nありが OpenAI",
     );
-    expect(completionCalls[0]?.[2].prompt).toContain("Original romaji input:\n kakuni。");
+    expect(suggestionCalls[0]?.[2].prompt).toContain("Original romaji input:\n kakuni。");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
   });
 
   it("does not complete a segment that is followed by a protected term", async () => {
@@ -527,7 +653,7 @@ describe("convertRomajiToJapanese", () => {
     );
 
     const completionCalls = transport.generate.mock.calls.filter((call) =>
-      String(call[2].system).includes("restore omitted kana"),
+      String(call[2].system).includes("one Japanese writing suggestion"),
     );
     expect(completionCalls).toHaveLength(0);
   });
@@ -564,12 +690,14 @@ describe("convertRomajiToJapanese", () => {
         "あしたはとうきょうでかいぎ",
         "sentence",
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isAllowedInputCompletion("あした かいぎ", "# あしたのかいぎです", "sentence"),
     ).toBe(false);
+    expect(isAllowedInputCompletion("あした", "あしたねこ", "sentence")).toBe(true);
+    expect(isAllowedInputCompletion("あしたかいぎ", "かいぎあした", "sentence")).toBe(false);
     expect(
-      isAllowedInputCompletion("あした", "あしたねこ", "sentence"),
+      isAllowedInputCompletion("あした", `あした${"ながい".repeat(20)}`, "sentence"),
     ).toBe(false);
   });
 
@@ -1043,5 +1171,25 @@ describe("collectInputCompletionAdditions", () => {
         "あしたのかいぎは10じです。",
       ),
     ).toEqual(["の", "は", "です"]);
+  });
+});
+
+describe("buildSuggestionConversionSystemPrompt", () => {
+  it("combines suggestion, conversion, difference, and vocabulary instructions", () => {
+    const prompt = buildSuggestionConversionSystemPrompt(
+      "sentence",
+      defaultConversionPrompt,
+      ["前回の候補"],
+      ["要件定義"],
+    );
+
+    expect(prompt).toContain("Return exactly one JSON object");
+    expect(prompt).toContain('"completedKana"');
+    expect(prompt).toContain('"convertedText"');
+    expect(prompt).toContain('"additions"');
+    expect(prompt).toContain("Act as a writing suggestion");
+    expect(prompt).toContain("- 前回の候補");
+    expect(prompt).toContain('- "要件定義"');
+    expect(prompt).toContain("Additional user preference for convertedText only");
   });
 });

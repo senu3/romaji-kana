@@ -475,6 +475,11 @@ try {
   await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
   await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
   assert.equal(
+    conversionRequestCount,
+    1,
+    "Word suggestion should complete and convert in one model request.",
+  );
+  assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
     "ariga.",
     "Input completion should stay as a ghost candidate even when direct replacement is selected.",
@@ -487,12 +492,10 @@ try {
       vocabularySystem.includes('- "ローカルモデル"'),
     "Kana-kanji conversion should receive the queued document vocabulary snapshot.",
   );
-  const completionSystem = conversionSystems.find((system) =>
-    system.includes("Complete only an unfinished final Japanese word."),
-  );
   assert.ok(
-    completionSystem && !completionSystem.includes("Document vocabulary reference:"),
-    "Document vocabulary must not influence the input-completion layer.",
+    vocabularySystem?.includes("Complete only an unfinished final Japanese word.") &&
+      vocabularySystem.includes("Return exactly one JSON object"),
+    "One structured request should contain both completion and conversion instructions.",
   );
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
@@ -749,6 +752,28 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (system.includes("one Japanese writing suggestion")) {
+    if (prompt?.includes("Mechanical kana:\nありが。")) {
+      const convertedText = system.includes("- ありがとう。") ? "有難う。" : "ありがとう。";
+      return JSON.stringify({
+        completedKana: "ありがとう。",
+        convertedText,
+        additions: ["とう"],
+      });
+    }
+    if (prompt?.includes("Mechanical kana:\nあした")) {
+      return JSON.stringify({
+        completedKana: "あした",
+        convertedText: "明日",
+        additions: [],
+      });
+    }
+    return JSON.stringify({
+      completedKana: prompt?.split("Mechanical kana:\n")[1]?.trim() ?? "",
+      convertedText: "あなたは誰ですか。",
+      additions: [],
+    });
+  }
   if (prompt?.trim() === "あしたかいぎのて") {
     return "明日会議の手";
   }

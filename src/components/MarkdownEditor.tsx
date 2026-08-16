@@ -141,7 +141,7 @@ class GhostTextWidget extends WidgetType {
   constructor(
     private readonly text: string,
     private readonly conversionStrategy: GhostConversionSuggestion["conversionStrategy"],
-    private readonly inputCompletionApplied: boolean,
+    private readonly inputCompletionLevel: GhostConversionSuggestion["inputCompletionLevel"],
     private readonly inputCompletionAdditions: string[],
   ) {
     super();
@@ -151,8 +151,10 @@ class GhostTextWidget extends WidgetType {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
     element.title =
-      this.inputCompletionApplied
-        ? "入力補完候補。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+      this.inputCompletionLevel === "word"
+        ? "単語サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+        : this.inputCompletionLevel === "sentence"
+        ? "文章サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
         : this.conversionStrategy === "completion"
         ? "補完変換候補。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
         : "Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
@@ -164,8 +166,10 @@ class GhostTextWidget extends WidgetType {
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
     hint.textContent =
-      this.inputCompletionApplied
-        ? "入力補完  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
+      this.inputCompletionLevel === "word"
+        ? "単語サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
+        : this.inputCompletionLevel === "sentence"
+        ? "文章サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
         : this.conversionStrategy === "completion"
         ? "補完変換  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
         : "Tab/句読点で確定  Ctrl/Cmd+/で別候補";
@@ -249,7 +253,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
       widget: new GhostTextWidget(
         suggestion.convertedText,
         suggestion.conversionStrategy,
-        Boolean(suggestion.inputCompletionApplied),
+        suggestion.inputCompletionLevel,
         suggestion.inputCompletionAdditions ?? [],
       ),
       side: 1,

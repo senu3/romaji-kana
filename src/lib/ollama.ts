@@ -1,9 +1,9 @@
 import type { AppSettings } from "./types";
 import { normalizeInputForPrompt } from "./conversion";
 import {
-  buildInputCompletionSystemPrompt,
   buildKanaKanjiSystemPrompt,
   buildKanaRepairSystemPrompt,
+  buildSuggestionConversionSystemPrompt,
 } from "./prompts";
 import {
   defaultOllamaTransport,
@@ -46,53 +46,8 @@ interface DictionaryCandidate {
 
 const MAX_ALTERNATIVE_CONVERSION_ATTEMPTS = 2;
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
-const ALLOWED_SENTENCE_INSERTIONS = new Set([
-  "は",
-  "が",
-  "を",
-  "に",
-  "で",
-  "と",
-  "も",
-  "の",
-  "へ",
-  "や",
-  "か",
-  "ね",
-  "よ",
-  "から",
-  "まで",
-  "より",
-  "ので",
-  "のに",
-  "なら",
-  "では",
-  "には",
-  "とは",
-  "です",
-  "でした",
-  "でしょう",
-  "ます",
-  "ました",
-  "ません",
-  "ましょう",
-  "する",
-  "します",
-  "した",
-  "しました",
-  "しない",
-  "しません",
-  "だ",
-  "だった",
-  "ではない",
-  "。",
-  "、",
-  "！",
-  "？",
-  "!",
-  "?",
-]);
-const SAFE_SENTENCE_WORD_COMPLETIONS: ReadonlyArray<readonly [string, string]> = [
+const PROTECTED_SUGGESTION_SYNTAX = ["#", "`", "[", "]", "{", "}", "<", ">"] as const;
+const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
   ["おはよ", "おはよう"],
   ["こんにち", "こんにちは"],
@@ -113,6 +68,13 @@ export interface JapaneseConversionResult {
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
+  suggestionRejected?: boolean;
+}
+
+interface StructuredSuggestionConversion {
+  completedKana: string;
+  convertedText: string;
+  additions: string[];
 }
 
 export interface JapaneseConversionOptions {
@@ -195,6 +157,7 @@ async function convertRomajiToJapaneseDetailedOnce(
   const convertedParts: string[] = [];
   const reviewKanaParts: string[] = [];
   const inputCompletionSourceParts: string[] = [];
+  const inputCompletionAdditions: string[] = [];
   let inputCompletionApplied = false;
   let finalMeaningfulPartIndex = -1;
   parts.forEach((part, index) => {
@@ -226,26 +189,48 @@ async function convertRomajiToJapaneseDetailedOnce(
     }
 
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
+    const suggestionLevel =
+      partIndex === inputCompletionPartIndex ? settings.inputCompletionLevel : "none";
+    if (suggestionLevel !== "none") {
+      const completionSeed = suggestionLevel === "word"
+        ? knownWordCompletionSeed(kanaResult.kana)
+        : kanaResult.kana;
+      const suggestion = await generateStructuredSuggestion(
+        part.value,
+        kanaResult.kana,
+        completionSeed,
+        suggestionLevel,
+        inputCompletionSourceParts.join(""),
+        settings,
+        transport,
+        options,
+      );
+      if (!suggestion) {
+        return {
+          text: "",
+          reviewKana: [...reviewKanaParts, kanaResult.kana].join(""),
+          suggestionRejected: true,
+        };
+      }
+      inputCompletionSourceParts.push(kanaResult.kana);
+      reviewKanaParts.push(suggestion.completedKana);
+      inputCompletionAdditions.push(...suggestion.additions);
+      inputCompletionApplied ||=
+        suggestion.completedKana !== kanaResult.kana || suggestion.additions.length > 0;
+      convertedParts.push(suggestion.convertedText);
+      continue;
+    }
+
     const repaired = await repairLowConfidenceKana(
       kanaResult,
       settings,
       transport,
       options.signal,
     );
-    const completedKana = await completeKanaInput(
-      part.value,
-      repaired.kana,
-      partIndex === inputCompletionPartIndex ? settings.inputCompletionLevel : "none",
-      inputCompletionSourceParts.join(""),
-      settings,
-      transport,
-      options.signal,
-    );
     inputCompletionSourceParts.push(repaired.kana);
-    reviewKanaParts.push(completedKana);
-    inputCompletionApplied ||= completedKana !== repaired.kana;
+    reviewKanaParts.push(repaired.kana);
     convertedParts.push(
-      await kanjiizeKana(completedKana, settings, transport, {
+      await kanjiizeKana(repaired.kana, settings, transport, {
         ...options,
         completionSourceRomaji: options.completionMode
           ? part.value
@@ -262,33 +247,34 @@ async function convertRomajiToJapaneseDetailedOnce(
     const inputCompletionSourceKana = inputCompletionSourceParts.join("");
     result.inputCompletionApplied = true;
     result.inputCompletionSourceKana = inputCompletionSourceKana;
-    result.inputCompletionAdditions = collectInputCompletionAdditions(
-      inputCompletionSourceKana,
-      result.reviewKana,
-    );
+    result.inputCompletionAdditions = inputCompletionAdditions.length > 0
+      ? inputCompletionAdditions
+      : collectInputCompletionAdditions(inputCompletionSourceKana, result.reviewKana);
   }
   return result;
 }
 
-async function completeKanaInput(
+async function generateStructuredSuggestion(
   originalRomaji: string,
   mechanicalKana: string,
-  level: InputCompletionLevel,
+  completionSeed: string,
+  level: Exclude<InputCompletionLevel, "none">,
   contextBefore: string,
   settings: AppSettings,
   transport: OllamaTransport,
-  signal?: AbortSignal,
-): Promise<string> {
-  if (level === "none" || !mechanicalKana.trim()) {
-    return mechanicalKana;
-  }
-
+  options: JapaneseConversionOptions,
+): Promise<StructuredSuggestionConversion | null> {
   const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildInputCompletionSystemPrompt(level),
+      system: buildSuggestionConversionSystemPrompt(
+        level,
+        settings.conversionPrompt,
+        options.avoidOutputs,
+        options.documentVocabulary,
+      ),
       prompt: [
         "Read-only context before the target:",
         contextBefore.trim() || "(none)",
@@ -298,21 +284,33 @@ async function completeKanaInput(
         "",
         "Mechanical kana:",
         mechanicalKana,
+        "",
+        "Application completion seed:",
+        completionSeed,
       ].join("\n"),
       stream: false,
       think: settings.think,
       options: {
-        temperature: level === "word" ? 0.05 : 0.15,
+        temperature: level === "word" ? 0.05 : 0.2,
       },
       keep_alive: "5m",
     },
     30_000,
-  ), signal);
+  ), options.signal);
 
-  const candidate = cleanCompletionText(generatedText(result));
-  return isAllowedInputCompletion(mechanicalKana, candidate, level)
-    ? candidate
-    : mechanicalKana;
+  const candidate = parseStructuredSuggestion(generatedText(result));
+  if (!candidate || !isAllowedStructuredSuggestion(mechanicalKana, candidate, level, options)) {
+    return null;
+  }
+  return {
+    ...candidate,
+    additions: reportedSuggestionAdditions(
+      mechanicalKana,
+      completionSeed,
+      candidate,
+      level,
+    ),
+  };
 }
 
 export function isAllowedInputCompletion(
@@ -338,38 +336,24 @@ export function isAllowedInputCompletion(
       sourceParts.punctuation === candidateParts.punctuation &&
       candidateParts.body.startsWith(sourceParts.body) &&
       addedLength > 0 &&
-      addedLength <= 4
+      addedLength <= 6
     );
   }
 
   const sourceCharacters = comparableCharacters(normalizedSource);
   const candidateCharacters = comparableCharacters(normalizedCandidate);
   const addedLength = candidateCharacters.length - sourceCharacters.length;
-  const maximumAddedLength = Math.max(12, Math.ceil(sourceCharacters.length * 0.75));
+  const maximumAddedLength = Math.max(24, Math.ceil(sourceCharacters.length * 1.25));
   if (
     addedLength <= 0 ||
     addedLength > maximumAddedLength ||
-    !isSubsequence(sourceCharacters, candidateCharacters)
+    !isSubsequence(sourceCharacters, candidateCharacters) ||
+    !preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate)
   ) {
     return false;
   }
 
-  if (isSafeSentenceWordCompletion(normalizedSource, normalizedCandidate)) {
-    return true;
-  }
-
-  const insertedSpans = collectInsertedSpans(sourceCharacters, candidateCharacters);
-  return (
-    insertedSpans.length > 0 &&
-    insertedSpans.every(isAllowedSentenceInsertionSequence)
-  );
-}
-
-function cleanCompletionText(text: string): string {
-  return stripThinkBlock(text)
-    .trim()
-    .replace(/^["'「『]|["'」』]$/g, "")
-    .trim();
+  return true;
 }
 
 function splitTerminalPunctuation(value: string): { body: string; punctuation: string } {
@@ -378,24 +362,6 @@ function splitTerminalPunctuation(value: string): { body: string; punctuation: s
     body: match?.[1] ?? value,
     punctuation: match?.[2] ?? "",
   };
-}
-
-function isSafeSentenceWordCompletion(source: string, candidate: string): boolean {
-  const sourceParts = splitTerminalPunctuation(source);
-  const candidateParts = splitTerminalPunctuation(candidate);
-  if (sourceParts.punctuation !== candidateParts.punctuation) {
-    return false;
-  }
-
-  return SAFE_SENTENCE_WORD_COMPLETIONS.some(([partial, completed]) => {
-    if (!sourceParts.body.endsWith(partial)) {
-      return false;
-    }
-    return (
-      candidateParts.body ===
-      `${sourceParts.body.slice(0, -partial.length)}${completed}`
-    );
-  });
 }
 
 function preservesProtectedAsciiTokens(source: string, candidate: string): boolean {
@@ -454,19 +420,135 @@ export function collectInputCompletionAdditions(
   );
 }
 
-function isAllowedSentenceInsertionSequence(insertion: string): boolean {
-  const reachable = new Set([0]);
-  for (let index = 0; index < insertion.length; index += 1) {
-    if (!reachable.has(index)) {
-      continue;
+function parseStructuredSuggestion(text: string): StructuredSuggestionConversion | null {
+  const cleaned = stripThinkBlock(text).trim().replace(/^```(?:json)?\s*|\s*```$/gi, "");
+  const objectStart = cleaned.indexOf("{");
+  const objectEnd = cleaned.lastIndexOf("}");
+  if (objectStart === -1 || objectEnd < objectStart) {
+    return null;
+  }
+
+  try {
+    const value = JSON.parse(cleaned.slice(objectStart, objectEnd + 1)) as Record<string, unknown>;
+    if (
+      typeof value.completedKana !== "string" ||
+      typeof value.convertedText !== "string" ||
+      (value.additions !== undefined &&
+        (!Array.isArray(value.additions) ||
+          !value.additions.every((addition) => typeof addition === "string")))
+    ) {
+      return null;
     }
-    for (const token of ALLOWED_SENTENCE_INSERTIONS) {
-      if (insertion.startsWith(token, index)) {
-        reachable.add(index + token.length);
-      }
+    return {
+      completedKana: value.completedKana.trim(),
+      convertedText: value.convertedText.trim(),
+      additions: (value.additions ?? [])
+        .map((addition) => String(addition).trim())
+        .filter(Boolean),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedStructuredSuggestion(
+  mechanicalKana: string,
+  candidate: StructuredSuggestionConversion,
+  level: Exclude<InputCompletionLevel, "none">,
+  options: JapaneseConversionOptions,
+): boolean {
+  if (!candidate.completedKana || !candidate.convertedText) {
+    return false;
+  }
+  if (!isAllowedInputCompletion(mechanicalKana, candidate.completedKana, level)) {
+    return false;
+  }
+
+  if (!preservesProtectedAsciiTokens(candidate.completedKana, candidate.convertedText)) {
+    return false;
+  }
+  if (!preservesProtectedSuggestionSyntax(candidate.completedKana, candidate.convertedText)) {
+    return false;
+  }
+  if (/\p{Cc}/u.test(candidate.convertedText)) {
+    return false;
+  }
+
+  const kanaLength = comparableCharacters(candidate.completedKana).length;
+  const convertedLength = comparableCharacters(candidate.convertedText).length;
+  if (
+    convertedLength < Math.max(1, Math.ceil(kanaLength * 0.2)) ||
+    convertedLength > Math.max(24, kanaLength * 2)
+  ) {
+    return false;
+  }
+  return !isAvoidedConversionOutput(candidate.convertedText, options.avoidOutputs);
+}
+
+function preservesProtectedSuggestionSyntax(source: string, candidate: string): boolean {
+  return PROTECTED_SUGGESTION_SYNTAX.every(
+    (character) => countCharacter(source, character) === countCharacter(candidate, character),
+  );
+}
+
+function countCharacter(value: string, target: string): number {
+  return Array.from(value).filter((character) => character === target).length;
+}
+
+function reportedSuggestionAdditions(
+  mechanicalKana: string,
+  completionSeed: string,
+  candidate: StructuredSuggestionConversion,
+  level: Exclude<InputCompletionLevel, "none">,
+): string[] {
+  const computed = collectInputCompletionAdditions(mechanicalKana, candidate.completedKana);
+  if (computed.length > 0) {
+    return computed;
+  }
+
+  if (level === "word" && completionSeed !== mechanicalKana) {
+    const seeded = collectInputCompletionAdditions(mechanicalKana, completionSeed);
+    if (additionsAppearInOrder(candidate.convertedText, seeded)) {
+      return seeded;
     }
   }
-  return reachable.has(insertion.length);
+
+  const declared = candidate.additions.filter(
+    (addition) => addition && /^[\p{Script=Hiragana}ー。、！？!?]+$/u.test(addition),
+  );
+  if (declared.length !== candidate.additions.length) {
+    return [];
+  }
+  const totalLength = declared.reduce((sum, addition) => sum + Array.from(addition).length, 0);
+  const sourceLength = comparableCharacters(mechanicalKana).length;
+  const maximumLength = level === "word" ? 6 : Math.max(24, Math.ceil(sourceLength * 1.25));
+  if (totalLength === 0 || totalLength > maximumLength) {
+    return [];
+  }
+
+  return additionsAppearInOrder(candidate.convertedText, declared) ? declared : [];
+}
+
+function additionsAppearInOrder(convertedText: string, additions: string[]): boolean {
+  let searchFrom = 0;
+  for (const addition of additions) {
+    const index = convertedText.indexOf(addition, searchFrom);
+    if (index === -1) {
+      return false;
+    }
+    searchFrom = index + addition.length;
+  }
+  return true;
+}
+
+function knownWordCompletionSeed(source: string): string {
+  const parts = splitTerminalPunctuation(source);
+  for (const [partial, completed] of SAFE_WORD_COMPLETION_SEEDS) {
+    if (parts.body.endsWith(partial)) {
+      return `${parts.body.slice(0, -partial.length)}${completed}${parts.punctuation}`;
+    }
+  }
+  return source;
 }
 
 function isAvoidedConversionOutput(output: string, avoidOutputs: string[] | undefined): boolean {

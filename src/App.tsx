@@ -1259,6 +1259,15 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         return;
       }
 
+      if (conversion.suggestionRejected) {
+        view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+        skipQueuedConversion(
+          request,
+          "候補が入力から大きく離れたため表示しませんでした。入力を続けると新しい候補を生成します。",
+        );
+        return;
+      }
+
       const currentView = editorViewRef.current;
       if (!currentView) {
         skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
@@ -1283,6 +1292,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       const converted = conversion.text;
       if (
         settingsRef.current.conversionMode === "ghost" ||
+        inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
@@ -1313,8 +1323,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         });
         setStatus({
           kind: "success",
-          message: conversion.inputCompletionApplied
-            ? "入力補完候補を生成しました。Tab で確定、Esc で破棄できます。"
+          message: inputCompletionLevel !== "none"
+            ? "サジェストを生成しました。Tab で確定、Esc で破棄できます。"
             : conversion.conversionStrategy === "completion"
               ? "補完変換候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
               : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。",
@@ -1409,6 +1419,14 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         return;
       }
 
+      if (conversion.suggestionRejected) {
+        skipQueuedConversion(
+          request,
+          "候補が入力から大きく離れたため、履歴からのサジェストを表示しませんでした。",
+        );
+        return;
+      }
+
       const converted = conversion.text;
       const latestView = editorViewRef.current;
       if (!latestView || !request.anchor || !resolved) {
@@ -1459,6 +1477,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
       if (
         settingsRef.current.conversionMode === "ghost" ||
+        inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
@@ -1487,8 +1506,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         latestView.focus();
         setStatus({
           kind: "success",
-          message: conversion.inputCompletionApplied
-            ? "履歴から入力補完候補を生成しました。Tab で適用、Esc で破棄できます。"
+          message: inputCompletionLevel !== "none"
+            ? "履歴からサジェストを生成しました。Tab で適用、Esc で破棄できます。"
             : conversion.conversionStrategy === "completion"
               ? "履歴から補完変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
               : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。",
@@ -1956,6 +1975,16 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           request.range.to,
         );
         if (!currentView || currentSource !== request.range.text) {
+          return;
+        }
+
+        if (conversion.suggestionRejected) {
+          displayedSuggestionRevisionRef.current = request.revision;
+          currentView.dispatch({ effects: clearGhostSuggestion.of(null) });
+          setStatus({
+            kind: "warning",
+            message: "候補が入力から大きく離れたため表示しませんでした。入力を続けると再生成します。",
+          });
           return;
         }
 

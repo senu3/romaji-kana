@@ -278,7 +278,7 @@ export function ConversionPanel({
         <fieldset className="input-completion-options">
           <legend>入力補完</legend>
           <p className="input-completion-intro">
-            入力にない文字を、どこまでAIに補わせるかを選びます。
+            読みを保つ変換と、書き進めるサジェストを切り替えます。
           </p>
           <div
             className="segmented-control input-completion-levels"
@@ -304,7 +304,7 @@ export function ConversionPanel({
           </div>
           {settings.inputCompletionLevel !== "none" ? (
             <p className="input-completion-safety">
-              補完が発生した場合は、直接置換でも候補として表示します。
+              単語・文章は直接置換せず、確認できるサジェストとして表示します。
             </p>
           ) : null}
         </fieldset>
@@ -394,10 +394,10 @@ function CheckRow({
 
 function inputCompletionDescription(level: InputCompletionLevel): string {
   if (level === "word") {
-    return "途中で切れた最後の単語だけを補います。";
+    return "途中で切れた最後の単語を補い、表記まで提案します。";
   }
   if (level === "sentence") {
-    return "助詞や文末を最小限補い、文章として整えます。";
+    return "入力を残しながら、自然な続きや文末まで提案します。";
   }
   return "入力の読みを変えず、そのまま変換します。";
 }
