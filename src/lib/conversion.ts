@@ -6,6 +6,9 @@ const URL_RE = /https?:\/\/[^\s)]+/g;
 export function triggerFromCharacter(
   character: string,
 ): Exclude<ConversionTrigger, "shortcut"> | null {
+  if (character === " ") {
+    return "space";
+  }
   if (character === ".") {
     return "period";
   }

@@ -112,6 +112,7 @@ export interface JapaneseConversionResult {
   conversionStrategy?: "completion";
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
+  inputCompletionAdditions?: string[];
 }
 
 export interface JapaneseConversionOptions {
@@ -122,6 +123,7 @@ export interface JapaneseConversionOptions {
   completionSourceRomaji?: string;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
   documentVocabulary?: string[];
+  signal?: AbortSignal;
 }
 
 export async function convertRomajiToJapanese(
@@ -139,6 +141,7 @@ export async function convertRomajiToJapaneseDetailed(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
+  throwIfConversionAborted(options.signal);
   const result = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, options);
   if (isUsableConversionResult(result, options)) {
     return result;
@@ -149,6 +152,7 @@ export async function convertRomajiToJapaneseDetailed(
   }
 
   for (let attempt = 1; attempt <= MAX_ALTERNATIVE_CONVERSION_ATTEMPTS; attempt += 1) {
+    throwIfConversionAborted(options.signal);
     const alternative = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
       ...options,
       strictAlternative: true,
@@ -182,6 +186,7 @@ async function convertRomajiToJapaneseDetailedOnce(
   transport: OllamaTransport,
   options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
+  throwIfConversionAborted(options.signal);
   const normalized = normalizeInputForPrompt(input, settings);
   const parts = splitInputForConversion(normalized, [
     ...(options.protectedDictionaryEntries ?? []),
@@ -205,6 +210,7 @@ async function convertRomajiToJapaneseDetailedOnce(
       : -1;
 
   for (const [partIndex, part] of parts.entries()) {
+    throwIfConversionAborted(options.signal);
     if (part.type === "dictionary" || part.type === "literal") {
       convertedParts.push(part.output);
       reviewKanaParts.push(part.output);
@@ -220,7 +226,12 @@ async function convertRomajiToJapaneseDetailedOnce(
     }
 
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
-    const repaired = await repairLowConfidenceKana(kanaResult, settings, transport);
+    const repaired = await repairLowConfidenceKana(
+      kanaResult,
+      settings,
+      transport,
+      options.signal,
+    );
     const completedKana = await completeKanaInput(
       part.value,
       repaired.kana,
@@ -228,6 +239,7 @@ async function convertRomajiToJapaneseDetailedOnce(
       inputCompletionSourceParts.join(""),
       settings,
       transport,
+      options.signal,
     );
     inputCompletionSourceParts.push(repaired.kana);
     reviewKanaParts.push(completedKana);
@@ -247,8 +259,13 @@ async function convertRomajiToJapaneseDetailedOnce(
     reviewKana: reviewKanaParts.join(""),
   };
   if (inputCompletionApplied) {
+    const inputCompletionSourceKana = inputCompletionSourceParts.join("");
     result.inputCompletionApplied = true;
-    result.inputCompletionSourceKana = inputCompletionSourceParts.join("");
+    result.inputCompletionSourceKana = inputCompletionSourceKana;
+    result.inputCompletionAdditions = collectInputCompletionAdditions(
+      inputCompletionSourceKana,
+      result.reviewKana,
+    );
   }
   return result;
 }
@@ -260,12 +277,13 @@ async function completeKanaInput(
   contextBefore: string,
   settings: AppSettings,
   transport: OllamaTransport,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (level === "none" || !mechanicalKana.trim()) {
     return mechanicalKana;
   }
 
-  const result = await transport.generate(
+  const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
@@ -289,7 +307,7 @@ async function completeKanaInput(
       keep_alive: "5m",
     },
     30_000,
-  );
+  ), signal);
 
   const candidate = cleanCompletionText(generatedText(result));
   return isAllowedInputCompletion(mechanicalKana, candidate, level)
@@ -426,6 +444,16 @@ function collectInsertedSpans(source: string[], candidate: string[]): string[] {
   return insertions;
 }
 
+export function collectInputCompletionAdditions(
+  source: string,
+  candidate: string,
+): string[] {
+  return collectInsertedSpans(
+    comparableCharacters(source),
+    comparableCharacters(candidate),
+  );
+}
+
 function isAllowedSentenceInsertionSequence(insertion: string): boolean {
   const reachable = new Set([0]);
   for (let index = 0; index < insertion.length; index += 1) {
@@ -475,6 +503,7 @@ export async function repairLowConfidenceKana(
   result: RomajiKanaResult,
   settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport,
+  signal?: AbortSignal,
 ): Promise<RomajiKanaResult> {
   if (result.lowConfidenceSpans.length === 0) {
     return result;
@@ -483,7 +512,14 @@ export async function repairLowConfidenceKana(
   let tokens = result.tokens;
 
   for (const span of result.lowConfidenceSpans) {
-    const repairedKana = await repairKanaSpan(span, result.kana, settings, transport);
+    throwIfConversionAborted(signal);
+    const repairedKana = await repairKanaSpan(
+      span,
+      result.kana,
+      settings,
+      transport,
+      signal,
+    );
     if (!repairedKana) {
       continue;
     }
@@ -500,7 +536,7 @@ export async function kanjiizeKana(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<string> {
-  const result = await transport.generate(
+  const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
@@ -522,7 +558,7 @@ export async function kanjiizeKana(
       keep_alive: "5m",
     },
     30_000,
-  );
+  ), options.signal);
 
   const rawText = generatedText(result);
   const text = stripThinkBlock(rawText).trim();
@@ -1015,8 +1051,9 @@ async function repairKanaSpan(
   mechanicalKana: string,
   settings: AppSettings,
   transport: OllamaTransport,
+  signal?: AbortSignal,
 ): Promise<string> {
-  const result = await transport.generate(
+  const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
@@ -1036,9 +1073,41 @@ async function repairKanaSpan(
       keep_alive: "5m",
     },
     30_000,
-  );
+  ), signal);
 
   return cleanKanaFragment(generatedText(result));
+}
+
+function throwIfConversionAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new DOMException("変換候補の生成を中止しました。", "AbortError");
+  }
+}
+
+function generateWithAbort<T>(
+  createPromise: () => Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<T> {
+  if (!signal) {
+    return createPromise();
+  }
+  throwIfConversionAborted(signal);
+  const promise = createPromise();
+
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new DOMException("変換候補の生成を中止しました。", "AbortError"));
+    signal.addEventListener("abort", abort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", abort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      },
+    );
+  });
 }
 
 function replaceSpanWithRepair(

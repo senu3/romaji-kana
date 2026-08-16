@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildProtectedDictionaryEntries,
+  collectInputCompletionAdditions,
   convertRomajiToJapanese,
   convertRomajiToJapaneseDetailed,
   isAllowedInputCompletion,
@@ -13,6 +14,24 @@ import {
 import { defaultSettings } from "./settings";
 
 describe("convertRomajiToJapanese", () => {
+  it("stops a stale suggestion when its abort signal is canceled", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn(() => new Promise<never>(() => undefined)),
+    };
+    const controller = new AbortController();
+    const conversion = convertRomajiToJapaneseDetailed(
+      "ashita ",
+      defaultSettings,
+      transport,
+      { signal: controller.signal },
+    );
+
+    controller.abort();
+
+    await expect(conversion).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("kanjiizes high-confidence mechanical kana without repair", async () => {
     const transport = {
       models: vi.fn(),
@@ -407,6 +426,7 @@ describe("convertRomajiToJapanese", () => {
       reviewKana: "ありがとう。",
       inputCompletionApplied: true,
       inputCompletionSourceKana: "ありが。",
+      inputCompletionAdditions: ["とう"],
     });
     expect(transport.generate).toHaveBeenNthCalledWith(
       1,
@@ -1013,4 +1033,15 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain('- "OpenAI"');
   });
 
+});
+
+describe("collectInputCompletionAdditions", () => {
+  it("reports each inserted kana span without counting existing punctuation", () => {
+    expect(
+      collectInputCompletionAdditions(
+        "あしたかいぎ10じ。",
+        "あしたのかいぎは10じです。",
+      ),
+    ).toEqual(["の", "は", "です"]);
+  });
 });

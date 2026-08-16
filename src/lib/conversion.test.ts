@@ -5,10 +5,21 @@ import {
   isInsideExcludedMarkdown,
   isJapaneseDominant,
   normalizeInputForPrompt,
+  triggerFromCharacter,
 } from "./conversion";
 import { defaultSettings } from "./settings";
 
 describe("extractConversionRange", () => {
+  it("extracts the current phrase including a space trigger", () => {
+    const doc = "ashita no yotei ";
+    expect(extractConversionRange(doc, doc.length, "space")).toEqual({
+      from: 0,
+      to: doc.length,
+      text: doc,
+      trigger: "space",
+    });
+  });
+
   it("skips punctuation-only input", () => {
     expect(extractConversionRange(".", 1, "period")).toBeNull();
   });
@@ -152,6 +163,12 @@ describe("extractConversionRange", () => {
   it("skips Japanese-dominant text", () => {
     const doc = "今日はいい天気です。";
     expect(extractConversionRange(doc, doc.length, "enter")).toBeNull();
+  });
+});
+
+describe("triggerFromCharacter", () => {
+  it("uses a typed space as a conversion suggestion trigger", () => {
+    expect(triggerFromCharacter(" ")).toBe("space");
   });
 });
 

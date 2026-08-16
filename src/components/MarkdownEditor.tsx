@@ -132,6 +132,7 @@ class GhostTextWidget extends WidgetType {
     private readonly text: string,
     private readonly conversionStrategy: GhostConversionSuggestion["conversionStrategy"],
     private readonly inputCompletionApplied: boolean,
+    private readonly inputCompletionAdditions: string[],
   ) {
     super();
   }
@@ -159,7 +160,23 @@ class GhostTextWidget extends WidgetType {
         ? "補完変換  Tabで確定  Ctrl/Cmd+/で別候補"
         : "Tabで確定  Ctrl/Cmd+/で別候補";
 
-    element.append(suggestion, hint);
+    element.append(suggestion);
+    if (this.inputCompletionAdditions.length > 0) {
+      const diff = document.createElement("span");
+      diff.className = "cm-ghost-text-diff";
+      const visibleAdditions = this.inputCompletionAdditions.slice(0, 3);
+      const additions = visibleAdditions
+        .map((addition) => `「${addition}」`)
+        .join("・");
+      const remainingCount = this.inputCompletionAdditions.length - visibleAdditions.length;
+      diff.textContent = `補完 +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
+      diff.setAttribute(
+        "aria-label",
+        `入力補完で追加: ${this.inputCompletionAdditions.join("、")}`,
+      );
+      element.append(diff);
+    }
+    element.append(hint);
     return element;
   }
 
@@ -176,11 +193,7 @@ export const ghostSuggestionField = StateField.define<GhostState>({
     let suggestion = value.suggestion;
 
     if (suggestion && transaction.docChanged) {
-      const from = transaction.changes.mapPos(suggestion.from, 1);
-      const to = transaction.changes.mapPos(suggestion.to, -1);
-      const mapped = { ...suggestion, from, to };
-      const currentText = transaction.state.doc.sliceString(from, to);
-      suggestion = currentText === mapped.originalText ? mapped : null;
+      suggestion = null;
     }
 
     for (const effect of transaction.effects) {
@@ -223,6 +236,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
         suggestion.convertedText,
         suggestion.conversionStrategy,
         Boolean(suggestion.inputCompletionApplied),
+        suggestion.inputCompletionAdditions ?? [],
       ),
       side: 1,
     }).range(suggestion.to),
@@ -280,15 +294,30 @@ const theme = EditorView.theme({
     borderRadius: "3px",
   },
   ".cm-ghost-text": {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
     color: "#0f766e",
     fontStyle: "italic",
     whiteSpace: "pre-wrap",
   },
   ".cm-ghost-text-suggestion": {
     opacity: "0.58",
+    marginRight: "8px",
+  },
+  ".cm-ghost-text-diff": {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "20px",
+    marginRight: "6px",
+    border: "1px solid #e2b45e",
+    borderRadius: "6px",
+    padding: "1px 6px",
+    backgroundColor: "#fff8e8",
+    color: "#7a4d0b",
+    fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
+    fontSize: "11px",
+    fontStyle: "normal",
+    fontWeight: "750",
+    verticalAlign: "middle",
+    whiteSpace: "nowrap",
   },
   ".cm-ghost-text-hint": {
     display: "inline-flex",

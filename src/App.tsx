@@ -253,7 +253,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     );
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
-    message: "準備完了。romaji を入力して句読点で確定するか、Ctrl+Enter を押してください。",
+    message: "準備完了。スペースで候補を確認するか、句読点または Ctrl+Enter で変換できます。",
   });
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorDocumentStatus>({
@@ -290,6 +290,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const conversionQueueRef = useRef<PendingConversion[]>([]);
   const processingQueueRef = useRef(false);
   const runningRequestIdRef = useRef<string | null>(null);
+  const latestSuggestionAbortRef = useRef<AbortController | null>(null);
   const suppressNextDirtyRef = useRef(false);
   const companionStatusRef = useRef(companionStatus);
   const companionRevisionRef = useRef(0);
@@ -343,6 +344,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   useEffect(() => {
     return () => {
+      latestSuggestionAbortRef.current?.abort();
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
@@ -392,6 +394,14 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, []);
 
   const handleDocumentChanged = useCallback((documentText: string) => {
+    if (latestSuggestionAbortRef.current) {
+      latestSuggestionAbortRef.current.abort();
+      latestSuggestionAbortRef.current = null;
+      setStatus({
+        kind: "idle",
+        message: "入力を続けています。次のスペースで最新候補を表示します。",
+      });
+    }
     docVersionRef.current += 1;
     if (suppressNextDirtyRef.current) {
       suppressNextDirtyRef.current = false;
@@ -1246,7 +1256,11 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       }
 
       const converted = conversion.text;
-      if (settingsRef.current.conversionMode === "ghost" || conversion.inputCompletionApplied) {
+      if (
+        settingsRef.current.conversionMode === "ghost" ||
+        conversion.inputCompletionApplied ||
+        request.range?.trigger === "space"
+      ) {
         currentView.dispatch({
           effects: [
             removeLoadingDecoration.of(request.id),
@@ -1262,6 +1276,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
               inputCompletionLevel,
               inputCompletionApplied: conversion.inputCompletionApplied,
               inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+              inputCompletionAdditions: conversion.inputCompletionAdditions,
+              trigger: request.range?.trigger,
               documentVocabulary: request.documentVocabulary,
               documentVocabularyRevision: request.documentVocabularyRevision,
               source: "editor",
@@ -1416,7 +1432,11 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         return;
       }
 
-      if (settingsRef.current.conversionMode === "ghost" || conversion.inputCompletionApplied) {
+      if (
+        settingsRef.current.conversionMode === "ghost" ||
+        conversion.inputCompletionApplied ||
+        request.range?.trigger === "space"
+      ) {
         latestView.dispatch({
           effects: showGhostSuggestion.of({
             id: request.id,
@@ -1430,6 +1450,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
             inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+            inputCompletionAdditions: conversion.inputCompletionAdditions,
+            trigger: request.range?.trigger,
             documentVocabulary: request.documentVocabulary,
             documentVocabularyRevision: request.documentVocabularyRevision,
             source: "history",
@@ -1688,6 +1710,14 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
       const request: PendingConversion = {
         id: createId("conversion"),
+        range: suggestion.trigger
+          ? {
+              from: suggestion.from,
+              to: suggestion.to,
+              text: suggestion.originalText,
+              trigger: suggestion.trigger,
+            }
+          : undefined,
         anchor: {
           from: suggestion.from,
           to: suggestion.to,
@@ -1869,10 +1899,109 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     setupComplete,
   ]);
 
+  const processLatestSpaceSuggestion = useCallback(async (range: ConversionRange) => {
+    const view = editorViewRef.current;
+    if (!view) {
+      return;
+    }
+
+    latestSuggestionAbortRef.current?.abort();
+    const controller = new AbortController();
+    latestSuggestionAbortRef.current = controller;
+    const requestId = createId("suggestion");
+    const requestDocVersion = docVersionRef.current;
+    const settingsSnapshot = {
+      ...settingsRef.current,
+      triggers: { ...settingsRef.current.triggers },
+      punctuationConversion: { ...settingsRef.current.punctuationConversion },
+      userDictionary: [...settingsRef.current.userDictionary],
+    };
+    const vocabularyProfile = settingsSnapshot.useDocumentVocabulary
+      ? buildDocumentVocabularyProfile(view.state.doc.toString())
+      : null;
+
+    setStatus({
+      kind: "loading",
+      message: `「${range.text.trim()}」の最新候補を生成しています`,
+    });
+
+    try {
+      const conversion = await convertRomajiToJapaneseDetailed(
+        range.text,
+        settingsSnapshot,
+        undefined,
+        {
+          documentVocabulary: vocabularyProfile?.terms,
+          signal: controller.signal,
+        },
+      );
+      if (
+        controller.signal.aborted ||
+        latestSuggestionAbortRef.current !== controller ||
+        docVersionRef.current !== requestDocVersion
+      ) {
+        return;
+      }
+
+      const currentView = editorViewRef.current;
+      if (
+        !currentView ||
+        currentView.state.doc.sliceString(range.from, range.to) !== range.text
+      ) {
+        return;
+      }
+
+      currentView.dispatch({
+        effects: showGhostSuggestion.of({
+          id: requestId,
+          from: range.from,
+          to: range.to,
+          originalText: range.text,
+          convertedText: conversion.text,
+          inputText: range.text,
+          reviewKana: conversion.reviewKana,
+          conversionStrategy: conversion.conversionStrategy,
+          inputCompletionLevel: settingsSnapshot.inputCompletionLevel,
+          inputCompletionApplied: conversion.inputCompletionApplied,
+          inputCompletionSourceKana: conversion.inputCompletionSourceKana,
+          inputCompletionAdditions: conversion.inputCompletionAdditions,
+          trigger: "space",
+          documentVocabulary: vocabularyProfile?.terms,
+          documentVocabularyRevision: vocabularyProfile?.revision,
+          source: "editor",
+        }),
+      });
+      setStatus({
+        kind: "success",
+        message: conversion.inputCompletionAdditions?.length
+          ? `補完差分 ${conversion.inputCompletionAdditions.map((text) => `+「${text}」`).join(" ")}。Tab で確定、Esc で破棄できます。`
+          : "最新の変換候補を表示しました。Tab で確定、Esc で破棄できます。",
+      });
+    } catch (error: unknown) {
+      if (
+        controller.signal.aborted ||
+        latestSuggestionAbortRef.current !== controller ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) {
+        return;
+      }
+      setStatus({ kind: "error", message: formatConversionError(error) });
+    } finally {
+      if (latestSuggestionAbortRef.current === controller) {
+        latestSuggestionAbortRef.current = null;
+      }
+    }
+  }, []);
+
   const handleConvert = useCallback((range: ConversionRange) => {
     const view = editorViewRef.current;
     if (!view) {
       return false;
+    }
+
+    if (range.trigger === "space") {
+      void processLatestSpaceSuggestion(range);
+      return true;
     }
 
     if (hasMatchingPendingEditorConversion(conversionQueueRef.current, range)) {
@@ -1915,7 +2044,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
     enqueueConversion(request);
     return true;
-  }, [enqueueConversion]);
+  }, [enqueueConversion, processLatestSpaceSuggestion]);
 
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
   const modelAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";

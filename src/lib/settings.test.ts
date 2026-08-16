@@ -17,6 +17,17 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
+  it("enables space suggestions for new and legacy settings", () => {
+    expect(loadSettings().triggers.space).toBe(true);
+
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ triggers: { period: false } }),
+    );
+    expect(loadSettings().triggers.space).toBe(true);
+    expect(loadSettings().triggers.period).toBe(false);
+  });
+
   it("drops removed homophone settings while preserving dictionary entries", () => {
     storage.set(
       "romaji-kana-settings",

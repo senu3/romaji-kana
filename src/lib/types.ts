@@ -1,4 +1,5 @@
 export type ConversionTrigger =
+  | "space"
   | "period"
   | "comma"
   | "enter"
@@ -23,6 +24,7 @@ export interface AppSettings {
   autoConvert: boolean;
   conversionMode: "replace" | "ghost";
   triggers: {
+    space: boolean;
     period: boolean;
     comma: boolean;
     enter: boolean;
@@ -114,6 +116,8 @@ export interface GhostConversionSuggestion {
   inputCompletionLevel?: InputCompletionLevel;
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
+  inputCompletionAdditions?: string[];
+  trigger?: ConversionTrigger;
   documentVocabulary?: string[];
   documentVocabularyRevision?: string;
   source: "editor" | "history";

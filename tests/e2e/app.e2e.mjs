@@ -64,7 +64,7 @@ try {
       conversionSystems.push(body.system ?? "");
       activeConversionRequests += 1;
       maxActiveConversionRequests = Math.max(maxActiveConversionRequests, activeConversionRequests);
-      if (body.prompt === "いち。") {
+      if (body.prompt === "いち。" || body.prompt?.trim() === "あした") {
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
     }
@@ -131,6 +131,11 @@ try {
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "変換タイミング" })
     .click();
+  assert.equal(
+    await page.getByLabel("スペースで候補を表示").isChecked(),
+    true,
+    "Space suggestions should be enabled by default.",
+  );
   await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
     await page.getByLabel("Enterで変換（IME 変換中は無視）").isChecked(),
@@ -155,6 +160,31 @@ try {
     "Model provider and conversion controls should share the same selected-state colors.",
   );
   await page.getByRole("button", { name: "モデル を閉じる" }).click();
+
+  conversionRequestCount = 0;
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ashita ");
+  await page.keyboard.type("no ");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日の" }).waitFor();
+  assert.equal(
+    await page.locator(".cm-ghost-source").textContent(),
+    "ashita no ",
+    "Only the newest space-triggered source should remain as a ghost.",
+  );
+  await page.keyboard.press("Tab");
+  await waitForEditorText(page, "明日の");
+  await page.waitForTimeout(400);
+  assert.equal(await editorText(page), "明日の", "A stale response must not replace the latest result.");
+  assert.equal(conversionRequestCount, 2, "Each typed space should refresh the latest suggestion.");
+
+  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
+  await page
+    .locator(".inspector-drawer .accordion-trigger")
+    .filter({ hasText: "変換タイミング" })
+    .click();
+  await page.getByLabel("スペースで候補を表示").uncheck();
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
@@ -330,7 +360,7 @@ try {
   await page.getByRole("button", { name: "変換を開く" }).click();
   await page.getByRole("region", { name: "変換設定" }).waitFor();
   assert.equal(await page.getByLabel("なし", { exact: true }).isChecked(), true);
-  await page.getByLabel("単語", { exact: true }).check();
+  await page.getByLabel("単語", { exact: true }).check({ force: true });
   await page.getByText("ariga → ありがとう", { exact: true }).waitFor();
   await page.waitForFunction(() => {
     const rawSettings = localStorage.getItem("romaji-kana-settings");
@@ -349,6 +379,7 @@ try {
   await page.keyboard.type("ariga.");
   const completionGhost = page.locator(".cm-ghost-text-suggestion");
   await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
   assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
     "ariga.",
@@ -396,7 +427,7 @@ try {
     .waitFor();
   await page.getByRole("button", { name: "履歴 を閉じる" }).click();
   await page.getByRole("button", { name: "変換を開く" }).click();
-  await page.getByLabel("なし", { exact: true }).check();
+  await page.getByLabel("なし", { exact: true }).check({ force: true });
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+End");
@@ -614,6 +645,12 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (prompt?.trim() === "あしたの") {
+    return "明日の";
+  }
+  if (prompt?.trim() === "あした") {
+    return "明日";
+  }
   if (
     system.includes("Complete only an unfinished final Japanese word.") &&
     prompt.includes("Mechanical kana:\nありが。")

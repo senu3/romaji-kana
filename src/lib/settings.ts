@@ -12,6 +12,7 @@ export const defaultSettings: AppSettings = {
   autoConvert: true,
   conversionMode: "replace",
   triggers: {
+    space: true,
     period: true,
     comma: true,
     enter: false,

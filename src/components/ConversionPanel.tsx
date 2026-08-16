@@ -91,6 +91,7 @@ export function ConversionPanel({
   };
 
   const enabledTriggerCount = [
+    settings.triggers.space,
     settings.triggers.period,
     settings.triggers.comma,
     settings.triggers.enter,
@@ -135,7 +136,7 @@ export function ConversionPanel({
 
         <AccordionSection
           title="変換タイミング"
-          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/3 条件` : "手動のみ"}
+          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/4 条件` : "手動のみ"}
           open={openAccordions.triggers}
           onToggle={() => toggleAccordion("triggers")}
         >
@@ -145,6 +146,12 @@ export function ConversionPanel({
             onChange={(checked) => update({ autoConvert: checked })}
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
+            <CheckRow
+              label="スペースで候補を表示"
+              checked={settings.triggers.space}
+              disabled={!settings.autoConvert}
+              onChange={(checked) => updateTriggers({ space: checked })}
+            />
             <CheckRow
               label="ピリオドで変換"
               checked={settings.triggers.period}
