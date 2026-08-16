@@ -104,6 +104,15 @@ try {
   const inputCompletionSegment = inputCompletionGroup.locator("label.selected");
   const expectedSegmentVisual = await selectedSegmentVisual(applyMethodSegment);
   assert.deepEqual(
+    await page
+      .locator(".conversion-result-settings, .input-completion-options")
+      .evaluateAll((sections) =>
+        sections.map((section) => getComputedStyle(section).borderBottomWidth),
+      ),
+    ["0px", "0px"],
+    "Conversion panel sections should use spacing instead of stray horizontal rules.",
+  );
+  assert.deepEqual(
     await selectedSegmentVisual(inputCompletionSegment),
     expectedSegmentVisual,
     "Apply method and input completion should share the same selected-state colors.",

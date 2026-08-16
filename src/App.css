@@ -2152,13 +2152,8 @@ h3 {
 
 .conversion-panel-content {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 16px;
-}
-
-.conversion-result-settings {
-  border-bottom: 1px solid #d5e8e5;
-  padding-bottom: 15px;
 }
 
 .input-completion-options {
@@ -2166,8 +2161,7 @@ h3 {
   gap: 10px;
   margin: 0;
   border: 0;
-  padding: 0 0 15px;
-  border-bottom: 1px solid #d5e8e5;
+  padding: 0;
 }
 
 .input-completion-options legend {
