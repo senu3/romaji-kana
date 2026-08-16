@@ -1309,7 +1309,7 @@ h3 {
 }
 
 .segmented-control button {
-  min-height: 34px;
+  min-height: 38px;
   border: 0;
   background: transparent;
   color: #0f766e;
@@ -1320,7 +1320,7 @@ h3 {
 .segmented-control label {
   position: relative;
   display: inline-flex;
-  min-height: 34px;
+  min-height: 38px;
   align-items: center;
   justify-content: center;
   color: #0f766e;
@@ -1341,14 +1341,19 @@ h3 {
 }
 
 .segmented-control button:hover,
-.segmented-control button.selected,
-.segmented-control label:hover,
-.segmented-control label.selected {
+.segmented-control label:hover {
   background: #ecfeff;
   color: #115e59;
 }
 
+.segmented-control button.selected,
+.segmented-control label.selected {
+  background: var(--accent);
+  color: var(--surface);
+}
+
 .segmented-control label:has(input:focus-visible) {
+  z-index: 1;
   outline: 3px solid #5eead4;
   outline-offset: -3px;
 }
@@ -2181,50 +2186,7 @@ h3 {
 }
 
 .input-completion-levels {
-  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid #b9d8d3;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.input-completion-levels label {
-  position: relative;
-  display: grid;
-  min-height: 38px;
-  place-items: center;
-  border-right: 1px solid #d5e8e5;
-  color: #385b57;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.input-completion-levels label:last-child {
-  border-right: 0;
-}
-
-.input-completion-levels label:hover {
-  background: #f3fbf9;
-}
-
-.input-completion-levels label.selected {
-  background: #0f766e;
-  color: #ffffff;
-}
-
-.input-completion-levels input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.input-completion-levels label:has(input:focus-visible) {
-  z-index: 1;
-  outline: 3px solid #5eead4;
-  outline-offset: -3px;
 }
 
 .input-completion-preview {
@@ -2702,10 +2664,8 @@ h3 {
   color: var(--accent);
 }
 
-.segmented-control button:hover,
-.segmented-control button.selected,
-.segmented-control label:hover,
-.segmented-control label.selected,
+.segmented-control button:hover:not(.selected),
+.segmented-control label:hover:not(.selected),
 .shortcut-recorder:hover,
 .shortcut-reset:hover,
 .secondary-button:hover:not(:disabled),
@@ -3401,16 +3361,8 @@ button.model-chip:hover {
 }
 
 .setup-form .segmented-control label.selected {
-  background: #f0fbfb;
-  box-shadow: inset 0 0 0 1px #007782;
-  color: #006b70;
-}
-.setup-form .segmented-control label:first-child.selected {
-    border-radius: 7px 0 0 7px;
-}
-
-.setup-form .segmented-control label:last-child.selected {
-    border-radius: 0 7px 7px 0;
+  background: var(--accent);
+  color: var(--surface);
 }
 
 .setup-inline-control {
@@ -3743,6 +3695,11 @@ button.model-chip:hover {
   .toolbar-command,
   .model-chip,
   .auto-convert-toggle {
+    min-height: 44px;
+  }
+
+  .segmented-control button,
+  .segmented-control label {
     min-height: 44px;
   }
 

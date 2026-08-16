@@ -229,7 +229,11 @@ export function ConversionPanel({
           <p className="input-completion-intro">
             入力にない文字を、どこまでAIに補わせるかを選びます。
           </p>
-          <div className="input-completion-levels">
+          <div
+            className="segmented-control input-completion-levels"
+            role="radiogroup"
+            aria-label="入力補完レベル"
+          >
             {INPUT_COMPLETION_OPTIONS.map((option) => (
               <label className={settings.inputCompletionLevel === option ? "selected" : ""} key={option}>
                 <input

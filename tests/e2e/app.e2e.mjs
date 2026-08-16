@@ -86,6 +86,9 @@ try {
   await assertVisibleText(page, "設定");
 
   await setupDialog.locator("label").filter({ hasText: "Ollama" }).click();
+  const setupProviderSegmentVisual = await selectedSegmentVisual(
+    setupDialog.locator(".provider-control label.selected"),
+  );
   await setupDialog.getByRole("button", { name: "接続チェック" }).click();
   await waitForVisibleText(page, 'Ollama に接続しましたが、"gemma3" は見つかりませんでした。候補: "gemma4:latest".');
   await setupDialog.getByRole("combobox").selectOption("gemma4:latest");
@@ -94,6 +97,27 @@ try {
   await page.getByRole("button", { name: "書き始める" }).click();
   await setupDialog.waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "変換を開く", exact: true }).click();
+  const applyMethodSegment = page
+    .getByRole("group", { name: "変換結果の適用方法" })
+    .locator("button.selected");
+  const inputCompletionGroup = page.getByRole("radiogroup", { name: "入力補完レベル" });
+  const inputCompletionSegment = inputCompletionGroup.locator("label.selected");
+  const expectedSegmentVisual = await selectedSegmentVisual(applyMethodSegment);
+  assert.deepEqual(
+    await selectedSegmentVisual(inputCompletionSegment),
+    expectedSegmentVisual,
+    "Apply method and input completion should share the same selected-state colors.",
+  );
+  assert.deepEqual(
+    setupProviderSegmentVisual,
+    expectedSegmentVisual,
+    "Setup provider and conversion controls should share the same selected-state colors.",
+  );
+  assert.equal(
+    await applyMethodSegment.evaluate((element) => element.getBoundingClientRect().height),
+    await inputCompletionSegment.evaluate((element) => element.getBoundingClientRect().height),
+    "Conversion segmented controls should share the same desktop height.",
+  );
   await page
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "変換タイミング" })
@@ -116,6 +140,11 @@ try {
   await page.getByRole("button", { name: "モデルを開く", exact: true }).click();
   const modelDrawer = page.getByRole("dialog", { name: "モデル" });
   await assertLocatorValue(modelDrawer.getByRole("combobox"), "gemma4:latest");
+  assert.deepEqual(
+    await selectedSegmentVisual(modelDrawer.locator(".provider-control label.selected")),
+    expectedSegmentVisual,
+    "Model provider and conversion controls should share the same selected-state colors.",
+  );
   await page.getByRole("button", { name: "モデル を閉じる" }).click();
 
   conversionRequestCount = 0;
@@ -541,6 +570,16 @@ async function assertVisibleText(page, text) {
 async function assertLocatorValue(locator, expectedValue) {
   const value = await locator.inputValue();
   assert.equal(value, expectedValue);
+}
+
+async function selectedSegmentVisual(locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color,
+    };
+  });
 }
 
 async function waitForVisibleText(page, text) {
