@@ -6,6 +6,7 @@ import {
   isInsideExcludedMarkdown,
   isJapaneseDominant,
   normalizeInputForPrompt,
+  punctuationSuffixForGhostCommit,
   triggerFromCharacter,
 } from "./conversion";
 import { defaultSettings } from "./settings";
@@ -192,6 +193,31 @@ describe("isTriggerEnabled", () => {
         triggers: { ...defaultSettings.triggers, space: false },
       }),
     ).toBe(false);
+  });
+});
+
+describe("punctuationSuffixForGhostCommit", () => {
+  it("uses the configured Japanese punctuation", () => {
+    expect(punctuationSuffixForGhostCommit(".", "明日", defaultSettings)).toBe("。");
+    expect(punctuationSuffixForGhostCommit(",", "明日", defaultSettings)).toBe("、");
+  });
+
+  it("keeps ASCII punctuation when conversion is disabled", () => {
+    const settings = {
+      ...defaultSettings,
+      punctuationConversion: {
+        periodToJapanese: false,
+        commaToJapanese: false,
+      },
+    };
+
+    expect(punctuationSuffixForGhostCommit(".", "明日", settings)).toBe(".");
+    expect(punctuationSuffixForGhostCommit(",", "明日", settings)).toBe(",");
+  });
+
+  it("does not duplicate equivalent punctuation already in the candidate", () => {
+    expect(punctuationSuffixForGhostCommit(".", "明日。", defaultSettings)).toBe("");
+    expect(punctuationSuffixForGhostCommit(",", "明日,", defaultSettings)).toBe("");
   });
 });
 

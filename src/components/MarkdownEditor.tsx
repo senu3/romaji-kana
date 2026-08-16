@@ -2,6 +2,7 @@ import {
   defaultKeymap,
   history,
   historyKeymap,
+  isolateHistory,
   redo,
   redoDepth,
   undo,
@@ -44,6 +45,7 @@ import {
   extractConversionRange,
   extractSelectedConversionRange,
   isTriggerEnabled,
+  punctuationSuffixForGhostCommit,
   triggerFromCharacter,
 } from "../lib/conversion";
 import {
@@ -150,10 +152,10 @@ class GhostTextWidget extends WidgetType {
     element.className = "cm-ghost-text";
     element.title =
       this.inputCompletionApplied
-        ? "入力補完候補。Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+        ? "入力補完候補。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
         : this.conversionStrategy === "completion"
-        ? "補完変換候補。Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
-        : "Tab で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
+        ? "補完変換候補。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
+        : "Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
 
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
@@ -163,10 +165,10 @@ class GhostTextWidget extends WidgetType {
     hint.className = "cm-ghost-text-hint";
     hint.textContent =
       this.inputCompletionApplied
-        ? "入力補完  Tabで確定  Ctrl/Cmd+/で別候補"
+        ? "入力補完  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
         : this.conversionStrategy === "completion"
-        ? "補完変換  Tabで確定  Ctrl/Cmd+/で別候補"
-        : "Tabで確定  Ctrl/Cmd+/で別候補";
+        ? "補完変換  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
+        : "Tab/句読点で確定  Ctrl/Cmd+/で別候補";
 
     element.append(suggestion);
     if (this.inputCompletionAdditions.length > 0) {
@@ -740,6 +742,9 @@ export function MarkdownEditor({
         shortcutCompartment.of(
           Prec.highest(keymap.of([
             {
+              any: acceptGhostSuggestionWithPunctuation,
+            },
+            {
               any: runPlainEnterConversion,
             },
             {
@@ -827,6 +832,9 @@ export function MarkdownEditor({
     view.dispatch({
       effects: shortcutCompartment.reconfigure(
         Prec.highest(keymap.of([
+          {
+            any: acceptGhostSuggestionWithPunctuation,
+          },
           {
             any: runPlainEnterConversion,
           },
@@ -937,6 +945,74 @@ export function MarkdownEditor({
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);
+    return true;
+  }
+
+  function acceptGhostSuggestionWithPunctuation(
+    view: EditorView,
+    event: KeyboardEvent,
+  ) {
+    if (
+      composingRef.current ||
+      event.isComposing ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      (event.key !== "." && event.key !== ",")
+    ) {
+      return false;
+    }
+
+    const character = event.key;
+    const trigger = character === "." ? "period" : "comma";
+    if (
+      !settingsRef.current.autoConvert ||
+      !isTriggerEnabled(trigger, settingsRef.current)
+    ) {
+      return false;
+    }
+
+    const suggestion = view.state.field(ghostSuggestionField).suggestion;
+    const selection = view.state.selection.main;
+    if (
+      !suggestion ||
+      suggestion.source !== "editor" ||
+      suggestion.previewOnly ||
+      !selection.empty ||
+      selection.head !== suggestion.to
+    ) {
+      return false;
+    }
+
+    const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
+    if (currentText !== suggestion.originalText) {
+      view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+      return false;
+    }
+
+    const suffix = punctuationSuffixForGhostCommit(
+      character,
+      suggestion.convertedText,
+      settingsRef.current,
+    );
+    const replacement = `${suggestion.convertedText}${suffix}`;
+    view.dispatch({
+      changes: {
+        from: suggestion.from,
+        to: suggestion.to,
+        insert: replacement,
+      },
+      selection: { anchor: suggestion.from + replacement.length },
+      effects: clearGhostSuggestion.of(suggestion.id),
+      annotations: isolateHistory.of("full"),
+      userEvent: "input.ghostAccept",
+    });
+    onAcceptGhostRef.current({
+      ...suggestion,
+      convertedText: replacement,
+      trigger,
+    });
     return true;
   }
 

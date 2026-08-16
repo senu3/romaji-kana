@@ -31,6 +31,25 @@ export function isTriggerEnabled(
   return settings.triggers[trigger];
 }
 
+export function punctuationSuffixForGhostCommit(
+  character: "." | ",",
+  convertedText: string,
+  settings: AppSettings,
+): string {
+  const trimmedText = convertedText.trimEnd();
+  if (character === ".") {
+    if (/[。.．]$/u.test(trimmedText)) {
+      return "";
+    }
+    return settings.punctuationConversion.periodToJapanese ? "。" : ".";
+  }
+
+  if (/[、,，]$/u.test(trimmedText)) {
+    return "";
+  }
+  return settings.punctuationConversion.commaToJapanese ? "、" : ",";
+}
+
 export function extractConversionRange(
   doc: string,
   cursor: number,

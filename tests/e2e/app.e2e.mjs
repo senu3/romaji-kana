@@ -195,6 +195,47 @@ try {
 
   conversionRequestCount = 0;
   await page.keyboard.press("Control+A");
+  await page.keyboard.type("ashita");
+  await waitForCondition(
+    () => conversionRequestCount === 1,
+    "A candidate should be ready before punctuation commits it.",
+  );
+  await page.locator(".cm-ghost-source").waitFor();
+  await page.keyboard.press(".");
+  await waitForEditorText(page, "明日。");
+  await page.waitForTimeout(500);
+  assert.equal(
+    conversionRequestCount,
+    1,
+    "A period should commit the visible candidate without another model request.",
+  );
+  await page.keyboard.press("Control+Z");
+  await waitForEditorText(page, "ashita");
+  assert.equal(
+    await editorText(page),
+    "ashita",
+    "One undo should revert the candidate and punctuation as a single edit.",
+  );
+
+  conversionRequestCount = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ashita");
+  await waitForCondition(
+    () => conversionRequestCount === 1,
+    "A candidate should be ready before comma commits it.",
+  );
+  await page.locator(".cm-ghost-source").waitFor();
+  await page.keyboard.press(",");
+  await waitForEditorText(page, "明日、");
+  await page.waitForTimeout(500);
+  assert.equal(
+    conversionRequestCount,
+    1,
+    "A comma should commit the visible candidate without another model request.",
+  );
+
+  conversionRequestCount = 0;
+  await page.keyboard.press("Control+A");
   await page.keyboard.type("ashitakaigi");
   await page.waitForTimeout(180);
   assert.equal(
