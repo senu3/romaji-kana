@@ -1,5 +1,11 @@
 import { defaultConversionPrompt } from "./prompts";
-import type { AppSettings, InputCompletionLevel, SharedConversionSettings, UserDictionaryEntry } from "./types";
+import type {
+  AppSettings,
+  InputCompletionLevel,
+  PredictiveSuggestionTiming,
+  SharedConversionSettings,
+  UserDictionaryEntry,
+} from "./types";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
@@ -24,6 +30,7 @@ export const defaultSettings: AppSettings = {
   },
   conversionPrompt: defaultConversionPrompt,
   inputCompletionLevel: "none",
+  predictiveSuggestionTiming: "auto",
   useDocumentVocabulary: false,
   userDictionary: [],
   think: false,
@@ -54,6 +61,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
     punctuationConversion: settings.punctuationConversion,
     conversionPrompt: settings.conversionPrompt,
     inputCompletionLevel: settings.inputCompletionLevel,
+    predictiveSuggestionTiming: settings.predictiveSuggestionTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
     userDictionary: settings.userDictionary,
   };
@@ -91,6 +99,9 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     conversionPrompt,
     think,
     inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
+    predictiveSuggestionTiming: normalizePredictiveSuggestionTiming(
+      settings.predictiveSuggestionTiming,
+    ),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: {
       ...defaultSettings.triggers,
@@ -106,6 +117,10 @@ function mergeSettings(settings: LegacySettings): AppSettings {
 
 function normalizeInputCompletionLevel(value: unknown): InputCompletionLevel {
   return value === "word" || value === "sentence" ? value : "none";
+}
+
+function normalizePredictiveSuggestionTiming(value: unknown): PredictiveSuggestionTiming {
+  return value === "early" || value === "deliberate" ? value : "auto";
 }
 
 function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {

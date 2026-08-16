@@ -12,9 +12,23 @@ import {
   isReservedAppShortcut,
   shortcutFromKeyboardEvent,
 } from "../lib/shortcuts";
-import type { AppSettings, InputCompletionLevel } from "../lib/types";
+import type {
+  AppSettings,
+  InputCompletionLevel,
+  PredictiveSuggestionTiming,
+} from "../lib/types";
 
 const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
+const PREDICTIVE_TIMING_OPTIONS: PredictiveSuggestionTiming[] = [
+  "early",
+  "auto",
+  "deliberate",
+];
+const PREDICTIVE_TIMING_LABELS: Record<PredictiveSuggestionTiming, string> = {
+  early: "早め",
+  auto: "自動",
+  deliberate: "長め",
+};
 
 interface ConversionPanelProps {
   settings: AppSettings;
@@ -147,11 +161,41 @@ export function ConversionPanel({
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="入力中の候補を常時先読み"
+              label="入力中の候補を先読み"
               checked={settings.triggers.space}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ space: checked })}
             />
+            <div
+              className={`mode-field compact-mode-field predictive-timing-field ${
+                settings.autoConvert && settings.triggers.space ? "" : "disabled"
+              }`}
+            >
+              <span>先読み開始</span>
+              <div
+                className="segmented-control"
+                role="radiogroup"
+                aria-label="候補の先読み開始"
+              >
+                {PREDICTIVE_TIMING_OPTIONS.map((option) => (
+                  <label
+                    className={settings.predictiveSuggestionTiming === option ? "selected" : ""}
+                    key={option}
+                  >
+                    <input
+                      type="radio"
+                      name="predictive-suggestion-timing"
+                      value={option}
+                      checked={settings.predictiveSuggestionTiming === option}
+                      disabled={!settings.autoConvert || !settings.triggers.space}
+                      onChange={() => update({ predictiveSuggestionTiming: option })}
+                    />
+                    <span>{PREDICTIVE_TIMING_LABELS[option]}</span>
+                  </label>
+                ))}
+              </div>
+              <small>{predictiveTimingDescription(settings.predictiveSuggestionTiming)}</small>
+            </div>
             <CheckRow
               label="ピリオドで変換"
               checked={settings.triggers.period}
@@ -285,6 +329,16 @@ export function ConversionPanel({
       </div>
     </section>
   );
+}
+
+function predictiveTimingDescription(timing: PredictiveSuggestionTiming): string {
+  if (timing === "early") {
+    return "短い文脈から候補を出します。入力の遅い方にも向いています。";
+  }
+  if (timing === "deliberate") {
+    return "文脈を長めに待ち、候補の安定性を優先します。";
+  }
+  return "入力速度に合わせ、最初は6〜12文字を目安に調整します。";
 }
 
 function AccordionSection({

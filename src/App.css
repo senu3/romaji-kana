@@ -1362,6 +1362,18 @@ h3 {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.predictive-timing-field {
+  margin-left: 8px;
+}
+
+.predictive-timing-field.disabled {
+  opacity: 0.68;
+}
+
+.predictive-timing-field.disabled .segmented-control label {
+  cursor: not-allowed;
+}
+
 .shortcut-field {
   display: grid;
   gap: 9px;

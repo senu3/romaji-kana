@@ -19,6 +19,7 @@ beforeEach(() => {
 describe("loadSettings", () => {
   it("enables space suggestions for new and legacy settings", () => {
     expect(loadSettings().triggers.space).toBe(true);
+    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
 
     storage.set(
       "romaji-kana-settings",
@@ -26,6 +27,21 @@ describe("loadSettings", () => {
     );
     expect(loadSettings().triggers.space).toBe(true);
     expect(loadSettings().triggers.period).toBe(false);
+    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
+  });
+
+  it("restores only supported predictive suggestion timing", () => {
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ ...defaultSettings, predictiveSuggestionTiming: "early" }),
+    );
+    expect(loadSettings().predictiveSuggestionTiming).toBe("early");
+
+    storage.set(
+      "romaji-kana-settings",
+      JSON.stringify({ ...defaultSettings, predictiveSuggestionTiming: "instant" }),
+    );
+    expect(loadSettings().predictiveSuggestionTiming).toBe("auto");
   });
 
   it("drops removed homophone settings while preserving dictionary entries", () => {

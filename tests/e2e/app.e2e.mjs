@@ -67,7 +67,8 @@ try {
       if (
         body.prompt === "いち。" ||
         body.prompt?.trim() === "あした" ||
-        body.prompt?.trim() === "あしたかいぎ"
+        body.prompt?.trim() === "あしたかいぎ" ||
+        body.prompt?.trim() === "あしたかいぎのて"
       ) {
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
@@ -136,9 +137,14 @@ try {
     .filter({ hasText: "変換タイミング" })
     .click();
   assert.equal(
-    await page.getByLabel("入力中の候補を常時先読み").isChecked(),
+    await page.getByLabel("入力中の候補を先読み").isChecked(),
     true,
     "Predictive suggestions should be enabled by default.",
+  );
+  assert.equal(
+    await page.getByRole("radio", { name: "自動", exact: true }).isChecked(),
+    true,
+    "Predictive timing should adapt to typing speed by default.",
   );
   await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
@@ -168,25 +174,41 @@ try {
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
-  await page.keyboard.type("ashita");
-  await page.waitForTimeout(380);
-  await page.keyboard.type("kaigi");
-  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日" }).waitFor();
+  await page.keyboard.type("ashitakaig");
+  await page.waitForTimeout(180);
   assert.equal(
-    await page.locator(".cm-ghost-source").textContent(),
-    "ashita",
-    "A completed candidate should remain visible after input continues.",
+    conversionRequestCount,
+    0,
+    "The first predictive request should wait for a natural boundary after 10 characters.",
   );
-  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日会議" }).waitFor();
+  await page.keyboard.type("i");
+  await waitForCondition(
+    () => conversionRequestCount === 1,
+    "The first predictive request should start at the next vowel.",
+  );
+  await page.keyboard.type("note");
+  await page.waitForFunction(
+    () => document.querySelector(".cm-ghost-source")?.textContent === "ashitakaigi",
+  );
   assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
     "ashitakaigi",
+    "A completed candidate should remain visible after input continues.",
+  );
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日会議の手" }).waitFor();
+  assert.equal(
+    await page.locator(".cm-ghost-source").textContent(),
+    "ashitakaiginote",
     "The displayed candidate should update to the newest queued source.",
   );
   await page.keyboard.press("Tab");
-  await waitForEditorText(page, "明日会議");
+  await waitForEditorText(page, "明日会議の手");
   await page.waitForTimeout(400);
-  assert.equal(await editorText(page), "明日会議", "A stale response must not replace the latest result.");
+  assert.equal(
+    await editorText(page),
+    "明日会議の手",
+    "A stale response must not replace the latest result.",
+  );
   assert.equal(conversionRequestCount, 2, "Continuous input should keep only one latest queued request.");
 
   await page.getByRole("button", { name: "変換を開く", exact: true }).click();
@@ -194,7 +216,7 @@ try {
     .locator(".inspector-drawer .accordion-trigger")
     .filter({ hasText: "変換タイミング" })
     .click();
-  await page.getByLabel("入力中の候補を常時先読み").uncheck();
+  await page.getByLabel("入力中の候補を先読み").uncheck();
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;
@@ -637,6 +659,16 @@ async function waitForVisibleText(page, text) {
   await page.getByText(text).first().waitFor();
 }
 
+async function waitForCondition(condition, message, timeoutMs = 2_000) {
+  const startedAt = Date.now();
+  while (!condition()) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      assert.fail(message);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function editorText(page) {
   const text = (await page.locator(".cm-content").textContent()) ?? "";
   return text === "romaji で日本語を書いてください..." ? "" : text;
@@ -656,6 +688,9 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (prompt?.trim() === "あしたかいぎのて") {
+    return "明日会議の手";
+  }
   if (prompt?.trim() === "あしたかいぎ") {
     return "明日会議";
   }

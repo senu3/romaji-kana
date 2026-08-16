@@ -24,6 +24,7 @@ import {
   lineNumbers,
   placeholder,
   type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import {
@@ -45,6 +46,17 @@ import {
   isTriggerEnabled,
   triggerFromCharacter,
 } from "../lib/conversion";
+import {
+  countRomajiCharacters,
+  estimateTypingSpeedCps,
+  isNaturalRomajiBoundary,
+  MAX_TYPING_INTERVAL_MS,
+  MIN_SPACE_TRIGGER_ROMAJI_CHARACTERS,
+  MIN_TYPING_INTERVAL_MS,
+  PREDICTIVE_PAUSE_MS,
+  predictiveSuggestionThresholds,
+  TYPING_SPEED_SAMPLE_SIZE,
+} from "../lib/predictiveSuggestions";
 import type {
   AppSettings,
   ConversionRange,
@@ -413,9 +425,6 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 const COMPOSITION_END_GRACE_MS = 120;
-const PREDICTIVE_SUGGESTION_DEBOUNCE_MS = 320;
-const PREDICTIVE_SUGGESTION_MAX_WAIT_MS = 1_000;
-const MIN_PREDICTIVE_ROMAJI_CHARACTERS = 4;
 const editorPhrases = EditorState.phrases.of({
   Find: "検索",
   Replace: "置換",
@@ -436,6 +445,30 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.historyApply",
   "input.ghostAccept",
 ]);
+
+interface PredictiveRequestMarker {
+  from: number;
+  text: string;
+  romajiCharacterCount: number;
+}
+
+type PredictiveRequestReason = "boundary" | "pause" | "space";
+
+function singleInsertedCharacter(update: ViewUpdate): string | null {
+  let changedRangeCount = 0;
+  let deletedText = false;
+  let insertedText = "";
+
+  update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    changedRangeCount += 1;
+    deletedText ||= fromA !== toA;
+    insertedText += inserted.toString();
+  });
+
+  return changedRangeCount === 1 && !deletedText && Array.from(insertedText).length === 1
+    ? insertedText
+    : null;
+}
 
 export function MarkdownEditor({
   settings,
@@ -475,29 +508,80 @@ export function MarkdownEditor({
   const settingsRef = useRef(settings);
   const composingRef = useRef(false);
   const lastCompositionEndAtRef = useRef(0);
-  const suggestionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suggestionMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestionPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingIntervalsRef = useRef<number[]>([]);
+  const lastTypingAtRef = useRef<number | null>(null);
+  const lastPredictiveRequestRef = useRef<PredictiveRequestMarker | null>(null);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
 
-  function clearPredictiveSuggestionTimers() {
-    if (suggestionDebounceTimerRef.current) {
-      window.clearTimeout(suggestionDebounceTimerRef.current);
-      suggestionDebounceTimerRef.current = null;
+  function clearPredictiveSuggestionTimer() {
+    if (suggestionPauseTimerRef.current) {
+      window.clearTimeout(suggestionPauseTimerRef.current);
+      suggestionPauseTimerRef.current = null;
     }
-    if (suggestionMaxWaitTimerRef.current) {
-      window.clearTimeout(suggestionMaxWaitTimerRef.current);
-      suggestionMaxWaitTimerRef.current = null;
+  }
+
+  function resetPredictiveSuggestionCadence() {
+    clearPredictiveSuggestionTimer();
+    lastTypingAtRef.current = null;
+    lastPredictiveRequestRef.current = null;
+  }
+
+  function recordTypingSpeed(update: ViewUpdate, userEvent: string | undefined) {
+    const character = singleInsertedCharacter(update);
+    if (!userEvent?.startsWith("input.type") || !character || !/[A-Za-z]/.test(character)) {
+      lastTypingAtRef.current = null;
+      return;
     }
+
+    const now = performance.now();
+    const previous = lastTypingAtRef.current;
+    lastTypingAtRef.current = now;
+    if (previous === null) {
+      return;
+    }
+
+    const interval = now - previous;
+    if (interval < MIN_TYPING_INTERVAL_MS || interval > MAX_TYPING_INTERVAL_MS) {
+      return;
+    }
+
+    typingIntervalsRef.current = [
+      ...typingIntervalsRef.current.slice(-(TYPING_SPEED_SAMPLE_SIZE - 1)),
+      interval,
+    ];
+  }
+
+  function predictiveRequirement(range: ConversionRange) {
+    const romajiCharacterCount = countRomajiCharacters(range.text);
+    const thresholds = predictiveSuggestionThresholds(
+      estimateTypingSpeedCps(typingIntervalsRef.current),
+      settingsRef.current.predictiveSuggestionTiming,
+    );
+    const previous = lastPredictiveRequestRef.current;
+    const isContinuation = Boolean(
+      previous &&
+        previous.from === range.from &&
+        range.text.startsWith(previous.text) &&
+        romajiCharacterCount >= previous.romajiCharacterCount,
+    );
+
+    return {
+      romajiCharacterCount,
+      requiredCharacterCount: isContinuation
+        ? previous!.romajiCharacterCount + thresholds.continuation
+        : thresholds.initial,
+    };
   }
 
   function requestPredictiveSuggestion(
     view: EditorView,
-    trigger: Extract<ConversionTrigger, "typing" | "space">,
+    reason: PredictiveRequestReason,
   ) {
-    clearPredictiveSuggestionTimers();
+    clearPredictiveSuggestionTimer();
     if (
       composingRef.current ||
       !settingsRef.current.autoConvert ||
@@ -508,12 +592,37 @@ export function MarkdownEditor({
     }
 
     const cursor = view.state.selection.main.head;
+    const trigger: Extract<ConversionTrigger, "typing" | "space"> =
+      reason === "space" ? "space" : "typing";
     const range = extractConversionRange(view.state.doc.toString(), cursor, trigger);
-    const romajiCharacterCount = range?.text.match(/[A-Za-z]/g)?.length ?? 0;
-    if (!range || romajiCharacterCount < MIN_PREDICTIVE_ROMAJI_CHARACTERS) {
-      return;
+    if (!range) {
+      return false;
     }
-    onConvertRef.current(range);
+
+    const { romajiCharacterCount, requiredCharacterCount } = predictiveRequirement(range);
+    if (
+      (reason === "space" && romajiCharacterCount < MIN_SPACE_TRIGGER_ROMAJI_CHARACTERS) ||
+      (reason !== "space" && romajiCharacterCount < requiredCharacterCount) ||
+      (reason === "boundary" && !isNaturalRomajiBoundary(range.text))
+    ) {
+      return false;
+    }
+
+    const previous = lastPredictiveRequestRef.current;
+    if (previous?.from === range.from && previous.text === range.text) {
+      return false;
+    }
+
+    if (!onConvertRef.current(range)) {
+      return false;
+    }
+
+    lastPredictiveRequestRef.current = {
+      from: range.from,
+      text: range.text,
+      romajiCharacterCount,
+    };
+    return true;
   }
 
   function schedulePredictiveSuggestion(view: EditorView) {
@@ -522,23 +631,36 @@ export function MarkdownEditor({
       !settingsRef.current.autoConvert ||
       !settingsRef.current.triggers.space
     ) {
-      clearPredictiveSuggestionTimers();
+      resetPredictiveSuggestionCadence();
       return;
     }
 
-    if (suggestionDebounceTimerRef.current) {
-      window.clearTimeout(suggestionDebounceTimerRef.current);
+    clearPredictiveSuggestionTimer();
+    if (!view.state.selection.main.empty) {
+      return;
     }
-    suggestionDebounceTimerRef.current = window.setTimeout(
-      () => requestPredictiveSuggestion(view, "typing"),
-      PREDICTIVE_SUGGESTION_DEBOUNCE_MS,
+
+    const cursor = view.state.selection.main.head;
+    const range = extractConversionRange(view.state.doc.toString(), cursor, "typing");
+    if (!range) {
+      lastPredictiveRequestRef.current = null;
+      return;
+    }
+
+    const { romajiCharacterCount, requiredCharacterCount } = predictiveRequirement(range);
+    if (romajiCharacterCount < requiredCharacterCount) {
+      return;
+    }
+
+    if (isNaturalRomajiBoundary(range.text)) {
+      requestPredictiveSuggestion(view, "boundary");
+      return;
+    }
+
+    suggestionPauseTimerRef.current = window.setTimeout(
+      () => requestPredictiveSuggestion(view, "pause"),
+      PREDICTIVE_PAUSE_MS,
     );
-    if (!suggestionMaxWaitTimerRef.current) {
-      suggestionMaxWaitTimerRef.current = window.setTimeout(
-        () => requestPredictiveSuggestion(view, "typing"),
-        PREDICTIVE_SUGGESTION_MAX_WAIT_MS,
-      );
-    }
   }
 
   const updateListener = useMemo(() => {
@@ -558,17 +680,22 @@ export function MarkdownEditor({
         .map((transaction) => transaction.annotation(Transaction.userEvent))
         .find(Boolean);
       if (userEvent?.startsWith("document.")) {
-        clearPredictiveSuggestionTimers();
+        resetPredictiveSuggestionCadence();
         return;
       }
       if (shouldSuppressAutoTriggerForUserEvent(userEvent)) {
-        clearPredictiveSuggestionTimers();
+        resetPredictiveSuggestionCadence();
         return;
       }
 
       if (!settingsRef.current.autoConvert) {
-        clearPredictiveSuggestionTimers();
+        resetPredictiveSuggestionCadence();
         return;
+      }
+
+      recordTypingSpeed(update, userEvent);
+      if (userEvent?.startsWith("input.delete")) {
+        lastPredictiveRequestRef.current = null;
       }
 
       const cursor = update.state.selection.main.head;
@@ -579,7 +706,7 @@ export function MarkdownEditor({
           requestPredictiveSuggestion(update.view, "space");
           return;
         }
-        clearPredictiveSuggestionTimers();
+        resetPredictiveSuggestionCadence();
         const range = extractConversionRange(update.state.doc.toString(), cursor, trigger);
         if (range) {
           onConvertRef.current(range);
@@ -626,9 +753,13 @@ export function MarkdownEditor({
 
   useEffect(() => {
     if (!settings.autoConvert || !settings.triggers.space) {
-      clearPredictiveSuggestionTimers();
+      resetPredictiveSuggestionCadence();
     }
-  }, [settings.autoConvert, settings.triggers.space]);
+  }, [
+    settings.autoConvert,
+    settings.predictiveSuggestionTiming,
+    settings.triggers.space,
+  ]);
 
   useEffect(() => {
     if (!hostRef.current) {
@@ -699,7 +830,7 @@ export function MarkdownEditor({
     setCanRedo(redoDepth(view.state) > 0);
 
     return () => {
-      clearPredictiveSuggestionTimers();
+      resetPredictiveSuggestionCadence();
       registerView(null);
       view.destroy();
       viewRef.current = null;
@@ -873,6 +1004,7 @@ export function MarkdownEditor({
   }
 
   function dismissGhostSuggestion(view: EditorView) {
+    clearPredictiveSuggestionTimer();
     const state = view.state.field(ghostSuggestionField);
     const suggestion = state.suggestion;
     if (!suggestion) {

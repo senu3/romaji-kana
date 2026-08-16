@@ -452,13 +452,14 @@ fn update_shared_conversion_settings(
     shared: &Arc<RwLock<SharedState>>,
     request: UpdateSettingsRequest,
 ) -> Result<CompanionSnapshot, String> {
-    const SHARED_KEYS: [&str; 8] = [
+    const SHARED_KEYS: [&str; 9] = [
         "autoConvert",
         "conversionMode",
         "triggers",
         "punctuationConversion",
         "conversionPrompt",
         "inputCompletionLevel",
+        "predictiveSuggestionTiming",
         "useDocumentVocabulary",
         "userDictionary",
     ];
@@ -653,6 +654,7 @@ mod tests {
             "punctuationConversion": { "periodToJapanese": true, "commaToJapanese": true },
             "conversionPrompt": "desktop prompt",
             "inputCompletionLevel": "none",
+            "predictiveSuggestionTiming": "auto",
             "useDocumentVocabulary": false,
             "userDictionary": [],
             "think": false
@@ -670,6 +672,7 @@ mod tests {
                     "punctuationConversion": { "periodToJapanese": false, "commaToJapanese": true },
                     "conversionPrompt": "mobile prompt",
                     "inputCompletionLevel": "word",
+                    "predictiveSuggestionTiming": "deliberate",
                     "useDocumentVocabulary": true,
                     "userDictionary": []
                 }),
@@ -681,8 +684,15 @@ mod tests {
         assert_eq!(snapshot.settings["modelName"], "desktop-model");
         assert_eq!(snapshot.settings["conversionMode"], "ghost");
         assert_eq!(snapshot.settings["conversionPrompt"], "mobile prompt");
+        assert_eq!(
+            snapshot.settings["predictiveSuggestionTiming"],
+            "deliberate"
+        );
         assert_eq!(snapshot.settings_updated_by, "mobile-test");
-        assert_eq!(model_settings(&manager.shared).unwrap().model_provider, "lmstudio");
+        assert_eq!(
+            model_settings(&manager.shared).unwrap().model_provider,
+            "lmstudio"
+        );
     }
 
     #[test]
