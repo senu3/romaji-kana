@@ -3,6 +3,7 @@ import { normalizeInputForPrompt } from "./conversion";
 import {
   buildKanaKanjiSystemPrompt,
   buildKanaRepairSystemPrompt,
+  buildSpeculativeConversionSystemPrompt,
   buildSuggestionConversionSystemPrompt,
 } from "./prompts";
 import {
@@ -64,11 +65,12 @@ export type ProtectedDictionaryEntry = Pick<
 export interface JapaneseConversionResult {
   text: string;
   reviewKana: string;
-  conversionStrategy?: "completion";
+  conversionStrategy?: "completion" | "speculative";
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
   suggestionRejected?: boolean;
+  suggestionRejectedReason?: "diverged" | "speculative";
 }
 
 interface StructuredSuggestionConversion {
@@ -82,6 +84,7 @@ export interface JapaneseConversionOptions {
   strictAlternative?: boolean;
   alternativeAttempt?: number;
   completionMode?: boolean;
+  speculativeMode?: boolean;
   completionSourceRomaji?: string;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
   documentVocabulary?: string[];
@@ -104,7 +107,13 @@ export async function convertRomajiToJapaneseDetailed(
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
   throwIfConversionAborted(options.signal);
-  const result = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, options);
+  const result = await applySpeculativeFallback(
+    input,
+    await convertRomajiToJapaneseDetailedOnce(input, settings, transport, options),
+    settings,
+    transport,
+    options,
+  );
   if (isUsableConversionResult(result, options)) {
     return result;
   }
@@ -115,27 +124,51 @@ export async function convertRomajiToJapaneseDetailed(
 
   for (let attempt = 1; attempt <= MAX_ALTERNATIVE_CONVERSION_ATTEMPTS; attempt += 1) {
     throwIfConversionAborted(options.signal);
-    const alternative = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
+    const alternativeOptions: JapaneseConversionOptions = {
       ...options,
       strictAlternative: true,
       alternativeAttempt: attempt,
       completionMode: false,
-    });
+    };
+    const alternative = await applySpeculativeFallback(
+      input,
+      await convertRomajiToJapaneseDetailedOnce(
+        input,
+        settings,
+        transport,
+        alternativeOptions,
+      ),
+      settings,
+      transport,
+      alternativeOptions,
+    );
     if (isUsableConversionResult(alternative, options)) {
       return alternative;
     }
   }
 
-  const completion = await convertRomajiToJapaneseDetailedOnce(input, settings, transport, {
+  const completionOptions: JapaneseConversionOptions = {
     ...options,
     strictAlternative: true,
     alternativeAttempt: 0,
     completionMode: true,
-  });
+  };
+  const completion = await applySpeculativeFallback(
+    input,
+    await convertRomajiToJapaneseDetailedOnce(
+      input,
+      settings,
+      transport,
+      completionOptions,
+    ),
+    settings,
+    transport,
+    completionOptions,
+  );
   if (isUsableConversionResult(completion, options)) {
     return {
       ...completion,
-      conversionStrategy: "completion",
+      conversionStrategy: completion.conversionStrategy ?? "completion",
     };
   }
 
@@ -210,6 +243,7 @@ async function convertRomajiToJapaneseDetailedOnce(
           text: "",
           reviewKana: [...reviewKanaParts, kanaResult.kana].join(""),
           suggestionRejected: true,
+          suggestionRejectedReason: "diverged",
         };
       }
       inputCompletionSourceParts.push(kanaResult.kana);
@@ -567,6 +601,10 @@ function isUsableConversionResult(
   result: JapaneseConversionResult,
   options: JapaneseConversionOptions,
 ): boolean {
+  if (result.suggestionRejected || !result.text.trim() || isHiraganaOnlyConversion(result.text)) {
+    return false;
+  }
+
   if (isAvoidedConversionOutput(result.text, options.avoidOutputs)) {
     return false;
   }
@@ -580,6 +618,72 @@ function isUsableConversionResult(
   }
 
   return true;
+}
+
+export function isHiraganaOnlyConversion(value: string): boolean {
+  const hasHiragana = /[\u3041-\u3096]/u.test(value);
+  const hasNonHiraganaWriting = /[\u30a1-\u30ff\u3400-\u9fff々〆ヵヶA-Za-z]/u.test(value);
+  return hasHiragana && !hasNonHiraganaWriting;
+}
+
+async function applySpeculativeFallback(
+  originalRomaji: string,
+  result: JapaneseConversionResult,
+  settings: AppSettings,
+  transport: OllamaTransport,
+  options: JapaneseConversionOptions,
+): Promise<JapaneseConversionResult> {
+  if (result.suggestionRejected || !isHiraganaOnlyConversion(result.text)) {
+    return result;
+  }
+
+  const speculative = await kanjiizeKana(result.reviewKana, settings, transport, {
+    ...options,
+    speculativeMode: true,
+    completionMode: false,
+    completionSourceRomaji: originalRomaji,
+    avoidOutputs: Array.from(new Set([...(options.avoidOutputs ?? []), result.text])),
+  });
+  if (
+    isHiraganaOnlyConversion(speculative) ||
+    isAvoidedConversionOutput(speculative, [...(options.avoidOutputs ?? []), result.text]) ||
+    !isAllowedSpeculativeConversion(result.reviewKana, speculative)
+  ) {
+    return {
+      ...result,
+      text: "",
+      suggestionRejected: true,
+      suggestionRejectedReason: "speculative",
+    };
+  }
+
+  return {
+    ...result,
+    text: speculative,
+    conversionStrategy: "speculative",
+  };
+}
+
+function isAllowedSpeculativeConversion(source: string, candidate: string): boolean {
+  const normalizedSource = source.trim();
+  const normalizedCandidate = candidate.trim();
+  if (!normalizedSource || !normalizedCandidate || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(candidate)) {
+    return false;
+  }
+  if (
+    !preservesProtectedAsciiTokens(normalizedSource, normalizedCandidate) ||
+    !preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate) ||
+    countCharacter(normalizedSource, "\n") !== countCharacter(normalizedCandidate, "\n")
+  ) {
+    return false;
+  }
+
+  const sourceLength = comparableCharacters(normalizedSource).length;
+  const candidateLength = comparableCharacters(normalizedCandidate).length;
+  return (
+    candidateLength >= Math.max(1, Math.ceil(sourceLength * 0.2)) &&
+    candidateLength <= Math.max(24, sourceLength * 2)
+  );
 }
 export async function repairLowConfidenceKana(
   result: RomajiKanaResult,
@@ -623,19 +727,31 @@ export async function kanjiizeKana(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildKanaKanjiSystemPrompt(
-        settings.conversionPrompt,
-        options.avoidOutputs ?? [],
-        options.strictAlternative ?? false,
-        options.alternativeAttempt ?? 0,
-        options.completionMode ?? false,
-        options.completionMode ? [] : options.documentVocabulary ?? [],
-      ),
+      system: options.speculativeMode
+        ? buildSpeculativeConversionSystemPrompt(
+            settings.conversionPrompt,
+            options.avoidOutputs ?? [],
+            options.documentVocabulary ?? [],
+          )
+        : buildKanaKanjiSystemPrompt(
+            settings.conversionPrompt,
+            options.avoidOutputs ?? [],
+            options.strictAlternative ?? false,
+            options.alternativeAttempt ?? 0,
+            options.completionMode ?? false,
+            options.completionMode ? [] : options.documentVocabulary ?? [],
+          ),
       prompt: buildKanaKanjiUserPrompt(kana, options),
       stream: false,
       think: settings.think,
       options: {
-        temperature: options.completionMode ? 0.35 : options.alternativeAttempt ? 0.25 : 0.1,
+        temperature: options.speculativeMode
+          ? 0.45
+          : options.completionMode
+            ? 0.35
+            : options.alternativeAttempt
+              ? 0.25
+              : 0.1,
       },
       keep_alive: "5m",
     },
@@ -652,7 +768,7 @@ export async function kanjiizeKana(
 }
 
 function buildKanaKanjiUserPrompt(kana: string, options: JapaneseConversionOptions): string {
-  if (!options.completionMode) {
+  if (!options.completionMode && !options.speculativeMode) {
     return kana;
   }
 

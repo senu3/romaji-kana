@@ -151,7 +151,9 @@ class GhostTextWidget extends WidgetType {
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
     element.title =
-      this.inputCompletionLevel === "word"
+      this.conversionStrategy === "speculative"
+        ? "推測候補。Tab で確定、Esc で破棄"
+        : this.inputCompletionLevel === "word"
         ? "単語サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
         : this.inputCompletionLevel === "sentence"
         ? "文章サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
@@ -166,7 +168,9 @@ class GhostTextWidget extends WidgetType {
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
     hint.textContent =
-      this.inputCompletionLevel === "word"
+      this.conversionStrategy === "speculative"
+        ? "推測候補  Tabで確定  Escで破棄"
+        : this.inputCompletionLevel === "word"
         ? "単語サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
         : this.inputCompletionLevel === "sentence"
         ? "文章サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
@@ -445,6 +449,7 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
   "input.ghostAccept",
+  "input.speculativeDismiss",
 ]);
 
 interface PredictiveRequestMarker {
@@ -970,13 +975,6 @@ export function MarkdownEditor({
 
     const character = event.key;
     const trigger = character === "." ? "period" : "comma";
-    if (
-      !settingsRef.current.autoConvert ||
-      !isTriggerEnabled(trigger, settingsRef.current)
-    ) {
-      return false;
-    }
-
     const suggestion = view.state.field(ghostSuggestionField).suggestion;
     const selection = view.state.selection.main;
     if (
@@ -992,6 +990,25 @@ export function MarkdownEditor({
     const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
     if (currentText !== suggestion.originalText) {
       view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
+      return false;
+    }
+
+    if (suggestion.conversionStrategy === "speculative") {
+      const cursor = selection.head;
+      view.dispatch({
+        changes: { from: cursor, to: cursor, insert: character },
+        selection: { anchor: cursor + character.length },
+        effects: clearGhostSuggestion.of(suggestion.id),
+        userEvent: "input.speculativeDismiss",
+      });
+      onDismissGhostRef.current();
+      return true;
+    }
+
+    if (
+      !settingsRef.current.autoConvert ||
+      !isTriggerEnabled(trigger, settingsRef.current)
+    ) {
       return false;
     }
 

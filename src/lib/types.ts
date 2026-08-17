@@ -116,7 +116,7 @@ export interface GhostConversionSuggestion {
   convertedText: string;
   inputText: string;
   reviewKana?: string;
-  conversionStrategy?: "completion";
+  conversionStrategy?: "completion" | "speculative";
   inputCompletionLevel?: InputCompletionLevel;
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
@@ -158,7 +158,7 @@ export interface ConversionHistoryItem {
   createdAt: number;
   source: "editor" | "history";
   anchor?: ConversionAnchor;
-  conversionStrategy?: "completion";
+  conversionStrategy?: "completion" | "speculative";
   inputCompletionLevel?: InputCompletionLevel;
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;

@@ -1263,7 +1263,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
         skipQueuedConversion(
           request,
-          "候補が入力から大きく離れたため表示しませんでした。入力を続けると新しい候補を生成します。",
+          conversion.suggestionRejectedReason === "speculative"
+            ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
+            : "候補が入力から大きく離れたため表示しませんでした。入力を続けると新しい候補を生成します。",
         );
         return;
       }
@@ -1294,6 +1296,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         settingsRef.current.conversionMode === "ghost" ||
         inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
+        conversion.conversionStrategy === "speculative" ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
         currentView.dispatch({
@@ -1323,7 +1326,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         });
         setStatus({
           kind: "success",
-          message: inputCompletionLevel !== "none"
+          message: conversion.conversionStrategy === "speculative"
+            ? "推測候補を生成しました。Tab で確定、Esc で破棄できます。"
+            : inputCompletionLevel !== "none"
             ? "サジェストを生成しました。Tab で確定、Esc で破棄できます。"
             : conversion.conversionStrategy === "completion"
               ? "補完変換候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
@@ -1422,7 +1427,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
       if (conversion.suggestionRejected) {
         skipQueuedConversion(
           request,
-          "候補が入力から大きく離れたため、履歴からのサジェストを表示しませんでした。",
+          conversion.suggestionRejectedReason === "speculative"
+            ? "適切な推測候補を作れなかったため、ローマ字を残しました。"
+            : "候補が入力から大きく離れたため、履歴からのサジェストを表示しませんでした。",
         );
         return;
       }
@@ -1479,6 +1486,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         settingsRef.current.conversionMode === "ghost" ||
         inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
+        conversion.conversionStrategy === "speculative" ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
         latestView.dispatch({
@@ -1506,7 +1514,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         latestView.focus();
         setStatus({
           kind: "success",
-          message: inputCompletionLevel !== "none"
+          message: conversion.conversionStrategy === "speculative"
+            ? "履歴から推測候補を生成しました。Tab で適用、Esc で破棄できます。"
+            : inputCompletionLevel !== "none"
             ? "履歴からサジェストを生成しました。Tab で適用、Esc で破棄できます。"
             : conversion.conversionStrategy === "completion"
               ? "履歴から補完変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
@@ -1728,7 +1738,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     setRecentRetryItem(historyItem);
     setStatus({
       kind: "success",
-      message: suggestion.inputCompletionApplied
+      message: suggestion.conversionStrategy === "speculative"
+        ? "推測候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+        : suggestion.inputCompletionApplied
         ? "入力補完候補を確定しました。"
         : suggestion.conversionStrategy === "completion"
           ? "補完変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
@@ -1983,7 +1995,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           currentView.dispatch({ effects: clearGhostSuggestion.of(null) });
           setStatus({
             kind: "warning",
-            message: "候補が入力から大きく離れたため表示しませんでした。入力を続けると再生成します。",
+            message: conversion.suggestionRejectedReason === "speculative"
+              ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
+              : "候補が入力から大きく離れたため表示しませんでした。入力を続けると再生成します。",
           });
           return;
         }
@@ -2011,7 +2025,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         });
         setStatus({
           kind: predictiveSuggestionQueueRef.current ? "loading" : "success",
-          message: conversion.inputCompletionAdditions?.length
+          message: conversion.conversionStrategy === "speculative"
+            ? "推測候補を表示しました。Tab で確定、Esc で破棄できます。"
+            : conversion.inputCompletionAdditions?.length
             ? `補完差分 ${conversion.inputCompletionAdditions.map((text) => `+「${text}」`).join(" ")}。Tab で確定できます。`
             : predictiveSuggestionQueueRef.current
               ? "候補を表示しました。より新しい入力の候補を更新しています。"
@@ -2462,7 +2478,9 @@ function RecentRetryChip({
   return (
     <aside
       className={`recent-retry-chip ${
-        item.conversionStrategy === "completion" || item.inputCompletionApplied
+        item.conversionStrategy === "completion" ||
+        item.conversionStrategy === "speculative" ||
+        item.inputCompletionApplied
           ? "completion"
           : ""
       }`}
@@ -2476,7 +2494,11 @@ function RecentRetryChip({
       >
         <RotateCcw size={15} aria-hidden="true" />
         <span className="recent-retry-chip-text">
-          {item.inputCompletionApplied
+          {item.conversionStrategy === "speculative"
+            ? item.output
+              ? `推測候補: ${item.output}`
+              : "推測候補を確定しました"
+            : item.inputCompletionApplied
             ? item.output
               ? `入力補完: ${item.output}`
               : "入力補完で生成しました"

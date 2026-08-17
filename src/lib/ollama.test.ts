@@ -5,10 +5,12 @@ import {
   convertRomajiToJapanese,
   convertRomajiToJapaneseDetailed,
   isAllowedInputCompletion,
+  isHiraganaOnlyConversion,
   normalizeRomajiReadingCandidate,
 } from "./ollama";
 import {
   buildKanaKanjiSystemPrompt,
+  buildSpeculativeConversionSystemPrompt,
   buildSuggestionConversionSystemPrompt,
   defaultConversionPrompt,
 } from "./prompts";
@@ -233,6 +235,7 @@ describe("convertRomajiToJapanese", () => {
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
         .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
+        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" })
         .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" }),
     };
 
@@ -244,7 +247,7 @@ describe("convertRomajiToJapanese", () => {
         { avoidOutputs: ["ご時達事はおそろしいものだ"] },
       ),
     ).rejects.toThrow("別候補に変換できませんでした。");
-    expect(transport.generate).toHaveBeenCalledTimes(4);
+    expect(transport.generate).toHaveBeenCalledTimes(5);
   });
 
   it("passes original romaji and mechanical kana to typo completion", async () => {
@@ -407,16 +410,19 @@ describe("convertRomajiToJapanese", () => {
     expect(request.system).not.toContain("api");
   });
 
-  it("completes an unfinished final word and converts it in one model call", async () => {
+  it("replaces an all-hiragana word completion with one speculative candidate", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({
-        response: JSON.stringify({
-          completedKana: "ありがとう。",
-          convertedText: "ありがとう。",
-          additions: ["とう"],
-        }),
-      }),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({
+          response: JSON.stringify({
+            completedKana: "ありがとう。",
+            convertedText: "ありがとう。",
+            additions: ["とう"],
+          }),
+        })
+        .mockResolvedValueOnce({ response: "有難う。" }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -426,13 +432,14 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toEqual({
-      text: "ありがとう。",
+      text: "有難う。",
       reviewKana: "ありがとう。",
+      conversionStrategy: "speculative",
       inputCompletionApplied: true,
       inputCompletionSourceKana: "ありが。",
       inputCompletionAdditions: ["とう"],
     });
-    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledTimes(2);
     expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
@@ -440,6 +447,17 @@ describe("convertRomajiToJapanese", () => {
         system: expect.stringContaining("Complete only an unfinished final Japanese word."),
         prompt: expect.stringContaining("Mechanical kana:\nありが。"),
         options: { temperature: 0.05 },
+      }),
+      30_000,
+    );
+    expect(transport.generate).toHaveBeenNthCalledWith(
+      2,
+      "ollama",
+      "http://localhost:11434",
+      expect.objectContaining({
+        system: expect.stringContaining("one speculative Japanese writing candidate"),
+        prompt: expect.stringContaining("Original romaji input:\nariga."),
+        options: { temperature: 0.45 },
       }),
       30_000,
     );
@@ -467,6 +485,7 @@ describe("convertRomajiToJapanese", () => {
       text: "",
       reviewKana: "ありが。",
       suggestionRejected: true,
+      suggestionRejectedReason: "diverged",
     });
     expect(transport.generate).toHaveBeenCalledTimes(1);
   });
@@ -474,13 +493,16 @@ describe("convertRomajiToJapanese", () => {
   it("recomputes additions instead of trusting a mismatched model declaration", async () => {
     const transport = {
       models: vi.fn(),
-      generate: vi.fn().mockResolvedValue({
-        response: JSON.stringify({
-          completedKana: "ありがとう。",
-          convertedText: "ありがとう。",
-          additions: [],
-        }),
-      }),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({
+          response: JSON.stringify({
+            completedKana: "ありがとう。",
+            convertedText: "ありがとう。",
+            additions: [],
+          }),
+        })
+        .mockResolvedValueOnce({ response: "有難う。" }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -490,13 +512,51 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toEqual({
-      text: "ありがとう。",
+      text: "有難う。",
       reviewKana: "ありがとう。",
+      conversionStrategy: "speculative",
       inputCompletionApplied: true,
       inputCompletionSourceKana: "ありが。",
       inputCompletionAdditions: ["とう"],
     });
-    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps romaji untouched when the speculative pass is still all hiragana", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "ありがとう。" })
+        .mockResolvedValueOnce({ response: "ありがとう。" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed("arigatou.", defaultSettings, transport);
+
+    expect(result).toEqual({
+      text: "",
+      reviewKana: "ありがとう。",
+      suggestionRejected: true,
+      suggestionRejectedReason: "speculative",
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a speculative candidate that changes protected digits", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi
+        .fn()
+        .mockResolvedValueOnce({ response: "じです。" })
+        .mockResolvedValueOnce({ response: "十一時です。" }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed("10zidesu.", defaultSettings, transport);
+
+    expect(result.text).toBe("");
+    expect(result.reviewKana).toBe("10じです。");
+    expect(result.suggestionRejectedReason).toBe("speculative");
+    expect(transport.generate).toHaveBeenCalledTimes(2);
   });
 
   it("allows a concise sentence suggestion while preserving the original kana in order", async () => {
@@ -1159,6 +1219,28 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("Never insert a listed term");
     expect(prompt).toContain('- "要件定義"');
     expect(prompt).toContain('- "OpenAI"');
+  });
+
+  it("builds a bounded speculative prompt for all-hiragana fallbacks", () => {
+    const prompt = buildSpeculativeConversionSystemPrompt(
+      defaultConversionPrompt,
+      ["ありがとう。"],
+      ["有難う"],
+    );
+
+    expect(prompt).toContain("one speculative Japanese writing candidate");
+    expect(prompt).toContain("Never invent an unrelated sentence");
+    expect(prompt).toContain("Preserve every digit, Latin token, Markdown marker");
+    expect(prompt).toContain("- ありがとう。");
+    expect(prompt).toContain('- "有難う"');
+  });
+
+  it("detects hiragana-only writing while ignoring digits and punctuation", () => {
+    expect(isHiraganaOnlyConversion("ありがとう。")).toBe(true);
+    expect(isHiraganaOnlyConversion("10じです。")).toBe(true);
+    expect(isHiraganaOnlyConversion("有難う。")).toBe(false);
+    expect(isHiraganaOnlyConversion("カタカナ")).toBe(false);
+    expect(isHiraganaOnlyConversion("OpenAIをつかう")).toBe(false);
   });
 
 });

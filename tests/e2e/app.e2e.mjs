@@ -472,12 +472,13 @@ try {
   await page.keyboard.press("Control+End");
   await page.keyboard.type("ariga.");
   const completionGhost = page.locator(".cm-ghost-text-suggestion");
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await page.locator(".cm-ghost-text-hint").filter({ hasText: "推測候補" }).waitFor();
   await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
   assert.equal(
     conversionRequestCount,
-    1,
-    "Word suggestion should complete and convert in one model request.",
+    2,
+    "An all-hiragana word suggestion should receive one speculative fallback request.",
   );
   assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
@@ -497,11 +498,28 @@ try {
       vocabularySystem.includes("Return exactly one JSON object"),
     "One structured request should contain both completion and conversion instructions.",
   );
+  await page.keyboard.press(",");
+  await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
+  assert.ok(
+    (await editorText(page)).endsWith("ariga.,"),
+    "Punctuation should dismiss a speculative candidate and remain literal romaji input.",
+  );
+  await page.keyboard.press("Control+Z");
+  await page.keyboard.press("Control+Enter");
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
+  assert.ok(
+    (await editorText(page)).endsWith("ariga."),
+    "Escape should dismiss a speculative candidate without changing the romaji source.",
+  );
+  await page.keyboard.press("Control+Enter");
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+/");
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await completionGhost.filter({ hasText: "有り難う。" }).waitFor();
   const ghostRetryVocabularySystem = conversionSystems.find((system) =>
     system.includes("Document vocabulary reference:"),
   );
@@ -538,7 +556,7 @@ try {
     .first()
     .getByRole("button", { name: "再試行" })
     .click();
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
   const historyRetryVocabularySystem = conversionSystems.find((system) =>
     system.includes("Document vocabulary reference:"),
   );
@@ -752,6 +770,9 @@ async function waitForEditorText(page, text) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  if (system.includes("one speculative Japanese writing candidate")) {
+    return system.includes("- 有難う。") ? "有り難う。" : "有難う。";
+  }
   if (system.includes("one Japanese writing suggestion")) {
     if (prompt?.includes("Mechanical kana:\nありが。")) {
       const convertedText = system.includes("- ありがとう。") ? "有難う。" : "ありがとう。";
