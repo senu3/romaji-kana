@@ -718,7 +718,7 @@ describe("convertRomajiToJapanese", () => {
     expect(completionCalls).toHaveLength(0);
   });
 
-  it("allows sentence completion only when the original content remains in order", () => {
+  it("allows grounded sentence suggestions without requiring literal subsequence fidelity", () => {
     expect(
       isAllowedInputCompletion("あした かいぎ 10じ", "あしたのかいぎは10じです", "sentence"),
     ).toBe(true);
@@ -755,10 +755,44 @@ describe("convertRomajiToJapanese", () => {
       isAllowedInputCompletion("あした かいぎ", "# あしたのかいぎです", "sentence"),
     ).toBe(false);
     expect(isAllowedInputCompletion("あした", "あしたねこ", "sentence")).toBe(true);
-    expect(isAllowedInputCompletion("あしたかいぎ", "かいぎあした", "sentence")).toBe(false);
+    expect(isAllowedInputCompletion("あしたかいぎ", "かいぎあした", "sentence")).toBe(true);
+    expect(
+      isAllowedInputCompletion("おはようございます", "よいあさですね", "sentence"),
+    ).toBe(true);
+    expect(
+      isAllowedInputCompletion("あしたのかいぎ", "ねこがまどでねています", "sentence"),
+    ).toBe(false);
     expect(
       isAllowedInputCompletion("あした", `あした${"ながい".repeat(20)}`, "sentence"),
     ).toBe(false);
+  });
+
+  it("accepts a concise sentence re-expression and omits an unreliable addition diff", async () => {
+    const transport = {
+      models: vi.fn(),
+      generate: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          completedKana: "よていをかくにんしましょう。",
+          convertedText: "予定を確認しましょう。",
+          additions: [],
+        }),
+      }),
+    };
+
+    const result = await convertRomajiToJapaneseDetailed(
+      "ashitanokaigi.",
+      { ...defaultSettings, inputCompletionLevel: "sentence" },
+      transport,
+    );
+
+    expect(result).toEqual({
+      text: "予定を確認しましょう。",
+      reviewKana: "よていをかくにんしましょう。",
+      inputCompletionApplied: true,
+      inputCompletionSourceKana: "あしたのかいぎ。",
+      inputCompletionAdditions: [],
+    });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
   it("treats space-delimited romaji particles as explicit particles", async () => {

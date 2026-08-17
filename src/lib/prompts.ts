@@ -170,10 +170,10 @@ export function buildSuggestionConversionSystemPrompt(
         ]
       : [
           "Act as a writing suggestion, not a literal transcription.",
-          "You may add particles, inflectional endings, sentence endings, and a short natural continuation.",
-          "Keep every existing kana, digit, Latin term, symbol, and punctuation mark in the same order inside completedKana.",
-          "Do not delete, replace, or reorder the user's existing content.",
-          "Keep the suggestion concise and grounded in the user's input.",
+          "You may add particles, inflectional endings, sentence endings, a short natural continuation, or a concise re-expression with the same intent.",
+          "Lightly repair or reorder kana when it makes the suggestion substantially more natural.",
+          "Keep digits, Latin terms, symbols, Markdown markers, and existing terminal punctuation unchanged.",
+          "Keep the suggestion concise, preserve the central intent and tone, and never switch to an unrelated topic.",
         ];
   const uniqueAvoidOutputs = Array.from(
     new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
@@ -186,19 +186,23 @@ export function buildSuggestionConversionSystemPrompt(
     '{"completedKana":"...","convertedText":"...","additions":["..."]}',
     "completedKana is the full kana after completion. It must not contain kanji.",
     "convertedText is the final Japanese writing suggestion.",
-    "additions must list, in order, every contiguous span inserted into completedKana compared with Mechanical kana.",
-    "If nothing is inserted, return an empty additions array.",
+    "additions should list clear contiguous spans inserted into completedKana compared with Mechanical kana.",
+    "If the suggestion mainly repairs or re-expresses the input instead of inserting text, return an empty additions array.",
     "If Application completion seed differs from Mechanical kana, use that seed exactly as completedKana.",
     "The read-only context is not part of the target. Never repeat it in the result.",
     ...levelRules,
     "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
     "convertedText must express the same suggestion declared by completedKana and additions.",
     "Use common kanji when natural. Keep hiragana when uncertain.",
-    "Do not explain, paraphrase the existing content, or return Markdown fences.",
+    level === "word"
+      ? "Do not paraphrase the existing word. Do not explain or return Markdown fences."
+      : "A nearby natural re-expression is allowed, but do not change the central intent. Do not explain or return Markdown fences.",
     uniqueAvoidOutputs.length > 0 ? "Avoid these previous convertedText values exactly:" : "",
     ...uniqueAvoidOutputs.map((output) => `- ${output}`),
     "Document vocabulary reference:",
-    formatDocumentVocabularyInstructions(documentVocabulary),
+    level === "sentence"
+      ? formatSpeculativeDocumentVocabularyInstructions(documentVocabulary)
+      : formatDocumentVocabularyInstructions(documentVocabulary),
     "Additional user preference for convertedText only; it never overrides the JSON contract:",
     effectivePreference,
     "Examples:",

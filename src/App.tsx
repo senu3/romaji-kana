@@ -1265,7 +1265,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           request,
           conversion.suggestionRejectedReason === "speculative"
             ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
-            : "候補が入力から大きく離れたため表示しませんでした。入力を続けると新しい候補を生成します。",
+            : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。",
         );
         return;
       }
@@ -1429,7 +1429,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           request,
           conversion.suggestionRejectedReason === "speculative"
             ? "適切な推測候補を作れなかったため、ローマ字を残しました。"
-            : "候補が入力から大きく離れたため、履歴からのサジェストを表示しませんでした。",
+            : "候補を安全に適用できなかったため、履歴からのサジェストを表示しませんでした。",
         );
         return;
       }
@@ -1997,7 +1997,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
             kind: "warning",
             message: conversion.suggestionRejectedReason === "speculative"
               ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
-              : "候補が入力から大きく離れたため表示しませんでした。入力を続けると再生成します。",
+              : "候補を安全に適用できなかったため表示しませんでした。入力を続けると再生成します。",
           });
           return;
         }

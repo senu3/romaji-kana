@@ -362,32 +362,41 @@ export function isAllowedInputCompletion(
     return false;
   }
 
+  if (!preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate)) {
+    return false;
+  }
+
+  const sourceParts = splitTerminalPunctuation(normalizedSource);
+  const candidateParts = splitTerminalPunctuation(normalizedCandidate);
+  if (sourceParts.punctuation && sourceParts.punctuation !== candidateParts.punctuation) {
+    return false;
+  }
+
+  const sourceCharacters = comparableReadingCharacters(sourceParts.body);
+  const candidateCharacters = comparableReadingCharacters(candidateParts.body);
   if (level === "word") {
-    const sourceParts = splitTerminalPunctuation(normalizedSource);
-    const candidateParts = splitTerminalPunctuation(normalizedCandidate);
-    const addedLength = Array.from(candidateParts.body).length - Array.from(sourceParts.body).length;
     return (
-      sourceParts.punctuation === candidateParts.punctuation &&
       candidateParts.body.startsWith(sourceParts.body) &&
-      addedLength > 0 &&
-      addedLength <= 6
+      candidateCharacters.length >= sourceCharacters.length &&
+      candidateCharacters.length <= sourceCharacters.length + 12
     );
   }
 
-  const sourceCharacters = comparableCharacters(normalizedSource);
-  const candidateCharacters = comparableCharacters(normalizedCandidate);
-  const addedLength = candidateCharacters.length - sourceCharacters.length;
-  const maximumAddedLength = Math.max(24, Math.ceil(sourceCharacters.length * 1.25));
+  const minimumLengthRatio = 0.25;
+  const maximumLength = Math.max(32, sourceCharacters.length * 3);
   if (
-    addedLength <= 0 ||
-    addedLength > maximumAddedLength ||
-    !isSubsequence(sourceCharacters, candidateCharacters) ||
-    !preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate)
+    candidateCharacters.length < Math.max(1, Math.ceil(sourceCharacters.length * minimumLengthRatio)) ||
+    candidateCharacters.length > maximumLength
   ) {
     return false;
   }
 
-  return true;
+  const minimumSharedCharacters = sourceCharacters.length <= 2
+    ? 0
+    : sourceCharacters.length <= 4
+      ? 1
+      : Math.min(3, Math.max(2, Math.ceil(sourceCharacters.length * 0.12)));
+  return countSharedCharacters(sourceCharacters, candidateCharacters) >= minimumSharedCharacters;
 }
 
 function splitTerminalPunctuation(value: string): { body: string; punctuation: string } {
@@ -409,6 +418,34 @@ function preservesProtectedAsciiTokens(source: string, candidate: string): boole
 
 function comparableCharacters(value: string): string[] {
   return Array.from(value).filter((character) => !/\s/u.test(character));
+}
+
+function comparableReadingCharacters(value: string): string[] {
+  return Array.from(value.normalize("NFKC"))
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= 0x30a1 && codePoint <= 0x30f6
+        ? String.fromCodePoint(codePoint - 0x60)
+        : character;
+    })
+    .filter((character) => /[\p{Script=Hiragana}ー]/u.test(character));
+}
+
+function countSharedCharacters(source: string[], candidate: string[]): number {
+  const available = new Map<string, number>();
+  source.forEach((character) => {
+    available.set(character, (available.get(character) ?? 0) + 1);
+  });
+
+  let shared = 0;
+  candidate.forEach((character) => {
+    const count = available.get(character) ?? 0;
+    if (count > 0) {
+      shared += 1;
+      available.set(character, count - 1);
+    }
+  });
+  return shared;
 }
 
 function isSubsequence(source: string[], candidate: string[]): boolean {
@@ -448,10 +485,12 @@ export function collectInputCompletionAdditions(
   source: string,
   candidate: string,
 ): string[] {
-  return collectInsertedSpans(
-    comparableCharacters(source),
-    comparableCharacters(candidate),
-  );
+  const sourceCharacters = comparableCharacters(source);
+  const candidateCharacters = comparableCharacters(candidate);
+  if (!isSubsequence(sourceCharacters, candidateCharacters)) {
+    return [];
+  }
+  return collectInsertedSpans(sourceCharacters, candidateCharacters);
 }
 
 function parseStructuredSuggestion(text: string): StructuredSuggestionConversion | null {
