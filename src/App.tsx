@@ -74,6 +74,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   const settingsRef = useRef(settings);
 
   const {
+    documentEpochRef,
     docVersionRef,
     saveCurrentDocumentSession,
     initialDocument,
@@ -191,6 +192,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   }, [persistDocumentChange, syncDocumentChange]);
 
   const { handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs } = useDocumentFiles({
+    documentEpochRef,
     confirmDiscardUnsavedChanges,
     currentFilePathRef,
     replaceEditorDocument,

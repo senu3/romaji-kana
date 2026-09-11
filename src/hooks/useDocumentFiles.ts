@@ -16,6 +16,7 @@ import { appShortcutFromKeyboardEvent } from "../lib/shortcuts";
 import type { ConversionStatus } from "../lib/types";
 
 interface DocumentFilesOptions {
+  documentEpochRef: RefObject<number>;
   confirmDiscardUnsavedChanges: () => boolean;
   currentFilePathRef: RefObject<string | null>;
   replaceEditorDocument: (content: string) => void;
@@ -30,6 +31,7 @@ interface DocumentFilesOptions {
 }
 
 export function useDocumentFiles({
+  documentEpochRef,
   confirmDiscardUnsavedChanges,
   currentFilePathRef,
   replaceEditorDocument,
@@ -43,6 +45,10 @@ export function useDocumentFiles({
   remoteMode,
 }: DocumentFilesOptions) {
   const initialFileRestoreStartedRef = useRef(false);
+  const saveRequestIdRef = useRef(0);
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  useEffect(() => () => { saveRequestIdRef.current += 1; }, []);
 
   const handleNewFile = useCallback(() => {
     if (!confirmDiscardUnsavedChanges()) {
@@ -79,41 +85,41 @@ export function useDocumentFiles({
     }
   }, [confirmDiscardUnsavedChanges, markDocumentClean, replaceEditorDocument]);
 
-  const handleSaveFile = useCallback(async () => {
+  const saveDocument = useCallback(async (path: string | null) => {
+    const content = getEditorDocument();
+    const epoch = documentEpochRef.current;
+    const requestId = ++saveRequestIdRef.current;
     try {
-      const savedPath = await saveMarkdownFile(getEditorDocument(), currentFilePathRef.current);
-      if (!savedPath) {
+      // Serialize disk writes so an older request cannot overwrite a newer save.
+      const operation = saveChainRef.current.then(() =>
+        epoch === documentEpochRef.current ? saveMarkdownFile(content, path) : null,
+      );
+      saveChainRef.current = operation.catch(() => undefined);
+      const savedPath = await operation;
+      if (!savedPath || epoch !== documentEpochRef.current || requestId !== saveRequestIdRef.current) {
         return;
       }
 
+      const currentContent = getEditorDocument();
+      const dirty = currentContent !== content;
       currentFilePathRef.current = savedPath;
       setCurrentFilePath(savedPath);
-      markDocumentClean();
-      saveFileDocumentSession(savedPath, getEditorDocument(), false);
-      notifyDocumentSaved(getEditorDocument(), savedPath);
-      setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
+      if (!dirty) markDocumentClean();
+      saveFileDocumentSession(savedPath, currentContent, dirty);
+      notifyDocumentSaved(currentContent, savedPath);
+      setStatus({
+        kind: dirty ? "warning" : "success",
+        message: `${basename(savedPath)} を保存しました。${dirty ? "保存中の変更は未保存です。" : ""}`,
+      });
     } catch (error: unknown) {
-      setStatus({ kind: "error", message: formatFileError(error) });
-    }
-  }, [getEditorDocument, markDocumentClean, notifyDocumentSaved]);
-
-  const handleSaveFileAs = useCallback(async () => {
-    try {
-      const savedPath = await saveMarkdownFile(getEditorDocument(), null);
-      if (!savedPath) {
-        return;
+      if (epoch === documentEpochRef.current && requestId === saveRequestIdRef.current) {
+        setStatus({ kind: "error", message: formatFileError(error) });
       }
-
-      currentFilePathRef.current = savedPath;
-      setCurrentFilePath(savedPath);
-      markDocumentClean();
-      saveFileDocumentSession(savedPath, getEditorDocument(), false);
-      notifyDocumentSaved(getEditorDocument(), savedPath);
-      setStatus({ kind: "success", message: `${basename(savedPath)} を保存しました。` });
-    } catch (error: unknown) {
-      setStatus({ kind: "error", message: formatFileError(error) });
     }
-  }, [getEditorDocument, markDocumentClean, notifyDocumentSaved]);
+  }, [documentEpochRef, getEditorDocument, markDocumentClean, notifyDocumentSaved]);
+
+  const handleSaveFile = useCallback(() => saveDocument(currentFilePathRef.current), [saveDocument]);
+  const handleSaveFileAs = useCallback(() => saveDocument(null), [saveDocument]);
 
   useEffect(() => {
     if (!editorReady || initialSession.kind !== "file" || initialFileRestoreStartedRef.current) {

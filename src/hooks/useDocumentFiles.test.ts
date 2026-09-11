@@ -3,7 +3,7 @@ import { act, useCallback } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadDocumentSession, saveFileDocumentSession } from "../lib/documentStore";
 import { openMarkdownFile, reopenMarkdownFile, saveMarkdownFile } from "../lib/fileSystem";
-import { mountHook, stateEditor } from "./testUtils";
+import { deferred, mountHook, stateEditor } from "./testUtils";
 import { useDocumentFiles } from "./useDocumentFiles";
 import { useDocumentSession } from "./useDocumentSession";
 
@@ -22,6 +22,7 @@ function harness(content = "draft") {
     const session = useDocumentSession({ remoteMode: false, editorViewRef });
     const replaceEditorDocument = useCallback((text: string) => session.replaceDocumentContent(text), [session.replaceDocumentContent]);
     const files = useDocumentFiles({
+      documentEpochRef: session.documentEpochRef,
       confirmDiscardUnsavedChanges: session.confirmDiscardUnsavedChanges,
       currentFilePathRef: session.currentFilePathRef,
       replaceEditorDocument,
@@ -54,6 +55,58 @@ describe("desktop file commands with a mocked file system", () => {
     const { hook } = harness("unsaved draft");
     expect(hook.current.session.initialDocument).toBe("unsaved draft");
     expect(reopenMarkdownFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps edits made during saving dirty and in the recovery session", async () => {
+    const saved = deferred<string | null>();
+    vi.mocked(saveMarkdownFile).mockReturnValue(saved.promise);
+    const { hook, editor } = harness("before save");
+    let saving!: Promise<void>;
+    act(() => { saving = hook.current.handleSaveFileAs(); });
+    act(() => editor.view.dispatch({ changes: { from: 0, to: editor.view.state.doc.length, insert: "new edit" } }));
+    await act(async () => { saved.resolve("C:/saved.md"); await saving; });
+    expect(saveMarkdownFile).toHaveBeenCalledWith("before save", null);
+    expect(hook.current.session.isDirty).toBe(true);
+    expect(loadDocumentSession()).toEqual({ kind: "file", path: "C:/saved.md", content: "new edit", dirty: true });
+  });
+
+  it("does not attach an old save result to a newly opened document", async () => {
+    const saved = deferred<string | null>();
+    vi.mocked(saveMarkdownFile).mockReturnValue(saved.promise);
+    const { hook } = harness();
+    let saving!: Promise<void>;
+    act(() => { saving = hook.current.handleSaveFileAs(); });
+    act(() => hook.current.handleNewFile());
+    await act(async () => { saved.resolve("C:/old.md"); await saving; });
+    expect(hook.current.session.currentFilePath).toBeNull();
+    expect(loadDocumentSession()).toEqual({ kind: "new", content: "" });
+  });
+
+  it("does not mark a saved file dirty when the draft debounce fires", async () => {
+    vi.mocked(saveMarkdownFile).mockResolvedValue("C:/saved.md");
+    const { hook, editor } = harness();
+    act(() => editor.view.dispatch({ changes: { from: 0, to: 5, insert: "saved content" } }));
+    await act(async () => { await hook.current.handleSaveFileAs(); });
+    act(() => { vi.advanceTimersByTime(250); });
+    expect(loadDocumentSession()).toEqual({ kind: "file", path: "C:/saved.md", content: "saved content", dirty: false });
+  });
+
+  it("serializes saves so the newest contents reach disk last", async () => {
+    const first = deferred<string | null>();
+    const second = deferred<string | null>();
+    vi.mocked(saveMarkdownFile).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { hook, editor } = harness("first");
+    act(() => { void hook.current.handleSaveFileAs(); });
+    await act(async () => {});
+    act(() => editor.view.dispatch({ changes: { from: 0, to: 5, insert: "second" } }));
+    act(() => { void hook.current.handleSaveFileAs(); });
+    await act(async () => {});
+    expect(saveMarkdownFile).toHaveBeenCalledTimes(1);
+    await act(async () => { first.resolve("C:/saved.md"); });
+    expect(saveMarkdownFile).toHaveBeenLastCalledWith("second", null);
+    await act(async () => { second.resolve("C:/saved.md"); });
+    expect(hook.current.session.isDirty).toBe(false);
+    expect(loadDocumentSession()).toEqual({ kind: "file", path: "C:/saved.md", content: "second", dirty: false });
   });
 
   it("opens a file and notifies synchronization only after a successful save", async () => {

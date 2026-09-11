@@ -54,6 +54,7 @@ export function useDocumentSession({ remoteMode, editorViewRef }: DocumentSessio
   );
 
   const docVersionRef = useRef(0);
+  const documentEpochRef = useRef(0);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -81,7 +82,7 @@ export function useDocumentSession({ remoteMode, editorViewRef }: DocumentSessio
     saveTimerRef.current = setTimeout(() => {
       const filePath = currentFilePathRef.current;
       if (filePath) {
-        saveFileDocumentSession(filePath, documentText, true);
+        saveFileDocumentSession(filePath, documentText, isDirtyRef.current);
       } else {
         saveNewDocumentSession(documentText);
       }
@@ -109,6 +110,7 @@ export function useDocumentSession({ remoteMode, editorViewRef }: DocumentSessio
       return;
     }
 
+    documentEpochRef.current += 1;
     suppressNextDirtyRef.current = true;
     view.dispatch({
       changes: {
@@ -170,6 +172,7 @@ export function useDocumentSession({ remoteMode, editorViewRef }: DocumentSessio
   }, [getEditorDocument, saveCurrentDocumentSession]);
 
   return {
+    documentEpochRef,
     docVersionRef,
     saveCurrentDocumentSession,
     initialDocument,
