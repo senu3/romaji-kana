@@ -264,6 +264,11 @@ export function reportedSuggestionAdditions(
   if (declared.length !== candidate.additions.length) {
     return [];
   }
+  // A model declaration is only a fallback. Existing source text cannot prove an insertion.
+  const sourceText = comparableCharacters(mechanicalKana).join("");
+  if (declared.some((addition) => sourceText.includes(addition))) {
+    return [];
+  }
   const totalLength = declared.reduce((sum, addition) => sum + Array.from(addition).length, 0);
   const sourceLength = comparableCharacters(mechanicalKana).length;
   const maximumLength = level === "word" ? 6 : Math.max(24, Math.ceil(sourceLength * 1.25));
