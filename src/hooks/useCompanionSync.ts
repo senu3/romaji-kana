@@ -69,13 +69,20 @@ export function useCompanionSync({
 
   const companionPushPendingRef = useRef(false);
 
+  const queuedDocumentRef = useRef<{ content: string; fileName: string } | null>(null);
+  const localEditRevisionRef = useRef(0);
+  const activeRef = useRef(true);
+
   const suppressNextCompanionPushRef = useRef(false);
 
   const companionClientIdRef = useRef(remoteMode ? createId("mobile") : "desktop");
 
   const remoteSettingsReadyRef = useRef(false);
 
-  const companionSettingsPushPendingRef = useRef(false);
+  const companionSettingsPushPendingRef = useRef(0);
+  const settingsPushChainRef = useRef<Promise<void>>(Promise.resolve());
+  const settingsPushRevisionRef = useRef(0);
+  const settingsSyncFailedRef = useRef(false);
 
   const suppressNextCompanionSettingsPushRef = useRef(false);
 
@@ -89,34 +96,74 @@ export function useCompanionSync({
         suppressNextCompanionSettingsPushRef.current = false;
         return;
       }
-      companionSettingsPushPendingRef.current = true;
-      void updateCompanionConversionSettings(
-        sharedConversionSettings(settings),
-        companionClientIdRef.current,
-      )
-        .catch((error: unknown) => {
-          setStatus({
-            kind: "error",
-            message: `変換設定をPCへ同期できませんでした。${error instanceof Error ? error.message : String(error)}`,
-          });
-        })
-        .finally(() => {
-          companionSettingsPushPendingRef.current = false;
-        });
+    } else if (!companionStatusRef.current.running) {
       return;
     }
-    if (companionStatusRef.current.running) {
-      void updateCompanionSettings(settings, companionClientIdRef.current);
-    }
+    companionSettingsPushPendingRef.current += 1;
+    const settingsRevision = ++settingsPushRevisionRef.current;
+    settingsSyncFailedRef.current = false;
+    settingsPushChainRef.current = settingsPushChainRef.current
+      .then(async () => {
+        if (!activeRef.current) return;
+        if (remoteMode) {
+          await updateCompanionConversionSettings(sharedConversionSettings(settings), companionClientIdRef.current);
+        } else {
+          await updateCompanionSettings(settings, companionClientIdRef.current);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!activeRef.current) return;
+        if (settingsRevision === settingsPushRevisionRef.current) settingsSyncFailedRef.current = true;
+        setStatus({
+          kind: "error",
+          message: `${remoteMode ? "変換設定をPCへ同期できませんでした。" : "変換設定をスマホ連携へ反映できませんでした。"}${error instanceof Error ? error.message : String(error)}`,
+        });
+      })
+      .finally(() => {
+        companionSettingsPushPendingRef.current -= 1;
+      });
   }, [remoteMode, settings]);
 
   useEffect(() => {
     companionStatusRef.current = companionStatus;
   }, [companionStatus]);
 
-  useEffect(() => () => {
-    if (companionPushTimerRef.current) clearTimeout(companionPushTimerRef.current);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+      if (companionPushTimerRef.current) clearTimeout(companionPushTimerRef.current);
+      companionPushTimerRef.current = null;
+      queuedDocumentRef.current = null;
+    };
   }, []);
+
+  // Only one PUT may run at a time; retain the newest edit while that request is in flight.
+  const flushDocumentPush = useCallback(async function pushNextDocument() {
+    if (!activeRef.current || companionPushPendingRef.current || !queuedDocumentRef.current) return;
+    const next = queuedDocumentRef.current;
+    queuedDocumentRef.current = null;
+    companionPushPendingRef.current = true;
+    let succeeded = false;
+    try {
+      const snapshot = await updateCompanionDocument(
+        next.content, next.fileName, companionClientIdRef.current,
+      );
+      companionRevisionRef.current = Math.max(companionRevisionRef.current, snapshot.document.revision);
+      succeeded = true;
+    } catch (error: unknown) {
+      if (!activeRef.current) return;
+      // Keep unsent local content protected from polling until a subsequent edit/save retries it.
+      queuedDocumentRef.current ??= next;
+      setStatus({
+        kind: "error",
+        message: `スマホ連携の同期に失敗しました。${error instanceof Error ? error.message : String(error)}`,
+      });
+    } finally {
+      companionPushPendingRef.current = false;
+      if (succeeded && !companionPushTimerRef.current) void pushNextDocument();
+    }
+  }, [setStatus]);
 
   const syncDocumentChange = useCallback((documentText: string) => {
     const syncEnabled = remoteMode || companionStatusRef.current.running;
@@ -127,36 +174,21 @@ export function useCompanionSync({
       suppressNextCompanionPushRef.current = false;
       return;
     }
+    localEditRevisionRef.current += 1;
+    queuedDocumentRef.current = {
+      content: documentText,
+      fileName: remoteMode
+        ? remoteFileName
+        : currentFilePathRef.current ? basename(currentFilePathRef.current) : "Untitled.md",
+    };
     if (companionPushTimerRef.current) {
       clearTimeout(companionPushTimerRef.current);
     }
-    companionPushTimerRef.current = setTimeout(async () => {
-      companionPushPendingRef.current = true;
-      try {
-        const snapshot = await updateCompanionDocument(
-          documentText,
-          remoteMode
-            ? remoteFileName
-            : currentFilePathRef.current
-              ? basename(currentFilePathRef.current)
-              : "Untitled.md",
-          companionClientIdRef.current,
-        );
-        companionRevisionRef.current = Math.max(
-          companionRevisionRef.current,
-          snapshot.document.revision,
-        );
-      } catch (error: unknown) {
-        setStatus({
-          kind: "error",
-          message: `スマホ連携の同期に失敗しました。${error instanceof Error ? error.message : String(error)}`,
-        });
-      } finally {
-        companionPushPendingRef.current = false;
-        companionPushTimerRef.current = null;
-      }
+    companionPushTimerRef.current = setTimeout(() => {
+      companionPushTimerRef.current = null;
+      void flushDocumentPush();
     }, COMPANION_SYNC_DELAY_MS);
-  }, [remoteFileName, remoteMode]);
+  }, [remoteFileName, remoteMode, flushDocumentPush]);
 
   const applyCompanionSnapshot = useCallback((snapshot: CompanionSnapshot) => {
     if (remoteMode) {
@@ -201,18 +233,13 @@ export function useCompanionSync({
 
   const notifyDocumentSaved = useCallback((documentText: string, savedPath: string) => {
     if (companionStatusRef.current.running) {
-      void updateCompanionDocument(
-        documentText,
-        basename(savedPath),
-        companionClientIdRef.current,
-      ).then((snapshot) => {
-        companionRevisionRef.current = Math.max(
-          companionRevisionRef.current,
-          snapshot.document.revision,
-        );
-      }).catch(() => undefined);
+      localEditRevisionRef.current += 1;
+      if (companionPushTimerRef.current) clearTimeout(companionPushTimerRef.current);
+      companionPushTimerRef.current = null;
+      queuedDocumentRef.current = { content: documentText, fileName: basename(savedPath) };
+      void flushDocumentPush();
     }
-  }, []);
+  }, [flushDocumentPush]);
 
   const handleStartCompanion = useCallback(async () => {
     setCompanionBusy(true);
@@ -274,13 +301,25 @@ export function useCompanionSync({
     }
 
     let disposed = false;
+    let polling = false;
     const poll = async () => {
-      if (companionPushPendingRef.current || companionPushTimerRef.current) {
+      if (
+        polling || companionPushPendingRef.current || companionPushTimerRef.current ||
+        queuedDocumentRef.current || companionSettingsPushPendingRef.current || settingsSyncFailedRef.current
+      ) {
         return;
       }
+      polling = true;
+      const editRevision = localEditRevisionRef.current;
+      const requestedSettings = settingsRef.current;
       try {
         const snapshot = await getCompanionState();
-        if (!disposed) {
+        if (
+          !disposed && editRevision === localEditRevisionRef.current &&
+          requestedSettings === settingsRef.current &&
+          !companionPushPendingRef.current && !companionPushTimerRef.current &&
+          !queuedDocumentRef.current && !companionSettingsPushPendingRef.current && !settingsSyncFailedRef.current
+        ) {
           applyCompanionSnapshot(snapshot);
         }
       } catch (error: unknown) {
@@ -292,6 +331,8 @@ export function useCompanionSync({
         if (remoteMode && !hasRemoteCompanionToken()) {
           window.location.reload();
         }
+      } finally {
+        polling = false;
       }
     };
 

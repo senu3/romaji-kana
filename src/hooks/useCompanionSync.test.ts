@@ -63,6 +63,111 @@ describe("companion synchronization lifecycle", () => {
     vi.mocked(updateCompanionDocument).mockReset().mockResolvedValue(snapshot("local edit", 2));
   });
 
+  it("ignores a poll response if typing started while it was in flight", async () => {
+    const poll = deferred<CompanionSnapshot>();
+    vi.mocked(getCompanionState).mockReturnValue(poll.promise);
+    const { hook, editor, applyRemoteDocument } = harness();
+    act(() => {
+      editor.view.dispatch({ changes: { from: 0, insert: "local typing" } });
+      hook.current.syncDocumentChange("local typing");
+    });
+    await act(async () => { poll.resolve(snapshot("stale PC document")); });
+    expect(applyRemoteDocument).not.toHaveBeenCalled();
+    expect(editor.view.state.doc.toString()).toBe("local typing");
+  });
+
+  it("serializes document writes and sends the latest queued edit last", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    const first = deferred<CompanionSnapshot>();
+    const second = deferred<CompanionSnapshot>();
+    vi.mocked(updateCompanionDocument).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { hook } = harness();
+    await act(async () => {});
+    act(() => hook.current.syncDocumentChange("first"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+    act(() => hook.current.syncDocumentChange("second"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+    expect(updateCompanionDocument).toHaveBeenCalledTimes(1);
+    await act(async () => { first.resolve(snapshot("first", 2)); });
+    expect(updateCompanionDocument).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(updateCompanionDocument).mock.calls[1][0]).toBe("second");
+    await act(async () => { second.resolve(snapshot("second", 3)); });
+  });
+
+  it("serializes settings writes and ignores snapshots until all settings are sent", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    const first = deferred<CompanionSnapshot>();
+    const second = deferred<CompanionSnapshot>();
+    vi.mocked(updateCompanionConversionSettings).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { hook } = harness();
+    await act(async () => {});
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "none" })));
+    expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(1);
+    await act(async () => { first.resolve(snapshot()); });
+    expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(650); });
+    expect(hook.current.settings.inputCompletionLevel).toBe("none");
+    await act(async () => { second.resolve(snapshot()); });
+  });
+
+  it("keeps the newer debounce timer when the preceding write completes", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    const first = deferred<CompanionSnapshot>();
+    vi.mocked(updateCompanionDocument).mockReturnValueOnce(first.promise);
+    const { hook } = harness();
+    await act(async () => {});
+    act(() => hook.current.syncDocumentChange("first"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+    act(() => hook.current.syncDocumentChange("newer"));
+    await act(async () => { first.resolve(snapshot("first", 2)); });
+    expect(updateCompanionDocument).toHaveBeenCalledTimes(1);
+    hook.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+    expect(updateCompanionDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send queued settings after unmount", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    const first = deferred<CompanionSnapshot>();
+    vi.mocked(updateCompanionConversionSettings).mockReturnValueOnce(first.promise);
+    const { hook } = harness();
+    await act(async () => {});
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "none" })));
+    hook.unmount();
+    await act(async () => { first.resolve(snapshot()); });
+    expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves an unsent document after a write failure instead of polling over it", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    vi.mocked(updateCompanionDocument).mockRejectedValueOnce(new Error("offline"));
+    const { hook, editor, applyRemoteDocument } = harness();
+    await act(async () => {});
+    act(() => {
+      editor.view.dispatch({ changes: { from: 0, to: editor.view.state.doc.length, insert: "unsent" } });
+      hook.current.syncDocumentChange("unsent");
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1300); });
+    expect(editor.view.state.doc.toString()).toBe("unsent");
+    expect(applyRemoteDocument).toHaveBeenCalledTimes(1);
+    expect(getCompanionState).toHaveBeenCalledTimes(1);
+    expect(updateCompanionDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not revert local settings after the last write fails", async () => {
+    vi.mocked(getCompanionState).mockResolvedValue(snapshot());
+    vi.mocked(updateCompanionConversionSettings).mockRejectedValueOnce(new Error("offline"));
+    const { hook } = harness();
+    await act(async () => {});
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1300); });
+    expect(hook.current.settings.inputCompletionLevel).toBe("sentence");
+    expect(getCompanionState).toHaveBeenCalledTimes(1);
+  });
+
   it("does not echo incoming documents or settings, but sends subsequent local edits", async () => {
     vi.mocked(getCompanionState).mockResolvedValue(snapshot());
     const { hook, applyRemoteDocument } = harness();
