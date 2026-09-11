@@ -6,6 +6,28 @@ describe("defaultOllamaTransport", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each(["ollama", "lmstudio"] as const)("does not retry unrelated %s API failures", async (provider) => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false, status: 404, text: async () => "unknown model: missing-model",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(defaultOllamaTransport.generate(provider, "http://localhost:1234", {
+      model: "missing-model", system: "system", prompt: "prompt", stream: false, think: true,
+    }, 100)).rejects.toThrow("unknown model");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a server failure even when its message mentions reasoning", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false, status: 503, text: async () => "reasoning backend has invalid state",
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(defaultOllamaTransport.generate("lmstudio", "http://localhost:1234", {
+      model: "local-model", system: "system", prompt: "prompt", stream: false, think: true,
+    }, 100)).rejects.toThrow("HTTP 503");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("retries Ollama generation without thinking when thinking is rejected", async () => {
     const bodies: unknown[] = [];
     const fetchMock = vi

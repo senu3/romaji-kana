@@ -280,7 +280,14 @@ async function requestLmStudioChat(
 
 function isReasoningOptionError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /reasoning|enable_thinking|thinking|unsupported|unknown|invalid/i.test(message);
+  const status = message.match(/\bHTTP (\d{3})\b/i)?.[1];
+  if (status && status !== "400" && status !== "422") {
+    return false;
+  }
+  return (
+    /\breasoning(?:_effort)?\b|\benable_thinking\b|\bthink(?:ing)?\b/i.test(message) &&
+    /unsupported|not supported|does not support|unknown|unrecognized|invalid|not allowed|must be|expected/i.test(message)
+  );
 }
 
 async function fetchLocalJson<T>(
