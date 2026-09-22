@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "node tests/e2e/app.e2e.mjs",
+    "eval:run": "node tests/evaluation/run.mjs",
+    "eval:test": "node --test tests/evaluation/runner.check.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
