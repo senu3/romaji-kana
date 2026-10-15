@@ -27,6 +27,43 @@ try {
   const firstRunPage = await firstRunContext.newPage();
   await firstRunPage.goto(appUrl);
   await firstRunPage.getByRole("region", { name: "Markdownエディター" }).waitFor();
+  const themeSelect = firstRunPage.getByRole("combobox", { name: "表示テーマ" });
+  await firstRunPage.emulateMedia({ colorScheme: "dark" });
+  await firstRunPage.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  await firstRunPage.waitForFunction(() => getComputedStyle(document.querySelector(".rail-button")).color === "rgb(224, 233, 237)");
+  const contrastRatios = await firstRunPage.evaluate(() => {
+    const luminance = color => {
+      const rgb = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(c => {
+        const v = c / 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    return [[".cm-content", ".cm-editor"], [".rail-button", ".app-rail"], [".theme-select", ".app-titlebar"]].map(([fg, bg]) => {
+      const a = luminance(getComputedStyle(document.querySelector(fg)).color);
+      const b = luminance(getComputedStyle(document.querySelector(bg)).backgroundColor);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+  });
+  assert.ok(contrastRatios.every(ratio => ratio >= 4.5), `Dark text contrast: ${contrastRatios}`);
+  assert.equal(await themeSelect.inputValue(), "system");
+  await themeSelect.selectOption("light");
+  await firstRunPage.waitForFunction(() => document.documentElement.dataset.theme === "light");
+  await firstRunPage.reload();
+  assert.equal(await themeSelect.inputValue(), "light");
+  await themeSelect.selectOption("dark");
+  await firstRunPage.emulateMedia({ colorScheme: "light" });
+  assert.equal(await firstRunPage.locator("html").getAttribute("data-theme"), "dark");
+  await themeSelect.selectOption("system");
+  await firstRunPage.waitForFunction(() => document.documentElement.dataset.theme === "light");
+  await firstRunPage.emulateMedia({ colorScheme: "dark" });
+  await firstRunPage.waitForFunction(() => document.documentElement.dataset.theme === "dark");
+  await firstRunPage.setViewportSize({ width: 390, height: 844 });
+  const selectorBounds = await themeSelect.boundingBox();
+  assert.ok(selectorBounds && selectorBounds.x >= 0 && selectorBounds.x + selectorBounds.width <= 390);
+  if (process.env.E2E_CANDIDATE_SCREENSHOT) {
+    await firstRunPage.screenshot({ path: process.env.E2E_CANDIDATE_SCREENSHOT + ".mobile.png" });
+  }
   assert.equal(
     await firstRunPage.getByRole("dialog").count(),
     0,
@@ -475,6 +512,16 @@ try {
   await completionGhost.filter({ hasText: "有難う。" }).waitFor();
   await page.locator(".cm-ghost-text-hint").filter({ hasText: "推測候補" }).waitFor();
   await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
+  const comparison = page.getByRole("group", { name: "候補の比較" });
+  assert.ok((await comparison.textContent()).includes("変換前:"));
+  assert.ok((await comparison.textContent()).includes("補完前の読み:"));
+  assert.ok((await comparison.textContent()).includes("候補: 有難う。"));
+  if (process.env.E2E_CANDIDATE_SCREENSHOT) {
+    await page.getByRole("combobox", { name: "表示テーマ" }).selectOption("dark");
+    await page.waitForFunction(() => getComputedStyle(document.querySelector(".rail-button")).color === "rgb(224, 233, 237)");
+    await page.screenshot({ path: process.env.E2E_CANDIDATE_SCREENSHOT });
+    await page.getByRole("combobox", { name: "表示テーマ" }).selectOption("system");
+  }
   assert.equal(
     conversionRequestCount,
     2,

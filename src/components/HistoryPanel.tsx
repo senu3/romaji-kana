@@ -1,5 +1,6 @@
+import { candidatePresentation } from "../lib/candidatePresentation";
 import { Loader2, RotateCcw, X } from "lucide-react";
-import type { ConversionHistoryItem, InputCompletionLevel, PendingConversion } from "../lib/types";
+import type { ConversionHistoryItem, PendingConversion } from "../lib/types";
 
 export function RecentRetryChip({
   item,
@@ -28,21 +29,7 @@ export function RecentRetryChip({
       >
         <RotateCcw size={15} aria-hidden="true" />
         <span className="recent-retry-chip-text">
-          {item.conversionStrategy === "speculative"
-            ? item.output
-              ? `推測候補: ${item.output}`
-              : "推測候補を確定しました"
-            : item.inputCompletionApplied
-              ? item.output
-                ? `入力補完: ${item.output}`
-                : "入力補完で生成しました"
-              : item.conversionStrategy === "completion"
-                ? item.output
-                  ? `補完変換: ${item.output}`
-                  : "補完変換で生成しました"
-                : item.output
-                  ? `${item.output} の別候補を試す`
-                  : "別候補を試す"}
+          {`${candidatePresentation(item).label}: ${item.output ?? "出力なし"} の別候補を試す`}
         </span>
         <kbd>Ctrl/Cmd+/</kbd>
       </button>
@@ -142,9 +129,15 @@ export function HistoryPanel({
               </div>
               <dl className="history-lines">
                 <div className="history-line">
-                  <dt>入力</dt>
+                  <dt>変換前</dt>
                   <dd>{item.input}</dd>
                 </div>
+                {item.inputCompletionSourceKana ? (
+                  <div className="history-line">
+                    <dt>補完前の読み</dt>
+                    <dd>{item.inputCompletionSourceKana}</dd>
+                  </div>
+                ) : null}
                 <div className="history-line">
                   <dt>{item.status === "success" ? "出力" : "結果"}</dt>
                   <dd>{item.output ?? item.error ?? "出力はありません。"}</dd>
@@ -158,13 +151,10 @@ export function HistoryPanel({
                   title={
                     item.inputCompletionApplied && item.inputCompletionSourceKana
                       ? `補完前: ${item.inputCompletionSourceKana}`
-                      : "この変換で使用した入力補完レベル"
+                      : candidatePresentation(item).description
                   }
                 >
-                  {historyInputCompletionLabel(
-                    item.inputCompletionLevel,
-                    item.inputCompletionApplied,
-                  )}
+                  {candidatePresentation(item).label}
                 </span>
                 <button
                   className="history-action-button"
@@ -215,17 +205,4 @@ function historyStatusLabel(status: ConversionHistoryItem["status"]): string {
     return "スキップ";
   }
   return "キャンセル";
-}
-
-function historyInputCompletionLabel(
-  level: InputCompletionLevel | undefined,
-  applied: boolean | undefined,
-): string {
-  if (level === "word") {
-    return applied ? "単語補完・適用" : "単語補完・変更なし";
-  }
-  if (level === "sentence") {
-    return applied ? "文章補完・適用" : "文章補完・変更なし";
-  }
-  return "入力どおり";
 }

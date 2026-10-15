@@ -1,6 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
+import "./theme.css";
 import {
   AppRail,
   AppTitleBar,

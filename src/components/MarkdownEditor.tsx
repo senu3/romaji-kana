@@ -1,3 +1,4 @@
+import { candidatePresentation } from "../lib/candidatePresentation";
 import {
   defaultKeymap,
   history,
@@ -138,62 +139,63 @@ interface GhostState {
 }
 
 class GhostTextWidget extends WidgetType {
-  constructor(
-    private readonly text: string,
-    private readonly conversionStrategy: GhostConversionSuggestion["conversionStrategy"],
-    private readonly inputCompletionLevel: GhostConversionSuggestion["inputCompletionLevel"],
-    private readonly inputCompletionAdditions: string[],
-  ) {
+  constructor(private readonly candidate: GhostConversionSuggestion) {
     super();
   }
 
   toDOM() {
+    const presentation = candidatePresentation(this.candidate);
+    const speculative = this.candidate.conversionStrategy === "speculative";
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
-    element.title =
-      this.conversionStrategy === "speculative"
-        ? "推測候補。Tab で確定、Esc で破棄"
-        : this.inputCompletionLevel === "word"
-        ? "単語サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
-        : this.inputCompletionLevel === "sentence"
-        ? "文章サジェスト。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
-        : this.conversionStrategy === "completion"
-        ? "補完変換候補。Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄"
-        : "Tab または句読点で確定、Ctrl/Cmd+/ で別候補、Esc で破棄";
-
+    element.title = presentation.description;
     const suggestion = document.createElement("span");
     suggestion.className = "cm-ghost-text-suggestion";
-    suggestion.textContent = `  ${this.text}`;
+    suggestion.textContent = this.candidate.convertedText;
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent =
-      this.conversionStrategy === "speculative"
-        ? "推測候補  Tabで確定  Escで破棄"
-        : this.inputCompletionLevel === "word"
-        ? "単語サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
-        : this.inputCompletionLevel === "sentence"
-        ? "文章サジェスト  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
-        : this.conversionStrategy === "completion"
-        ? "補完変換  Tab/句読点で確定  Ctrl/Cmd+/で別候補"
-        : "Tab/句読点で確定  Ctrl/Cmd+/で別候補";
+    hint.textContent = `${presentation.label}  ${speculative
+      ? "Tabで確定  Escで破棄"
+      : "Tab/句読点で確定  Ctrl/Cmd+/で別候補  Escで破棄"}`;
 
-    element.append(suggestion);
-    if (this.inputCompletionAdditions.length > 0) {
+    if ((this.candidate.inputCompletionAdditions ?? []).length > 0) {
       const diff = document.createElement("span");
       diff.className = "cm-ghost-text-diff";
-      const visibleAdditions = this.inputCompletionAdditions.slice(0, 3);
+      const visibleAdditions = (this.candidate.inputCompletionAdditions ?? []).slice(0, 3);
       const additions = visibleAdditions
         .map((addition) => `「${addition}」`)
         .join("・");
-      const remainingCount = this.inputCompletionAdditions.length - visibleAdditions.length;
+      const remainingCount = (this.candidate.inputCompletionAdditions ?? []).length - visibleAdditions.length;
       diff.textContent = `補完 +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
       diff.setAttribute(
         "aria-label",
-        `入力補完で追加: ${this.inputCompletionAdditions.join("、")}`,
+        `入力補完で追加: ${(this.candidate.inputCompletionAdditions ?? []).join("、")}`,
       );
       element.append(diff);
     }
+    const comparison = document.createElement("span");
+    comparison.className = "cm-ghost-comparison";
+    comparison.setAttribute("role", "group");
+    comparison.setAttribute("aria-label", "候補の比較");
+    const before = document.createElement("span");
+    before.textContent = `変換前: ${this.candidate.originalText}`;
+    comparison.append(before);
+    if (this.candidate.inputCompletionSourceKana) {
+      const reading = document.createElement("span");
+      reading.textContent = `補完前の読み: ${this.candidate.inputCompletionSourceKana}`;
+      comparison.append(reading);
+    }
+    const after = document.createElement("span");
+    after.textContent = "候補: ";
+    after.append(suggestion);
+    comparison.append(after);
+    if (this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {
+      const note = document.createElement("span");
+      note.textContent = "補足・言い換えあり。追加箇所は特定できません。";
+      comparison.append(note);
+    }
+    element.prepend(comparison);
     element.append(hint);
     return element;
   }
@@ -254,12 +256,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
   return Decoration.set([
     sourceDecoration,
     Decoration.widget({
-      widget: new GhostTextWidget(
-        suggestion.convertedText,
-        suggestion.conversionStrategy,
-        suggestion.inputCompletionLevel,
-        suggestion.inputCompletionAdditions ?? [],
-      ),
+      widget: new GhostTextWidget(suggestion),
       side: 1,
     }).range(suggestion.to),
   ]);
@@ -268,8 +265,8 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
 const theme = EditorView.theme({
   "&": {
     height: "100%",
-    color: "#123f3b",
-    backgroundColor: "#ffffff",
+    color: "var(--theme-text, #123f3b)",
+    backgroundColor: "var(--theme-surface, #ffffff)",
   },
   ".cm-scroller": {
     fontFamily:
@@ -280,7 +277,7 @@ const theme = EditorView.theme({
   ".cm-content": {
     minHeight: "100%",
     padding: "44px 54px",
-    caretColor: "#0d9488",
+    caretColor: "var(--theme-accent, #0d9488)",
   },
   ".cm-line": {
     padding: "0 2px",
@@ -289,67 +286,83 @@ const theme = EditorView.theme({
     outline: "none",
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-    backgroundColor: "#b8ece4",
+    backgroundColor: "var(--theme-selection, #b8ece4)",
   },
   ".cm-gutters": {
-    backgroundColor: "#fbfdfc",
-    color: "#718782",
-    borderRight: "1px solid #dde9e6",
+    backgroundColor: "var(--theme-raised, #fbfdfc)",
+    color: "var(--theme-muted, #718782)",
+    borderRight: "1px solid var(--theme-border, #dde9e6)",
   },
   ".cm-activeLineGutter": {
-    backgroundColor: "#e7f8f3",
+    backgroundColor: "var(--theme-accent-soft, #e7f8f3)",
   },
   ".cm-activeLine": {
-    backgroundColor: "#f7fbfa",
+    backgroundColor: "var(--theme-raised, #f7fbfa)",
   },
   ".cm-placeholder": {
-    color: "#617872",
+    color: "var(--theme-muted, #617872)",
   },
   ".cm-conversion-loading": {
-    backgroundColor: "#d8f7ef",
-    borderBottom: "2px solid #0d9488",
+    backgroundColor: "var(--theme-selection, #d8f7ef)",
+    borderBottom: "2px solid var(--theme-accent, #0d9488)",
     borderRadius: "3px",
   },
   ".cm-ghost-source": {
-    backgroundColor: "#f3f8f6",
-    borderBottom: "1px dashed #0d9488",
+    backgroundColor: "var(--theme-chrome, #f3f8f6)",
+    borderBottom: "1px dashed var(--theme-accent, #0d9488)",
     borderRadius: "3px",
   },
   ".cm-ghost-text": {
-    color: "#0f766e",
+    color: "var(--theme-accent, #0f766e)",
     fontStyle: "italic",
     whiteSpace: "pre-wrap",
   },
   ".cm-ghost-text-suggestion": {
-    opacity: "0.58",
     marginRight: "8px",
+  },
+  ".cm-ghost-comparison": {
+    display: "inline-flex",
+    flexDirection: "column",
+    maxWidth: "100%",
+    margin: "4px 8px",
+    padding: "4px 8px",
+    border: "1px solid var(--theme-border, #b5d7d1)",
+    borderRadius: "6px",
+    color: "var(--theme-text, #123f3b)",
+    backgroundColor: "var(--theme-accent-soft, #f8fffd)",
+    fontSize: "12px",
+    fontStyle: "normal",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
+    verticalAlign: "middle",
   },
   ".cm-ghost-text-diff": {
     display: "inline-flex",
     alignItems: "center",
     minHeight: "20px",
     marginRight: "6px",
-    border: "1px solid #e2b45e",
+    border: "1px solid var(--theme-warning, #e2b45e)",
     borderRadius: "6px",
     padding: "1px 6px",
-    backgroundColor: "#fff8e8",
-    color: "#7a4d0b",
+    backgroundColor: "var(--theme-warning-soft, #fff8e8)",
+    color: "var(--theme-warning, #7a4d0b)",
     fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
     fontSize: "11px",
     fontStyle: "normal",
     fontWeight: "750",
     verticalAlign: "middle",
-    whiteSpace: "nowrap",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
   ".cm-ghost-text-hint": {
     display: "inline-flex",
     alignItems: "center",
     minHeight: "20px",
-    border: "1px solid #b5d7d1",
+    border: "1px solid var(--theme-border, #b5d7d1)",
     borderRadius: "999px",
     padding: "1px 7px",
-    backgroundColor: "#f8fffd",
-    color: "#0f766e",
+    backgroundColor: "var(--theme-accent-soft, #f8fffd)",
+    color: "var(--theme-accent, #0f766e)",
     fontFamily: '"Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif',
     fontSize: "11px",
     fontStyle: "normal",
@@ -359,18 +372,18 @@ const theme = EditorView.theme({
     whiteSpace: "nowrap",
   },
   ".cm-history-preview": {
-    backgroundColor: "#e8f5f2",
-    borderBottom: "1px solid #5aa79d",
+    backgroundColor: "var(--theme-accent-soft, #e8f5f2)",
+    borderBottom: "1px solid var(--theme-accent, #5aa79d)",
     borderRadius: "3px",
   },
   ".cm-panels": {
-    backgroundColor: "#fbfdfc",
-    color: "#123f3b",
+    backgroundColor: "var(--theme-raised, #fbfdfc)",
+    color: "var(--theme-text, #123f3b)",
     fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
     fontSize: "13px",
   },
   ".cm-panels.cm-panels-top": {
-    borderBottom: "1px solid #dbe8e4",
+    borderBottom: "1px solid var(--theme-border, #dbe8e4)",
   },
   ".cm-search": {
     display: "flex",
@@ -385,25 +398,25 @@ const theme = EditorView.theme({
   ".cm-search .cm-textfield": {
     width: "min(180px, 34vw)",
     minHeight: "32px",
-    border: "1px solid #b8d5cf",
+    border: "1px solid var(--theme-border, #b8d5cf)",
     borderRadius: "6px",
     padding: "5px 8px",
-    backgroundColor: "#ffffff",
-    color: "#123f3b",
+    backgroundColor: "var(--theme-surface, #ffffff)",
+    color: "var(--theme-text, #123f3b)",
     outline: "none",
   },
   ".cm-search .cm-textfield:focus": {
-    borderColor: "#0f766e",
-    boxShadow: "0 0 0 2px #ccfbf1",
+    borderColor: "var(--theme-accent, #0f766e)",
+    boxShadow: "0 0 0 2px var(--theme-selection, #ccfbf1)",
   },
   ".cm-search .cm-button": {
     minHeight: "32px",
-    border: "1px solid #b8d5cf",
+    border: "1px solid var(--theme-border, #b8d5cf)",
     borderRadius: "6px",
     padding: "5px 9px",
     backgroundImage: "none",
-    backgroundColor: "#ffffff",
-    color: "#0f766e",
+    backgroundColor: "var(--theme-surface, #ffffff)",
+    color: "var(--theme-accent, #0f766e)",
     fontSize: "12px",
     fontWeight: "700",
   },
@@ -416,17 +429,17 @@ const theme = EditorView.theme({
   '.cm-search button[name="close"]': {
     position: "static",
     marginLeft: "auto",
-    color: "#617872",
+    color: "var(--theme-muted, #617872)",
     fontSize: "18px",
   },
 });
 
 const highlightStyle = HighlightStyle.define([
-  { tag: tags.heading, color: "#0f766e", fontWeight: "700" },
+  { tag: tags.heading, color: "var(--theme-accent, #0f766e)", fontWeight: "700" },
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strong, fontWeight: "700" },
-  { tag: tags.link, color: "#0d9488", textDecoration: "underline" },
-  { tag: tags.monospace, color: "#9a3412", backgroundColor: "#fff7ed" },
+  { tag: tags.link, color: "var(--theme-accent, #0d9488)", textDecoration: "underline" },
+  { tag: tags.monospace, color: "var(--theme-warning, #9a3412)", backgroundColor: "var(--theme-warning-soft, #fff7ed)" },
 ]);
 
 const COMPOSITION_END_GRACE_MS = 120;

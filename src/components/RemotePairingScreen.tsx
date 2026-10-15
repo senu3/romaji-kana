@@ -1,6 +1,7 @@
 import { Link2, Loader2, Smartphone } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { clearRemoteCompanionToken, pairRemoteCompanion } from "../lib/companion";
+import { ThemeSelect } from "./ThemeSelect";
 
 export function RemotePairingScreen({ onPaired }: { onPaired: () => void }) {
   const [code, setCode] = useState("");
@@ -29,6 +30,7 @@ export function RemotePairingScreen({ onPaired }: { onPaired: () => void }) {
   return (
     <main className="pairing-page">
       <section className="pairing-sheet" aria-labelledby="pairing-title">
+        <ThemeSelect />
         <div className="pairing-brand" aria-hidden="true">
           <span className="app-logo">か</span>
           <span>Romaji Kana</span>

@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { ThemeSelect } from "./ThemeSelect";
 import type { ActivePanel } from "../lib/appTypes";
 import { providerLabel } from "../lib/ollama";
 import type {
@@ -27,6 +28,7 @@ export function AppTitleBar() {
         <span className="app-logo" aria-hidden="true">か</span>
         <span>Romaji Kana</span>
       </div>
+      <ThemeSelect />
     </header>
   );
 }

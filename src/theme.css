@@ -1,0 +1,66 @@
+/* Dark surfaces use a cool neutral base; teal remains the action color.
+   Text, borders and status colors are chosen separately, never inverted. */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --theme-surface: #151e24;
+  --theme-chrome: #11191f;
+  --theme-raised: #202c33;
+  --theme-text: #e0e9ed;
+  --theme-muted: #a8b9c1;
+  --theme-accent: #75d9cb;
+  --theme-accent-soft: #203e3d;
+  --theme-border: #536b73;
+  --theme-focus: #97efe0;
+  --theme-selection: #315d64;
+  --theme-success: #86dca8;
+  --theme-warning: #f3c27e;
+  --theme-warning-soft: #3b3022;
+  --theme-danger: #ffaaa5;
+  --theme-danger-soft: #422c30;
+  --theme-glaze: #202c33;
+  --theme-shadow: rgba(0, 0, 0, 0.28);
+}
+
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.theme-select select {
+  width: auto;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left-color: var(--ink);
+}
+
+:root[data-theme="dark"] .cm-editor .cm-selectionBackground,
+:root[data-theme="dark"] .cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--theme-selection);
+}
+
+:root[data-theme="dark"] ::selection {
+  color: var(--theme-text);
+  background: var(--theme-selection);
+}
+
+@media (max-width: 480px) {
+  .theme-select { gap: 4px; }
+  .theme-select > span { display: none; }
+  .theme-select select { min-height: 44px; }
+}
