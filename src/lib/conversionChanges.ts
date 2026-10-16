@@ -1,4 +1,5 @@
 import { collectInputCompletionAdditions } from "./completionValidation";
+import { localCorrectionRule } from "./conversionRules";
 
 /** A description of the observed change, independent of the requested mode
  * and generation strategy. Model readings are evidence, not semantic proof. */
@@ -47,7 +48,7 @@ export function classifyConversionChanges(
   let endA = a.length, endB = b.length;
   while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
   const changedLength = Math.max(endA - start, endB - start);
-  if (changedLength <= 2 && changedLength / Math.max(a.length, b.length) <= 0.25) {
+  if (changedLength <= localCorrectionRule.maximumChange(Math.max(a.length, b.length))) {
     return { ...base, kind: "correction" };
   }
   return { ...base, kind: "rewrite" };

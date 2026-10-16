@@ -5,6 +5,7 @@ import {
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
 import { preservesProtectedContent } from "./conversionProtection";
+import { convertedTextLengthRule, finalReadingRule, speculativeRule } from "./conversionRules";
 
 export type SegmentRoute =
   | { kind: "word" | "sentence" }
@@ -52,15 +53,13 @@ export function isUsableConversionResult(
 }
 
 export function isHiraganaOnlyConversion(value: string): boolean {
-  const hasHiragana = /[\u3041-\u3096]/u.test(value);
-  const hasNonHiraganaWriting = /[\u30a1-\u30ff\u3400-\u9fff々〆ヵヶA-Za-z]/u.test(value);
-  return hasHiragana && !hasNonHiraganaWriting;
+  return speculativeRule.isHiraganaOnlyCandidate(value);
 }
 
 export function isAllowedSpeculativeConversion(source: string, candidate: string): boolean {
   const normalizedSource = source.trim();
   const normalizedCandidate = candidate.trim();
-  if (!normalizedSource || !normalizedCandidate || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(candidate)) {
+  if (!normalizedSource || !normalizedCandidate || finalReadingRule.forbiddenControls.test(candidate)) {
     return false;
   }
   if (
@@ -71,8 +70,5 @@ export function isAllowedSpeculativeConversion(source: string, candidate: string
 
   const sourceLength = comparableCharacters(normalizedSource).length;
   const candidateLength = comparableCharacters(normalizedCandidate).length;
-  return (
-    candidateLength >= Math.max(1, Math.ceil(sourceLength * 0.2)) &&
-    candidateLength <= Math.max(24, sourceLength * 2)
-  );
+  return convertedTextLengthRule.accepts(sourceLength, candidateLength);
 }

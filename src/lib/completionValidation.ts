@@ -5,6 +5,7 @@ import { stripThinkBlock } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule } from "./conversionRules";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -51,8 +52,8 @@ export function isAllowedInputCompletion(
     );
   }
 
-  const minimumLengthRatio = 0.25;
-  const maximumLength = Math.max(32, sourceCharacters.length * 3);
+  const minimumLengthRatio = sentenceCompletionRule.minimumLengthRatio;
+  const maximumLength = Math.max(sentenceCompletionRule.maximumLengthFloor, sourceCharacters.length * sentenceCompletionRule.maximumLengthRatio);
   if (
     candidateCharacters.length < Math.max(1, Math.ceil(sourceCharacters.length * minimumLengthRatio)) ||
     candidateCharacters.length > maximumLength
@@ -60,11 +61,7 @@ export function isAllowedInputCompletion(
     return false;
   }
 
-  const minimumSharedCharacters = sourceCharacters.length <= 2
-    ? 0
-    : sourceCharacters.length <= 4
-      ? 1
-      : Math.min(3, Math.max(2, Math.ceil(sourceCharacters.length * 0.12)));
+  const minimumSharedCharacters = sentenceCompletionRule.minimumSharedCharacters(sourceCharacters.length);
   return countSharedCharacters(sourceCharacters, candidateCharacters) >= minimumSharedCharacters;
 }
 
@@ -192,10 +189,7 @@ export function isAllowedStructuredSuggestion(
   level: Exclude<InputCompletionLevel, "none">,
   options: JapaneseConversionOptions,
 ): boolean {
-  if (!candidate.completedKana || !candidate.convertedText) {
-    return false;
-  }
-  if (/[\p{Script=Han}々〆]/u.test(candidate.completedKana)) {
+  if (!finalReadingRule.accepts(candidate, "suggestion")) {
     return false;
   }
   const correctedKana = candidate.correctedKana ?? mechanicalKana;
@@ -204,18 +198,11 @@ export function isAllowedStructuredSuggestion(
     return false;
   }
 
-  if (!preservesProtectedContent(mechanicalKana, candidate.convertedText) ||
-      !preservesProtectedContent(candidate.completedKana, candidate.convertedText)) return false;
-  if (/\p{Cc}/u.test(candidate.convertedText)) {
-    return false;
-  }
+  if (!preservesProtectedContent(mechanicalKana, candidate.convertedText)) return false;
 
   const kanaLength = comparableCharacters(candidate.completedKana).length;
   const convertedLength = comparableCharacters(candidate.convertedText).length;
-  if (
-    convertedLength < Math.max(1, Math.ceil(kanaLength * 0.2)) ||
-    convertedLength > Math.max(24, kanaLength * 2)
-  ) {
+  if (!convertedTextLengthRule.accepts(kanaLength, convertedLength)) {
     return false;
   }
   return !isAvoidedConversionOutput(candidate.convertedText, options.avoidOutputs);
@@ -240,7 +227,7 @@ export function reportedSuggestionAdditions(
   }
 
   const declared = candidate.additions.filter(
-    (addition) => addition && /^[\p{Script=Hiragana}ー。、！？!?]+$/u.test(addition),
+    (addition) => addition && declaredSuggestionAdditionRule.allowedSpan.test(addition),
   );
   if (declared.length !== candidate.additions.length) {
     return [];
@@ -252,7 +239,7 @@ export function reportedSuggestionAdditions(
   }
   const totalLength = declared.reduce((sum, addition) => sum + Array.from(addition).length, 0);
   const sourceLength = comparableCharacters(mechanicalKana).length;
-  const maximumLength = level === "word" ? MAX_WORD_COMPLETION_KANA : Math.max(24, Math.ceil(sourceLength * 1.25));
+  const maximumLength = level === "word" ? MAX_WORD_COMPLETION_KANA : Math.max(sentenceCompletionRule.declaredAdditionFloor, Math.ceil(sourceLength * sentenceCompletionRule.declaredAdditionRatio));
   if (totalLength === 0 || totalLength > maximumLength) {
     return [];
   }

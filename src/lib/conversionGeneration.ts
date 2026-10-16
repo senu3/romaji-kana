@@ -20,7 +20,7 @@ import {
 import { rebuildRomajiKanaResult } from "./romajiKana";
 import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 import { selectSegmentRoute } from "./conversionPolicy";
-import { preservesProtectedContent } from "./conversionProtection";
+import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
 
 export async function generateStructuredSuggestion(
   originalRomaji: string,
@@ -154,10 +154,7 @@ export async function kanjiizeKanaDetailed(
 
   const structured = parseStructuredSuggestion(text);
   if (structured) {
-    if (!structured.completedKana || !structured.convertedText ||
-        /[\p{Script=Han}々〆]/u.test(structured.completedKana) ||
-        /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(structured.completedKana + structured.convertedText) ||
-        !preservesProtectedContent(structured.completedKana, structured.convertedText)) {
+    if (!finalReadingRule.accepts(structured, "final")) {
       throw new Error("変換結果の読みと本文の形式が一致しませんでした。");
     }
     return { text: structured.convertedText, reading: structured.completedKana, modelReading: true };
@@ -215,7 +212,7 @@ async function repairKanaSpan(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildKanaRepairSystemPrompt(),
+      system: buildKanaRepairSystemPrompt(span.romaji),
       prompt: [
         `未確定部分: ${span.kana}`,
         `周辺: ${span.contextKana}`,
@@ -234,9 +231,7 @@ async function repairKanaSpan(
 
   const fragment = cleanKanaFragment(generatedText(result));
   // A fragment repair must not smuggle in a full sentence, symbols or JSON.
-  return /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(fragment) &&
-    Array.from(fragment).length <= Math.max(2, Array.from(span.romaji).length)
-    ? fragment : "";
+  return fragmentRepairRule.accepts(span.romaji, fragment) ? fragment : "";
 }
 
 function replaceSpanWithRepair(

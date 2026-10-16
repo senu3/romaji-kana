@@ -15,6 +15,7 @@ import {
   defaultConversionPrompt,
 } from "./prompts";
 import { defaultSettings } from "./settings";
+import { protectedContentPrompt } from "./conversionProtection";
 
 describe("convertRomajiToJapanese", () => {
   it("stops a stale suggestion when its abort signal is canceled", async () => {
@@ -1249,7 +1250,7 @@ describe("convertRomajiToJapanese", () => {
 
     expect(prompt).toContain("one speculative Japanese writing candidate");
     expect(prompt).toContain("Never invent an unrelated sentence");
-    expect(prompt).toContain("Preserve every digit, Latin token, Markdown marker");
+    expect(prompt).toContain(protectedContentPrompt);
     expect(prompt).toContain("- ありがとう。");
     expect(prompt).toContain('- "有難う"');
   });

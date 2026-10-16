@@ -1,19 +1,18 @@
 import type { InputCompletionLevel } from "./types";
-import { MAX_WORD_COMPLETION_KANA } from "./conversionLimits";
+import {
+  convertedTextLengthRule, declaredSuggestionAdditionRule, faithfulConversionRule, finalReadingRule, fragmentRepairRule,
+  localCorrectionRule, sentenceCompletionRule, speculativeRule, wordCompletionRule,
+  typoCompletionRule,
+} from "./conversionRules";
+import { protectedContentPrompt } from "./conversionProtection";
 
-const finalConversionReadingRules = [
-  "After writing convertedText, transcribe THAT TEXT into completedKana. Read its kanji with their correct pronunciation, even if the input contained a misspelling.",
-  "Include every correction, completion and re-expression in completedKana.",
-  "Do not reuse the input kana when its reading differs from convertedText. Do not include explanations.",
-  '{"convertedText":"本を読む。","completedKana":"ほんをよむ。"}',
-  "Keep existing terminal punctuation unchanged.",
-  "completedKana must not contain kanji. Use the correct reading of the final text: 学校 is がっこう, never がくこう.",
-].join("\n");
+const finalConversionReadingRules = finalReadingRule.guidance.join("\n");
 
 export const finalConversionOutputContract = [
   "Output contract (overrides response-format instructions only):",
   "Return exactly one JSON object and nothing else. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
   finalConversionReadingRules,
+  finalReadingRule.controlPrompt("final"),
 ].join("\n");
 
 export const defaultConversionPrompt = [
@@ -123,11 +122,7 @@ export function buildInputCompletionSystemPrompt(
 ): string {
   const levelRules =
     level === "word"
-      ? [
-          "Complete only an unfinished final Japanese word.",
-          "You may append at most a few kana immediately before terminal punctuation.",
-          "Do not add particles, predicates, politeness, or a new phrase.",
-        ]
+      ? wordCompletionRule.prompt()
       : [
           "Turn rough notes into the smallest complete Japanese sentence supported by the input.",
           "You may insert missing particles, inflectional endings, punctuation, and a minimal sentence ending.",
@@ -160,18 +155,8 @@ export function buildSuggestionConversionSystemPrompt(
       : "None.";
   const levelRules =
     level === "word"
-      ? [
-          "Complete only an unfinished final Japanese word.",
-          `Append at most ${MAX_WORD_COMPLETION_KANA} kana immediately before terminal punctuation.`,
-          "Do not add particles, predicates, politeness, or a new phrase.",
-        ]
-      : [
-          "Act as a writing suggestion, not a literal transcription.",
-          "You may add particles, inflectional endings, sentence endings, a short natural continuation, or a concise re-expression with the same intent.",
-          "Lightly repair or reorder kana when it makes the suggestion substantially more natural.",
-          "Keep digits, Latin terms, symbols, Markdown markers, and existing terminal punctuation unchanged.",
-          "Keep the suggestion concise, preserve the central intent and tone, and never switch to an unrelated topic.",
-        ];
+      ? wordCompletionRule.prompt()
+      : sentenceCompletionRule.prompt();
   const uniqueAvoidOutputs = Array.from(
     new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
   );
@@ -182,17 +167,19 @@ export function buildSuggestionConversionSystemPrompt(
     "Output contract (overrides response-format instructions only):",
     "Return exactly one JSON object. Write fields in this order: correctedKana FIRST, convertedText SECOND, completedKana THIRD, additions LAST.",
     finalConversionReadingRules,
+    finalReadingRule.controlPrompt("suggestion"),
     "Also return correctedKana: the reading BEFORE completion. Copy Mechanical kana exactly unless there is a clear local typing error.",
-    "In correctedKana, repair at most one contiguous kana fragment of at most two characters and at most a quarter of the input kana. Never paraphrase, complete a word, change negation, or change punctuation in this stage.",
+    localCorrectionRule.prompt(),
     "If the intended correction is unclear, keep Mechanical kana unchanged in correctedKana.",
     "If you fix a typo in convertedText, correctedKana MUST include that same fix. Never leave よってい in correctedKana when converting it to 予定 (よてい).",
     "additions should list clear contiguous spans inserted into completedKana compared with correctedKana.",
+    declaredSuggestionAdditionRule.guidance,
     "If the suggestion mainly repairs or re-expresses the input instead of inserting text, return an empty additions array.",
     "If correctedKana equals Mechanical kana and Application completion seed differs, use that seed exactly as completedKana. Otherwise complete only correctedKana according to the level rules.",
     "The read-only context is not part of the target. Never repeat it in the result.",
     ...levelRules,
-    "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
-    "Copy digits into ALL kana fields too: 10時 must read 10じ, never じゅうじ.",
+    convertedTextLengthRule.prompt("completedKana"),
+    protectedContentPrompt,
     "convertedText must express the same suggestion declared by completedKana and additions.",
     "Use common kanji when natural. Keep hiragana when uncertain.",
     level === "word"
@@ -218,14 +205,8 @@ export function buildSuggestionConversionSystemPrompt(
   ].filter(Boolean).join("\n");
 }
 
-export function buildKanaRepairSystemPrompt(): string {
-  return [
-    "You repair only the uncertain kana fragment in a mechanical romaji-to-kana conversion.",
-    "Return only the kana that should replace the uncertain fragment.",
-    "Do not rewrite trusted surrounding kana.",
-    "Do not explain.",
-    "Prefer the closest phonetic repair over a semantic paraphrase.",
-  ].join("\n");
+export function buildKanaRepairSystemPrompt(romaji?: string): string {
+  return fragmentRepairRule.prompt(romaji).join("\n");
 }
 
 export function buildKanaKanjiSystemPrompt(
@@ -249,20 +230,12 @@ export function buildKanaKanjiSystemPrompt(
   );
 
   return [
-    "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
+    completionMode
+      ? "You minimally repair typing errors before converting Japanese kana text into natural Japanese writing."
+      : "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
     "Highest priority rules:",
-    "1. Preserve the phonetic reading of the input kana.",
-    "2. Do not replace words with semantically plausible alternatives if their reading differs.",
-    "3. Reject kanji candidates whose common reading drops, adds, or changes kana from the input. For example, しっぴつ can be 執筆 or しっぴつ, never 失費 because 失費 is read しっぴ.",
-    "4. Do not paraphrase, summarize, explain, or substitute a phrase with a different wording.",
-    "5. Preserve lexical items from the kana. For example, ごじまん must stay ご自慢 or ごじまん, never 持っている.",
-    "6. Keep hiragana when kanji conversion is uncertain.",
-    "7. Use kanji only when it is common and the reading is clear.",
-    "8. Choose among same-reading kanji only when the context is clear; otherwise keep hiragana.",
-    "9. Avoid contextually odd kanji even when they match the reading.",
-    "10. Do not add intensifiers, modifiers, nouns, particles, or predicates that are not present in the kana.",
-    "11. If the kana appears to include a typo repair, keep the closest reading rather than making a more fluent different sentence.",
-    "12. Do not explain. Follow the response contract.",
+    ...(completionMode ? typoCompletionRule.guidance : faithfulConversionRule.guidance),
+    protectedContentPrompt,
     "",
     "Alternative conversion request:",
     alternativeInstructions || "None.",
@@ -295,15 +268,9 @@ export function buildSpeculativeConversionSystemPrompt(
 
   return [
     "You generate one speculative Japanese writing candidate when ordinary kana-kanji conversion returned only hiragana.",
-    "Infer the user's most plausible intended Japanese from both the original romaji and the mechanical kana.",
-    "This is not another strict kana-to-kanji pass. It is a suggestion, so you may resolve an ambiguous reading, minimally repair a likely typing error, or use a nearby natural expression with the same intent.",
-    "When the standard spelling itself is all hiragana, prefer a concise semantic re-expression containing common kanji instead of forcing ateji.",
-    "Keep the central intent and tone close to the input. Never invent an unrelated sentence or new facts.",
-    "A valid result must contain at least one common kanji or katakana character.",
-    "Returning only hiragana is invalid in this pass, even when all-hiragana would normally be the standard spelling.",
-    "Prefer a natural candidate containing common kanji or katakana.",
-    "Never force obscure ateji or unnatural kanji merely to avoid hiragana.",
-    "Preserve every digit, Latin token, Markdown marker, line break, and punctuation mark exactly and in the same order.",
+    ...speculativeRule.guidance,
+    convertedTextLengthRule.prompt("input"),
+    protectedContentPrompt,
     "Produce one Japanese candidate. Do not explain or use Markdown fences. Follow the response contract.",
     "If no plausible non-hiragana candidate exists, return the mechanical kana unchanged; the application will discard it.",
     uniqueAvoidOutputs.length > 0 ? "Do not return these previous candidates exactly:" : "",
@@ -410,13 +377,5 @@ function formatCompletionConversionInstructions(
     "The previous attempts produced the same or unusable output.",
     uniqueOutputs.length > 0 ? "Avoid returning these previous outputs exactly:" : "",
     ...uniqueOutputs.map((output) => `- ${output}`),
-    "The user prompt contains both the original romaji input and the mechanical kana.",
-    "Use both signals to infer a minimal romaji typo repair before kana-kanji conversion.",
-    "Assume the romaji input may contain a small typing error such as one wrong consonant.",
-    "For example, mododuki may be a typo of motoduki, yielding もとづき and 基づき.",
-    "Repair only the minimum romaji or kana needed to produce a natural Japanese sentence.",
-    "Do not paraphrase, summarize, or replace words whose reading already makes sense.",
-    "Do not add new information. Keep the output close to the original wording.",
-    "If the intended repair is still unclear, keep the uncertain part in hiragana rather than inventing meaning.",
   ].join("\n");
 }
