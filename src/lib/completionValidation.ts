@@ -4,6 +4,7 @@ export { countCharacter, preservesProtectedAsciiTokens, preservesProtectedSugges
 import { stripThinkBlock } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
+import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -15,6 +16,7 @@ const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export interface StructuredSuggestionConversion {
+  correctedKana?: string;
   completedKana: string;
   convertedText: string;
   additions: string[];
@@ -164,6 +166,7 @@ export function parseStructuredSuggestion(text: string): StructuredSuggestionCon
     if (
       typeof value.completedKana !== "string" ||
       typeof value.convertedText !== "string" ||
+      (value.correctedKana !== undefined && typeof value.correctedKana !== "string") ||
       (value.additions !== undefined &&
         (!Array.isArray(value.additions) ||
           !value.additions.every((addition) => typeof addition === "string")))
@@ -171,6 +174,7 @@ export function parseStructuredSuggestion(text: string): StructuredSuggestionCon
       return null;
     }
     return {
+      ...(typeof value.correctedKana === "string" ? { correctedKana: value.correctedKana.trim() } : {}),
       completedKana: value.completedKana.trim(),
       convertedText: value.convertedText.trim(),
       additions: (value.additions ?? [])
@@ -194,7 +198,9 @@ export function isAllowedStructuredSuggestion(
   if (/[\p{Script=Han}々〆]/u.test(candidate.completedKana)) {
     return false;
   }
-  if (!isAllowedInputCompletion(mechanicalKana, candidate.completedKana, level)) {
+  const correctedKana = candidate.correctedKana ?? mechanicalKana;
+  if (!isAllowedLocalKanaCorrection(mechanicalKana, correctedKana) ||
+      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level)) {
     return false;
   }
 

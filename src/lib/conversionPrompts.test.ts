@@ -19,7 +19,10 @@ describe("shared conversion prompt contracts", () => {
     expect(faithful).not.toContain("Return only the converted Japanese text");
     expect(buildSpeculativeConversionSystemPrompt(defaultConversionPrompt)).not.toContain("Return only one Japanese candidate");
     expect(buildKanaKanjiSystemPrompt("Prefer familiar words.")).toContain("Prefer familiar words.");
-    expect(buildSuggestionConversionSystemPrompt("sentence", defaultConversionPrompt)).toContain(finalConversionOutputContract);
+    const suggestion = buildSuggestionConversionSystemPrompt("sentence", defaultConversionPrompt);
+    expect(suggestion).toContain("correctedKana FIRST, convertedText SECOND, completedKana THIRD");
+    expect(suggestion).toContain("After writing convertedText, transcribe THAT TEXT into completedKana.");
+    expect(finalConversionOutputContract).toContain("Write convertedText (the FINAL Japanese output) FIRST");
   });
   it.each([kanaKanjiFewShotExamples, completionKanaKanjiFewShotExamples])("uses parseable JSON final responses in every example", examples => {
     const outputs = examples.split("出力:\n").slice(1);

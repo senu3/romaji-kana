@@ -108,13 +108,15 @@ export async function convertInputOnce(
     const suggestionLevel =
       partIndex === inputCompletionPartIndex ? settings.inputCompletionLevel : "none";
     const route = selectSegmentRoute(suggestionLevel, options);
+    // Uncertain romaji is repaired for every route before completion validation.
+    const repaired = await repairLowConfidenceKana(kanaResult, settings, transport, options.signal);
     if (route.kind === "word" || route.kind === "sentence") {
       const completionSeed = route.kind === "word"
-        ? knownWordCompletionSeed(kanaResult.kana)
-        : kanaResult.kana;
+        ? knownWordCompletionSeed(repaired.kana)
+        : repaired.kana;
       const suggestion = await generateStructuredSuggestion(
         part.value,
-        kanaResult.kana,
+        repaired.kana,
         completionSeed,
         route.kind,
         segments.map(segment => segment.preparedReading).join(""),
@@ -125,7 +127,7 @@ export async function convertInputOnce(
       if (!suggestion) {
         return {
           text: "",
-          reviewKana: segments.map(segment => segment.reviewReading).join("") + kanaResult.kana,
+          reviewKana: segments.map(segment => segment.reviewReading).join("") + repaired.kana,
           suggestionRejected: true,
           suggestionRejectedReason: "diverged",
         };
@@ -133,23 +135,17 @@ export async function convertInputOnce(
       segments.push({
         text: suggestion.convertedText,
         sourceReading: originalKana,
-        preparedReading: kanaResult.kana,
+        preparedReading: suggestion.correctedKana ?? repaired.kana,
         reviewReading: suggestion.completedKana,
         finalReading: suggestion.completedKana,
         // A claimed addition contradicting an unchanged reading is not proof.
-        readingReliable: !(suggestion.completedKana === kanaResult.kana && suggestion.additions.length),
-        knownRepair: originalKana !== kanaResult.kana,
+        readingReliable: !(suggestion.completedKana === (suggestion.correctedKana ?? repaired.kana) && suggestion.additions.length),
+        knownRepair: originalKana !== (suggestion.correctedKana ?? repaired.kana),
         modelReading: true,
       });
       continue;
     }
 
-    const repaired = await repairLowConfidenceKana(
-      kanaResult,
-      settings,
-      transport,
-      options.signal,
-    );
     const convertedPart = await kanjiizeKanaDetailed(repaired.kana, settings, transport, {
       ...options,
       completionSourceRomaji: options.completionMode ? part.value : options.completionSourceRomaji,
@@ -191,6 +187,7 @@ function assembleConversionResult(segments: ConvertedSegment[]): JapaneseConvers
     changes: classifyConversionChanges(
       sourceReading, readingReliable ? finalReading : undefined,
       evidence, hasKnownRepair && finalReading === preparedReading,
+      hasKnownRepair ? preparedReading : undefined,
     ),
   };
   if (result.changes && ["completion", "correction", "rewrite"].includes(result.changes.kind)) {

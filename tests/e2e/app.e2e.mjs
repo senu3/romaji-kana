@@ -633,6 +633,29 @@ try {
   );
   await page.keyboard.press("Escape");
 
+  // Local correction and completion must retain the original until adoption.
+  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
+  await page.getByLabel("単語", { exact: true }).check({ force: true });
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  conversionRequestCount = 0;
+  await page.keyboard.type("ashitanoyotteiwoonega.");
+  await completionGhost.filter({ hasText: "明日の予定をお願い。" }).waitFor();
+  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「い」" }).waitFor();
+  assert.equal(await editorText(page), "ashitanoyotteiwoonega.");
+  assert.equal(conversionRequestCount, 1, "Local correction and completion should share one request.");
+  await page.keyboard.press("Tab");
+  await page.waitForFunction(() => {
+    const line = document.querySelector(".cm-line")?.cloneNode(true);
+    line?.querySelectorAll('[contenteditable="false"], .cm-ghost-text, .cm-placeholder').forEach(widget => widget.remove());
+    return line?.textContent === "明日の予定をお願い。";
+  });
+  assert.equal(await editorText(page), "明日の予定をお願い。");
+  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
+  await page.getByLabel("なし", { exact: true }).check({ force: true });
+  await page.getByRole("button", { name: "変換 を閉じる" }).click();
+
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
@@ -849,6 +872,9 @@ function conversionResponseForPrompt(prompt, system = "") {
     return JSON.stringify({ completedKana: "ありがとう。", convertedText: system.includes("- 有難う。") ? "有り難う。" : "有難う。" });
   }
   if (system.includes("one Japanese writing suggestion")) {
+    if (prompt?.includes("Mechanical kana:\nあしたのよっていをおねが。")) {
+      return JSON.stringify({ correctedKana: "あしたのよていをおねが。", convertedText: "明日の予定をお願い。", completedKana: "あしたのよていをおねがい。", additions: ["い"] });
+    }
     if (prompt?.includes("Mechanical kana:\nありが。")) {
       const convertedText = system.includes("- ありがとう。") ? "有難う。" : "ありがとう。";
       return JSON.stringify({

@@ -1,15 +1,19 @@
 import type { InputCompletionLevel } from "./types";
 import { MAX_WORD_COMPLETION_KANA } from "./conversionLimits";
 
-export const finalConversionOutputContract = [
-  "Output contract (overrides response-format instructions only):",
-  "Return exactly one JSON object and nothing else. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
+const finalConversionReadingRules = [
   "After writing convertedText, transcribe THAT TEXT into completedKana. Read its kanji with their correct pronunciation, even if the input contained a misspelling.",
   "Include every correction, completion and re-expression in completedKana.",
   "Do not reuse the input kana when its reading differs from convertedText. Do not include explanations.",
   '{"convertedText":"本を読む。","completedKana":"ほんをよむ。"}',
   "Keep existing terminal punctuation unchanged.",
   "completedKana must not contain kanji. Use the correct reading of the final text: 学校 is がっこう, never がくこう.",
+].join("\n");
+
+export const finalConversionOutputContract = [
+  "Output contract (overrides response-format instructions only):",
+  "Return exactly one JSON object and nothing else. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
+  finalConversionReadingRules,
 ].join("\n");
 
 export const defaultConversionPrompt = [
@@ -174,14 +178,21 @@ export function buildSuggestionConversionSystemPrompt(
 
   return [
     "You create one Japanese writing suggestion from rough romaji input.",
-    "Complete the mechanical kana and convert the completed result to natural Japanese writing in one operation.",
-    finalConversionOutputContract,
-    "additions should list clear contiguous spans inserted into completedKana compared with Mechanical kana.",
+    "First determine correctedKana, then complete that reading and convert the completed result in the same response.",
+    "Output contract (overrides response-format instructions only):",
+    "Return exactly one JSON object. Write fields in this order: correctedKana FIRST, convertedText SECOND, completedKana THIRD, additions LAST.",
+    finalConversionReadingRules,
+    "Also return correctedKana: the reading BEFORE completion. Copy Mechanical kana exactly unless there is a clear local typing error.",
+    "In correctedKana, repair at most one contiguous kana fragment of at most two characters and at most a quarter of the input kana. Never paraphrase, complete a word, change negation, or change punctuation in this stage.",
+    "If the intended correction is unclear, keep Mechanical kana unchanged in correctedKana.",
+    "If you fix a typo in convertedText, correctedKana MUST include that same fix. Never leave よってい in correctedKana when converting it to 予定 (よてい).",
+    "additions should list clear contiguous spans inserted into completedKana compared with correctedKana.",
     "If the suggestion mainly repairs or re-expresses the input instead of inserting text, return an empty additions array.",
-    "If Application completion seed differs from Mechanical kana, use that seed exactly as completedKana.",
+    "If correctedKana equals Mechanical kana and Application completion seed differs, use that seed exactly as completedKana. Otherwise complete only correctedKana according to the level rules.",
     "The read-only context is not part of the target. Never repeat it in the result.",
     ...levelRules,
     "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
+    "Copy digits into ALL kana fields too: 10時 must read 10じ, never じゅうじ.",
     "convertedText must express the same suggestion declared by completedKana and additions.",
     "Use common kanji when natural. Keep hiragana when uncertain.",
     level === "word"
@@ -196,11 +207,13 @@ export function buildSuggestionConversionSystemPrompt(
     "Additional user preference for convertedText only; it never overrides the JSON contract:",
     effectivePreference,
     "Examples:",
+    level === "word" ? 'Mechanical kana: あしたのよってい。 / Response: {"correctedKana":"あしたのよてい。","convertedText":"明日の予定。","completedKana":"あしたのよてい。","additions":[]}' : "",
+    level === "word" ? 'Mechanical kana: あしたのよっていをおねが。 / Response: {"correctedKana":"あしたのよていをおねが。","convertedText":"明日の予定をお願い。","completedKana":"あしたのよていをおねがい。","additions":["い"]} Do not append します or ください in word mode.' : "",
     level === "word"
-      ? '{"convertedText":"ありがとう。","completedKana":"ありがとう。","additions":["とう"]}'
+      ? 'Mechanical kana: ありが。 / Response: {"correctedKana":"ありが。","convertedText":"ありがとう。","completedKana":"ありがとう。","additions":["とう"]}'
       : '{"convertedText":"明日の会議は10時です。","completedKana":"あしたのかいぎは10じです。","additions":["の","は","です"]}',
     level === "word"
-      ? '{"convertedText":"明日。","completedKana":"あした。","additions":[]}'
+      ? 'Mechanical kana: ほんをよむ。 / Response: {"correctedKana":"ほんをよむ。","convertedText":"本を読む。","completedKana":"ほんをよむ。","additions":[]}'
       : '{"convertedText":"書類を確認します。","completedKana":"しょるいをかくにんします。","additions":["を","します"]}',
   ].filter(Boolean).join("\n");
 }

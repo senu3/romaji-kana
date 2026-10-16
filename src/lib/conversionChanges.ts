@@ -7,6 +7,8 @@ export interface ConversionChanges {
   evidence: "literal" | "model-reading" | "repair-stage" | "unavailable";
   sourceReading: string;
   resultReading?: string;
+  /** Validated reading after local correction, before any completion. */
+  correctedReading?: string;
   additions: string[];
 }
 
@@ -21,8 +23,11 @@ export function classifyConversionChanges(
   resultReading: string | undefined,
   evidence: ConversionChanges["evidence"],
   repaired = false,
+  correctedReading?: string,
 ): ConversionChanges {
-  const base = { sourceReading, resultReading, evidence, additions: [] as string[] };
+  const base = { sourceReading, resultReading, evidence, additions: [] as string[],
+    ...(correctedReading !== undefined ? { correctedReading } : {}),
+  };
   if (resultReading === undefined) return { ...base, kind: "unknown", evidence: "unavailable" };
   const source = normalizeComparableReading(sourceReading);
   const result = normalizeComparableReading(resultReading);
@@ -30,7 +35,9 @@ export function classifyConversionChanges(
   // A known repair stage may replace or delete characters. Do not guess that
   // any small arbitrary model rewrite is necessarily a typing correction.
   if (repaired) return { ...base, kind: "correction" };
-  const additions = collectInputCompletionAdditions(source, result);
+  const additions = collectInputCompletionAdditions(
+    correctedReading === undefined ? source : normalizeComparableReading(correctedReading), result,
+  );
   if (additions.length) return { ...base, kind: "completion", additions };
   // A local replacement/deletion/transposition is a correction candidate.
   // This describes the edit shape, not proof of the author's intended meaning.

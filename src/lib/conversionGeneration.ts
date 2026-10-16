@@ -73,8 +73,9 @@ export async function generateStructuredSuggestion(
   return {
     ...candidate,
     additions: reportedSuggestionAdditions(
-      mechanicalKana,
-      completionSeed,
+      candidate.correctedKana ?? mechanicalKana,
+      candidate.correctedKana && candidate.correctedKana !== mechanicalKana
+        ? candidate.correctedKana : completionSeed,
       candidate,
       level,
     ),
@@ -231,7 +232,11 @@ async function repairKanaSpan(
     30_000,
   ), signal);
 
-  return cleanKanaFragment(generatedText(result));
+  const fragment = cleanKanaFragment(generatedText(result));
+  // A fragment repair must not smuggle in a full sentence, symbols or JSON.
+  return /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u.test(fragment) &&
+    Array.from(fragment).length <= Math.max(2, Array.from(span.romaji).length)
+    ? fragment : "";
 }
 
 function replaceSpanWithRepair(
