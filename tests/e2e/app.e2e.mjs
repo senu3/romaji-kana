@@ -669,9 +669,11 @@ try {
     }`,
   );
   await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl/Cmd+/で別候補" }).waitFor();
-  await waitForEditorText(page, "三。");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "三。" }).waitFor();
+  assert.equal(await editorText(page), "san.", "A displayed candidate must not count as committed document text.");
   await page.keyboard.press("Control+/");
-  await waitForEditorText(page, "参。");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "参。" }).waitFor();
+  assert.equal(await editorText(page), "san.", "An alternative must leave the source intact until acceptance.");
   assert.deepEqual(conversionPrompts, ["さん。", "さん。"]);
   assert.ok(
     conversionSystems[1]?.includes("Avoid returning these previous outputs exactly:"),
@@ -690,7 +692,8 @@ try {
     .getByRole("button", { name: "別候補" })
     .click();
   await page.locator(".cm-ghost-text-hint").waitFor();
-  await waitForEditorText(page, "あなたは誰ですか。");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "あなたは誰ですか。" }).waitFor();
+  assert.equal(await editorText(page), "参。", "History previews must not replace committed text before Tab.");
   await page.keyboard.press("Tab");
   await waitForEditorText(page, "あなたは誰ですか。");
   await page.getByRole("button", { name: /履歴を開く/ }).click();
@@ -818,21 +821,27 @@ async function waitForCondition(condition, message, timeoutMs = 2_000) {
 }
 
 async function editorText(page) {
-  const text = (await page.locator(".cm-content").textContent()) ?? "";
-  return text === "romaji で日本語を書いてください..." ? "" : text;
+  return page.evaluate(readEditorDocument);
 }
 
 async function editorLines(page) {
-  return page.locator(".cm-line").evaluateAll((lines) =>
-    lines.map((line) => line.textContent ?? ""),
-  );
+  return page.evaluate(readEditorDocument, { linesOnly: true });
 }
 
 async function waitForEditorText(page, text) {
-  await page.waitForFunction(
-    (expected) => document.querySelector(".cm-content")?.textContent?.includes(expected),
-    text,
-  );
+  await page.waitForFunction(readEditorDocument, { contains: text });
+}
+
+// Read document characters only. CodeMirror widgets contain candidate text,
+// hints and comparisons that must not satisfy an assertion about the document.
+function readEditorDocument({ contains, linesOnly } = {}) {
+  const lines = Array.from(document.querySelectorAll(".cm-content .cm-line"), line => {
+    const copy = line.cloneNode(true);
+    copy.querySelectorAll('[contenteditable="false"], .cm-ghost-text, .cm-placeholder').forEach(widget => widget.remove());
+    return copy.textContent ?? "";
+  });
+  if (contains !== undefined) return lines.join("\n").includes(contains);
+  return linesOnly ? lines : lines.join("\n");
 }
 
 function conversionResponseForPrompt(prompt, system = "") {

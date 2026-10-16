@@ -21,10 +21,53 @@ describe("source protection across conversion routes", () => {
     expect(result.suggestionRejected).toBeUndefined();
   });
 
-  it("checks the reported final reading independently of the displayed text", async () => {
+  it("compares the original number even when both returned fields agree on a different one", async () => {
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "11じです。", convertedText: "11時です。" }) });
     const result = await convertRomajiToJapaneseDetailed("10zidesu.", defaultSettings, { models: vi.fn(), generate });
     expect(result).toMatchObject({ text: "", suggestionRejectedReason: "protected" });
+  });
+
+  for (const level of ["none", "word", "sentence"] as const) {
+    it.each([
+      { completedKana: "11じです。", convertedText: "10時です。" },
+      { completedKana: "10じです。", convertedText: "11時です。" },
+    ])(`rejects disagreement between final reading and text in ${level} mode`, async candidate => {
+      const generate = vi.fn().mockResolvedValue({ response: JSON.stringify(candidate) });
+      const conversion = convertRomajiToJapaneseDetailed("10zidesu.", { ...defaultSettings, inputCompletionLevel: level }, { models: vi.fn(), generate });
+      if (level === "none") {
+        await expect(conversion).rejects.toThrow("変換結果の読みと本文の形式が一致しませんでした。");
+      } else {
+        const result = await conversion;
+        expect(result.text).toBe("");
+        expect(result.suggestionRejected).toBe(true);
+      }
+      expect(generate).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  it("applies original-number protection to a legacy plain-text response", async () => {
+    const generate = vi.fn().mockResolvedValue({ response: "11時です。" });
+    const result = await convertRomajiToJapaneseDetailed("10zidesu.", defaultSettings, { models: vi.fn(), generate });
+    expect(result).toMatchObject({ text: "", suggestionRejectedReason: "protected", changes: { kind: "unknown", additions: [] } });
+    expect(result.inputCompletionApplied).toBeUndefined();
+    expect(result.inputCompletionAdditions).toBeUndefined();
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["none", "word", "sentence"] as const)("preserves grouped decimals through the complete %s route", async level => {
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "よさん1,500.25えん。", convertedText: "予算1,500.25円。" }) });
+    const result = await convertRomajiToJapaneseDetailed("yosan1,500.25en.", { ...defaultSettings, inputCompletionLevel: level }, { models: vi.fn(), generate });
+    expect(result.text).toBe("予算1,500.25円。");
+    expect(result.suggestionRejected).toBeUndefined();
+    expect(generate.mock.calls[0][2].prompt).toContain("1,500.25");
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["none", "word", "sentence"] as const)("rejects duplicated Japanese literal terms after aggregation in %s mode", async level => {
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "にかくにん。", convertedText: "東京に確認。" }) });
+    const result = await convertRomajiToJapaneseDetailed("東京nikakunin.", { ...defaultSettings, inputCompletionLevel: level }, { models: vi.fn(), generate });
+    expect(result).toMatchObject({ text: "", suggestionRejectedReason: "protected" });
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("protects original digits through the speculative route", async () => {
