@@ -34,6 +34,28 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
 
+  it("passes corrected/completed readings through ghost and history alternatives, including legacy text responses", async () => {
+    const changes = { kind: "completion" as const, evidence: "repair-stage" as const,
+      sourceReading: "ありっが", correctedReading: "ありが", resultReading: "ありがとう", additions: ["とう"] };
+    const legacyChanges = { kind: "unknown" as const, evidence: "unavailable" as const,
+      sourceReading: "ありっが", correctedReading: "ありが", additions: [] };
+    const convert = vi.mocked(convertRomajiToJapaneseDetailed);
+    convert.mockResolvedValueOnce({ text: "ありがとう", reviewKana: "ありがとう", changes, inputCompletionApplied: true })
+      .mockResolvedValue({ text: "有難う", reviewKana: "ありがとう", changes: legacyChanges });
+    const { hook, view, options } = harness("arigga");
+    options.settingsRef.current.inputCompletionLevel = "word";
+    await act(async () => { hook.current.handleConvert(range("arigga")); });
+    const first = view.state.field(ghostSuggestionField).suggestion!;
+    await act(async () => { hook.current.handleRetryGhost(first); });
+    expect(convert.mock.calls[1][3]).toMatchObject({ alternativeReading: "ありがとう", alternativeCorrectedReading: "ありが", avoidOutputs: ["ありがとう"] });
+    const alternative = view.state.field(ghostSuggestionField).suggestion!;
+    await act(async () => { hook.current.handleAcceptGhost(alternative); });
+    const history = hook.current.history[0];
+    expect(history.reviewKana).toBe("ありがとう");
+    await act(async () => { hook.current.handleAlternativeHistory(history); });
+    expect(convert.mock.calls[2][3]).toMatchObject({ alternativeReading: "ありがとう", alternativeCorrectedReading: "ありが" });
+  });
+
   it("preserves observed changes when a candidate is accepted into history", async () => {
     const changes = {
       kind: "notation" as const, evidence: "model-reading" as const,

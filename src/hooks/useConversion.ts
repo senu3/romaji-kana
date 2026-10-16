@@ -77,6 +77,9 @@ function hasDuplicatePendingHistoryConversion(
     request.source === "history" &&
     request.originalText === next.originalText &&
     request.retryOf === next.retryOf &&
+    request.alternativeReading === next.alternativeReading &&
+    request.alternativeCorrectedReading === next.alternativeCorrectedReading &&
+    request.alternativeAdditionKind === next.alternativeAdditionKind &&
     (request.avoidOutputs?.join("\u0000") ?? "") === nextAvoidOutputs &&
     request.anchor?.from === next.anchor?.from &&
     request.anchor?.to === next.anchor?.to &&
@@ -257,6 +260,9 @@ export function useConversion({
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
+          alternativeReading: request.alternativeReading,
+          alternativeCorrectedReading: request.alternativeCorrectedReading,
+          alternativeAdditionKind: request.alternativeAdditionKind,
           documentVocabulary: request.documentVocabulary,
         },
       );
@@ -366,6 +372,7 @@ export function useConversion({
         status: "success",
         input: request.originalText,
         output: converted,
+        reviewKana: conversion.reviewKana,
         modelName: settingsRef.current.modelName,
         createdAt: Date.now(),
         source: "editor",
@@ -417,6 +424,9 @@ export function useConversion({
         undefined,
         {
           avoidOutputs: request.avoidOutputs,
+          alternativeReading: request.alternativeReading,
+          alternativeCorrectedReading: request.alternativeCorrectedReading,
+          alternativeAdditionKind: request.alternativeAdditionKind,
           documentVocabulary: request.documentVocabulary,
           protectedDictionaryEntries: resolved
             ? buildProtectedDictionaryEntries(
@@ -450,6 +460,7 @@ export function useConversion({
             status: "success",
             input: request.originalText,
             output: converted,
+            reviewKana: conversion.reviewKana,
             modelName: settingsRef.current.modelName,
             createdAt: Date.now(),
             source: "history",
@@ -557,6 +568,7 @@ export function useConversion({
         status: "success",
         input: request.originalText,
         output: converted,
+        reviewKana: conversion.reviewKana,
         modelName: settingsRef.current.modelName,
         createdAt: Date.now(),
         source: "history",
@@ -728,6 +740,7 @@ export function useConversion({
       status: "success",
       input: suggestion.inputText,
       output: suggestion.convertedText,
+      reviewKana: suggestion.reviewKana,
       modelName: settingsRef.current.modelName,
       createdAt: Date.now(),
       source: suggestion.source,
@@ -808,6 +821,9 @@ export function useConversion({
         status: "queued",
         retryOf: suggestion.retryOf ?? suggestion.id,
         avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
+        alternativeReading: suggestion.changes?.resultReading ?? suggestion.reviewKana,
+        alternativeCorrectedReading: suggestion.changes?.correctedReading,
+        alternativeAdditionKind: suggestion.changes?.additionKind,
         inputCompletionLevel:
           suggestion.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
         documentVocabulary: suggestion.documentVocabulary,
@@ -858,6 +874,7 @@ export function useConversion({
         originalText: resolved.matchedText,
         convertedText: item.output,
         inputText: item.input,
+        reviewKana: item.reviewKana,
         conversionStrategy: item.conversionStrategy,
         changes: item.changes,
         inputCompletionLevel: item.inputCompletionLevel,
@@ -908,6 +925,9 @@ export function useConversion({
       status: "queued",
       retryOf: item.id,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
+      alternativeReading: item.changes?.resultReading ?? item.reviewKana,
+      alternativeCorrectedReading: item.changes?.correctedReading,
+      alternativeAdditionKind: item.changes?.additionKind,
       inputCompletionLevel: item.inputCompletionLevel,
       documentVocabulary: item.documentVocabulary,
       documentVocabularyRevision: item.documentVocabularyRevision,

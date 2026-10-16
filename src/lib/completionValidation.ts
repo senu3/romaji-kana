@@ -5,7 +5,8 @@ import { stripThinkBlock } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
-import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule } from "./conversionRules";
+import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule, wordCompletionRule } from "./conversionRules";
+import type { WordCompletionBoundary } from "./conversionRules";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -17,6 +18,7 @@ const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export interface StructuredSuggestionConversion {
+  wordCompletion?: WordCompletionBoundary;
   correctedKana?: string;
   completedKana: string;
   convertedText: string;
@@ -27,10 +29,12 @@ export function isAllowedInputCompletion(
   source: string,
   candidate: string,
   level: Exclude<InputCompletionLevel, "none">,
+  wordBoundary?: WordCompletionBoundary,
+  convertedText?: string,
 ): boolean {
   const normalizedSource = source.trim();
   const normalizedCandidate = candidate.trim();
-  if (!normalizedCandidate || normalizedCandidate === normalizedSource) {
+  if (!normalizedCandidate || (normalizedCandidate === normalizedSource && !wordBoundary)) {
     return normalizedCandidate === normalizedSource;
   }
 
@@ -45,8 +49,12 @@ export function isAllowedInputCompletion(
   const sourceCharacters = comparableReadingCharacters(sourceParts.body);
   const candidateCharacters = comparableReadingCharacters(candidateParts.body);
   if (level === "word") {
+    const convertedBody = convertedText === undefined ? undefined : splitTerminalPunctuation(convertedText).body;
     return (
       candidateParts.body.startsWith(sourceParts.body) &&
+      (!wordBoundary || (convertedBody !== undefined && wordCompletionRule.matchesDeclaredWord(sourceParts.body, candidateParts.body, convertedBody, wordBoundary))) &&
+      wordCompletionRule.staysInFinalWord(sourceParts.body, candidateParts.body,
+        convertedBody, wordBoundary) &&
       candidateCharacters.length >= sourceCharacters.length &&
       candidateCharacters.length <= sourceCharacters.length + MAX_WORD_COMPLETION_KANA
     );
@@ -160,10 +168,13 @@ export function parseStructuredSuggestion(text: string): StructuredSuggestionCon
 
   try {
     const value = JSON.parse(cleaned.slice(objectStart, objectEnd + 1)) as Record<string, unknown>;
+    const word = value.wordCompletion as Record<string, unknown> | undefined;
     if (
       typeof value.completedKana !== "string" ||
       typeof value.convertedText !== "string" ||
       (value.correctedKana !== undefined && typeof value.correctedKana !== "string") ||
+      (word !== undefined && (!word || typeof word !== "object" ||
+        typeof word.sourceKana !== "string" || typeof word.completedKana !== "string" || typeof word.convertedText !== "string")) ||
       (value.additions !== undefined &&
         (!Array.isArray(value.additions) ||
           !value.additions.every((addition) => typeof addition === "string")))
@@ -171,6 +182,7 @@ export function parseStructuredSuggestion(text: string): StructuredSuggestionCon
       return null;
     }
     return {
+      ...(word ? { wordCompletion: { sourceKana: String(word.sourceKana).trim(), completedKana: String(word.completedKana).trim(), convertedText: String(word.convertedText).trim() } } : {}),
       ...(typeof value.correctedKana === "string" ? { correctedKana: value.correctedKana.trim() } : {}),
       completedKana: value.completedKana.trim(),
       convertedText: value.convertedText.trim(),
@@ -194,7 +206,7 @@ export function isAllowedStructuredSuggestion(
   }
   const correctedKana = candidate.correctedKana ?? mechanicalKana;
   if (!isAllowedLocalKanaCorrection(mechanicalKana, correctedKana) ||
-      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level)) {
+      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level, candidate.wordCompletion, candidate.convertedText)) {
     return false;
   }
 

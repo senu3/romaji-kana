@@ -9,14 +9,14 @@ import { convertedTextLengthRule, finalReadingRule, speculativeRule } from "./co
 
 export type SegmentRoute =
   | { kind: "word" | "sentence" }
-  | { kind: "faithful" | "typo-completion" | "speculative" };
+  | { kind: "faithful" | "alternative" | "typo-repair" | "speculative" };
 
-/** Current precedence, including suggestion modes overriding retry flags.
- * This makes the existing behavior explicit; it does not expand permissions. */
+/** Explicit request purposes override the configured completion level. */
 export function selectSegmentRoute(level: InputCompletionLevel, options: JapaneseConversionOptions): SegmentRoute {
-  if (level !== "none") return { kind: level };
   if (options.speculativeMode) return { kind: "speculative" };
-  if (options.completionMode) return { kind: "typo-completion" };
+  if (options.completionMode) return { kind: "typo-repair" };
+  if (options.alternativeMode) return { kind: "alternative" };
+  if (level !== "none") return { kind: level };
   return { kind: "faithful" };
 }
 
@@ -24,13 +24,9 @@ export function* alternativeConversionAttempts(options: JapaneseConversionOption
   for (let attempt = 1; attempt <= 2; attempt++) {
     yield {
       kind: "alternative" as const,
-      options: { ...options, strictAlternative: true, alternativeAttempt: attempt, completionMode: false },
+      options: { ...options, alternativeMode: true, strictAlternative: true, alternativeAttempt: attempt, completionMode: false, speculativeMode: false },
     };
   }
-  yield {
-    kind: "typo-completion" as const,
-    options: { ...options, strictAlternative: true, alternativeAttempt: 0, completionMode: true },
-  };
 }
 
 export function hasAvoidOutputs(avoidOutputs: string[] | undefined): boolean {

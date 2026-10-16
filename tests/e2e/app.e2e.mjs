@@ -715,15 +715,17 @@ try {
     .getByRole("button", { name: "別候補" })
     .click();
   await page.locator(".cm-ghost-text-hint").waitFor();
-  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "あなたは誰ですか。" }).waitFor();
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "參。" }).waitFor();
   assert.equal(await editorText(page), "参。", "History previews must not replace committed text before Tab.");
+  assert.deepEqual(conversionPrompts, ["さん。"], "History spelling exploration must retain the previous reading.");
+  assert.ok(!conversionSystems[0].includes("infer a minimal romaji typo repair"));
   await page.keyboard.press("Tab");
-  await waitForEditorText(page, "あなたは誰ですか。");
+  await waitForEditorText(page, "參。");
   await page.getByRole("button", { name: /履歴を開く/ }).click();
   await page
     .locator(".history-item")
     .first()
-    .getByText("あなたは誰ですか。")
+    .getByText("參。")
     .waitFor();
   await page.getByRole("button", { name: "履歴 を閉じる" }).click();
 
@@ -919,6 +921,9 @@ function conversionResponseForPrompt(prompt, system = "") {
       return "壱。";
     }
     if (prompt === "さん。") {
+      if (system.includes("- 参。") && system.includes("- 三。")) {
+        return JSON.stringify({ completedKana: "さん。", convertedText: "參。" });
+      }
       if (system.includes("- 参。")) {
         return "三。";
       }

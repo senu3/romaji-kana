@@ -173,126 +173,41 @@ describe("convertRomajiToJapanese", () => {
     );
   });
 
-  it("tries typo completion after repeated unusable alternative conversions", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "誤字脱字は恐ろしいものだ" }),
-    };
-
-    const result = await convertRomajiToJapaneseDetailed(
-      "gozidatuzihaosorosiimonoda",
-      defaultSettings,
-      transport,
-      {
-        avoidOutputs: ["ご時達事はおそろしいものだ"],
-        documentVocabulary: ["誤字脱字"],
-      },
-    );
-
-    expect(result).toMatchObject({
-      text: "誤字脱字は恐ろしいものだ",
-      reviewKana: "ごじだつじはおそろしいものだ",
-      conversionStrategy: "completion",
-    });
-    expect(transport.generate).toHaveBeenCalledTimes(4);
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      3,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        system: expect.stringContaining("Alternative attempt 2"),
-      }),
-      30_000,
-    );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      4,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        system: expect.stringMatching(
-          /Typo completion request:[\s\S]*Document vocabulary reference:\nNone\./,
-        ),
-      }),
-      30_000,
-    );
-    expect(
-      transport.generate.mock.calls[0]?.[2]?.system,
-    ).toContain('- "誤字脱字"');
-    expect(
-      transport.generate.mock.calls[3]?.[2]?.system,
-    ).not.toContain('- "誤字脱字"');
+  it("ends alternative exploration without switching to typo repair or speculation", async () => {
+    const generate = vi.fn().mockResolvedValue({ response: "ご時達事はおそろしいものだ" });
+    await expect(convertRomajiToJapaneseDetailed("gozidatuzihaosorosiimonoda", defaultSettings,
+      { models: vi.fn(), generate }, { avoidOutputs: ["ご時達事はおそろしいものだ"], documentVocabulary: ["誤字脱字"] },
+    )).rejects.toThrow("別候補に変換できませんでした。");
+    expect(generate).toHaveBeenCalledTimes(3);
+    expect(generate.mock.calls[2][2].system).toContain("Alternative attempt 2");
+    for (const call of generate.mock.calls) {
+      expect(call[2].system).toContain('- "誤字脱字"');
+      expect(call[2].system).not.toContain("infer a minimal romaji typo repair");
+      expect(call[2].system).not.toContain("one speculative Japanese writing candidate");
+    }
   });
 
-  it("throws when typo completion cannot produce a usable alternative", async () => {
-    const transport = {
-      models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ご時達事はおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" })
-        .mockResolvedValueOnce({ response: "ごじだつじはおそろしいものだ" }),
-    };
-
-    await expect(
-      convertRomajiToJapaneseDetailed(
-        "gozidatuzihaosorosiimonoda",
-        defaultSettings,
-        transport,
-        { avoidOutputs: ["ご時達事はおそろしいものだ", "ごじだつじはおそろしいものだ"] },
-      ),
-    ).rejects.toThrow("別候補に変換できませんでした。");
-    expect(transport.generate).toHaveBeenCalledTimes(5);
+  it("does not treat an avoided hiragana alternative as a request for rescue", async () => {
+    const generate = vi.fn().mockResolvedValue({ response: "ごじだつじはおそろしいものだ" });
+    await expect(convertRomajiToJapaneseDetailed("gozidatuzihaosorosiimonoda", defaultSettings,
+      { models: vi.fn(), generate }, { avoidOutputs: ["ごじだつじはおそろしいものだ"] },
+    )).rejects.toThrow("別候補に変換できませんでした。");
+    expect(generate).toHaveBeenCalledTimes(3);
   });
 
-  it("passes original romaji and mechanical kana to typo completion", async () => {
-    const failedOutput = "ガイドラインに戻づき変換してください";
-    const transport = {
-      models: vi.fn(),
-      generate: vi
-        .fn()
-        .mockResolvedValueOnce({ response: failedOutput })
-        .mockResolvedValueOnce({ response: failedOutput })
-        .mockResolvedValueOnce({ response: failedOutput })
-        .mockResolvedValueOnce({ response: "ガイドラインに基づき変換してください" }),
-    };
-
-    const result = await convertRomajiToJapaneseDetailed(
-      "gaidorainnimododukihenkansitekudasai",
-      defaultSettings,
-      transport,
-      { avoidOutputs: [failedOutput] },
+  it("passes original romaji and mechanical kana to an explicit typo-repair request", async () => {
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: "ガイドラインに基づき変換してください", completedKana: "がいどらいんにもとづきへんかんしてください" }) });
+    const result = await convertRomajiToJapaneseDetailed("gaidorainnimododukihenkansitekudasai",
+      { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate },
+      { completionMode: true, avoidOutputs: ["ガイドラインに戻づき変換してください"], documentVocabulary: ["無関係な語"] },
     );
-
-    expect(result).toMatchObject({
-      text: "ガイドラインに基づき変換してください",
-      reviewKana: "がいどらいんにもどづきへんかんしてください",
-      conversionStrategy: "completion",
-    });
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      4,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        system: expect.stringContaining("mododuki may be a typo of motoduki"),
-        prompt: [
-          "Original romaji input:",
-          "gaidorainnimododukihenkansitekudasai",
-          "",
-          "Mechanical kana:",
-          "がいどらいんにもどづきへんかんしてください",
-        ].join("\n"),
-      }),
-      30_000,
-    );
+    expect(result).toMatchObject({ text: "ガイドラインに基づき変換してください", conversionStrategy: "completion" });
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(generate.mock.calls[0][2].system).toContain("mododuki may be a typo of motoduki");
+    expect(generate.mock.calls[0][2].system).not.toContain("Complete only an unfinished final Japanese word.");
+    expect(generate.mock.calls[0][2].system).not.toContain('- "無関係な語"');
+    expect(generate.mock.calls[0][2].prompt).toBe("Original romaji input:\ngaidorainnimododukihenkansitekudasai\n\nMechanical kana:\nがいどらいんにもどづきへんかんしてください");
   });
-
   it("uses a later non-kana alternative instead of returning kana immediately", async () => {
     const transport = {
       models: vi.fn(),

@@ -14,9 +14,15 @@ export interface JapaneseConversionResult {
 }
 
 export interface JapaneseConversionOptions {
+  /** Explore spelling only, holding the previous candidate's reading fixed. */
+  alternativeMode?: boolean;
+  alternativeReading?: string;
+  alternativeCorrectedReading?: string;
+  alternativeAdditionKind?: ConversionChanges["additionKind"];
   avoidOutputs?: string[];
   strictAlternative?: boolean;
   alternativeAttempt?: number;
+  /** Explicit typo-repair request (legacy name); never a spelling retry policy. */
   completionMode?: boolean;
   speculativeMode?: boolean;
   completionSourceRomaji?: string;

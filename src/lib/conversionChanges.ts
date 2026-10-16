@@ -1,5 +1,5 @@
 import { collectInputCompletionAdditions } from "./completionValidation";
-import { localCorrectionRule } from "./conversionRules";
+import { localCorrectionRule, wordCompletionRule } from "./conversionRules";
 
 /** A description of the observed change, independent of the requested mode
  * and generation strategy. Model readings are evidence, not semantic proof. */
@@ -11,6 +11,8 @@ export interface ConversionChanges {
   /** Validated reading after local correction, before any completion. */
   correctedReading?: string;
   additions: string[];
+  /** Observed boundary of an insertion, independent of requested mode. */
+  additionKind?: "word" | "phrase" | "unverified";
 }
 
 export function normalizeComparableReading(value: string): string {
@@ -36,10 +38,13 @@ export function classifyConversionChanges(
   // A known repair stage may replace or delete characters. Do not guess that
   // any small arbitrary model rewrite is necessarily a typing correction.
   if (repaired) return { ...base, kind: "correction" };
-  const additions = collectInputCompletionAdditions(
-    correctedReading === undefined ? source : normalizeComparableReading(correctedReading), result,
-  );
-  if (additions.length) return { ...base, kind: "completion", additions };
+  const completionSource = correctedReading === undefined ? source : normalizeComparableReading(correctedReading);
+  const additions = collectInputCompletionAdditions(completionSource, result);
+  if (additions.length) {
+    const additionKind = !result.startsWith(completionSource) || typeof Intl.Segmenter !== "function"
+      ? "unverified" : wordCompletionRule.staysInFinalWord(completionSource, result) ? "word" : "phrase";
+    return { ...base, kind: "completion", additions, additionKind };
+  }
   // A local replacement/deletion/transposition is a correction candidate.
   // This describes the edit shape, not proof of the author's intended meaning.
   const a = Array.from(source), b = Array.from(result);

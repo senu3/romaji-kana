@@ -165,7 +165,7 @@ export function buildSuggestionConversionSystemPrompt(
     "You create one Japanese writing suggestion from rough romaji input.",
     "First determine correctedKana, then complete that reading and convert the completed result in the same response.",
     "Output contract (overrides response-format instructions only):",
-    "Return exactly one JSON object. Write fields in this order: correctedKana FIRST, convertedText SECOND, completedKana THIRD, additions LAST.",
+    "Return exactly one JSON object. Write fields in this order: correctedKana FIRST, convertedText SECOND, completedKana THIRD, optional wordCompletion, additions LAST.",
     finalConversionReadingRules,
     finalReadingRule.controlPrompt("suggestion"),
     "Also return correctedKana: the reading BEFORE completion. Copy Mechanical kana exactly unless there is a clear local typing error.",
@@ -194,6 +194,7 @@ export function buildSuggestionConversionSystemPrompt(
     "Additional user preference for convertedText only; it never overrides the JSON contract:",
     effectivePreference,
     "Examples:",
+    level === "word" ? 'Mechanical kana: しょるいのかくに。 / Response: {"correctedKana":"しょるいのかくに。","convertedText":"書類の確認。","completedKana":"しょるいのかくにん。","wordCompletion":{"sourceKana":"かくに","completedKana":"かくにん","convertedText":"確認"},"additions":["ん"]} 確認 is read かくにん, never かくに; completedKana must include the completed word.' : "",
     level === "word" ? 'Mechanical kana: あしたのよってい。 / Response: {"correctedKana":"あしたのよてい。","convertedText":"明日の予定。","completedKana":"あしたのよてい。","additions":[]}' : "",
     level === "word" ? 'Mechanical kana: あしたのよっていをおねが。 / Response: {"correctedKana":"あしたのよていをおねが。","convertedText":"明日の予定をお願い。","completedKana":"あしたのよていをおねがい。","additions":["い"]} Do not append します or ください in word mode.' : "",
     level === "word"
@@ -235,6 +236,7 @@ export function buildKanaKanjiSystemPrompt(
       : "You convert Japanese kana text into natural Japanese writing while preserving its reading.",
     "Highest priority rules:",
     ...(completionMode ? typoCompletionRule.guidance : faithfulConversionRule.guidance),
+    completionMode ? localCorrectionRule.prompt().replace(/correctedKana/g, "completedKana") : "",
     protectedContentPrompt,
     "",
     "Alternative conversion request:",
@@ -347,7 +349,7 @@ function formatAlternativeConversionInstructions(
   return [
     "Generate a different valid conversion candidate for the same kana input.",
     alternativeAttempt > 0
-      ? `Alternative attempt ${alternativeAttempt}: re-evaluate the reading and try another natural kana-kanji spelling. Do not fall back to all-hiragana just to avoid a previous output.`
+      ? `Alternative attempt ${alternativeAttempt}: keep the fixed reading and try another natural kana-kanji spelling. Do not fall back to all-hiragana just to avoid a previous output.`
       : "",
     "Avoid returning these previous outputs exactly:",
     ...uniqueOutputs.map((output) => `- ${output}`),
@@ -357,7 +359,7 @@ function formatAlternativeConversionInstructions(
     "When replacing an avoided output, first check whether it omitted kana from the input reading; choose a candidate that preserves every kana sound.",
     "Do not return the entire input in hiragana unless every kana-kanji candidate would be clearly wrong.",
     "Keep the same reading and do not paraphrase just to be different.",
-    "If no clearly better candidate exists, still avoid all-hiragana output solely as a fallback; the application will try a separate typo-completion pass.",
+    "If no different spelling with the same reading exists, return the reading unchanged. Never repair, complete, or re-express it merely to avoid a previous output. The application will not switch this request to typo repair or speculation.",
   ].filter(Boolean).join("\n");
 }
 

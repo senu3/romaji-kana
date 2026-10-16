@@ -27,22 +27,18 @@ describe("observed conversion changes", () => {
   });
 
   it("uses the final speculative reading instead of stale completion metadata", async () => {
-    const generate = vi.fn()
-      .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。", additions: ["とう"] }) })
-      .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "かんしゃします。", convertedText: "感謝します。" }) });
-    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { avoidOutputs: ["ありがとう。"] });
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "かんしゃします。", convertedText: "感謝します。" }) });
+    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { speculativeMode: true });
     expect(result.conversionStrategy).toBe("speculative");
     expect(result.reviewKana).toBe("かんしゃします。");
     expect(result.changes).toMatchObject({ kind: "rewrite", resultReading: "かんしゃします。", additions: [] });
     expect(result.inputCompletionAdditions).toEqual([]);
-    expect(generate).toHaveBeenCalledTimes(2);
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("clears earlier additions when a plain-text fallback has no known reading", async () => {
-    const generate = vi.fn()
-      .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。", additions: ["とう"] }) })
-      .mockResolvedValueOnce({ response: "感謝します。" });
-    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { avoidOutputs: ["ありがとう。"] });
+    const generate = vi.fn().mockResolvedValue({ response: "感謝します。" });
+    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { speculativeMode: true });
     expect(result.changes).toMatchObject({ kind: "unknown", additions: [] });
     expect(result.inputCompletionAdditions).toBeUndefined();
     expect(result.inputCompletionApplied).toBeUndefined();

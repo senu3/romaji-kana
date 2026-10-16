@@ -132,6 +132,9 @@ export interface GhostConversionSuggestion {
 }
 
 export interface PendingConversion {
+  alternativeAdditionKind?: import("./conversionChanges").ConversionChanges["additionKind"];
+  alternativeReading?: string;
+  alternativeCorrectedReading?: string;
   id: string;
   range?: ConversionRange;
   anchor?: ConversionAnchor;
@@ -150,6 +153,8 @@ export interface PendingConversion {
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
 
 export interface ConversionHistoryItem {
+  /** Intended reading retained for spelling exploration, even for legacy text responses. */
+  reviewKana?: string;
   changes?: import("./conversionChanges").ConversionChanges;
   id: string;
   status: ConversionHistoryStatus;

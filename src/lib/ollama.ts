@@ -1,7 +1,7 @@
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
-import { applySpeculativeFallback, convertInputOnce } from "./conversionPipeline";
+import { convertInputOnce } from "./conversionPipeline";
 import {
   alternativeConversionAttempts,
   hasAvoidOutputs,
@@ -26,29 +26,28 @@ export async function convertRomajiToJapaneseDetailed(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
+  const explicitRescue = options.completionMode || options.speculativeMode;
+  const requestOptions = !explicitRescue && hasAvoidOutputs(options.avoidOutputs)
+    ? { ...options, alternativeMode: true } : options;
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = await convertInputOnce(input, settings, transport, attemptOptions);
-    // Script choice is not a failure: a valid kana-only completion should
-    // never be replaced merely to force a Kanji/katakana candidate.
-    if (isUsableConversionResult(candidate, attemptOptions)) return candidate;
-    return applySpeculativeFallback(input, candidate, settings, transport, attemptOptions);
+    return attemptOptions.speculativeMode ? { ...candidate, conversionStrategy: "speculative" as const }
+      : attemptOptions.completionMode ? { ...candidate, conversionStrategy: "completion" as const } : candidate;
   };
-  const result = await runAttempt(options);
+  const result = await runAttempt(requestOptions);
   if (isUsableConversionResult(result, options)) {
     return result;
   }
 
-  if (!hasAvoidOutputs(options.avoidOutputs)) {
+  if (explicitRescue || !hasAvoidOutputs(options.avoidOutputs)) {
     return result;
   }
 
-  for (const attempt of alternativeConversionAttempts(options)) {
+  for (const attempt of alternativeConversionAttempts(requestOptions)) {
     const candidate = await runAttempt(attempt.options);
     if (isUsableConversionResult(candidate, options)) {
-      return attempt.kind === "typo-completion"
-        ? { ...candidate, conversionStrategy: candidate.conversionStrategy ?? "completion" }
-        : candidate;
+      return candidate;
     }
   }
 

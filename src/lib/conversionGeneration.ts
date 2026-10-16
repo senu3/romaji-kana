@@ -175,14 +175,14 @@ function kanaGenerationParameters(settings: AppSettings, options: JapaneseConver
       temperature: 0.45,
     };
   }
-  const typoCompletion = route.kind === "typo-completion";
+  const typoRepair = route.kind === "typo-repair";
   return {
     system: buildKanaKanjiSystemPrompt(
       settings.conversionPrompt, options.avoidOutputs ?? [],
       options.strictAlternative ?? false, options.alternativeAttempt ?? 0,
-      typoCompletion, typoCompletion ? [] : options.documentVocabulary ?? [],
+      typoRepair, typoRepair ? [] : options.documentVocabulary ?? [],
     ),
-    temperature: typoCompletion ? 0.35 : options.alternativeAttempt ? 0.25 : 0.1,
+    temperature: typoRepair ? 0.35 : options.alternativeAttempt ? 0.25 : 0.1,
   };
 }
 

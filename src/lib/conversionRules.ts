@@ -1,15 +1,51 @@
 import { preservesProtectedContent } from "./conversionProtection";
 
+export interface WordCompletionBoundary {
+  sourceKana: string;
+  completedKana: string;
+  convertedText: string;
+}
+
 /** Generation guidance and executable limits live together. Semantic guidance
  * is deliberately separate: a character guard cannot prove intended meaning. */
 export const wordCompletionRule = {
   maximumAddedKana: 12,
+  staysInFinalWord(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): boolean {
+    if (source === candidate) return true;
+    if (!candidate.startsWith(source) || typeof Intl.Segmenter !== "function") return false;
+    const words = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(candidate)]
+      .filter(segment => segment.isWordLike);
+    const last = words[words.length - 1];
+    // The appended text must belong to one word already started by the user.
+    if (last && last.index < source.length && last.index + last.segment.length === candidate.length) return true;
+    // Kana-only segmentation can split a real word (かくにん). A declared
+    // surface word is an additional check, never an unverified mode label.
+    return Boolean(boundary && convertedText && this.matchesDeclaredWord(source, candidate, convertedText, boundary));
+  },
+  matchesDeclaredWord(source: string, candidate: string, convertedText: string, boundary: WordCompletionBoundary): boolean {
+    if (!boundary.sourceKana || !boundary.convertedText ||
+        !source.endsWith(boundary.sourceKana) || !boundary.completedKana.startsWith(boundary.sourceKana) ||
+        candidate !== source.slice(0, -boundary.sourceKana.length) + boundary.completedKana ||
+        !convertedText.endsWith(boundary.convertedText)) return false;
+    if (source === candidate) return true; // No addition needs boundary proof.
+    if (typeof Intl.Segmenter !== "function") return false;
+    const surfaceWords = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(boundary.convertedText)];
+    const finalSurfaceWord = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(convertedText)].filter(segment => segment.isWordLike).pop();
+    const sourcePrefix = source.slice(0, -boundary.sourceKana.length);
+    const convertedPrefix = convertedText.slice(0, -boundary.convertedText.length);
+    return surfaceWords.length === 1 && Boolean(surfaceWords[0].isWordLike) &&
+      finalSurfaceWord?.segment === boundary.convertedText &&
+      finalSurfaceWord.index + finalSurfaceWord.segment.length === convertedText.length &&
+      Boolean(sourcePrefix) === Boolean(convertedPrefix);
+  },
   guidance: [
     "Complete only an unfinished final Japanese word.",
     "Do not add particles, predicates, politeness, or a new phrase.",
   ],
   prompt(): string[] {
-    return [this.guidance[0], `Append at most ${this.maximumAddedKana} kana immediately before terminal punctuation.`, this.guidance[1]];
+    return [this.guidance[0], `Append at most ${this.maximumAddedKana} kana immediately before terminal punctuation.`, this.guidance[1],
+      "The entire appended suffix must stay inside the final Japanese word already started in correctedKana. New word boundaries are rejected by Japanese word segmentation. If the boundary is unclear, leave correctedKana unchanged.",
+      'When completing a word, also return wordCompletion: {"sourceKana":"かくに","completedKana":"かくにん","convertedText":"確認"}. These fields describe ONLY the final word, without terminal punctuation or preceding words. sourceKana must be a nonempty suffix of correctedKana; completedKana must retain it as a prefix; convertedText must be the final single word of the output. Do not declare a phrase as a word.'];
   },
 } as const;
 
@@ -135,6 +171,11 @@ export const finalReadingRule = {
 } as const;
 
 export const faithfulConversionRule = {
+  sameReading(a: string, b: string): boolean {
+    const normalize = (value: string) => value.normalize("NFKC").replace(/[ァ-ヶ]/gu,
+      char => String.fromCharCode(char.charCodeAt(0) - 0x60)).replace(/\s/gu, "");
+    return normalize(a) === normalize(b);
+  },
   guidance: [
     "1. Preserve the phonetic reading of the input kana.",
     "2. Do not replace words with semantically plausible alternatives if their reading differs.",
