@@ -1,4 +1,5 @@
 import { preservesProtectedContent } from "./conversionProtection";
+import { MAX_WORD_COMPLETION_KANA } from "./conversionLimits";
 export { countCharacter, preservesProtectedAsciiTokens, preservesProtectedSuggestionSyntax } from "./conversionProtection";
 import { stripThinkBlock } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
@@ -44,7 +45,7 @@ export function isAllowedInputCompletion(
     return (
       candidateParts.body.startsWith(sourceParts.body) &&
       candidateCharacters.length >= sourceCharacters.length &&
-      candidateCharacters.length <= sourceCharacters.length + 12
+      candidateCharacters.length <= sourceCharacters.length + MAX_WORD_COMPLETION_KANA
     );
   }
 
@@ -245,7 +246,7 @@ export function reportedSuggestionAdditions(
   }
   const totalLength = declared.reduce((sum, addition) => sum + Array.from(addition).length, 0);
   const sourceLength = comparableCharacters(mechanicalKana).length;
-  const maximumLength = level === "word" ? 6 : Math.max(24, Math.ceil(sourceLength * 1.25));
+  const maximumLength = level === "word" ? MAX_WORD_COMPLETION_KANA : Math.max(24, Math.ceil(sourceLength * 1.25));
   if (totalLength === 0 || totalLength > maximumLength) {
     return [];
   }

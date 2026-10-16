@@ -1172,8 +1172,8 @@ describe("convertRomajiToJapanese", () => {
   it("adds kana-kanji fidelity rules and examples", () => {
     const prompt = buildKanaKanjiSystemPrompt(defaultConversionPrompt);
 
-    expect(prompt).toContain("Japanese kana-to-kanji conversion engine");
-    expect(prompt).toContain("Japanese kana text produced from romaji typing");
+    expect(prompt).toContain("Japanese kana text into natural Japanese writing while preserving its reading");
+    expect(prompt).toContain("Additional user preference:\nNone.");
     expect(prompt).toContain("Do not paraphrase");
     expect(prompt).toContain("never 失費");
     expect(prompt).toContain("ごじまん must stay ご自慢 or ごじまん");

@@ -4,17 +4,18 @@ import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { buildSuggestionConversionSystemPrompt, defaultConversionPrompt } from "./prompts";
 import { defaultSettings } from "./settings";
 
-// These document current boundary problems, not desired long-term policy.
-// When intentionally fixing one, change its assertion alongside the policy.
+// Keep unresolved boundaries visible and guard routes already fixed.
+// Update each assertion alongside an intentional policy change.
 describe("current conversion route boundaries", () => {
   it("rejects a local typo repair in word mode", () => {
     expect(isAllowedInputCompletion("あしたのよってい。", "あしたのよてい。", "word")).toBe(false);
     expect(isAllowedInputCompletion("すみませ。", "すみません。", "word")).toBe(true);
   });
 
-  it("permits more kana and a new phrase than the word prompt asks for", () => {
+  it("uses the same length limit in prompt and validation, but still lacks a word-boundary check", () => {
     const prompt = buildSuggestionConversionSystemPrompt("word", defaultConversionPrompt);
-    expect(prompt).toContain("Append at most 6 kana");
+    expect(prompt).toContain("Append at most 12 kana");
+    expect(isAllowedInputCompletion("お", "お" + "あ".repeat(13), "word")).toBe(false);
     expect(isAllowedInputCompletion("お", "おめでとうございます", "word")).toBe(true);
     expect(isAllowedInputCompletion("ほんをよむ", "ほんをよむことにしました", "word")).toBe(true);
     expect(isAllowedInputCompletion("ほん をよむ", "ほんをよむ", "word")).toBe(false);

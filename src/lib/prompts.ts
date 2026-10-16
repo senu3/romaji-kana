@@ -1,14 +1,15 @@
 import type { InputCompletionLevel } from "./types";
+import { MAX_WORD_COMPLETION_KANA } from "./conversionLimits";
 
 export const finalConversionOutputContract = [
   "Output contract (overrides response-format instructions only):",
-  "Return one JSON object. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
+  "Return exactly one JSON object and nothing else. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
   "After writing convertedText, transcribe THAT TEXT into completedKana. Read its kanji with their correct pronunciation, even if the input contained a misspelling.",
   "Include every correction, completion and re-expression in completedKana.",
   "Do not reuse the input kana when its reading differs from convertedText. Do not include explanations.",
   '{"convertedText":"本を読む。","completedKana":"ほんをよむ。"}',
   "Keep existing terminal punctuation unchanged.",
-  'For typo input がくこう。: {"convertedText":"学校。","completedKana":"がっこう。"}. Use the correct reading of 学校, not the misspelled input.',
+  "completedKana must not contain kanji. Use the correct reading of the final text: 学校 is がっこう, never がくこう.",
 ].join("\n");
 
 export const defaultConversionPrompt = [
@@ -28,103 +29,82 @@ export const defaultConversionPrompt = [
   "6. When part of the input is difficult to convert, keep the closest readable form instead of inventing missing meaning.",
 ].join("\n");
 
-export const kanaKanjiFewShotExamples = [
-  "入力:",
-  "あなたのえがおがすきです",
-  "",
-  "出力:",
-  "あなたの笑顔が好きです",
-  "",
-  "入力:",
-  "しっぴつのてすとです",
-  "",
-  "出力:",
-  "執筆のテストです",
-  "",
-  "入力:",
-  "おじいさんごじまんのとけいさ",
-  "",
-  "出力:",
-  "おじいさんご自慢の時計さ",
-  "",
-  "入力:",
-  "ごじだつじはおそろしいものだ",
-  "",
-  "出力:",
-  "誤字脱字は恐ろしいものだ",
-  "",
-  "入力:",
-  "ごじにけーきをたべよう",
-  "",
-  "出力:",
-  "五時にケーキを食べよう",
-  "",
-  "入力:",
-  "ぎじにさんかしよう",
-  "",
-  "出力:",
-  "議事に参加しよう",
-  "",
-  "入力:",
-  "みちのえいごについてはごじのかのうせいもあるため",
-  "",
-  "出力:",
-  "未知の英語については誤字の可能性もあるため",
-  "",
-  "入力:",
-  "みちのたんごはひらがなのままでもかまわない",
-  "",
-  "出力:",
-  "みちの単語はひらがなのままでも構わない",
-  "",
-  "入力:",
-  "へんかんがふあんなところはひらがなのままにしてください",
-  "",
-  "出力:",
-  "変換が不安なところはひらがなのままにしてください",
-].join("\n");
+function renderConversionExamples(examples: Array<{ input: string; convertedText: string; completedKana: string }>): string {
+  return examples.map(({ input, convertedText, completedKana }) => [
+    "入力:", input, "", "出力:", JSON.stringify({ convertedText, completedKana }),
+  ].join("\n")).join("\n\n");
+}
 
-export const completionKanaKanjiFewShotExamples = [
-  "入力:",
-  "Original romaji input:",
-  "gaidorainnimododukihenkansitekudasai",
-  "",
-  "Mechanical kana:",
-  "がいどらいんにもどづきへんかんしてください",
-  "",
-  "出力:",
-  "ガイドラインに基づき変換してください",
-  "",
-  "入力:",
-  "Original romaji input:",
-  "あなたのえがおがすきです",
-  "",
-  "Mechanical kana:",
-  "あなたのえがおがすきです",
-  "",
-  "出力:",
-  "あなたの笑顔が好きです",
-  "",
-  "入力:",
-  "Original romaji input:",
-  "しっぴつのてすとです",
-  "",
-  "Mechanical kana:",
-  "しっぴつのてすとです",
-  "",
-  "出力:",
-  "執筆のテストです",
-  "",
-  "入力:",
-  "Original romaji input:",
-  "おじいさんごじまんのとけいさ",
-  "",
-  "Mechanical kana:",
-  "おじいさんごじまんのとけいさ",
-  "",
-  "出力:",
-  "おじいさんご自慢の時計さ",
-].join("\n");
+export const kanaKanjiFewShotExamples = renderConversionExamples([
+  {
+    "input": "あなたのえがおがすきです",
+    "convertedText": "あなたの笑顔が好きです",
+    "completedKana": "あなたのえがおがすきです"
+  },
+  {
+    "input": "しっぴつのてすとです",
+    "convertedText": "執筆のテストです",
+    "completedKana": "しっぴつのてすとです"
+  },
+  {
+    "input": "おじいさんごじまんのとけいさ",
+    "convertedText": "おじいさんご自慢の時計さ",
+    "completedKana": "おじいさんごじまんのとけいさ"
+  },
+  {
+    "input": "ごじだつじはおそろしいものだ",
+    "convertedText": "誤字脱字は恐ろしいものだ",
+    "completedKana": "ごじだつじはおそろしいものだ"
+  },
+  {
+    "input": "ごじにけーきをたべよう",
+    "convertedText": "五時にケーキを食べよう",
+    "completedKana": "ごじにけーきをたべよう"
+  },
+  {
+    "input": "ぎじにさんかしよう",
+    "convertedText": "議事に参加しよう",
+    "completedKana": "ぎじにさんかしよう"
+  },
+  {
+    "input": "みちのえいごについてはごじのかのうせいもあるため",
+    "convertedText": "未知の英語については誤字の可能性もあるため",
+    "completedKana": "みちのえいごについてはごじのかのうせいもあるため"
+  },
+  {
+    "input": "みちのたんごはひらがなのままでもかまわない",
+    "convertedText": "みちの単語はひらがなのままでも構わない",
+    "completedKana": "みちのたんごはひらがなのままでもかまわない"
+  },
+  {
+    "input": "へんかんがふあんなところはひらがなのままにしてください",
+    "convertedText": "変換が不安なところはひらがなのままにしてください",
+    "completedKana": "へんかんがふあんなところはひらがなのままにしてください"
+  }
+]);
+
+export const completionKanaKanjiFewShotExamples = renderConversionExamples([
+  {
+    "input": "Original romaji input:\ngaidorainnimododukihenkansitekudasai\n\nMechanical kana:\nがいどらいんにもどづきへんかんしてください",
+    "convertedText": "ガイドラインに基づき変換してください",
+    "completedKana": "がいどらいんにもとづきへんかんしてください"
+  },
+  {
+    "input": "Original romaji input:\nあなたのえがおがすきです\n\nMechanical kana:\nあなたのえがおがすきです",
+    "convertedText": "あなたの笑顔が好きです",
+    "completedKana": "あなたのえがおがすきです"
+  },
+  {
+    "input": "Original romaji input:\nしっぴつのてすとです\n\nMechanical kana:\nしっぴつのてすとです",
+    "convertedText": "執筆のテストです",
+    "completedKana": "しっぴつのてすとです"
+  },
+  {
+    "input": "Original romaji input:\nおじいさんごじまんのとけいさ\n\nMechanical kana:\nおじいさんごじまんのとけいさ",
+    "convertedText": "おじいさんご自慢の時計さ",
+    "completedKana": "おじいさんごじまんのとけいさ"
+  }
+]);
 
 export const inputCompletionLabels: Record<InputCompletionLevel, string> = {
   none: "なし",
@@ -132,6 +112,8 @@ export const inputCompletionLabels: Record<InputCompletionLevel, string> = {
   sentence: "文章",
 };
 
+/** @deprecated Legacy kana-only contract. The active pipeline uses
+ * buildSuggestionConversionSystemPrompt; retained for import compatibility. */
 export function buildInputCompletionSystemPrompt(
   level: Exclude<InputCompletionLevel, "none">,
 ): string {
@@ -176,7 +158,7 @@ export function buildSuggestionConversionSystemPrompt(
     level === "word"
       ? [
           "Complete only an unfinished final Japanese word.",
-          "Append at most 6 kana immediately before terminal punctuation.",
+          `Append at most ${MAX_WORD_COMPLETION_KANA} kana immediately before terminal punctuation.`,
           "Do not add particles, predicates, politeness, or a new phrase.",
         ]
       : [
@@ -193,11 +175,7 @@ export function buildSuggestionConversionSystemPrompt(
   return [
     "You create one Japanese writing suggestion from rough romaji input.",
     "Complete the mechanical kana and convert the completed result to natural Japanese writing in one operation.",
-    "Return exactly one JSON object and nothing else.",
-    '{"convertedText":"...","completedKana":"...","additions":["..."]}',
-    "Write convertedText first, then transcribe its final reading into completedKana. Reading must follow the final Japanese text, including corrected kanji readings, rather than copying the input.",
-    "completedKana is the full kana after completion. It must not contain kanji.",
-    "convertedText is the final Japanese writing suggestion.",
+    finalConversionOutputContract,
     "additions should list clear contiguous spans inserted into completedKana compared with Mechanical kana.",
     "If the suggestion mainly repairs or re-expresses the input instead of inserting text, return an empty additions array.",
     "If Application completion seed differs from Mechanical kana, use that seed exactly as completedKana.",
@@ -205,7 +183,6 @@ export function buildSuggestionConversionSystemPrompt(
     ...levelRules,
     "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
     "convertedText must express the same suggestion declared by completedKana and additions.",
-    "completedKana must give the reading of the FINAL convertedText, including every typo repair and re-expression. Never copy Mechanical kana unchanged when convertedText has a different reading.",
     "Use common kanji when natural. Keep hiragana when uncertain.",
     level === "word"
       ? "Do not paraphrase the existing word. Do not explain or return Markdown fences."
@@ -220,11 +197,11 @@ export function buildSuggestionConversionSystemPrompt(
     effectivePreference,
     "Examples:",
     level === "word"
-      ? '{"completedKana":"ありがとう。","convertedText":"ありがとう。","additions":["とう"]}'
-      : '{"completedKana":"あしたのかいぎは10じです。","convertedText":"明日の会議は10時です。","additions":["の","は","です"]}',
+      ? '{"convertedText":"ありがとう。","completedKana":"ありがとう。","additions":["とう"]}'
+      : '{"convertedText":"明日の会議は10時です。","completedKana":"あしたのかいぎは10じです。","additions":["の","は","です"]}',
     level === "word"
-      ? '{"completedKana":"あした。","convertedText":"明日。","additions":[]}'
-      : '{"completedKana":"しょるいをかくにんします。","convertedText":"書類を確認します。","additions":["を","します"]}',
+      ? '{"convertedText":"明日。","completedKana":"あした。","additions":[]}'
+      : '{"convertedText":"書類を確認します。","completedKana":"しょるいをかくにんします。","additions":["を","します"]}',
   ].filter(Boolean).join("\n");
 }
 
@@ -246,7 +223,7 @@ export function buildKanaKanjiSystemPrompt(
   completionMode = false,
   documentVocabulary: string[] = [],
 ): string {
-  const prompt = userPrompt.trim() || defaultConversionPrompt;
+  const prompt = userPrompt.trim() && userPrompt.trim() !== defaultConversionPrompt ? userPrompt.trim() : "None.";
   const alternativeInstructions = formatAlternativeConversionInstructions(
     avoidOutputs,
     strictAlternative,
@@ -272,7 +249,7 @@ export function buildKanaKanjiSystemPrompt(
     "9. Avoid contextually odd kanji even when they match the reading.",
     "10. Do not add intensifiers, modifiers, nouns, particles, or predicates that are not present in the kana.",
     "11. If the kana appears to include a typo repair, keep the closest reading rather than making a more fluent different sentence.",
-    "12. Return only the converted Japanese text. Do not explain.",
+    "12. Do not explain. Follow the response contract.",
     "",
     "Alternative conversion request:",
     alternativeInstructions || "None.",
@@ -314,7 +291,7 @@ export function buildSpeculativeConversionSystemPrompt(
     "Prefer a natural candidate containing common kanji or katakana.",
     "Never force obscure ateji or unnatural kanji merely to avoid hiragana.",
     "Preserve every digit, Latin token, Markdown marker, line break, and punctuation mark exactly and in the same order.",
-    "Return only one Japanese candidate. Do not explain and do not use Markdown fences.",
+    "Produce one Japanese candidate. Do not explain or use Markdown fences. Follow the response contract.",
     "If no plausible non-hiragana candidate exists, return the mechanical kana unchanged; the application will discard it.",
     uniqueAvoidOutputs.length > 0 ? "Do not return these previous candidates exactly:" : "",
     ...uniqueAvoidOutputs.map((output) => `- ${output}`),
