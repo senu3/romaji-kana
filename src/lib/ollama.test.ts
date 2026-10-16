@@ -244,7 +244,7 @@ describe("convertRomajiToJapanese", () => {
         "gozidatuzihaosorosiimonoda",
         defaultSettings,
         transport,
-        { avoidOutputs: ["ご時達事はおそろしいものだ"] },
+        { avoidOutputs: ["ご時達事はおそろしいものだ", "ごじだつじはおそろしいものだ"] },
       ),
     ).rejects.toThrow("別候補に変換できませんでした。");
     expect(transport.generate).toHaveBeenCalledTimes(5);
@@ -410,7 +410,7 @@ describe("convertRomajiToJapanese", () => {
     expect(request.system).not.toContain("api");
   });
 
-  it("replaces an all-hiragana word completion with one speculative candidate", async () => {
+  it("keeps a valid hiragana word completion without speculative rewriting", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
@@ -432,14 +432,13 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toMatchObject({
-      text: "有難う。",
+      text: "ありがとう。",
       reviewKana: "ありがとう。",
-      conversionStrategy: "speculative",
       inputCompletionApplied: true,
       inputCompletionSourceKana: "ありが。",
       inputCompletionAdditions: ["とう"],
     });
-    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenCalledTimes(1);
     expect(transport.generate).toHaveBeenCalledWith(
       "ollama",
       "http://localhost:11434",
@@ -450,17 +449,7 @@ describe("convertRomajiToJapanese", () => {
       }),
       30_000,
     );
-    expect(transport.generate).toHaveBeenNthCalledWith(
-      2,
-      "ollama",
-      "http://localhost:11434",
-      expect.objectContaining({
-        system: expect.stringContaining("one speculative Japanese writing candidate"),
-        prompt: expect.stringContaining("Original romaji input:\nariga."),
-        options: { temperature: 0.45 },
-      }),
-      30_000,
-    );
+    expect(result.conversionStrategy).toBeUndefined();
   });
 
   it("discards a structured suggestion that rewrites the input without another call", async () => {
@@ -512,17 +501,16 @@ describe("convertRomajiToJapanese", () => {
     );
 
     expect(result).toMatchObject({
-      text: "有難う。",
+      text: "ありがとう。",
       reviewKana: "ありがとう。",
-      conversionStrategy: "speculative",
       inputCompletionApplied: true,
       inputCompletionSourceKana: "ありが。",
       inputCompletionAdditions: ["とう"],
     });
-    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps romaji untouched when the speculative pass is still all hiragana", async () => {
+  it("accepts faithful hiragana without an extra speculative pass", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
@@ -534,12 +522,10 @@ describe("convertRomajiToJapanese", () => {
     const result = await convertRomajiToJapaneseDetailed("arigatou.", defaultSettings, transport);
 
     expect(result).toMatchObject({
-      text: "",
+      text: "ありがとう。",
       reviewKana: "ありがとう。",
-      suggestionRejected: true,
-      suggestionRejectedReason: "speculative",
     });
-    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
   it("rejects dropped digits before attempting a speculative fallback", async () => {

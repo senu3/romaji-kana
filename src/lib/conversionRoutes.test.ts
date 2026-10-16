@@ -20,21 +20,22 @@ describe("current conversion route boundaries", () => {
     expect(isAllowedInputCompletion("ほん をよむ", "ほんをよむ", "word")).toBe(false);
   });
 
-  it("discards a successful hiragana word completion after the speculative pass", async () => {
+  it("retains a successful hiragana word completion", async () => {
     const response = JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。" });
     const generate = vi.fn().mockResolvedValue({ response });
     const result = await convertRomajiToJapaneseDetailed("ariga.", { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate });
-    expect(result).toMatchObject({ text: "", suggestionRejectedReason: "speculative" });
-    expect(generate).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ text: "ありがとう。", changes: { kind: "completion" } });
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
-  it("allows speculative rewriting to exceed word-mode permissions", async () => {
+  it("does not rewrite a successful word completion through speculation", async () => {
     const generate = vi.fn()
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。" }) })
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "かんしゃします。", convertedText: "感謝します。" }) });
     const result = await convertRomajiToJapaneseDetailed("ariga.", { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate });
-    expect(result).toMatchObject({ text: "感謝します。", conversionStrategy: "speculative", changes: { kind: "rewrite" } });
-    expect(generate).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ text: "ありがとう。", changes: { kind: "completion" } });
+    expect(result.conversionStrategy).toBeUndefined();
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 
   it("skips uncertain-kana repair in suggestion modes and then protects the typo as Latin text", async () => {

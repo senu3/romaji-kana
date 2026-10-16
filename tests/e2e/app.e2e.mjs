@@ -528,13 +528,13 @@ try {
   await page.keyboard.press("Control+End");
   await page.keyboard.type("ariga.");
   const completionGhost = page.locator(".cm-ghost-text-suggestion");
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
-  await page.locator(".cm-ghost-text-hint").filter({ hasText: "推測候補" }).waitFor();
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
+  await page.locator(".cm-ghost-text-hint").filter({ hasText: "単語補完" }).waitFor();
   await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
   const comparison = page.getByRole("group", { name: "候補の比較" });
   assert.ok((await comparison.textContent()).includes("変換前:"));
   assert.ok((await comparison.textContent()).includes("補完前の読み:"));
-  assert.ok((await comparison.textContent()).includes("候補: 有難う。"));
+  assert.ok((await comparison.textContent()).includes("候補: ありがとう。"));
   if (process.env.E2E_CANDIDATE_SCREENSHOT) {
     await page.getByRole("combobox", { name: "表示テーマ" }).selectOption("dark");
     await page.waitForFunction(() => getComputedStyle(document.querySelector(".rail-button")).color === "rgb(224, 233, 237)");
@@ -543,8 +543,8 @@ try {
   }
   assert.equal(
     conversionRequestCount,
-    2,
-    "An all-hiragana word suggestion should receive one speculative fallback request.",
+    1,
+    "A valid hiragana word completion should not request speculative rewriting.",
   );
   assert.equal(
     await page.locator(".cm-ghost-source").textContent(),
@@ -567,25 +567,25 @@ try {
   await page.keyboard.press(",");
   await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
   assert.ok(
-    (await editorText(page)).endsWith("ariga.,"),
-    "Punctuation should dismiss a speculative candidate and remain literal romaji input.",
+    (await editorText(page)).endsWith("ありがとう。、"),
+    "Punctuation should accept a valid word-completion candidate.",
   );
   await page.keyboard.press("Control+Z");
   await page.keyboard.press("Control+Enter");
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
   await page.keyboard.press("Escape");
   await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
   assert.ok(
     (await editorText(page)).endsWith("ariga."),
-    "Escape should dismiss a speculative candidate without changing the romaji source.",
+    "Escape should dismiss a word-completion candidate without changing the romaji source.",
   );
   await page.keyboard.press("Control+Enter");
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
   conversionPrompts.length = 0;
   conversionSystems.length = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+/");
-  await completionGhost.filter({ hasText: "有り難う。" }).waitFor();
+  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
   const ghostRetryVocabularySystem = conversionSystems.find((system) =>
     system.includes("Document vocabulary reference:"),
   );
@@ -622,7 +622,7 @@ try {
     .first()
     .getByRole("button", { name: "再試行" })
     .click();
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
+  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
   const historyRetryVocabularySystem = conversionSystems.find((system) =>
     system.includes("Document vocabulary reference:"),
   );

@@ -3,6 +3,7 @@ import { preservesProtectedContent } from "./conversionProtection";
 import { normalizeInputForPrompt } from "./conversion";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings } from "./settings";
+import { applySpeculativeFallback, convertInputOnce } from "./conversionPipeline";
 
 describe("source protection across conversion routes", () => {
   it.each(["none", "word", "sentence"] as const)("rejects numeric loss in %s mode", async level => {
@@ -29,7 +30,9 @@ describe("source protection across conversion routes", () => {
   it("protects original digits through the speculative route", async () => {
     const generate = vi.fn().mockResolvedValueOnce({ response: "10じです。" })
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "11じです。", convertedText: "11時です。" }) });
-    const result = await convertRomajiToJapaneseDetailed("10zidesu.", defaultSettings, { models: vi.fn(), generate });
+    const transport = { models: vi.fn(), generate };
+    const first = await convertInputOnce("10zidesu.", defaultSettings, transport, {});
+    const result = await applySpeculativeFallback("10zidesu.", first, defaultSettings, transport, {});
     expect(result).toMatchObject({ text: "", suggestionRejectedReason: "protected" });
     expect(generate).toHaveBeenCalledTimes(2);
   });

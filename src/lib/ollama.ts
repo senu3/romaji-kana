@@ -29,6 +29,9 @@ export async function convertRomajiToJapaneseDetailed(
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = await convertInputOnce(input, settings, transport, attemptOptions);
+    // Script choice is not a failure: a valid kana-only completion should
+    // never be replaced merely to force a Kanji/katakana candidate.
+    if (isUsableConversionResult(candidate, attemptOptions)) return candidate;
     return applySpeculativeFallback(input, candidate, settings, transport, attemptOptions);
   };
   const result = await runAttempt(options);

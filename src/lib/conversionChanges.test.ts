@@ -30,7 +30,7 @@ describe("observed conversion changes", () => {
     const generate = vi.fn()
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。", additions: ["とう"] }) })
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "かんしゃします。", convertedText: "感謝します。" }) });
-    const result = await convertRomajiToJapaneseDetailed("ariga.", { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate });
+    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { avoidOutputs: ["ありがとう。"] });
     expect(result.conversionStrategy).toBe("speculative");
     expect(result.reviewKana).toBe("かんしゃします。");
     expect(result.changes).toMatchObject({ kind: "rewrite", resultReading: "かんしゃします。", additions: [] });
@@ -42,7 +42,7 @@ describe("observed conversion changes", () => {
     const generate = vi.fn()
       .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "ありがとう。", additions: ["とう"] }) })
       .mockResolvedValueOnce({ response: "感謝します。" });
-    const result = await convertRomajiToJapaneseDetailed("ariga.", { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate });
+    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, { models: vi.fn(), generate }, { avoidOutputs: ["ありがとう。"] });
     expect(result.changes).toMatchObject({ kind: "unknown", additions: [] });
     expect(result.inputCompletionAdditions).toBeUndefined();
     expect(result.inputCompletionApplied).toBeUndefined();

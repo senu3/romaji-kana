@@ -40,19 +40,11 @@ export function isUsableConversionResult(
   result: JapaneseConversionResult,
   options: JapaneseConversionOptions,
 ): boolean {
-  if (result.suggestionRejected || !result.text.trim() || isHiraganaOnlyConversion(result.text)) {
+  if (result.suggestionRejected || !result.text.trim()) {
     return false;
   }
 
   if (isAvoidedConversionOutput(result.text, options.avoidOutputs)) {
-    return false;
-  }
-
-  if (
-    hasAvoidOutputs(options.avoidOutputs) &&
-    result.text.trim() &&
-    result.text.trim() === result.reviewKana.trim()
-  ) {
     return false;
   }
 
