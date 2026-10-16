@@ -213,6 +213,25 @@ try {
   );
   await page.getByRole("button", { name: "モデル を閉じる" }).click();
 
+  // Editing an earlier typo must regenerate the complete unfinished phrase,
+  // even after its first candidate has been dismissed.
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  const typoPhrase = "ashitanoyottei";
+  await page.keyboard.type(typoPhrase);
+  await page.locator(".cm-ghost-source").waitFor();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Control+Home");
+  for (let index = 0; index < typoPhrase.indexOf("tt") + 1; index++) {
+    await page.keyboard.press("ArrowRight");
+  }
+  await page.keyboard.press("Delete");
+  await page.waitForFunction(() =>
+    document.querySelector(".cm-ghost-source")?.textContent === "ashitanoyotei",
+  );
+  assert.equal(await page.locator(".cm-ghost-source").textContent(), "ashitanoyotei");
+  await page.keyboard.press("Escape");
+
   conversionRequestCount = 0;
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");

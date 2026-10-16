@@ -1,3 +1,4 @@
+import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
 import { candidatePresentation } from "../lib/candidatePresentation";
 import {
   defaultKeymap,
@@ -43,7 +44,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  extractConversionRange,
   extractSelectedConversionRange,
   isTriggerEnabled,
   punctuationSuffixForGhostCommit,
@@ -590,7 +590,7 @@ export function MarkdownEditor({
     const cursor = view.state.selection.main.head;
     const trigger: Extract<ConversionTrigger, "typing" | "space"> =
       reason === "space" ? "space" : "typing";
-    const range = extractConversionRange(view.state.doc.toString(), cursor, trigger);
+    const range = retainedConversionRange(view.state, cursor, trigger);
     if (!range) {
       return false;
     }
@@ -600,6 +600,7 @@ export function MarkdownEditor({
       return false;
     }
 
+    view.dispatch({ effects: rememberUnconvertedRange.of(range) });
     if (!onConvertRef.current(range)) {
       return false;
     }
@@ -627,7 +628,7 @@ export function MarkdownEditor({
     }
 
     const cursor = view.state.selection.main.head;
-    const range = extractConversionRange(view.state.doc.toString(), cursor, "typing");
+    const range = retainedConversionRange(view.state, cursor, "typing");
     if (!range) {
       lastPredictiveRequestRef.current = null;
       return;
@@ -686,8 +687,9 @@ export function MarkdownEditor({
           return;
         }
         resetPredictiveSuggestionCadence();
-        const range = extractConversionRange(update.state.doc.toString(), cursor, trigger);
+        const range = retainedConversionRange(update.state, cursor, trigger);
         if (range) {
+          update.view.dispatch({ effects: rememberUnconvertedRange.of(range) });
           onConvertRef.current(range);
         }
         return;
@@ -755,6 +757,7 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        unconvertedRanges,
         theme,
         syntaxHighlighting(highlightStyle),
         highlightSelectionMatches(),
@@ -901,11 +904,12 @@ export function MarkdownEditor({
     }
 
     const cursor = view.state.selection.main.head;
-    const range = extractConversionRange(view.state.doc.toString(), cursor, "enter");
+    const range = retainedConversionRange(view.state, cursor, "enter");
     if (!range) {
       return false;
     }
 
+    view.dispatch({ effects: rememberUnconvertedRange.of(range) });
     onConvertRef.current(range);
     return false;
   }
@@ -926,6 +930,9 @@ export function MarkdownEditor({
   function runManualConversion(view: EditorView) {
     const range = extractManualConversionRange(view, "shortcut");
     if (range) {
+      if (view.state.selection.main.empty) {
+        view.dispatch({ effects: rememberUnconvertedRange.of(range) });
+      }
       onConvertRef.current(range);
     }
     return true;
@@ -941,7 +948,7 @@ export function MarkdownEditor({
       return extractSelectedConversionRange(doc, selection.from, selection.to, trigger);
     }
 
-    return extractConversionRange(doc, selection.head, trigger);
+    return retainedConversionRange(view.state, selection.head, trigger);
   }
 
   function acceptGhostSuggestion(view: EditorView) {
