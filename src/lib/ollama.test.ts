@@ -542,7 +542,7 @@ describe("convertRomajiToJapanese", () => {
     expect(transport.generate).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects a speculative candidate that changes protected digits", async () => {
+  it("rejects dropped digits before attempting a speculative fallback", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi
@@ -555,8 +555,8 @@ describe("convertRomajiToJapanese", () => {
 
     expect(result.text).toBe("");
     expect(result.reviewKana).toBe("10じです。");
-    expect(result.suggestionRejectedReason).toBe("speculative");
-    expect(transport.generate).toHaveBeenCalledTimes(2);
+    expect(result.suggestionRejectedReason).toBe("protected");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
   it("allows a concise sentence suggestion while preserving the original kana in order", async () => {

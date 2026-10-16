@@ -1,12 +1,10 @@
 import {
   comparableCharacters,
-  countCharacter,
   isAvoidedConversionOutput,
-  preservesProtectedAsciiTokens,
-  preservesProtectedSuggestionSyntax,
 } from "./completionValidation";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
+import { preservesProtectedContent } from "./conversionProtection";
 
 export type SegmentRoute =
   | { kind: "word" | "sentence" }
@@ -74,9 +72,7 @@ export function isAllowedSpeculativeConversion(source: string, candidate: string
     return false;
   }
   if (
-    !preservesProtectedAsciiTokens(normalizedSource, normalizedCandidate) ||
-    !preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate) ||
-    countCharacter(normalizedSource, "\n") !== countCharacter(normalizedCandidate, "\n")
+    !preservesProtectedContent(normalizedSource, normalizedCandidate)
   ) {
     return false;
   }

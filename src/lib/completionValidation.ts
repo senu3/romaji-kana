@@ -1,8 +1,8 @@
+import { preservesProtectedContent } from "./conversionProtection";
+export { countCharacter, preservesProtectedAsciiTokens, preservesProtectedSuggestionSyntax } from "./conversionProtection";
 import { stripThinkBlock } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
-
-const PROTECTED_SUGGESTION_SYNTAX = ["#", "`", "[", "]", "{", "}", "<", ">"] as const;
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -30,13 +30,7 @@ export function isAllowedInputCompletion(
     return normalizedCandidate === normalizedSource;
   }
 
-  if (!preservesProtectedAsciiTokens(normalizedSource, normalizedCandidate)) {
-    return false;
-  }
-
-  if (!preservesProtectedSuggestionSyntax(normalizedSource, normalizedCandidate)) {
-    return false;
-  }
+  if (!preservesProtectedContent(normalizedSource, normalizedCandidate)) return false;
 
   const sourceParts = splitTerminalPunctuation(normalizedSource);
   const candidateParts = splitTerminalPunctuation(normalizedCandidate);
@@ -77,15 +71,6 @@ function splitTerminalPunctuation(value: string): { body: string; punctuation: s
     body: match?.[1] ?? value,
     punctuation: match?.[2] ?? "",
   };
-}
-
-export function preservesProtectedAsciiTokens(source: string, candidate: string): boolean {
-  const sourceTokens = source.match(/[A-Za-z0-9][A-Za-z0-9._:/-]*/g) ?? [];
-  const candidateTokens = candidate.match(/[A-Za-z0-9][A-Za-z0-9._:/-]*/g) ?? [];
-  return (
-    sourceTokens.length === candidateTokens.length &&
-    sourceTokens.every((token, index) => candidateTokens[index] === token)
-  );
 }
 
 export function comparableCharacters(value: string): string[] {
@@ -212,12 +197,8 @@ export function isAllowedStructuredSuggestion(
     return false;
   }
 
-  if (!preservesProtectedAsciiTokens(candidate.completedKana, candidate.convertedText)) {
-    return false;
-  }
-  if (!preservesProtectedSuggestionSyntax(candidate.completedKana, candidate.convertedText)) {
-    return false;
-  }
+  if (!preservesProtectedContent(mechanicalKana, candidate.convertedText) ||
+      !preservesProtectedContent(candidate.completedKana, candidate.convertedText)) return false;
   if (/\p{Cc}/u.test(candidate.convertedText)) {
     return false;
   }
@@ -231,16 +212,6 @@ export function isAllowedStructuredSuggestion(
     return false;
   }
   return !isAvoidedConversionOutput(candidate.convertedText, options.avoidOutputs);
-}
-
-export function preservesProtectedSuggestionSyntax(source: string, candidate: string): boolean {
-  return PROTECTED_SUGGESTION_SYNTAX.every(
-    (character) => countCharacter(source, character) === countCharacter(candidate, character),
-  );
-}
-
-export function countCharacter(value: string, target: string): number {
-  return Array.from(value).filter((character) => character === target).length;
 }
 
 export function reportedSuggestionAdditions(

@@ -135,11 +135,13 @@ export function normalizeInputForPrompt(
   settings: AppSettings,
 ): string {
   let normalized = text;
+  const numericSeparator = (source: string, index: number) =>
+    /\d/u.test(source[index - 1] ?? "") && /\d/u.test(source[index + 1] ?? "");
   if (settings.punctuationConversion.periodToJapanese) {
-    normalized = normalized.replace(/\./g, "。");
+    normalized = normalized.replace(/\./g, (mark, index, source) => numericSeparator(source, index) ? mark : "。");
   }
   if (settings.punctuationConversion.commaToJapanese) {
-    normalized = normalized.replace(/,/g, "、");
+    normalized = normalized.replace(/,/g, (mark, index, source) => numericSeparator(source, index) ? mark : "、");
   }
   return normalized;
 }

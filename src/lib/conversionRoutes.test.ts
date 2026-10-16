@@ -71,10 +71,10 @@ describe("current conversion route boundaries", () => {
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
-  it("treats two mutually consistent model fields as sufficient despite dropping an input number", async () => {
+  it("rejects a dropped input number even when both model fields agree", async () => {
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "じです。", convertedText: "時です。" }) });
     const result = await convertRomajiToJapaneseDetailed("10zidesu.", defaultSettings, { models: vi.fn(), generate });
-    expect(result.text).toBe("時です。");
+    expect(result).toMatchObject({ text: "", suggestionRejected: true, suggestionRejectedReason: "protected" });
     expect(generate).toHaveBeenCalledTimes(1);
   });
 });

@@ -25,6 +25,31 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import type { OllamaTransport } from "./ollamaProxy";
 import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
+import { preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
+
+function conversionParts(input: string, settings: AppSettings, options: JapaneseConversionOptions) {
+  return splitInputForConversion(normalizeInputForPrompt(input, settings), [
+    ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
+  ]);
+}
+
+function sourceProtection(parts: ReturnType<typeof splitInputForConversion>): ConversionProtection {
+  const literalTerms = parts.flatMap(part => part.type === "text" ? [] : [part.output]);
+  const source = parts.map(part => part.type !== "text" ? part.output
+    : romajiToKana(part.value).tokens.map(token =>
+      // Unknown romaji is repairable input, not an explicitly protected name.
+      token.kind === "unknown" && /^[A-Za-z]$/u.test(token.kana) ? " " : token.kana,
+    ).join("")).join("");
+  return { source, literalTerms };
+}
+
+function protectedRejection(result: JapaneseConversionResult): JapaneseConversionResult {
+  return {
+    ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "protected",
+    changes: classifyConversionChanges(result.changes?.sourceReading ?? result.reviewKana, undefined, "unavailable"),
+    inputCompletionApplied: undefined, inputCompletionSourceKana: undefined, inputCompletionAdditions: undefined,
+  };
+}
 
 interface ConvertedSegment {
   text: string;
@@ -62,11 +87,8 @@ export async function convertInputOnce(
   options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
   throwIfConversionAborted(options.signal);
-  const normalized = normalizeInputForPrompt(input, settings);
-  const parts = splitInputForConversion(normalized, [
-    ...(options.protectedDictionaryEntries ?? []),
-    ...settings.userDictionary,
-  ]);
+  const parts = conversionParts(input, settings, options);
+  const protection = sourceProtection(parts);
   const segments: ConvertedSegment[] = [];
   const inputCompletionPartIndex = suggestionPartIndex(parts);
 
@@ -143,7 +165,14 @@ export async function convertInputOnce(
       modelReading: convertedPart.modelReading,
     });
   }
-  return assembleConversionResult(segments);
+  const result = assembleConversionResult(segments);
+  const preserves = (candidate: string) => preservesProtectedContent(protection.source, candidate, protection.literalTerms);
+  if (!preserves(result.text) ||
+      (segments.every(segment => segment.finalReading !== undefined) &&
+       !preserves(segments.map(segment => segment.finalReading).join("")))) {
+    return protectedRejection(result);
+  }
+  return result;
 }
 
 function assembleConversionResult(segments: ConvertedSegment[]): JapaneseConversionResult {
@@ -191,6 +220,12 @@ export async function applySpeculativeFallback(
     avoidOutputs: Array.from(new Set([...(options.avoidOutputs ?? []), result.text])),
   });
   const speculative = speculativeResult.text;
+  const protection = sourceProtection(conversionParts(originalRomaji, settings, options));
+  if (!preservesProtectedContent(protection.source, speculative, protection.literalTerms) ||
+      (speculativeResult.reading !== undefined &&
+       !preservesProtectedContent(protection.source, speculativeResult.reading, protection.literalTerms))) {
+    return protectedRejection(result);
+  }
   if (
     isHiraganaOnlyConversion(speculative) ||
     isAvoidedConversionOutput(speculative, [...(options.avoidOutputs ?? []), result.text]) ||

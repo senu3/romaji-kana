@@ -1,6 +1,5 @@
 import {
   isAllowedStructuredSuggestion, parseStructuredSuggestion,
-  preservesProtectedAsciiTokens, preservesProtectedSuggestionSyntax,
   reportedSuggestionAdditions, type StructuredSuggestionConversion,
 } from "./completionValidation";
 import { literalCandidateReading } from "./conversionChanges";
@@ -21,6 +20,7 @@ import {
 import { rebuildRomajiKanaResult } from "./romajiKana";
 import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 import { selectSegmentRoute } from "./conversionPolicy";
+import { preservesProtectedContent } from "./conversionProtection";
 
 export async function generateStructuredSuggestion(
   originalRomaji: string,
@@ -156,8 +156,7 @@ export async function kanjiizeKanaDetailed(
     if (!structured.completedKana || !structured.convertedText ||
         /[\p{Script=Han}々〆]/u.test(structured.completedKana) ||
         /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(structured.completedKana + structured.convertedText) ||
-        !preservesProtectedAsciiTokens(structured.completedKana, structured.convertedText) ||
-        !preservesProtectedSuggestionSyntax(structured.completedKana, structured.convertedText)) {
+        !preservesProtectedContent(structured.completedKana, structured.convertedText)) {
       throw new Error("変換結果の読みと本文の形式が一致しませんでした。");
     }
     return { text: structured.convertedText, reading: structured.completedKana, modelReading: true };

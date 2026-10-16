@@ -10,7 +10,7 @@ export interface JapaneseConversionResult {
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
   suggestionRejected?: boolean;
-  suggestionRejectedReason?: "diverged" | "speculative";
+  suggestionRejectedReason?: "diverged" | "speculative" | "protected";
 }
 
 export interface JapaneseConversionOptions {
