@@ -837,7 +837,7 @@ async function waitForEditorText(page, text) {
 
 function conversionResponseForPrompt(prompt, system = "") {
   if (system.includes("one speculative Japanese writing candidate")) {
-    return system.includes("- 有難う。") ? "有り難う。" : "有難う。";
+    return JSON.stringify({ completedKana: "ありがとう。", convertedText: system.includes("- 有難う。") ? "有り難う。" : "有難う。" });
   }
   if (system.includes("one Japanese writing suggestion")) {
     if (prompt?.includes("Mechanical kana:\nありが。")) {

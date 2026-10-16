@@ -34,6 +34,21 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
 
+  it("preserves observed changes when a candidate is accepted into history", async () => {
+    const changes = {
+      kind: "notation" as const, evidence: "model-reading" as const,
+      sourceReading: "ほんをよむ", resultReading: "ほんをよむ", additions: [],
+    };
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本を読む", reviewKana: "ほんをよむ", changes });
+    const { hook, view, options } = harness("honwoyomu");
+    options.settingsRef.current.inputCompletionLevel = "sentence";
+    await act(async () => { hook.current.handleConvert(range("honwoyomu")); });
+    const suggestion = view.state.field(ghostSuggestionField).suggestion;
+    expect(suggestion?.changes).toEqual(changes);
+    await act(async () => { hook.current.handleAcceptGhost(suggestion!); });
+    expect(hook.current.history[0].changes).toEqual(changes);
+  });
+
   it("does not apply a delayed result after switching documents, even with identical text", async () => {
     const response = deferred<JapaneseConversionResult>();
     vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(response.promise);

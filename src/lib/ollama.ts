@@ -1,5 +1,4 @@
 import {
-  collectInputCompletionAdditions,
   comparableCharacters,
   countCharacter,
   isAllowedStructuredSuggestion,
@@ -12,6 +11,7 @@ import {
   type StructuredSuggestionConversion,
 } from "./completionValidation";
 import { normalizeInputForPrompt } from "./conversion";
+import { classifyConversionChanges, literalCandidateReading, type ConversionChanges } from "./conversionChanges";
 import {
   hasConvertibleRomaji,
   normalizeRomajiReadingCandidate,
@@ -34,6 +34,7 @@ import {
   buildKanaRepairSystemPrompt,
   buildSpeculativeConversionSystemPrompt,
   buildSuggestionConversionSystemPrompt,
+  finalConversionOutputContract,
 } from "./prompts";
 import { rebuildRomajiKanaResult, romajiToKana } from "./romajiKana";
 import type {
@@ -147,8 +148,11 @@ async function convertRomajiToJapaneseDetailedOnce(
   const convertedParts: string[] = [];
   const reviewKanaParts: string[] = [];
   const inputCompletionSourceParts: string[] = [];
-  const inputCompletionAdditions: string[] = [];
-  let inputCompletionApplied = false;
+  const originalReadingParts: string[] = [];
+  const finalReadingParts: string[] = [];
+  let hasKnownRepair = false;
+  let finalReadingKnown = true;
+  let readingEvidence: ConversionChanges["evidence"] = "literal";
   let finalMeaningfulPartIndex = -1;
   parts.forEach((part, index) => {
     const value = part.type === "text" ? part.value : part.output;
@@ -168,6 +172,8 @@ async function convertRomajiToJapaneseDetailedOnce(
       convertedParts.push(part.output);
       reviewKanaParts.push(part.output);
       inputCompletionSourceParts.push(part.output);
+      originalReadingParts.push(part.output);
+      finalReadingParts.push(part.output);
       continue;
     }
 
@@ -175,10 +181,15 @@ async function convertRomajiToJapaneseDetailedOnce(
       convertedParts.push(part.value);
       reviewKanaParts.push(part.value);
       inputCompletionSourceParts.push(part.value);
+      originalReadingParts.push(part.value);
+      finalReadingParts.push(part.value);
       continue;
     }
 
     const kanaResult = romajiToKana(normalizeRomajiReadingCandidate(part.value));
+    const originalKana = romajiToKana(part.value).kana;
+    originalReadingParts.push(originalKana);
+    hasKnownRepair ||= originalKana !== kanaResult.kana;
     const suggestionLevel =
       partIndex === inputCompletionPartIndex ? settings.inputCompletionLevel : "none";
     if (suggestionLevel !== "none") {
@@ -204,10 +215,14 @@ async function convertRomajiToJapaneseDetailedOnce(
         };
       }
       inputCompletionSourceParts.push(kanaResult.kana);
+      readingEvidence = "model-reading";
+      finalReadingParts.push(suggestion.completedKana);
+      // Declarations of visible additions contradicting an unchanged reading
+      // cannot establish that the final candidate is only a notation change.
+      if (suggestion.completedKana === kanaResult.kana && suggestion.additions.length) {
+        finalReadingKnown = false;
+      }
       reviewKanaParts.push(suggestion.completedKana);
-      inputCompletionAdditions.push(...suggestion.additions);
-      inputCompletionApplied ||=
-        suggestion.completedKana !== kanaResult.kana || suggestion.additions.length > 0;
       convertedParts.push(suggestion.convertedText);
       continue;
     }
@@ -219,28 +234,37 @@ async function convertRomajiToJapaneseDetailedOnce(
       options.signal,
     );
     inputCompletionSourceParts.push(repaired.kana);
+    hasKnownRepair ||= repaired.kana !== kanaResult.kana;
     reviewKanaParts.push(repaired.kana);
-    convertedParts.push(
-      await kanjiizeKana(repaired.kana, settings, transport, {
+    const convertedPart = await kanjiizeKanaDetailed(repaired.kana, settings, transport, {
         ...options,
         completionSourceRomaji: options.completionMode
           ? part.value
           : options.completionSourceRomaji,
-      }),
-    );
+      });
+    convertedParts.push(convertedPart.text);
+    // In a free-text response the kana supplied to the model is not evidence
+    // of the final output's reading. Only literal output is observable here.
+    finalReadingKnown &&= convertedPart.reading !== undefined;
+    if (convertedPart.reading !== undefined) finalReadingParts.push(convertedPart.reading);
+    if (convertedPart.modelReading) readingEvidence = "model-reading";
   }
 
   const result: JapaneseConversionResult = {
     text: convertedParts.join(""),
-    reviewKana: reviewKanaParts.join(""),
+    reviewKana: finalReadingKnown && preservesProtectedAsciiTokens(originalReadingParts.join(""), finalReadingParts.join(""))
+      ? finalReadingParts.join("") : reviewKanaParts.join(""),
+    changes: classifyConversionChanges(
+      originalReadingParts.join(""),
+      finalReadingKnown ? finalReadingParts.join("") : undefined,
+      hasKnownRepair ? "repair-stage" : readingEvidence,
+      hasKnownRepair && finalReadingParts.join("") === inputCompletionSourceParts.join(""),
+    ),
   };
-  if (inputCompletionApplied) {
-    const inputCompletionSourceKana = inputCompletionSourceParts.join("");
+  if (result.changes && ["completion", "correction", "rewrite"].includes(result.changes.kind)) {
     result.inputCompletionApplied = true;
-    result.inputCompletionSourceKana = inputCompletionSourceKana;
-    result.inputCompletionAdditions = inputCompletionAdditions.length > 0
-      ? inputCompletionAdditions
-      : collectInputCompletionAdditions(inputCompletionSourceKana, result.reviewKana);
+    result.inputCompletionSourceKana = result.changes.sourceReading;
+    result.inputCompletionAdditions = result.changes.additions;
   }
   return result;
 }
@@ -348,30 +372,48 @@ async function applySpeculativeFallback(
     return result;
   }
 
-  const speculative = await kanjiizeKana(result.reviewKana, settings, transport, {
+  const speculativeResult = await kanjiizeKanaDetailed(result.reviewKana, settings, transport, {
     ...options,
     speculativeMode: true,
     completionMode: false,
     completionSourceRomaji: originalRomaji,
     avoidOutputs: Array.from(new Set([...(options.avoidOutputs ?? []), result.text])),
   });
+  const speculative = speculativeResult.text;
   if (
     isHiraganaOnlyConversion(speculative) ||
     isAvoidedConversionOutput(speculative, [...(options.avoidOutputs ?? []), result.text]) ||
-    !isAllowedSpeculativeConversion(result.reviewKana, speculative)
+    !isAllowedSpeculativeConversion(result.changes?.sourceReading ?? result.reviewKana, speculative)
   ) {
     return {
       ...result,
       text: "",
+      changes: classifyConversionChanges(result.changes?.sourceReading ?? result.reviewKana, undefined, "unavailable"),
+      inputCompletionApplied: undefined,
+      inputCompletionSourceKana: undefined,
+      inputCompletionAdditions: undefined,
       suggestionRejected: true,
       suggestionRejectedReason: "speculative",
     };
   }
 
+  const changes = classifyConversionChanges(
+    result.changes?.sourceReading ?? result.reviewKana,
+    speculativeResult.reading,
+    speculativeResult.modelReading ? "model-reading" : "literal",
+  );
+  const applied = ["completion", "correction", "rewrite"].includes(changes.kind);
   return {
     ...result,
     text: speculative,
     conversionStrategy: "speculative",
+    changes,
+    reviewKana: speculativeResult.reading ?? result.reviewKana,
+    // The fallback may re-express the completed input. Its final reading is
+    // unavailable, so additions from the preceding candidate are not valid.
+    inputCompletionApplied: applied || undefined,
+    inputCompletionSourceKana: applied ? changes.sourceReading : undefined,
+    inputCompletionAdditions: applied ? changes.additions : undefined,
   };
 }
 
@@ -434,12 +476,21 @@ export async function kanjiizeKana(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<string> {
+  return (await kanjiizeKanaDetailed(kana, settings, transport, options)).text;
+}
+
+async function kanjiizeKanaDetailed(
+  kana: string,
+  settings: AppSettings,
+  transport: OllamaTransport,
+  options: JapaneseConversionOptions,
+): Promise<{ text: string; reading?: string; modelReading: boolean }> {
   const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: options.speculativeMode
+      system: (options.speculativeMode
         ? buildSpeculativeConversionSystemPrompt(
           settings.conversionPrompt,
           options.avoidOutputs ?? [],
@@ -452,7 +503,7 @@ export async function kanjiizeKana(
           options.alternativeAttempt ?? 0,
           options.completionMode ?? false,
           options.completionMode ? [] : options.documentVocabulary ?? [],
-        ),
+        )) + "\n\n" + finalConversionOutputContract,
       prompt: buildKanaKanjiUserPrompt(kana, options),
       stream: false,
       think: settings.think,
@@ -476,7 +527,21 @@ export async function kanjiizeKana(
     throw new Error(`${providerLabel(settings)} returned an empty conversion.`);
   }
 
-  return text;
+  const structured = parseStructuredSuggestion(text);
+  if (structured) {
+    if (!structured.completedKana || !structured.convertedText ||
+        /[\p{Script=Han}々〆]/u.test(structured.completedKana) ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(structured.completedKana + structured.convertedText) ||
+        !preservesProtectedAsciiTokens(structured.completedKana, structured.convertedText) ||
+        !preservesProtectedSuggestionSyntax(structured.completedKana, structured.convertedText)) {
+      throw new Error("変換結果の読みと本文の形式が一致しませんでした。");
+    }
+    return { text: structured.convertedText, reading: structured.completedKana, modelReading: true };
+  }
+  if (/^(?:\{|```json)/u.test(text)) throw new Error("変換結果の形式を読み取れませんでした。");
+  // Older/custom providers can still return plain text. Do not invent a
+  // reading for Kanji output from that response.
+  return { text, reading: literalCandidateReading(text), modelReading: false };
 }
 
 function buildKanaKanjiUserPrompt(kana: string, options: JapaneseConversionOptions): string {

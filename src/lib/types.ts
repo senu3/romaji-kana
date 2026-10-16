@@ -109,6 +109,7 @@ export interface ConversionAnchor {
 }
 
 export interface GhostConversionSuggestion {
+  changes?: import("./conversionChanges").ConversionChanges;
   id: string;
   from: number;
   to: number;
@@ -149,6 +150,7 @@ export interface PendingConversion {
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
 
 export interface ConversionHistoryItem {
+  changes?: import("./conversionChanges").ConversionChanges;
   id: string;
   status: ConversionHistoryStatus;
   input: string;

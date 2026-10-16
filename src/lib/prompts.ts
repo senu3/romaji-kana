@@ -1,5 +1,16 @@
 import type { InputCompletionLevel } from "./types";
 
+export const finalConversionOutputContract = [
+  "Output contract (overrides response-format instructions only):",
+  "Return one JSON object. Write convertedText (the FINAL Japanese output) FIRST, then completedKana (the hiragana reading of that convertedText).",
+  "After writing convertedText, transcribe THAT TEXT into completedKana. Read its kanji with their correct pronunciation, even if the input contained a misspelling.",
+  "Include every correction, completion and re-expression in completedKana.",
+  "Do not reuse the input kana when its reading differs from convertedText. Do not include explanations.",
+  '{"convertedText":"本を読む。","completedKana":"ほんをよむ。"}',
+  "Keep existing terminal punctuation unchanged.",
+  'For typo input がくこう。: {"convertedText":"学校。","completedKana":"がっこう。"}. Use the correct reading of 学校, not the misspelled input.',
+].join("\n");
+
 export const defaultConversionPrompt = [
   "You are an advanced Japanese kana-to-kanji conversion engine.",
   "",
@@ -183,7 +194,8 @@ export function buildSuggestionConversionSystemPrompt(
     "You create one Japanese writing suggestion from rough romaji input.",
     "Complete the mechanical kana and convert the completed result to natural Japanese writing in one operation.",
     "Return exactly one JSON object and nothing else.",
-    '{"completedKana":"...","convertedText":"...","additions":["..."]}',
+    '{"convertedText":"...","completedKana":"...","additions":["..."]}',
+    "Write convertedText first, then transcribe its final reading into completedKana. Reading must follow the final Japanese text, including corrected kanji readings, rather than copying the input.",
     "completedKana is the full kana after completion. It must not contain kanji.",
     "convertedText is the final Japanese writing suggestion.",
     "additions should list clear contiguous spans inserted into completedKana compared with Mechanical kana.",
@@ -193,6 +205,7 @@ export function buildSuggestionConversionSystemPrompt(
     ...levelRules,
     "Preserve digits, Latin terms, Markdown symbols, and terminal punctuation exactly.",
     "convertedText must express the same suggestion declared by completedKana and additions.",
+    "completedKana must give the reading of the FINAL convertedText, including every typo repair and re-expression. Never copy Mechanical kana unchanged when convertedText has a different reading.",
     "Use common kanji when natural. Keep hiragana when uncertain.",
     level === "word"
       ? "Do not paraphrase the existing word. Do not explain or return Markdown fences."

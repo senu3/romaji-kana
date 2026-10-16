@@ -157,7 +157,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "おじいさんご自慢の時計さ",
       reviewKana: "おじいさんごじまんのとけいさ",
     });
@@ -193,7 +193,7 @@ describe("convertRomajiToJapanese", () => {
       },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "誤字脱字は恐ろしいものだ",
       reviewKana: "ごじだつじはおそろしいものだ",
       conversionStrategy: "completion",
@@ -269,7 +269,7 @@ describe("convertRomajiToJapanese", () => {
       { avoidOutputs: [failedOutput] },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "ガイドラインに基づき変換してください",
       reviewKana: "がいどらいんにもどづきへんかんしてください",
       conversionStrategy: "completion",
@@ -309,7 +309,7 @@ describe("convertRomajiToJapanese", () => {
       { avoidOutputs: ["失費のテストです"] },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "執筆のテストです",
       reviewKana: "しっぴつのてすとです",
     });
@@ -422,7 +422,7 @@ describe("convertRomajiToJapanese", () => {
             additions: ["とう"],
           }),
         })
-        .mockResolvedValueOnce({ response: "有難う。" }),
+        .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "有難う。" }) }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -431,7 +431,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "有難う。",
       reviewKana: "ありがとう。",
       conversionStrategy: "speculative",
@@ -481,7 +481,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "",
       reviewKana: "ありが。",
       suggestionRejected: true,
@@ -502,7 +502,7 @@ describe("convertRomajiToJapanese", () => {
             additions: [],
           }),
         })
-        .mockResolvedValueOnce({ response: "有難う。" }),
+        .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ありがとう。", convertedText: "有難う。" }) }),
     };
 
     const result = await convertRomajiToJapaneseDetailed(
@@ -511,7 +511,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "有難う。",
       reviewKana: "ありがとう。",
       conversionStrategy: "speculative",
@@ -533,7 +533,7 @@ describe("convertRomajiToJapanese", () => {
 
     const result = await convertRomajiToJapaneseDetailed("arigatou.", defaultSettings, transport);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "",
       reviewKana: "ありがとう。",
       suggestionRejected: true,
@@ -577,7 +577,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "明日の会議は10時です。",
       reviewKana: "あしたのかいぎは10じです。",
       inputCompletionApplied: true,
@@ -605,7 +605,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({ text: "明日。", reviewKana: "あした。" });
+    expect(result).toMatchObject({ text: "明日。", reviewKana: "あした。" });
     expect(transport.generate).toHaveBeenCalledTimes(1);
   });
 
@@ -626,10 +626,10 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({ text: "あなたは誰ですか。", reviewKana: "あなたはだれですか。" });
+    expect(result).toMatchObject({ text: "あなたは誰ですか。", reviewKana: "あなたはだれですか。" });
   });
 
-  it("reports safe visible additions even when the model leaves completedKana unchanged", async () => {
+  it("does not claim additions from an inconsistent completedKana declaration", async () => {
     const transport = {
       models: vi.fn(),
       generate: vi.fn().mockResolvedValue({
@@ -647,13 +647,12 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "書類を確認。",
       reviewKana: "しょるい かくにん。",
-      inputCompletionApplied: true,
-      inputCompletionSourceKana: "しょるい かくにん。",
-      inputCompletionAdditions: ["を"],
+      changes: { kind: "unknown", evidence: "unavailable", additions: [] },
     });
+    expect(result.inputCompletionAdditions).toBeUndefined();
   });
 
   it("runs input completion only for the final convertible segment", async () => {
@@ -785,7 +784,7 @@ describe("convertRomajiToJapanese", () => {
       transport,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "予定を確認しましょう。",
       reviewKana: "よていをかくにんしましょう。",
       inputCompletionApplied: true,
@@ -1076,7 +1075,7 @@ describe("convertRomajiToJapanese", () => {
       { protectedDictionaryEntries },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       text: "openairに行く。",
       reviewKana: "openairにいく。",
     });

@@ -205,6 +205,9 @@ export function isAllowedStructuredSuggestion(
   if (!candidate.completedKana || !candidate.convertedText) {
     return false;
   }
+  if (/[\p{Script=Han}々〆]/u.test(candidate.completedKana)) {
+    return false;
+  }
   if (!isAllowedInputCompletion(mechanicalKana, candidate.completedKana, level)) {
     return false;
   }

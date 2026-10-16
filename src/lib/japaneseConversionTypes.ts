@@ -1,8 +1,10 @@
 import type { ProtectedDictionaryEntry } from "./conversionInput";
+import type { ConversionChanges } from "./conversionChanges";
 
 export interface JapaneseConversionResult {
   text: string;
   reviewKana: string;
+  changes?: ConversionChanges;
   conversionStrategy?: "completion" | "speculative";
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
