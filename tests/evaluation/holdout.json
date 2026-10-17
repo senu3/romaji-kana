@@ -1,0 +1,163 @@
+{
+  "version": "2026-10-17-holdout-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "punctuationConversion": {
+      "periodToJapanese": true,
+      "commaToJapanese": true
+    },
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "cases": [
+    {
+      "id": "holdout-01",
+      "category": "inflection",
+      "input": "madaokutteinakatta.",
+      "acceptableExamples": [
+        "まだ送っていなかった。"
+      ],
+      "criteria": [
+        "未送付の状態と過去形を維持する",
+        "送ったという肯定に変えない"
+      ],
+      "criticalChecks": [
+        "否定と時制を維持する"
+      ]
+    },
+    {
+      "id": "holdout-02",
+      "category": "inflection",
+      "input": "kakuninshitemoraerebatasukarimasu.",
+      "acceptableExamples": [
+        "確認してもらえれば助かります。"
+      ],
+      "criteria": [
+        "条件形と依頼の口調を維持する",
+        "依頼の期限や相手を追加しない"
+      ]
+    },
+    {
+      "id": "holdout-03",
+      "category": "context",
+      "input": "kouenniitta.",
+      "options": {
+        "contextBefore": "子どもが遊べる場所を探していた。"
+      },
+      "acceptableExamples": [
+        "公園に行った。"
+      ],
+      "criteria": [
+        "前方文脈に合う公園を選ぶ",
+        "文脈を本文に混ぜない"
+      ]
+    },
+    {
+      "id": "holdout-04",
+      "category": "context",
+      "input": "kouenwokiita.",
+      "options": {
+        "contextAfter": "登壇者の説明は分かりやすかった。"
+      },
+      "acceptableExamples": [
+        "講演を聞いた。",
+        "講演を聴いた。"
+      ],
+      "criteria": [
+        "後方文脈に合う講演を選ぶ",
+        "登壇者や説明を対象文に追加しない"
+      ]
+    },
+    {
+      "id": "holdout-05",
+      "category": "numeric",
+      "input": "omosaha2.75kirodesu.",
+      "acceptableExamples": [
+        "重さは2.75キロです。",
+        "重さは2.75きろです。"
+      ],
+      "criteria": [
+        "重さという対象と単位を維持する",
+        "小数の2.75を表記どおり保持する"
+      ],
+      "criticalChecks": [
+        "数値を変更・分断しない"
+      ]
+    },
+    {
+      "id": "holdout-06",
+      "category": "numeric",
+      "input": "goukeiha12,800endesu.",
+      "acceptableExamples": [
+        "合計は12,800円です。"
+      ],
+      "criteria": [
+        "桁区切りを含む金額を保持する"
+      ],
+      "criticalChecks": [
+        "金額と桁区切りを維持する"
+      ]
+    },
+    {
+      "id": "holdout-07",
+      "category": "protected",
+      "input": "`ZX-42`nosetteiwokaenai.",
+      "acceptableExamples": [
+        "ZX-42の設定を変えない。"
+      ],
+      "criteria": [
+        "未知の識別子をそのまま保持する",
+        "否定を維持する"
+      ],
+      "criticalChecks": [
+        "識別子と否定を変更しない"
+      ]
+    },
+    {
+      "id": "holdout-08",
+      "category": "long",
+      "input": "raishuunokaigimadenishiryouwoyondegimontenwomatometeoitekudasai.",
+      "acceptableExamples": [
+        "来週の会議までに資料を読んで疑問点をまとめておいてください。"
+      ],
+      "criteria": [
+        "長い入力でも読みを変更せず候補を保持する",
+        "期限や依頼内容を追加しない"
+      ]
+    },
+    {
+      "id": "holdout-09",
+      "category": "word",
+      "input": "renrakusakinosette",
+      "settingsOverrides": {
+        "inputCompletionLevel": "word"
+      },
+      "acceptableExamples": [
+        "連絡先の設定"
+      ],
+      "criteria": [
+        "末尾の語の完成に限定する",
+        "設定方法などの新しい句を追加しない"
+      ]
+    },
+    {
+      "id": "holdout-10",
+      "category": "sentence",
+      "input": "ashitanoannai madaokutteina",
+      "settingsOverrides": {
+        "inputCompletionLevel": "sentence"
+      },
+      "acceptableExamples": [
+        "明日の案内はまだ送っていない。"
+      ],
+      "criteria": [
+        "未送付という中心的な意図を維持する",
+        "送付先や送付時刻を創作しない"
+      ],
+      "criticalChecks": [
+        "未送付を送付済みに変えない"
+      ]
+    }
+  ]
+}

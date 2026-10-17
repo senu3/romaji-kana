@@ -348,6 +348,7 @@ try {
     .filter({ hasText: "変換タイミング" })
     .click();
   await page.getByLabel("入力停止後に候補を生成").uncheck();
+  await page.getByLabel("Spaceで候補を生成").uncheck();
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;

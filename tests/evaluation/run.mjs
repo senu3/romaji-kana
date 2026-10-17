@@ -16,12 +16,14 @@ const { values: args } = parseArgs({ options: {
   seed: { type: "string", default: "20260922" }, case: { type: "string" },
   out: { type: "string" }, prompt: { type: "string" }, note: { type: "string", default: "" },
   engine: { type: "string", default: "hybrid" },
+  dataset: { type: "string", default: "tests/evaluation/cases.json" },
 } });
 
 if (args.help) {
   console.log(`Usage: npm run eval:run -- --model MODEL [options]
   --provider ollama|lmstudio  --url http://localhost:PORT
   --engine hybrid|local|llm
+  --dataset tests/evaluation/holdout.json
   --repeats 3  --seed 20260922  --case basic-01,basic-02
   --prompt FILE  --note TEXT  --out NEW_DIRECTORY  --dry-run
 Dry run validates cases and writes the schedule without contacting a model.
@@ -41,7 +43,7 @@ async function main() {
   if (!["http:", "https:"].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
     throw new Error("URL must be HTTP(S), without credentials, query or fragment");
   }
-  const source = await readFile(resolve(root, "tests/evaluation/cases.json"), "utf8");
+  const source = await readFile(resolve(root, args.dataset), "utf8");
   const dataset = JSON.parse(source);
   const ids = new Set();
   for (const c of dataset.cases) {
@@ -89,7 +91,7 @@ async function main() {
     await mkdir(out); // Never overwrite an earlier experiment.
     const git = (...argv) => { try { return execFileSync("git", argv, { cwd: root, encoding: "utf8" }).trim(); } catch { return "unknown"; } };
     const metadata = {
-      formatVersion: 1, datasetVersion: dataset.version, datasetSha256: hash(source),
+      formatVersion: 1, datasetPath: args.dataset, datasetVersion: dataset.version, datasetSha256: hash(source),
       createdAt: new Date().toISOString(), dryRun: Boolean(args["dry-run"]),
       gitSha: git("rev-parse", "HEAD"), gitStatus: git("status", "--porcelain"),
       platform: `${os.platform()} ${os.release()} ${os.arch()}`, node: process.version,
@@ -141,9 +143,11 @@ async function main() {
       engineCalls = [];
       const started = performance.now();
       const row = { ...trial, category: c.category, mode: c.settings.inputCompletionLevel, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options: c.options };
+      row.firstDictionaryCandidateMs = null;
       try {
         row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, {
           ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid" }),
+          onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
         });
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";
       } catch (error) {
@@ -152,6 +156,7 @@ async function main() {
         stopped = true;
       }
       row.elapsedMs = performance.now() - started;
+      row.rankingCompletionMs = args.engine === "hybrid" && row.result?.session && row.firstDictionaryCandidateMs !== null ? row.elapsedMs : null;
       row.apiCalls = calls;
       row.apiCallCount = calls.length;
       row.exactReferenceMatch = {

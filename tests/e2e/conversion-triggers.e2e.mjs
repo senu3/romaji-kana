@@ -1,0 +1,86 @@
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { createServer } from 'vite';
+
+const server = await createServer({ server: { host: '127.0.0.1', port: 0, strictPort: false } });
+let browser;
+try {
+  await server.listen();
+  browser = await chromium.launch({ headless: true });
+  const url = server.resolvedUrls.local[0];
+  async function scenario(settings, run) {
+    const context = await browser.newContext();
+    await context.addInitScript(settings => {
+      localStorage.clear();
+      localStorage.setItem('romaji-kana-settings', JSON.stringify({
+        conversionEngine: 'local', conversionMode: 'ghost', inputPauseTiming: 'early', ...settings,
+      }));
+    }, settings);
+    const page = await context.newPage();
+    const searches = [];
+    await page.route('**/api/tags', route => route.fulfill({ json: { models: [{ name: 'gemma3' }] } }));
+    await page.route('**/api/generate', route => route.fulfill({ json: { response: JSON.stringify({ order: ['candidate-0'] }) } }));
+    await page.route('**/api/kana-engine', route => {
+      const { reading } = route.request().postDataJSON();
+      searches.push(reading);
+      const candidate = (text, cost) => ({ text, reading, cost, tokens: [{ text, reading,
+        from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: cost }] });
+      return route.fulfill({ json: { candidates: [candidate(reading, 0), candidate('候補', 100)], dictionaryRevision: 'test', truncated: false } });
+    });
+    try {
+      await page.goto(url);
+      const editor = page.locator('.cm-content');
+      await editor.click();
+      await run(page, editor, searches);
+    } finally { await context.close(); }
+  }
+
+  await scenario({ triggers: { typing: true, space: false } }, async (page, _editor, searches) => {
+    await page.keyboard.type('hon ');
+    await page.waitForTimeout(100);
+    assert.equal(searches.length, 0, 'Disabled Space must not request immediately');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    assert.equal(searches.length, 1, 'Pause still generates when Space is disabled');
+  });
+  await scenario({ triggers: { typing: false, space: true } }, async (page, _editor, searches) => {
+    await page.keyboard.type('hon');
+    await page.waitForTimeout(600);
+    assert.equal(searches.length, 0, 'Disabled pause must not generate');
+    await page.keyboard.type(' ');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    assert.equal(searches.length, 1, 'Space works independently of pause');
+  });
+  await scenario({ triggers: { typing: true, space: true } }, async (page, editor, searches) => {
+    await editor.evaluate(element => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'hon.');
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await page.waitForTimeout(600);
+    assert.equal(await editor.innerText(), 'hon.');
+    assert.equal(searches.length, 0, 'Paste must not generate or replace text');
+    await page.keyboard.press('Control+Enter');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    assert.ok(searches.length > 0, 'Pasted text remains manually convertible');
+  });
+  await scenario({}, async (page, editor, searches) => {
+    await editor.dispatchEvent('compositionstart');
+    await page.keyboard.type('hon.');
+    await editor.dispatchEvent('compositionend');
+    await page.waitForTimeout(600);
+    assert.equal(searches.length, 0, 'IME edits must not start punctuation or pause conversion');
+  });
+  await scenario({ autoConvert: false }, async (page, _editor, searches) => {
+    await page.keyboard.type('mae\n```\ncode\n```\nato');
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Control+Enter');
+    await page.waitForTimeout(150);
+    assert.equal(searches.length, 0, 'A selection containing a fence must be rejected');
+    await page.keyboard.type('nedanwa1.5endesu.');
+    await page.keyboard.press('Control+Enter');
+    await page.locator('.cm-ghost-source').waitFor();
+    assert.equal(await page.locator('.cm-ghost-source').textContent(), 'nedanwa1.5endesu.');
+    assert.match(await page.locator('.cm-ghost-text-suggestion').textContent(), /1\.5/);
+  });
+  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, fences and numeric ranges.');
+} finally { await browser?.close(); await server.close(); }
