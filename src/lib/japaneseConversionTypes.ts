@@ -1,6 +1,7 @@
 import type { ProtectedDictionaryEntry } from "./conversionInput";
 import type { ConversionChanges } from "./conversionChanges";
 import type { ReadingVerifier } from "./readingAssessment";
+import type { ConversionDiagnostic } from "./conversionDiagnostics";
 
 export interface JapaneseConversionResult {
   text: string;
@@ -11,6 +12,7 @@ export interface JapaneseConversionResult {
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
   suggestionRejected?: boolean;
+  rejectionDetail?: ConversionDiagnostic;
   suggestionRejectedReason?: "diverged" | "speculative" | "protected" | "reading";
 }
 

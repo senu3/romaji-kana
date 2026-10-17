@@ -119,7 +119,11 @@ async function main() {
       try {
         row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, c.options);
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";
-      } catch (error) { row.outcome = "error"; row.error = String(error); stopped = true; }
+      } catch (error) {
+        row.outcome = "error"; row.error = String(error);
+        if (error?.diagnostic) row.errorDiagnostic = error.diagnostic;
+        stopped = true;
+      }
       row.elapsedMs = performance.now() - started;
       row.apiCalls = calls;
       row.apiCallCount = calls.length;

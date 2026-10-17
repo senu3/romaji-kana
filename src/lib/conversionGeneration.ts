@@ -1,5 +1,5 @@
 import {
-  isAllowedStructuredSuggestion, parseStructuredSuggestion,
+  structuredSuggestionRejection, parseStructuredSuggestion,
   reportedSuggestionAdditions, type StructuredSuggestionConversion,
 } from "./completionValidation";
 import { literalCandidateReading } from "./conversionChanges";
@@ -23,6 +23,7 @@ import { selectSegmentRoute } from "./conversionPolicy";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
 import { suggestionTargetPrompt, type SuggestionRequest } from "./conversionRequest";
 import { normalizeNumericReading } from "./numericReading";
+import { ConversionResponseError, type ConversionDiagnostic } from "./conversionDiagnostics";
 
 export async function generateStructuredSuggestion(
   request: SuggestionRequest,
@@ -30,7 +31,7 @@ export async function generateStructuredSuggestion(
   settings: AppSettings,
   transport: OllamaTransport,
   options: JapaneseConversionOptions,
-): Promise<StructuredSuggestionConversion | null> {
+): Promise<{ candidate: StructuredSuggestionConversion; rejection?: never } | { rejection: ConversionDiagnostic; candidate?: never }> {
   const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
     currentProviderBaseUrl(settings),
@@ -55,19 +56,20 @@ export async function generateStructuredSuggestion(
 
   const parsed = parseStructuredSuggestion(generatedText(result));
   const { preparedReading, completionSeed } = request.target;
-  if (!parsed) return null;
+  if (!parsed) return { rejection: "response-format" };
   const numericReading = normalizeNumericReading(preparedReading, parsed.completedKana);
   const candidate: StructuredSuggestionConversion = {
     ...parsed, completedKana: numericReading.reading, reportedKana: parsed.completedKana,
     numericReadingNormalized: numericReading.normalized,
     ...(parsed.correctedKana !== undefined ? { correctedKana: normalizeNumericReading(preparedReading, parsed.correctedKana).reading } : {}),
   };
-  const confirmedBoundary = isAllowedStructuredSuggestion(preparedReading, candidate, level, options);
-  const provisionalBoundary = !confirmedBoundary && level === "word" && isAllowedStructuredSuggestion(preparedReading, candidate, level, options, true);
-  if (!confirmedBoundary && !provisionalBoundary) {
-    return null;
+  const rejection = structuredSuggestionRejection(preparedReading, candidate, level, options);
+  const provisionalBoundary = rejection === "completion-shape" && level === "word" &&
+    structuredSuggestionRejection(preparedReading, candidate, level, options, true) === undefined;
+  if (rejection && !provisionalBoundary) {
+    return { rejection };
   }
-  return {
+  return { candidate: {
     ...candidate,
     ...(provisionalBoundary ? { boundaryUnverified: true } : {}),
     additions: reportedSuggestionAdditions(
@@ -77,7 +79,7 @@ export async function generateStructuredSuggestion(
       candidate,
       level,
     ),
-  };
+  } };
 }
 
 export async function repairLowConfidenceKana(
@@ -154,12 +156,12 @@ export async function kanjiizeKanaDetailed(
   if (structured) {
     const numericReading = normalizeNumericReading(kana, structured.completedKana);
     if (!finalReadingRule.accepts({ ...structured, completedKana: numericReading.reading }, "final")) {
-      throw new Error("変換結果の読みと本文の形式が一致しませんでした。");
+      throw new ConversionResponseError("reading-format", "変換結果の読みと本文の形式が一致しませんでした。");
     }
     return { text: structured.convertedText, reading: numericReading.reading, reportedReading: structured.completedKana,
       numericReadingNormalized: numericReading.normalized, modelReading: true };
   }
-  if (/^(?:\{|```json)/u.test(text)) throw new Error("変換結果の形式を読み取れませんでした。");
+  if (/^(?:\{|```json)/u.test(text)) throw new ConversionResponseError("response-format", "変換結果の形式を読み取れませんでした。");
   // Older/custom providers can still return plain text. Do not invent a
   // reading for Kanji output from that response.
   return { text, reading: literalCandidateReading(text), modelReading: false };

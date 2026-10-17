@@ -56,7 +56,7 @@ function alternativeReadingParts(parts: ReturnType<typeof splitInputForConversio
 
 function protectedRejection(result: JapaneseConversionResult): JapaneseConversionResult {
   return {
-    ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "protected",
+    ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "protected", rejectionDetail: "protected-content",
     changes: classifyConversionChanges(result.changes?.sourceReading ?? result.reviewKana, undefined, "unavailable"),
     inputCompletionApplied: undefined, inputCompletionSourceKana: undefined, inputCompletionAdditions: undefined,
   };
@@ -143,7 +143,7 @@ export async function convertInputOnce(
       const completionSeed = route.kind === "word"
         ? knownWordCompletionSeed(repaired.kana)
         : repaired.kana;
-      const suggestion = await generateStructuredSuggestion(
+      const outcome = await generateStructuredSuggestion(
         {
           target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana, completionSeed },
           reference: { beforeTarget: segments.map(segment => segment.preparedReading).join(""), documentVocabulary },
@@ -153,14 +153,16 @@ export async function convertInputOnce(
         transport,
         options,
       );
-      if (!suggestion) {
+      if (outcome.rejection) {
         return {
           text: "",
           reviewKana: segments.map(segment => segment.reviewReading).join("") + repaired.kana,
           suggestionRejected: true,
           suggestionRejectedReason: "diverged",
+          rejectionDetail: outcome.rejection,
         };
       }
+      const suggestion = outcome.candidate;
       segments.push({
         text: suggestion.convertedText,
         sourceReading: originalKana,
@@ -188,7 +190,8 @@ export async function convertInputOnce(
       route.kind === "alternative" && !faithfulConversionRule.sameReading(repaired.kana, convertedPart.reading) ||
       route.kind === "typo-repair" && !isAllowedLocalKanaCorrection(repaired.kana, convertedPart.reading)
     )) {
-      return { text: "", reviewKana: repaired.kana, suggestionRejected: true, suggestionRejectedReason: "diverged" };
+      return { text: "", reviewKana: repaired.kana, suggestionRejected: true, suggestionRejectedReason: "diverged",
+        rejectionDetail: route.kind === "alternative" ? "fixed-reading" : "local-correction" };
     }
     segments.push({
       text: convertedPart.text,
@@ -206,7 +209,7 @@ export async function convertInputOnce(
   }
   const result = assembleConversionResult(segments, isAlternative ? options.alternativeCorrectedReading : undefined);
   if (result.changes?.readingAssessment?.status === "contradicted") {
-    return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "reading",
+    return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "reading", rejectionDetail: "reading-contradiction",
       inputCompletionApplied: undefined, inputCompletionSourceKana: undefined, inputCompletionAdditions: undefined };
   }
   if (isAlternative && options.alternativeReading !== undefined && options.alternativeAdditionKind && result.changes?.kind === "completion") {
@@ -220,7 +223,7 @@ export async function convertInputOnce(
   }
   if (options.speculativeMode && (isHiraganaOnlyConversion(result.text) ||
       !isAllowedSpeculativeConversion(protection.source, result.text))) {
-    return { text: "", reviewKana: result.reviewKana, suggestionRejected: true, suggestionRejectedReason: "speculative" };
+    return { text: "", reviewKana: result.reviewKana, suggestionRejected: true, suggestionRejectedReason: "speculative", rejectionDetail: "speculative-policy" };
   }
   return result;
 }

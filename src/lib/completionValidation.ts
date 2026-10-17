@@ -8,6 +8,7 @@ import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule, wordCompletionRule } from "./conversionRules";
 import type { WordCompletionBoundary } from "./conversionRules";
 import { comparableKanaCharacters as comparableReadingCharacters, splitTerminalPunctuation } from "./readingComparison";
+import type { ConversionDiagnostic } from "./conversionDiagnostics";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -191,23 +192,31 @@ export function isAllowedStructuredSuggestion(
   options: JapaneseConversionOptions,
   allowUnverifiedBoundary = false,
 ): boolean {
+  return structuredSuggestionRejection(mechanicalKana, candidate, level, options, allowUnverifiedBoundary) === undefined;
+}
+
+export function structuredSuggestionRejection(
+  mechanicalKana: string,
+  candidate: StructuredSuggestionConversion,
+  level: Exclude<InputCompletionLevel, "none">,
+  options: JapaneseConversionOptions,
+  allowUnverifiedBoundary = false,
+): ConversionDiagnostic | undefined {
+  if (!preservesProtectedContent(mechanicalKana, candidate.convertedText) ||
+      !preservesProtectedContent(candidate.completedKana, candidate.convertedText)) return "protected-content";
   if (!finalReadingRule.accepts(candidate, "suggestion")) {
-    return false;
+    return "reading-format";
   }
   const correctedKana = candidate.correctedKana ?? mechanicalKana;
-  if (!isAllowedLocalKanaCorrection(mechanicalKana, correctedKana) ||
-      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level, candidate.wordCompletion, candidate.convertedText, allowUnverifiedBoundary)) {
-    return false;
-  }
-
-  if (!preservesProtectedContent(mechanicalKana, candidate.convertedText)) return false;
+  if (!isAllowedLocalKanaCorrection(mechanicalKana, correctedKana)) return "local-correction";
+  if (!isAllowedInputCompletion(correctedKana, candidate.completedKana, level, candidate.wordCompletion, candidate.convertedText, allowUnverifiedBoundary)) return "completion-shape";
 
   const kanaLength = comparableCharacters(candidate.completedKana).length;
   const convertedLength = comparableCharacters(candidate.convertedText).length;
   if (!convertedTextLengthRule.accepts(kanaLength, convertedLength)) {
-    return false;
+    return "text-length";
   }
-  return !isAvoidedConversionOutput(candidate.convertedText, options.avoidOutputs);
+  return isAvoidedConversionOutput(candidate.convertedText, options.avoidOutputs) ? "avoided-output" : undefined;
 }
 
 export function reportedSuggestionAdditions(
