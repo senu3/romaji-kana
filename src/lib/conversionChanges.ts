@@ -1,9 +1,12 @@
 import { collectInputCompletionAdditions } from "./completionValidation";
 import { localCorrectionRule, wordCompletionRule } from "./conversionRules";
+import type { ReadingAssessment } from "./readingAssessment";
 
 /** A description of the observed change, independent of the requested mode
  * and generation strategy. Model readings are evidence, not semantic proof. */
 export interface ConversionChanges {
+  readingAssessment?: ReadingAssessment;
+  wordBoundary?: "unverified";
   kind: "notation" | "completion" | "correction" | "rewrite" | "unknown";
   evidence: "literal" | "model-reading" | "repair-stage" | "unavailable";
   sourceReading: string;

@@ -257,8 +257,9 @@ try {
     "A candidate should be ready before punctuation commits it.",
   );
   await page.locator(".cm-ghost-source").waitFor();
+  await acceptUnverifiedCandidate(page, "明日");
   await page.keyboard.press(".");
-  await waitForEditorText(page, "明日。");
+  await waitForEditorText(page, "明日.");
   await page.waitForTimeout(500);
   assert.equal(
     conversionRequestCount,
@@ -270,7 +271,7 @@ try {
   assert.equal(
     await editorText(page),
     "ashita",
-    "One undo should revert the candidate and punctuation as a single edit.",
+    "Undo should restore the original after explicit adoption and punctuation.",
   );
 
   conversionRequestCount = 0;
@@ -281,14 +282,23 @@ try {
     "A candidate should be ready before comma commits it.",
   );
   await page.locator(".cm-ghost-source").waitFor();
+  await acceptUnverifiedCandidate(page, "明日");
   await page.keyboard.press(",");
-  await waitForEditorText(page, "明日、");
+  await waitForEditorText(page, "明日,");
   await page.waitForTimeout(500);
   assert.equal(
     conversionRequestCount,
     1,
     "A comma should commit the visible candidate without another model request.",
   );
+
+  conversionRequestCount = 0;
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("ashita");
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "明日" }).waitFor();
+  await page.keyboard.press(".");
+  assert.equal(await editorText(page), "ashita.", "Punctuation must not implicitly accept unverified Kanji.");
+  assert.equal(conversionRequestCount, 1);
 
   conversionRequestCount = 0;
   await page.keyboard.press("Control+A");
@@ -348,6 +358,7 @@ try {
     1,
     `Enter should trigger conversion. Editor text: ${await page.locator(".cm-content").textContent()}`,
   );
+  await acceptUnverifiedCandidate(page, "あなたは誰ですか。");
   await waitForEditorText(page, "あなたは誰ですか。");
   assert.deepEqual((await editorLines(page)).slice(0, 2), ["あなたは誰ですか。", ""]);
   assert.equal(conversionRequestCount, 1, "Enter should trigger exactly one conversion.");
@@ -369,6 +380,7 @@ try {
   await page.waitForTimeout(300);
   assert.equal(conversionRequestCount, 0, "Auto conversion should stop while the toolbar toggle is off.");
   await page.keyboard.press("Control+Enter");
+  await acceptUnverifiedCandidate(page, "一。");
   await waitForEditorText(page, "一。");
   assert.equal(conversionRequestCount, 1, "Manual conversion should remain available while auto conversion is off.");
   await page.getByRole("button", { name: "自動変換をオンにする", exact: true }).click();
@@ -382,9 +394,11 @@ try {
   await page.locator(".cm-content").click();
   await page.keyboard.press("Control+A");
   await page.keyboard.type("ichi.");
+  await acceptUnverifiedCandidate(page, "一。");
   await page.keyboard.press("Enter");
   await page.keyboard.type("ni.");
   await waitForEditorText(page, "一。");
+  await acceptUnverifiedCandidate(page, "二。");
   await waitForEditorText(page, "二。");
   await page.waitForTimeout(300);
   assert.deepEqual(conversionPrompts, ["いち。", "に。"]);
@@ -404,6 +418,7 @@ try {
   conversionRequestCount = 0;
   conversionPrompts.length = 0;
   await page.keyboard.press("Control+Enter");
+  await acceptUnverifiedCandidate(page, "明日の予定");
   await waitForEditorText(page, "already written 明日の予定");
   assert.deepEqual(
     conversionPrompts,
@@ -419,9 +434,16 @@ try {
   await page.keyboard.press("Control+A");
   await page.keyboard.type("ichi.");
   await page.keyboard.type("ni.");
-  await waitForEditorText(page, "一。二。");
+  await acceptUnverifiedCandidate(page, "二。");
+  assert.equal(await editorText(page), "ichi.二。");
   assert.deepEqual(conversionPrompts, ["いち。", "に。"]);
-  assert.equal(conversionRequestCount, 2, "Both triggers should be converted.");
+  await page.keyboard.press("Control+Home");
+  for (let index = 0; index < 5; index++) await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Control+Enter");
+  await acceptUnverifiedCandidate(page, "一。");
+  await waitForEditorText(page, "一。二。");
+  assert.deepEqual(conversionPrompts, ["いち。", "に。", "いち。"]);
+  assert.equal(conversionRequestCount, 3, "Unverified candidates require explicit adoption; the remaining range can be requested again.");
   assert.equal(maxActiveConversionRequests, 1, "Conversions should run sequentially.");
 
   conversionRequestCount = 0;
@@ -434,6 +456,7 @@ try {
     .first()
     .getByRole("button", { name: "別候補" })
     .click();
+  await acceptUnverifiedCandidate(page, "壱。");
   await waitForEditorText(page, "壱。二。");
   assert.deepEqual(conversionPrompts, ["いち。"]);
   assert.ok(
@@ -642,7 +665,7 @@ try {
   conversionRequestCount = 0;
   await page.keyboard.type("ashitanoyotteiwoonega.");
   await completionGhost.filter({ hasText: "明日の予定をお願い。" }).waitFor();
-  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「い」" }).waitFor();
+  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完候補（読み未確認） +「い」" }).waitFor();
   assert.equal(await editorText(page), "ashitanoyotteiwoonega.");
   assert.equal(conversionRequestCount, 1, "Local correction and completion should share one request.");
   await page.keyboard.press("Tab");
@@ -847,6 +870,14 @@ async function waitForCondition(condition, message, timeoutMs = 2_000) {
 
 async function editorText(page) {
   return page.evaluate(readEditorDocument);
+}
+
+async function acceptUnverifiedCandidate(page, text) {
+  const original = await editorText(page);
+  await page.locator(".cm-ghost-text-suggestion").filter({ hasText: text }).waitFor();
+  assert.equal(await editorText(page), original, "An unverified reading must not silently replace the original.");
+  await page.getByText("読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。", { exact: true }).waitFor();
+  await page.keyboard.press("Tab");
 }
 
 async function editorLines(page) {

@@ -1,5 +1,6 @@
 import type { ProtectedDictionaryEntry } from "./conversionInput";
 import type { ConversionChanges } from "./conversionChanges";
+import type { ReadingVerifier } from "./readingAssessment";
 
 export interface JapaneseConversionResult {
   text: string;
@@ -10,10 +11,12 @@ export interface JapaneseConversionResult {
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
   suggestionRejected?: boolean;
-  suggestionRejectedReason?: "diverged" | "speculative" | "protected";
+  suggestionRejectedReason?: "diverged" | "speculative" | "protected" | "reading";
 }
 
 export interface JapaneseConversionOptions {
+  /** Local independent verification, never a reference or saved setting. */
+  readingVerifier?: ReadingVerifier;
   /** Explore spelling only, holding the previous candidate's reading fixed. */
   alternativeMode?: boolean;
   alternativeReading?: string;

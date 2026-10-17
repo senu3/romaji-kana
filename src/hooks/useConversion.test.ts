@@ -7,6 +7,8 @@ import { defaultSettings } from "../lib/settings";
 import type { ConversionRange } from "../lib/types";
 import { deferred, mountHook, stateEditor } from "./testUtils";
 import { useConversion } from "./useConversion";
+import { assessReading } from "../lib/readingAssessment";
+import { classifyConversionChanges } from "../lib/conversionChanges";
 
 vi.mock("../lib/ollama", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/ollama")>(),
@@ -113,7 +115,10 @@ describe("conversion lifecycle", () => {
     act(() => hook.current.cancelConversion(hook.current.pending[0]));
     await act(async () => { first.resolve({ text: "こんにちは", reviewKana: "こんにちは" }); });
     expect(convertRomajiToJapaneseDetailed).toHaveBeenCalledTimes(2);
-    await act(async () => { second.resolve({ text: "さようなら", reviewKana: "さようなら" }); });
+    await act(async () => { second.resolve({ text: "さようなら", reviewKana: "さようなら", changes: {
+      ...classifyConversionChanges("さようなら", "さようなら", "literal"),
+      readingAssessment: assessReading("さようなら", "さようなら", false),
+    } }); });
     expect(view.state.doc.toString()).toBe("konnichiha さようなら");
     expect(hook.current.history.map(item => item.status)).toEqual(["success", "canceled"]);
   });
@@ -130,6 +135,21 @@ describe("conversion lifecycle", () => {
     if (action === "unmount") hook.unmount();
     await act(async () => { response.resolve({ text: "こんにちは", reviewKana: "こんにちは" }); });
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+  });
+  it("keeps unverified Kanji in a candidate even when direct replacement is configured", async () => {
+    const changes = { ...classifyConversionChanges("ほん", "ほん", "model-reading"), readingAssessment: assessReading("本", "ほん", true) };
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん", changes });
+    const { hook, view, options } = harness("hon");
+    await act(async () => { hook.current.handleConvert(range("hon")); });
+    expect(view.state.doc.toString()).toBe("hon");
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
+    const candidate = view.state.field(ghostSuggestionField).suggestion!;
+    expect(candidate.changes?.readingAssessment?.status).toBe("unverified");
+    // MarkdownEditor's Tab command applies the edit before this callback.
+    view.dispatch({ changes: { from: candidate.from, to: candidate.to, insert: candidate.convertedText } });
+    await act(async () => { hook.current.handleAcceptGhost(candidate); });
+    expect(view.state.doc.toString()).toBe("本");
+    expect(hook.current.history[0].changes?.readingAssessment?.status).toBe("unverified");
   });
 
   it("shows a valid prediction and clears the retry timer on unmount", async () => {

@@ -27,6 +27,7 @@ import { preservesProtectedContent } from "./conversionProtection";
 import { prepareConversionRequest } from "./conversionRequest";
 import { faithfulConversionRule } from "./conversionRules";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { assessReading, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
 
 /** Reuse the prior reading without asking the model to repair/complete again.
  * Literal anchors retain their original boundaries and never enter generation. */
@@ -68,7 +69,8 @@ interface ConvertedSegment {
   preparedReading: string;
   reviewReading: string;
   finalReading?: string;
-  readingReliable: boolean;
+  readingAvailable: boolean;
+  readingAssessment: ReadingAssessment;
   knownRepair: boolean;
   modelReading: boolean;
 }
@@ -76,7 +78,8 @@ interface ConvertedSegment {
 function preservedSegment(text: string): ConvertedSegment {
   return {
     text, sourceReading: text, preparedReading: text, reviewReading: text,
-    finalReading: text, readingReliable: true, knownRepair: false, modelReading: false,
+    finalReading: text, readingAvailable: true, knownRepair: false, modelReading: false,
+    readingAssessment: { status: "verified", origin: "literal", proof: "preserved" },
   };
 }
 
@@ -162,7 +165,8 @@ export async function convertInputOnce(
         reviewReading: suggestion.completedKana,
         finalReading: suggestion.completedKana,
         // A claimed addition contradicting an unchanged reading is not proof.
-        readingReliable: !(suggestion.completedKana === (suggestion.correctedKana ?? repaired.kana) && suggestion.additions.length),
+        readingAvailable: !(suggestion.completedKana === (suggestion.correctedKana ?? repaired.kana) && suggestion.additions.length),
+        readingAssessment: assessReading(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier),
         knownRepair: originalKana !== (suggestion.correctedKana ?? repaired.kana),
         modelReading: true,
         wordCompletion: route.kind === "word" && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana),
@@ -186,12 +190,17 @@ export async function convertInputOnce(
       preparedReading: repaired.kana,
       reviewReading: repaired.kana,
       finalReading: convertedPart.reading,
-      readingReliable: convertedPart.reading !== undefined,
+      readingAvailable: convertedPart.reading !== undefined,
+      readingAssessment: assessReading(convertedPart.text, convertedPart.reading, convertedPart.modelReading, options.readingVerifier),
       knownRepair: route.kind !== "alternative" && (originalKana !== kanaResult.kana || repaired.kana !== kanaResult.kana),
       modelReading: convertedPart.modelReading,
     });
   }
   const result = assembleConversionResult(segments, isAlternative ? options.alternativeCorrectedReading : undefined);
+  if (result.changes?.readingAssessment?.status === "contradicted") {
+    return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "reading",
+      inputCompletionApplied: undefined, inputCompletionSourceKana: undefined, inputCompletionAdditions: undefined };
+  }
   if (isAlternative && options.alternativeReading !== undefined && options.alternativeAdditionKind && result.changes?.kind === "completion") {
     result.changes.additionKind = options.alternativeAdditionKind;
   }
@@ -212,21 +221,22 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
   const sourceReading = segments.map(segment => segment.sourceReading).join("");
   const preparedReading = previousCorrectedReading ?? segments.map(segment => segment.preparedReading).join("");
   const finalReading = segments.map(segment => segment.finalReading ?? "").join("");
-  const readingReliable = segments.every(segment => segment.readingReliable);
+  const readingAvailable = segments.every(segment => segment.readingAvailable);
   const hasKnownRepair = (previousCorrectedReading !== undefined && previousCorrectedReading !== sourceReading) || segments.some(segment => segment.knownRepair);
   const evidence: ConversionChanges["evidence"] = hasKnownRepair
     ? "repair-stage" : segments.some(segment => segment.modelReading) ? "model-reading" : "literal";
 
   const result: JapaneseConversionResult = {
     text: segments.map(segment => segment.text).join(""),
-    reviewKana: readingReliable && preservesProtectedAsciiTokens(sourceReading, finalReading)
+    reviewKana: readingAvailable && preservesProtectedAsciiTokens(sourceReading, finalReading)
       ? finalReading : segments.map(segment => segment.reviewReading).join(""),
     changes: classifyConversionChanges(
-      sourceReading, readingReliable ? finalReading : undefined,
+      sourceReading, readingAvailable ? finalReading : undefined,
       evidence, hasKnownRepair && finalReading === preparedReading,
       hasKnownRepair ? preparedReading : undefined,
     ),
   };
+  result.changes!.readingAssessment = combineReadingAssessments(segments.map(segment => segment.readingAssessment));
   if (result.changes?.kind === "completion" && segments[segments.length - 1]?.wordCompletion &&
       segments.slice(0, -1).every(segment => segment.finalReading !== undefined && faithfulConversionRule.sameReading(segment.preparedReading, segment.finalReading))) {
     result.changes.additionKind = "word";

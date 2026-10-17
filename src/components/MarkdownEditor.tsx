@@ -1,5 +1,6 @@
 import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
 import { candidatePresentation } from "../lib/candidatePresentation";
+import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import {
   defaultKeymap,
   history,
@@ -145,7 +146,7 @@ class GhostTextWidget extends WidgetType {
 
   toDOM() {
     const presentation = candidatePresentation(this.candidate);
-    const speculative = this.candidate.conversionStrategy === "speculative";
+    const explicitAcceptance = requiresExplicitAcceptance(this.candidate);
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
     element.title = presentation.description;
@@ -155,8 +156,8 @@ class GhostTextWidget extends WidgetType {
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent = `${presentation.label}  ${speculative
-      ? "Tabで確定  Escで破棄"
+    hint.textContent = `${presentation.label}  ${explicitAcceptance
+      ? this.candidate.conversionStrategy === "speculative" ? "Tabで確定  Escで破棄" : "Tabで確定  Ctrl/Cmd+/で別候補  Escで破棄"
       : "Tab/句読点で確定  Ctrl/Cmd+/で別候補  Escで破棄"}`;
 
     if ((this.candidate.inputCompletionAdditions ?? []).length > 0) {
@@ -167,10 +168,10 @@ class GhostTextWidget extends WidgetType {
         .map((addition) => `「${addition}」`)
         .join("・");
       const remainingCount = (this.candidate.inputCompletionAdditions ?? []).length - visibleAdditions.length;
-      diff.textContent = `補完 +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
+      diff.textContent = `${explicitAcceptance ? "補完候補（読み未確認）" : "補完"} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
       diff.setAttribute(
         "aria-label",
-        `入力補完で追加: ${(this.candidate.inputCompletionAdditions ?? []).join("、")}`,
+        `${explicitAcceptance ? "モデル申告の追加候補" : "入力補完で追加"}: ${(this.candidate.inputCompletionAdditions ?? []).join("、")}`,
       );
       element.append(diff);
     }
@@ -190,6 +191,11 @@ class GhostTextWidget extends WidgetType {
     after.textContent = "候補: ";
     after.append(suggestion);
     comparison.append(after);
+    if (this.candidate.changes?.readingAssessment?.status !== "verified") {
+      const note = document.createElement("span");
+      note.textContent = "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
+      comparison.append(note);
+    }
     if (this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {
       const note = document.createElement("span");
       note.textContent = "補足・言い換えあり。追加箇所は特定できません。";
@@ -1013,7 +1019,7 @@ export function MarkdownEditor({
       return false;
     }
 
-    if (suggestion.conversionStrategy === "speculative") {
+    if (requiresExplicitAcceptance(suggestion)) {
       const cursor = selection.head;
       view.dispatch({
         changes: { from: cursor, to: cursor, insert: character },

@@ -14,6 +14,7 @@ import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { resolveConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
 import { buildProtectedDictionaryEntries, convertRomajiToJapaneseDetailed } from "../lib/ollama";
+import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import type {
   AppSettings,
   ConversionAnchor,
@@ -305,6 +306,7 @@ export function useConversion({
       const converted = conversion.text;
       if (
         settingsRef.current.conversionMode === "ghost" ||
+        requiresExplicitAcceptance(conversion) ||
         inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
         conversion.conversionStrategy === "speculative" ||
@@ -503,6 +505,7 @@ export function useConversion({
 
       if (
         settingsRef.current.conversionMode === "ghost" ||
+        requiresExplicitAcceptance(conversion) ||
         inputCompletionLevel !== "none" ||
         conversion.inputCompletionApplied ||
         conversion.conversionStrategy === "speculative" ||
