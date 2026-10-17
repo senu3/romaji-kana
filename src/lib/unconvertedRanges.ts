@@ -1,3 +1,4 @@
+import { isSentenceBoundary } from "./conversionBoundaries";
 import { StateEffect, StateField, Transaction, type EditorState } from "@codemirror/state";
 import { extractConversionRange, isInsideExcludedMarkdown } from "./conversion";
 import type { ConversionRange, ConversionTrigger } from "./types";
@@ -57,7 +58,7 @@ export function retainedConversionRange(
 
   // Punctuation explicitly typed at the caret ends this request. In particular,
   // inserting a period into a remembered sentence must not consume the next one.
-  if ((trigger === "period" || trigger === "comma") || /[。、.,\n]/u.test(doc[position - 1] ?? "")) {
+  if ((trigger === "period" || trigger === "comma") || isSentenceBoundary(doc, position - 1)) {
     return extractConversionRange(doc, position, trigger);
   }
 
@@ -65,10 +66,10 @@ export function retainedConversionRange(
   const lineEnd = Math.min(state.doc.lineAt(position).to, retained?.to ?? doc.length);
   while (end < lineEnd) {
     const char = doc[end];
-    if (/[。、.,]/u.test(char)) { end++; break; }
+    if (isSentenceBoundary(doc, end)) { end++; break; }
     // For restored/unrequested text, extend through romaji only. A remembered
     // range can include mixed Japanese, but never cross Markdown code/URLs.
-    if ((!retained || end >= retained.to) && !/[A-Za-z0-9\t '\-]/u.test(char)) break;
+    if ((!retained || end >= retained.to) && !/[A-Za-z0-9.,\t '\-]/u.test(char)) break;
     if (char === "`" || isInsideExcludedMarkdown(doc, end)) break;
     end++;
   }

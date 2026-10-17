@@ -12,6 +12,21 @@ import {
 import { defaultSettings } from "./settings";
 
 describe("extractConversionRange", () => {
+  it.each(["nedanwa1.5endesu.", "kingakuwa1,000endesu.", "10:30niiku.", "2026/10/17niiku.", "10%desu."])("keeps complete numeric tokens in %s", doc => {
+    expect(extractConversionRange(doc, doc.length, "period")?.text).toBe(doc);
+  });
+  it.each(["nedanwa1.", "kingakuwa1,"])("waits for ambiguous numeric punctuation in %s", doc => {
+    expect(extractConversionRange(doc, doc.length, doc.endsWith(".") ? "period" : "comma")).toBeNull();
+    expect(extractConversionRange(doc, doc.length, "shortcut")?.text).toBe(doc);
+  });
+  it("keeps punctuation inside complete protected literals out of sentence boundaries", () => {
+    const doc = "`v1.2`wotukau.";
+    expect(extractConversionRange(doc, doc.length, "period")?.text).toBe(doc);
+  });
+  it("starts after a URL instead of converting its suffix", () => {
+    const doc = "https://example.com/path yomu.";
+    expect(extractConversionRange(doc, doc.length, "period")?.text).toBe("yomu.");
+  });
   it("extracts an unfinished phrase for predictive typing", () => {
     const doc = "ashita no yotei";
     expect(extractConversionRange(doc, doc.length, "typing")).toEqual({
@@ -222,6 +237,14 @@ describe("punctuationSuffixForGhostCommit", () => {
 });
 
 describe("extractSelectedConversionRange", () => {
+  it.each(["mae\n```ts\nconst x = 1\n```\nato", "mae\n~~~\ncode\n~~~\nato", "mae\n```\ncode", "mae ``code`value`` ato", "mae https://example.com ato"])("rejects a selection containing excluded content: %s", doc => {
+    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")).toBeNull();
+  });
+  it("preserves complete single-backtick literals and supports Kanji-mixed selections", () => {
+    for (const doc of ["`OpenAI`wotukau", "明日の予定wo"]) {
+      expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")?.text).toBe(doc);
+    }
+  });
   it("extracts only the selected text for manual conversion", () => {
     const doc = "今日は会議の要点を確認します。 ashita no yotei mo kakunin shimasu";
     const selected = "ashita no yotei mo kakunin shimasu";
@@ -249,9 +272,10 @@ describe("extractSelectedConversionRange", () => {
     });
   });
 
-  it("skips Japanese-dominant selections", () => {
+  it("allows Japanese-dominant selections containing protected Kanji and romaji", () => {
     const doc = "今日はいい tenki";
-    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")).toBeNull();
+    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")?.text).toBe(doc);
+    expect(extractSelectedConversionRange("きょうは tenki", 0, 11, "shortcut")).toBeNull();
   });
 
   it("skips selections without romaji", () => {

@@ -1,7 +1,6 @@
+import { excludedRanges, isNumericSeparator, isPendingNumericSeparator, isSentenceBoundary } from "./conversionBoundaries";
 import type { AppSettings, ConversionRange, ConversionTrigger } from "./types";
 
-const END_DELIMITERS = new Set(["。", "、", ".", ","]);
-const URL_RE = /https?:\/\/[^\s)]+/g;
 
 export function triggerFromCharacter(
   character: string,
@@ -60,14 +59,15 @@ export function extractConversionRange(
     return null;
   }
 
+  if ((trigger === "period" || trigger === "comma" || trigger === "typing" || trigger === "space") && isPendingNumericSeparator(doc, safeCursor)) return null;
+
   const line = getLineAt(doc, safeCursor);
   const lineOffset = safeCursor - line.from;
   const markdownBoundary = getMarkdownLineBoundary(line.text);
   let start = line.from + markdownBoundary;
 
   for (let index = lineOffset - 1; index >= markdownBoundary; index -= 1) {
-    const char = line.text[index];
-    if (END_DELIMITERS.has(char)) {
+    if (isSentenceBoundary(line.text, index) && !isInsideExcludedMarkdown(doc, line.from + index)) {
       const isTriggerChar = line.from + index === safeCursor - 1;
       if (!isTriggerChar) {
         start = line.from + index + 1;
@@ -76,6 +76,12 @@ export function extractConversionRange(
     }
   }
 
+  // A URL or code span earlier on the line is a hard boundary. Complete
+  // single-backtick literals retain their existing fixed-replacement semantics.
+  for (const range of excludedRanges(doc)) {
+    if (range.kind !== "literal" && range.from < safeCursor && range.to > start) start = Math.max(start, range.to);
+  }
+  if (start >= safeCursor) return null;
   const adjustedStart = start + startOffsetAfterExistingJapanese(doc.slice(start, safeCursor));
   const rawText = doc.slice(adjustedStart, safeCursor);
   const text = rawText.trimStart();
@@ -118,7 +124,7 @@ export function extractSelectedConversionRange(
   const to = safeTo - trailingWhitespace;
   const text = doc.slice(from, to);
 
-  if (from >= to || !text.trim() || !/[A-Za-z]/.test(text) || isJapaneseDominant(text)) {
+  if (from >= to || !text.trim() || !/[A-Za-z]/.test(text) || (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))) {
     return null;
   }
 
@@ -135,13 +141,11 @@ export function normalizeInputForPrompt(
   settings: AppSettings,
 ): string {
   let normalized = text;
-  const numericSeparator = (source: string, index: number) =>
-    /\d/u.test(source[index - 1] ?? "") && /\d/u.test(source[index + 1] ?? "");
   if (settings.punctuationConversion.periodToJapanese) {
-    normalized = normalized.replace(/\./g, (mark, index, source) => numericSeparator(source, index) ? mark : "。");
+    normalized = normalized.replace(/\./g, (mark, index, source) => isNumericSeparator(source, index) ? mark : "。");
   }
   if (settings.punctuationConversion.commaToJapanese) {
-    normalized = normalized.replace(/,/g, (mark, index, source) => numericSeparator(source, index) ? mark : "、");
+    normalized = normalized.replace(/,/g, (mark, index, source) => isNumericSeparator(source, index) ? mark : "、");
   }
   return normalized;
 }
@@ -160,11 +164,8 @@ export function isJapaneseDominant(text: string): boolean {
 }
 
 export function isInsideExcludedMarkdown(doc: string, position: number): boolean {
-  return (
-    isInsideFencedCode(doc, position) ||
-    isInsideInlineCode(doc, position) ||
-    isInsideUrl(doc, position)
-  );
+  return excludedRanges(doc).some(range =>
+    position >= range.from && (position < range.to || (range.kind === "url" && position === range.to)));
 }
 
 function getLineAt(doc: string, position: number): { from: number; to: number; text: string } {
@@ -227,77 +228,11 @@ function isKanjiMixedRomajiInput(text: string): boolean {
   return /[A-Za-z]/.test(text) && /[\u3400-\u9fff]/u.test(text);
 }
 
-function isInsideFencedCode(doc: string, position: number): boolean {
-  const before = doc.slice(0, position).split("\n");
-  let openFence: { marker: "`" | "~"; length: number } | null = null;
-
-  for (const line of before) {
-    const match = /^\s*(`{3,}|~{3,})/.exec(line);
-    if (!match) {
-      continue;
-    }
-
-    const fence = match[1];
-    const marker = fence[0] as "`" | "~";
-    if (!openFence) {
-      openFence = { marker, length: fence.length };
-      continue;
-    }
-
-    if (openFence.marker === marker && fence.length >= openFence.length) {
-      openFence = null;
-    }
-  }
-
-  return openFence !== null;
-}
-
-function isInsideInlineCode(doc: string, position: number): boolean {
-  const line = getLineAt(doc, position);
-  const before = line.text.slice(0, position - line.from);
-  let openRunLength: number | null = null;
-
-  for (const match of before.matchAll(/(?<!\\)(`+)/g)) {
-    const runLength = match[1].length;
-    if (openRunLength === null) {
-      openRunLength = runLength;
-    } else if (openRunLength === runLength) {
-      openRunLength = null;
-    }
-  }
-
-  return openRunLength !== null;
-}
-
-function isInsideUrl(doc: string, position: number): boolean {
-  const line = getLineAt(doc, position);
-  URL_RE.lastIndex = 0;
-
-  for (const match of line.text.matchAll(URL_RE)) {
-    const start = line.from + (match.index ?? 0);
-    const end = start + match[0].length;
-    if (position >= start && position <= end) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function rangeIntersectsExcludedMarkdown(doc: string, from: number, to: number): boolean {
-  const lastPosition = Math.max(from, to - 1);
-  if (isInsideExcludedMarkdown(doc, from) || isInsideExcludedMarkdown(doc, lastPosition)) {
-    return true;
-  }
-
-  const selectedText = doc.slice(from, to);
-  for (const match of selectedText.matchAll(URL_RE)) {
-    const start = from + (match.index ?? 0);
-    const end = start + match[0].length;
-    if (start < to && end > from) {
-      return true;
-    }
-  }
-
-  return false;
+  return excludedRanges(doc).some(range => {
+    if (range.from >= to || range.to <= from) return false;
+    // Complete single-backtick literals are explicitly supported by the
+    // conversion pipeline; partial selections inside them are not.
+    return range.kind !== "literal" || from > range.from || to < range.to;
+  });
 }

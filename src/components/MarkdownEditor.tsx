@@ -1,6 +1,7 @@
 import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
 import { candidatePresentation } from "../lib/candidatePresentation";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
+import { isPendingNumericSeparator } from "../lib/conversionBoundaries";
 import {
   defaultKeymap,
   history,
@@ -1017,6 +1018,8 @@ export function MarkdownEditor({
     }
 
     const character = event.key;
+    const cursor = view.state.selection.main.head;
+    if (isPendingNumericSeparator(view.state.doc.sliceString(0, cursor) + character, cursor + 1)) return false;
     const trigger = character === "." ? "period" : "comma";
     const suggestion = view.state.field(ghostSuggestionField).suggestion;
     const selection = view.state.selection.main;

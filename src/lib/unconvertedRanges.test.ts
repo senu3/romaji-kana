@@ -9,6 +9,12 @@ function remembered(doc: string, from = 0, to = doc.length) {
 }
 
 describe("unconverted range retention", () => {
+  it("extends through decimal and grouping separators", () => {
+    for (const doc of ["nedanwa1.5endesu.", "kingakuwa1,000endesu."]) {
+      expect(retainedConversionRange(EditorState.create({ doc }), 3, "typing")?.text).toBe(doc);
+      expect(retainedConversionRange(remembered(doc), doc.indexOf("1") + 1, "typing")?.text).toBe(doc);
+    }
+  });
   it("includes the suffix after fixing a typo in a previously requested sentence", () => {
     let state = remembered("ashita kaigi ni ikku.");
     state = state.update({ changes: { from: 17, to: 18 }, userEvent: "delete.backward" }).state;
