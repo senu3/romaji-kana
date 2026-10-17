@@ -182,7 +182,7 @@ export function normalizePersonalDictionary(entries: unknown): PersonalWord[] {
     const reading = normalizeKanaWidth(readString(entry.reading).trim());
     const text = readString(entry.text).trim();
     if (!/^[ぁ-ゖー]+$/u.test(reading) || Array.from(reading).length > 80 || !text ||
-      Array.from(text).length > 80 || /[\u0000-\u001f\u007f]/u.test(text)) return [];
+      Array.from(text).length > 80 || /\p{Cc}/u.test(text)) return [];
     return [{ id: readString(entry.id) || `word-${index}`, reading, text,
       pos: ["proper", "person", "organization"].includes(entry.pos) ? entry.pos : "noun", enabled: entry.enabled !== false }];
   }).slice(0, 500);

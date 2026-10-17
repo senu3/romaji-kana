@@ -14,6 +14,7 @@ import { generatedText, generateWithAbort, stripThinkBlock, throwIfConversionAbo
 import { isAvoidedConversionOutput } from "./completionValidation";
 import { learnedBonus } from "./conversionLearning";
 import { withLegacyCompletionMetadata } from "./conversionCompatibility";
+import { finalReadingRule } from "./conversionRules";
 
 const MAX_CANDIDATES = 24;
 interface Combined { text: string; reading: string; cost: number; tokens: EngineToken[] }
@@ -71,7 +72,7 @@ export async function convertLocally(input: string, settings: AppSettings, trans
   const reading = combined[0]?.reading ?? sourceReading;
   // Literal fallback is kept outside cost pruning.
   if (!combined.some(c => c.text === reading)) combined.push(appendLiteral({ text: "", reading: "", cost: Number.MAX_SAFE_INTEGER, tokens: [] }, reading));
-  const candidates: SessionCandidate[] = combined.filter(c => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(c.text) && preservesProtectedContent(sourceReading, c.text, protection.literalTerms) &&
+  const candidates: SessionCandidate[] = combined.filter(c => finalReadingRule.acceptsControls({ completedKana: c.reading, convertedText: c.text }) && preservesProtectedContent(sourceReading, c.text, protection.literalTerms) &&
     !isAvoidedConversionOutput(c.text, options.avoidOutputs)).map((c, i) => {
     const dictionaryPath = c.tokens.some(t => t.source !== "literal");
     const changes = classifyConversionChanges(sourceReading, c.reading, dictionaryPath ? "dictionary-path" : "literal", false, undefined,

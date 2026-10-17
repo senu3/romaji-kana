@@ -181,10 +181,12 @@ export const finalReadingRule = {
   // Tabs and CR/LF are ordinary document whitespace; all other C0/C1
   // controls are forbidden in both text and readings, in every route.
   forbiddenControls: /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u,
+  acceptsControls(candidate: { completedKana: string; convertedText: string }): boolean {
+    return !this.forbiddenControls.test(candidate.completedKana + candidate.convertedText);
+  },
   accepts(candidate: { completedKana: string; convertedText: string }, _route: "final" | "suggestion"): boolean {
     if (!candidate.completedKana || !candidate.convertedText || this.forbiddenKanji.test(candidate.completedKana)) return false;
-    const controlsValid = !this.forbiddenControls.test(candidate.completedKana + candidate.convertedText);
-    return controlsValid && preservesProtectedContent(candidate.completedKana, candidate.convertedText);
+    return this.acceptsControls(candidate) && preservesProtectedContent(candidate.completedKana, candidate.convertedText);
   },
   controlPrompt(_route: "final" | "suggestion"): string {
     return "Neither completedKana nor convertedText may contain C0/C1 control characters other than tabs and line breaks. Preserve the original number of line breaks.";

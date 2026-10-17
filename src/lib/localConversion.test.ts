@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapaneseDetailed } from "./ollama";
+import { convertRomajiToJapaneseDetailed, type JapaneseConversionResult } from "./ollama";
 import { defaultSettings } from "./settings";
 import { defaultKanaEngine, type EngineCandidate, type KanaEngine } from "./kanaEngine";
 import { nextSessionCandidate } from "./conversionSession";
@@ -95,6 +95,35 @@ describe("local faithful conversion", () => {
     const h = harness();
     h.search.mockResolvedValue({ candidates: [{ ...candidate("記者"), reading: "きじ" }], truncated: false });
     await expect(convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine })).rejects.toThrow("有効な候補");
+  });
+  it.each(["\u0001", "\u007f", "\u0085", "\u009f"])("filters forbidden controls before ranking or displaying local candidates: %j", async control => {
+    const h = harness();
+    h.search.mockResolvedValue({ candidates: [candidate(`記${control}者`), candidate("汽車", "きしゃ", 200)],
+      truncated: false, dictionaryRevision: "test" });
+    const onLocalCandidates = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport,
+      { kanaEngine: h.engine, onLocalCandidates });
+    expect(result.text).toBe("汽車");
+    expect(result.session?.candidates.map(c => c.result.text)).not.toContain(`記${control}者`);
+    expect(onLocalCandidates.mock.calls[0][0].session.candidates.map((c: { result: JapaneseConversionResult }) => c.result.text))
+      .not.toContain(`記${control}者`);
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).candidates.map((c: { text: string }) => c.text))
+      .not.toContain(`記${control}者`);
+  });
+  it("rejects forbidden controls in the reading as well as in candidate text", async () => {
+    const h = harness();
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading, reading)], truncated: false, dictionaryRevision: "test" }));
+    const result = await convertRomajiToJapaneseDetailed("kisha\u0085", defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false });
+    expect(result.suggestionRejected).toBe(true);
+    expect(result.text).toBe("");
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+  it("keeps preserved Kanji and permitted whitespace when checking local candidates", async () => {
+    const h = harness();
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading, reading)], truncated: false, dictionaryRevision: "test" }));
+    const result = await convertRomajiToJapaneseDetailed("`既存の漢字`kisha\nhon", defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false });
+    expect(result.text).toBe("既存の漢字きしゃ\nほん");
+    expect(result.suggestionRejected).not.toBe(true);
   });
   it("propagates cancellation instead of falling back to an abandoned session", async () => {
     const h = harness();

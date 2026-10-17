@@ -28,6 +28,8 @@ describe("conversion session contracts", () => {
       { id: "company", reading: "テストシャ", text: "試験社", pos: "organization" },
       { reading: "abbr", text: "長い定型文" },
       { reading: "よみ", text: "本文\n追加" },
+      { reading: "よみ", text: "本文\u0085追加" },
+      { reading: "よみ", text: "本文\u009f追加" },
     ])).toEqual([{ id: "company", reading: "てすとしゃ", text: "試験社", pos: "organization", enabled: true }]);
   });
 });
