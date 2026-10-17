@@ -329,6 +329,10 @@ describe("markdown exclusions", () => {
 });
 
 describe("normalization", () => {
+  it("keeps punctuation inside protected literals and URLs exact", () => {
+    expect(normalizeInputForPrompt("`v1.beta,a`wotukau.", defaultSettings)).toBe("`v1.beta,a`wotukau。");
+    expect(normalizeInputForPrompt("https://example.com/a,b yomu.", defaultSettings)).toBe("https://example.com/a,b yomu。");
+  });
   it("converts ascii punctuation when enabled", () => {
     expect(normalizeInputForPrompt("anata, watashi.", defaultSettings)).toBe(
       "anata、 watashi。",

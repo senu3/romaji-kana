@@ -148,11 +148,14 @@ export function normalizeInputForPrompt(
   settings: AppSettings,
 ): string {
   let normalized = text;
+  const protectedRanges = excludedRanges(text);
+  const preserveMark = (source: string, index: number) => isNumericSeparator(source, index) ||
+    protectedRanges.some(range => range.from <= index && index < range.to);
   if (settings.punctuationConversion.periodToJapanese) {
-    normalized = normalized.replace(/\./g, (mark, index, source) => isNumericSeparator(source, index) ? mark : "。");
+    normalized = normalized.replace(/\./g, (mark, index, source) => preserveMark(source, index) ? mark : "。");
   }
   if (settings.punctuationConversion.commaToJapanese) {
-    normalized = normalized.replace(/,/g, (mark, index, source) => isNumericSeparator(source, index) ? mark : "、");
+    normalized = normalized.replace(/,/g, (mark, index, source) => preserveMark(source, index) ? mark : "、");
   }
   return normalized;
 }
