@@ -18,6 +18,8 @@ const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export interface StructuredSuggestionConversion {
+  reportedKana?: string;
+  numericReadingNormalized?: boolean;
   /** Application assessment, never parsed from the model's declaration. */
   boundaryUnverified?: boolean;
   wordCompletion?: WordCompletionBoundary;

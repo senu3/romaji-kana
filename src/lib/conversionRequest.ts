@@ -6,6 +6,7 @@ import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
 
 export interface ConversionTarget {
+  /** Source fragment after prompt punctuation normalization, before kana conversion. */
   readonly originalRomaji: string;
   readonly mechanicalReading: string;
   /** Reading after preprocessing; correction/completion is validated against it. */
@@ -36,7 +37,7 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
         token.kind === "unknown" && /^[A-Za-z]$/u.test(token.kana) ? " " : token.kana,
       ).join("")).join(""),
   };
-  return { parts, protection, documentVocabulary: options.documentVocabulary?.slice() };
+  return { originalInput: input, parts, protection, documentVocabulary: options.documentVocabulary?.slice() };
 }
 
 export function suggestionTargetPrompt({ target, reference }: SuggestionRequest): string {

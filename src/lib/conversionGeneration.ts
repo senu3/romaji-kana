@@ -22,6 +22,7 @@ import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpa
 import { selectSegmentRoute } from "./conversionPolicy";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
 import { suggestionTargetPrompt, type SuggestionRequest } from "./conversionRequest";
+import { normalizeNumericReading } from "./numericReading";
 
 export async function generateStructuredSuggestion(
   request: SuggestionRequest,
@@ -52,9 +53,15 @@ export async function generateStructuredSuggestion(
     30_000,
   ), options.signal);
 
-  const candidate = parseStructuredSuggestion(generatedText(result));
+  const parsed = parseStructuredSuggestion(generatedText(result));
   const { preparedReading, completionSeed } = request.target;
-  if (!candidate) return null;
+  if (!parsed) return null;
+  const numericReading = normalizeNumericReading(preparedReading, parsed.completedKana);
+  const candidate: StructuredSuggestionConversion = {
+    ...parsed, completedKana: numericReading.reading, reportedKana: parsed.completedKana,
+    numericReadingNormalized: numericReading.normalized,
+    ...(parsed.correctedKana !== undefined ? { correctedKana: normalizeNumericReading(preparedReading, parsed.correctedKana).reading } : {}),
+  };
   const confirmedBoundary = isAllowedStructuredSuggestion(preparedReading, candidate, level, options);
   const provisionalBoundary = !confirmedBoundary && level === "word" && isAllowedStructuredSuggestion(preparedReading, candidate, level, options, true);
   if (!confirmedBoundary && !provisionalBoundary) {
@@ -118,7 +125,7 @@ export async function kanjiizeKanaDetailed(
   settings: AppSettings,
   transport: OllamaTransport,
   options: JapaneseConversionOptions,
-): Promise<{ text: string; reading?: string; modelReading: boolean }> {
+): Promise<{ text: string; reading?: string; reportedReading?: string; numericReadingNormalized?: boolean; modelReading: boolean }> {
   const generation = kanaGenerationParameters(settings, options);
   const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
@@ -145,10 +152,12 @@ export async function kanjiizeKanaDetailed(
 
   const structured = parseStructuredSuggestion(text);
   if (structured) {
-    if (!finalReadingRule.accepts(structured, "final")) {
+    const numericReading = normalizeNumericReading(kana, structured.completedKana);
+    if (!finalReadingRule.accepts({ ...structured, completedKana: numericReading.reading }, "final")) {
       throw new Error("変換結果の読みと本文の形式が一致しませんでした。");
     }
-    return { text: structured.convertedText, reading: structured.completedKana, modelReading: true };
+    return { text: structured.convertedText, reading: numericReading.reading, reportedReading: structured.completedKana,
+      numericReadingNormalized: numericReading.normalized, modelReading: true };
   }
   if (/^(?:\{|```json)/u.test(text)) throw new Error("変換結果の形式を読み取れませんでした。");
   // Older/custom providers can still return plain text. Do not invent a

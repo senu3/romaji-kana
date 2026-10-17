@@ -1,9 +1,11 @@
+import { numericReadingRule } from "./numericReading";
+
 const PROTECTED_SUGGESTION_SYNTAX = ["#", "`", "[", "]", "{", "}", "<", ">"] as const;
 
 /** Describes the invariants enforced by preservesProtectedContent below. */
 export const protectedContentPrompt = [
   "Preserve every digit, Latin token and protected literal exactly, in the same order and with the same number of occurrences.",
-  "Preserve numeric signs, decimal points, separators, dates and percentages exactly; copy digits into completedKana too (10時 reads 10じ, never じゅうじ).",
+  numericReadingRule.prompt(),
   `Preserve the order and count of Markdown markers (${PROTECTED_SUGGESTION_SYNTAX.join(" ")}) and the number of line breaks.`,
 ].join("\n");
 

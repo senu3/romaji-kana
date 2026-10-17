@@ -1,3 +1,5 @@
+import { normalizeNumericReading } from "./numericReading";
+
 /** Independent local lookup. Model output and reference vocabulary are not
  * independent verifiers. An unknown entry must return undefined. */
 export interface ReadingVerifier {
@@ -5,6 +7,9 @@ export interface ReadingVerifier {
 }
 
 export interface ReadingAssessment {
+  /** Preserve the model's raw reading even when numeric representation is canonicalized. */
+  reportedReading?: string;
+  numericReadingNormalized?: boolean;
   status: "verified" | "unverified" | "contradicted";
   origin: "literal" | "model" | "unavailable" | "mixed";
   proof?: "literal" | "independent" | "preserved" | "mixed";
@@ -22,7 +27,7 @@ export function assessReading(text: string, claimed: string | undefined, modelRe
   }
   const readings = verifier?.lookupReadings(text);
   if (claimed !== undefined && readings?.length) {
-    return { status: readings.some(reading => normalizeReading(reading) === normalizeReading(claimed)) ? "verified" : "contradicted", origin, proof: "independent" };
+    return { status: readings.some(reading => normalizeReading(normalizeNumericReading(claimed, reading).reading) === normalizeReading(claimed)) ? "verified" : "contradicted", origin, proof: "independent" };
   }
   return { status: "unverified", origin };
 }

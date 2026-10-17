@@ -63,6 +63,8 @@ function protectedRejection(result: JapaneseConversionResult): JapaneseConversio
 }
 
 interface ConvertedSegment {
+  reportedReading?: string;
+  numericReadingNormalized?: boolean;
   boundaryUnverified?: boolean;
   wordCompletion?: boolean;
   text: string;
@@ -165,6 +167,8 @@ export async function convertInputOnce(
         preparedReading: suggestion.correctedKana ?? repaired.kana,
         reviewReading: suggestion.completedKana,
         finalReading: suggestion.completedKana,
+        reportedReading: suggestion.reportedKana,
+        numericReadingNormalized: suggestion.numericReadingNormalized,
         // A claimed addition contradicting an unchanged reading is not proof.
         readingAvailable: !(suggestion.completedKana === (suggestion.correctedKana ?? repaired.kana) && suggestion.additions.length),
         readingAssessment: assessReading(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier),
@@ -192,6 +196,8 @@ export async function convertInputOnce(
       preparedReading: repaired.kana,
       reviewReading: repaired.kana,
       finalReading: convertedPart.reading,
+      reportedReading: convertedPart.reportedReading,
+      numericReadingNormalized: convertedPart.numericReadingNormalized,
       readingAvailable: convertedPart.reading !== undefined,
       readingAssessment: assessReading(convertedPart.text, convertedPart.reading, convertedPart.modelReading, options.readingVerifier),
       knownRepair: route.kind !== "alternative" && (originalKana !== kanaResult.kana || repaired.kana !== kanaResult.kana),
@@ -239,6 +245,10 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
     ),
   };
   result.changes!.readingAssessment = combineReadingAssessments(segments.map(segment => segment.readingAssessment));
+  if (segments.some(segment => segment.modelReading)) {
+    result.changes!.readingAssessment.reportedReading = segments.map(segment => segment.reportedReading ?? segment.finalReading ?? segment.reviewReading).join("");
+  }
+  if (segments.some(segment => segment.numericReadingNormalized)) result.changes!.readingAssessment.numericReadingNormalized = true;
   if (segments.some(segment => segment.boundaryUnverified)) {
     result.changes!.wordBoundary = "unverified";
     if (result.changes?.kind === "completion") result.changes.additionKind = "unverified";
