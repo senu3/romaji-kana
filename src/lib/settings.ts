@@ -6,6 +6,8 @@ import type {
   SharedConversionSettings,
   UserDictionaryEntry,
 } from "./types";
+import type { PersonalWord } from "./kanaEngine";
+import { normalizeKanaWidth } from "./readingComparison";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
@@ -17,6 +19,7 @@ export const defaultSettings: AppSettings = {
   modelName: "gemma3",
   autoConvert: true,
   conversionMode: "replace",
+  conversionEngine: "local",
   triggers: {
     space: true,
     period: true,
@@ -33,6 +36,7 @@ export const defaultSettings: AppSettings = {
   inputPauseTiming: "auto",
   useDocumentVocabulary: false,
   userDictionary: [],
+  personalDictionary: [],
   think: false,
 };
 
@@ -57,6 +61,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
   return {
     autoConvert: settings.autoConvert,
     conversionMode: settings.conversionMode,
+    conversionEngine: settings.conversionEngine ?? "local",
     triggers: settings.triggers,
     punctuationConversion: settings.punctuationConversion,
     conversionPrompt: settings.conversionPrompt,
@@ -64,6 +69,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
     inputPauseTiming: settings.inputPauseTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
     userDictionary: settings.userDictionary,
+    personalDictionary: settings.personalDictionary ?? [],
   };
 }
 
@@ -77,6 +83,7 @@ export function mergeSharedConversionSettings(
     triggers: { ...shared.triggers },
     punctuationConversion: { ...shared.punctuationConversion },
     userDictionary: [...shared.userDictionary],
+    personalDictionary: normalizePersonalDictionary(shared.personalDictionary),
   };
 }
 
@@ -107,6 +114,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     conversionPrompt,
     think,
     inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
+    conversionEngine: settings.conversionEngine === "llm" ? "llm" : "local",
     inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: {
@@ -118,6 +126,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
       ...settings.punctuationConversion,
     },
     userDictionary: normalizeUserDictionary(settings.userDictionary),
+    personalDictionary: normalizePersonalDictionary(settings.personalDictionary),
   };
 }
 
@@ -164,4 +173,17 @@ function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+export function normalizePersonalDictionary(entries: unknown): PersonalWord[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.flatMap((entry, index): PersonalWord[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const reading = normalizeKanaWidth(readString(entry.reading).trim());
+    const text = readString(entry.text).trim();
+    if (!/^[ぁ-ゖー]+$/u.test(reading) || Array.from(reading).length > 80 || !text ||
+      Array.from(text).length > 80 || /[\u0000-\u001f\u007f]/u.test(text)) return [];
+    return [{ id: readString(entry.id) || `word-${index}`, reading, text,
+      pos: ["proper", "person", "organization"].includes(entry.pos) ? entry.pos : "noun", enabled: entry.enabled !== false }];
+  }).slice(0, 500);
 }

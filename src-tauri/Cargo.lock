@@ -2194,6 +2194,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kana-engine"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3335,6 +3345,7 @@ name = "romaji-kana"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "kana-engine",
  "local-ip-address",
  "mime_guess",
  "rand",

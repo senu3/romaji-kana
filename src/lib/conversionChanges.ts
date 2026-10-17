@@ -10,7 +10,7 @@ export interface ConversionChanges {
   readingAssessment?: ReadingAssessment;
   wordBoundary?: "unverified";
   kind: "notation" | "completion" | "correction" | "rewrite" | "unknown";
-  evidence: "literal" | "model-reading" | "repair-stage" | "unavailable";
+  evidence: "literal" | "dictionary-path" | "model-reading" | "repair-stage" | "unavailable";
   sourceReading: string;
   resultReading?: string;
   /** Validated reading after local correction, before any completion. */

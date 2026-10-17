@@ -3,6 +3,8 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { DocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { createId } from "../lib/id";
 import type { UserDictionaryEntry } from "../lib/types";
+import type { PersonalWord } from "../lib/kanaEngine";
+import { PersonalDictionary } from "./PersonalDictionary";
 
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 
@@ -12,14 +14,18 @@ export function DictionaryModal({
   useDocumentVocabulary,
   onUseDocumentVocabularyChange,
   onChange,
+  personalWords = [],
+  onPersonalWordsChange,
 }: {
   entries: UserDictionaryEntry[];
   documentVocabularyProfile: DocumentVocabularyProfile;
   useDocumentVocabulary: boolean;
   onUseDocumentVocabularyChange: (enabled: boolean) => void;
   onChange: (entries: UserDictionaryEntry[]) => void;
+  personalWords?: PersonalWord[];
+  onPersonalWordsChange?: (words: PersonalWord[]) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"registered" | "detected">("detected");
+  const [activeTab, setActiveTab] = useState<"registered" | "detected" | "personal">("personal");
   const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
   const [detectedDraft, setDetectedDraft] = useState<{
     reading: string;
@@ -115,6 +121,9 @@ export function DictionaryModal({
   return (
     <section className="dictionary-modal inspector-panel" aria-label="辞書項目">
       <div className="dictionary-tabs" role="tablist" aria-label="辞書の表示">
+        <button type="button" role="tab" id="dictionary-personal-tab" aria-controls="dictionary-personal-panel"
+          aria-selected={activeTab === "personal"} className={activeTab === "personal" ? "selected" : ""}
+          onClick={() => setActiveTab("personal")}>個人語彙 {personalWords.length}</button>
         <button
           id="dictionary-registered-tab"
           className={activeTab === "registered" ? "selected" : ""}
@@ -124,7 +133,7 @@ export function DictionaryModal({
           aria-controls="dictionary-registered-panel"
           onClick={() => setActiveTab("registered")}
         >
-          登録済み {entries.length}
+          登録済みスニペット {entries.length}
         </button>
         <button
           id="dictionary-detected-tab"
@@ -138,6 +147,10 @@ export function DictionaryModal({
           文書から検出 {detectedTerms.length}
         </button>
       </div>
+
+      {activeTab === "personal" && <div id="dictionary-personal-panel" role="tabpanel" aria-labelledby="dictionary-personal-tab">
+        <PersonalDictionary words={personalWords} onChange={onPersonalWordsChange ?? (() => undefined)} />
+      </div>}
 
       {activeTab === "registered" ? (
         <div

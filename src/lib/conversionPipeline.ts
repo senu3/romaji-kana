@@ -27,7 +27,8 @@ import { preservesProtectedContent } from "./conversionProtection";
 import { prepareConversionRequest, type ConversionRequest } from "./conversionRequest";
 import { faithfulConversionRule, type CompletionBoundaryStatus } from "./conversionRules";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
-import { assessReading, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
+import { assessReadingWithEngine, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
+import { convertLocally } from "./localConversion";
 
 /** Reuse the prior reading without asking the model to repair/complete again.
  * Literal anchors retain their original boundaries and never enter generation. */
@@ -104,6 +105,8 @@ export async function convertInputOnce(
   options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
   throwIfConversionAborted(options.signal);
+  const purpose = selectSegmentRoute(settings.inputCompletionLevel, options).kind;
+  if (options.kanaEngine && purpose === "faithful") return convertLocally(input, settings, transport, options);
   const { parts, protection, documentVocabulary } = prepareConversionRequest(input, settings, options);
   options = { ...options, documentVocabulary };
   const isAlternative = selectSegmentRoute("none", options).kind === "alternative";
@@ -142,7 +145,7 @@ export async function convertInputOnce(
     const request: ConversionRequest = {
       target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana,
         completionSeed: route.kind === "word" ? knownWordCompletionSeed(repaired.kana) : repaired.kana },
-      reference: { beforeTarget: segments.map(segment => segment.text).join(""),
+      reference: { beforeTarget: (options.contextBefore ?? "") + segments.map(segment => segment.text).join(""), afterTarget: options.contextAfter,
         beforeTargetReading: segments.map(segment => segment.preparedReading).join(""), documentVocabulary },
     };
     if (route.kind === "word" || route.kind === "sentence") {
@@ -173,7 +176,7 @@ export async function convertInputOnce(
         numericReadingNormalized: suggestion.numericReadingNormalized,
         // A claimed addition contradicting an unchanged reading is not proof.
         readingAvailable: !(suggestion.completedKana === (suggestion.correctedKana ?? repaired.kana) && suggestion.additions.length),
-        readingAssessment: assessReading(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier),
+        readingAssessment: await assessReadingWithEngine(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier, options.kanaEngine, settings.personalDictionary, options.signal),
         knownRepair: originalKana !== (suggestion.correctedKana ?? repaired.kana),
         modelReading: true,
         completionBoundary: route.kind === "word" && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana)
@@ -200,7 +203,7 @@ export async function convertInputOnce(
       reportedReading: convertedPart.reportedReading,
       numericReadingNormalized: convertedPart.numericReadingNormalized,
       readingAvailable: convertedPart.reading !== undefined,
-      readingAssessment: assessReading(convertedPart.text, convertedPart.reading, convertedPart.modelReading, options.readingVerifier),
+      readingAssessment: await assessReadingWithEngine(convertedPart.text, convertedPart.reading, convertedPart.modelReading, options.readingVerifier, options.kanaEngine, settings.personalDictionary, options.signal),
       knownRepair: route.kind !== "alternative" && (originalKana !== kanaResult.kana || repaired.kana !== kanaResult.kana),
       modelReading: convertedPart.modelReading,
     });

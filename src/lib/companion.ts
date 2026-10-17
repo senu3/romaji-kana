@@ -131,7 +131,7 @@ export async function remoteModelRequest<T>(
   }
 }
 
-async function remoteJson<T>(path: string, init: RequestInit): Promise<T> {
+export async function remoteJson<T>(path: string, init: RequestInit): Promise<T> {
   const token = readRemoteToken();
   if (!token) {
     throw new Error("PCとのペアリング情報がありません。再度ペアリングしてください。");

@@ -1,0 +1,88 @@
+import { describe, expect, it, vi } from "vitest";
+import { convertRomajiToJapaneseDetailed } from "./ollama";
+import { defaultSettings } from "./settings";
+import type { EngineCandidate, KanaEngine } from "./kanaEngine";
+import { nextSessionCandidate } from "./conversionSession";
+import { romajiToKana } from "./romajiKana";
+
+function candidate(text: string, reading = "きしゃ", cost = 100): EngineCandidate {
+  return { text, reading, cost, tokens: [{ text, reading, from: 0, to: Array.from(reading).length,
+    source: "mozc", entryId: text, lid: 1851, rid: 1851, wordCost: cost }] };
+}
+function harness() {
+  const search = vi.fn().mockResolvedValue({ candidates: [candidate("記者"), candidate("汽車", "きしゃ", 200)],
+    truncated: false, dictionaryRevision: "test" });
+  const engine: KanaEngine = { search, verify: vi.fn().mockResolvedValue("unverified") };
+  const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1", "candidate-0", "candidate-2"] }) });
+  return { engine, search, generate, transport: { models: vi.fn(), generate } };
+}
+describe("local faithful conversion", () => {
+  it("selects only retained candidates by ID and preserves their dictionary paths", async () => {
+    const h = harness();
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
+      kanaEngine: h.engine, contextBefore: "列車の話。", contextAfter: "が到着した。",
+    });
+    expect(result.text).toBe("汽車");
+    expect(result.reviewKana).toBe("きしゃ");
+    expect(result.changes?.readingAssessment).toMatchObject({ status: "verified", proof: "independent" });
+    expect(result.session?.candidates.find(c => c.result.text === "記者")?.tokens?.[0].entryId).toBe("記者");
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt)).toMatchObject({ before: "列車の話。", after: "が到着した。" });
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    { order: ["invented", "candidate-0", "candidate-2"] },
+    { order: ["candidate-0", "candidate-0", "candidate-2"] },
+    { order: ["candidate-1"] },
+    { convertedText: "記事を追加しました" },
+  ])("falls back to local order for invalid ranking %j", async response => {
+    const h = harness();
+    h.generate.mockResolvedValue({ response: JSON.stringify(response) });
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.text).toBe("記者");
+    expect(result.session?.rerankStatus).toBe("invalid");
+  });
+  it("retains local results on a failed model connection", async () => {
+    const h = harness();
+    h.generate.mockRejectedValue(new Error("offline"));
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.text).toBe("記者");
+    expect(result.session?.rerankStatus).toBe("failed");
+  });
+  it("freezes order once the user starts navigating", async () => {
+    const h = harness();
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
+      kanaEngine: h.engine, onLocalCandidates: local => { expect(local.text).toBe("記者"); nextSessionCandidate(local.session!); },
+    });
+    expect(result.text).toBe("汽車");
+    expect(result.session?.candidates[0].result.text).toBe("記者");
+    expect(result.session?.rerankStatus).toBe("skipped");
+  });
+  it("does not silently repair the mechanical reading in normal conversion", async () => {
+    const h = harness();
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading, reading)], truncated: false, dictionaryRevision: "test" }));
+    const input = "dseu";
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false });
+    expect(result.reviewKana).toBe(romajiToKana(input).kana);
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+  it("keeps numeric and literal anchors out of dictionary exploration", async () => {
+    const h = harness();
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading === "じ" ? "時" : reading, reading)], truncated: false, dictionaryRevision: "test" }));
+    const result = await convertRomajiToJapaneseDetailed("10ji`OpenAI`", defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false });
+    expect(result.text).toBe("10時OpenAI");
+    expect(h.search).toHaveBeenCalledTimes(1);
+    expect(h.search.mock.calls[0][0]).toBe("じ");
+  });
+  it("rejects inconsistent engine wire data instead of treating it as verified", async () => {
+    const h = harness();
+    h.search.mockResolvedValue({ candidates: [{ ...candidate("記者"), reading: "きじ" }], truncated: false });
+    await expect(convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine })).rejects.toThrow("有効な候補");
+  });
+  it("propagates cancellation instead of falling back to an abandoned session", async () => {
+    const h = harness();
+    const controller = new AbortController();
+    await expect(convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
+      kanaEngine: h.engine, signal: controller.signal, onLocalCandidates: () => controller.abort(),
+    })).rejects.toMatchObject({ name: "AbortError" });
+  });
+});

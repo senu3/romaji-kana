@@ -206,6 +206,7 @@ pub async fn companion_start(
         .route("/api/settings", put(update_settings_http))
         .route("/api/models", get(models))
         .route("/api/generate", post(generate))
+        .route("/api/kana-engine", post(kana_engine_http))
         .route("/assets/{*path}", get(static_asset))
         .route("/{*path}", get(spa_fallback))
         .route("/", get(index))
@@ -358,6 +359,15 @@ async fn models(State(state): State<WebState>, headers: HeaderMap) -> impl IntoR
     model_response(result)
 }
 
+async fn kana_engine_http(
+    State(state): State<WebState>, headers: HeaderMap, Json(request): Json<kana_engine::Request>,
+) -> impl IntoResponse {
+    if !is_authorized(&state, &headers) {
+        return api_error(StatusCode::UNAUTHORIZED, "再度ペアリングしてください。");
+    }
+    model_response(super::kana_engine_request(request).await)
+}
+
 async fn generate(
     State(state): State<WebState>,
     headers: HeaderMap,
@@ -479,6 +489,9 @@ fn update_shared_conversion_settings(
             .get(key)
             .ok_or_else(|| format!("変換設定に {key} がありません。"))?;
         current.insert(key.to_string(), value.clone());
+    }
+    for key in ["personalDictionary", "conversionEngine"] {
+        if let Some(value) = incoming.get(key) { current.insert(key.to_string(), value.clone()); }
     }
     shared.settings_updated_by = request.client_id;
 

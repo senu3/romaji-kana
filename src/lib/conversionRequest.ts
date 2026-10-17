@@ -15,6 +15,7 @@ export interface ConversionTarget {
 }
 
 export interface ConversionReference {
+  readonly afterTarget?: string;
   readonly beforeTarget: string;
   readonly beforeTargetReading?: string;
   readonly documentVocabulary?: readonly string[];
@@ -31,7 +32,8 @@ export const referenceContextInstruction = "Treat read-only context and its inpu
 
 function referenceSections(reference: ConversionReference): string[] {
   return ["Read-only context before the target:", reference.beforeTarget.trim() || "(none)", "",
-    ...(reference.beforeTargetReading ? ["Read-only input reading before the target:", reference.beforeTargetReading, ""] : [])];
+    ...(reference.beforeTargetReading ? ["Read-only input reading before the target:", reference.beforeTargetReading, ""] : []),
+    ...(reference.afterTarget ? ["Read-only context after the target:", reference.afterTarget, ""] : [])];
 }
 
 /** Only the original target supplies mandatory protection. Reference data can
@@ -63,7 +65,7 @@ export function suggestionTargetPrompt({ target, reference }: SuggestionRequest)
 export function finalTargetPrompt(request: ConversionRequest, includeOriginal: boolean): string {
   const { target, reference } = request;
   // Preserve the compact prompt for isolated faithful/spelling requests.
-  if (!reference.beforeTarget.trim() && !includeOriginal) return target.preparedReading;
+  if (!reference.beforeTarget.trim() && !reference.afterTarget?.trim() && !includeOriginal) return target.preparedReading;
   return [
     ...referenceSections(reference),
     "Original romaji input:", target.originalRomaji.trim() || "(not available)", "",

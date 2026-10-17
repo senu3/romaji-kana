@@ -4,6 +4,7 @@ import type { ReadingVerifier } from "./readingAssessment";
 import type { ConversionDiagnostic } from "./conversionDiagnostics";
 
 export interface JapaneseConversionResult {
+  session?: import("./conversionSession").ConversionSession;
   text: string;
   reviewKana: string;
   changes?: ConversionChanges;
@@ -17,6 +18,12 @@ export interface JapaneseConversionResult {
 }
 
 export interface JapaneseConversionOptions {
+  kanaEngine?: import("./kanaEngine").KanaEngine;
+  anchor?: import("./types").ConversionAnchor;
+  contextBefore?: string;
+  contextAfter?: string;
+  rerank?: boolean;
+  onLocalCandidates?: (result: JapaneseConversionResult) => void;
   /** Local independent verification, never a reference or saved setting. */
   readingVerifier?: ReadingVerifier;
   /** Explore spelling only, holding the previous candidate's reading fixed. */

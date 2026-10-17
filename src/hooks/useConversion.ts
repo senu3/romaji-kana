@@ -15,6 +15,9 @@ import { resolveConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
 import { buildProtectedDictionaryEntries, convertRomajiToJapaneseDetailed } from "../lib/ollama";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
+import { defaultKanaEngine } from "../lib/kanaEngine";
+import { nextSessionCandidate, sessionResult } from "../lib/conversionSession";
+import { recordConversionChoice } from "../lib/conversionLearning";
 import type {
   AppSettings,
   ConversionAnchor,
@@ -157,6 +160,8 @@ export function useConversion({
     if (clearVisible) {
       const view = editorViewRef.current;
       if (view) {
+        const session = view.state.field(ghostSuggestionField).suggestion?.session;
+        if (session?.state === "open") session.state = "dismissed";
         view.dispatch({ effects: clearGhostSuggestion.of(null) });
       }
     }
@@ -260,6 +265,21 @@ export function useConversion({
         { ...settingsRef.current, inputCompletionLevel },
         undefined,
         {
+          kanaEngine: settingsRef.current.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+          anchor,
+          contextBefore: view.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from),
+          contextAfter: view.state.doc.sliceString(resolved.to, Math.min(view.state.doc.length, resolved.to + 600)),
+          onLocalCandidates: (result) => {
+            const current = editorViewRef.current;
+            const position = current && resolveConversionAnchor(current.state.doc.toString(), anchor);
+            if (!current || !position || canceledRequestsRef.current.has(request.id)) return;
+            current.dispatch({ effects: showGhostSuggestion.of({
+              id: request.id, from: position.from, to: position.to, originalText: position.matchedText,
+              convertedText: result.text, inputText: request.originalText, reviewKana: result.reviewKana,
+              changes: result.changes, session: result.session, trigger: request.range?.trigger,
+              inputCompletionLevel, source: request.source, documentVocabulary: request.documentVocabulary,
+            }) });
+          },
           avoidOutputs: request.avoidOutputs,
           alternativeReading: request.alternativeReading,
           alternativeCorrectedReading: request.alternativeCorrectedReading,
@@ -270,6 +290,7 @@ export function useConversion({
       if (canceledRequestsRef.current.has(request.id)) {
         return;
       }
+      if (conversion.session && (conversion.session.state !== "open" || conversion.session.locked)) return;
 
       if (conversion.suggestionRejected) {
         view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
@@ -325,6 +346,7 @@ export function useConversion({
               reviewKana: conversion.reviewKana,
               conversionStrategy: conversion.conversionStrategy,
               changes: conversion.changes,
+              session: conversion.session,
               inputCompletionLevel,
               inputCompletionApplied: conversion.inputCompletionApplied,
               inputCompletionSourceKana: conversion.inputCompletionSourceKana,
@@ -381,6 +403,7 @@ export function useConversion({
         anchor: nextAnchor,
         conversionStrategy: conversion.conversionStrategy,
         changes: conversion.changes,
+        session: conversion.session,
         inputCompletionLevel,
         inputCompletionApplied: conversion.inputCompletionApplied,
         inputCompletionSourceKana: conversion.inputCompletionSourceKana,
@@ -425,6 +448,10 @@ export function useConversion({
         { ...settingsRef.current, inputCompletionLevel },
         undefined,
         {
+          kanaEngine: settingsRef.current.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+          anchor: request.anchor,
+          contextBefore: resolved && currentView ? currentView.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from) : "",
+          contextAfter: resolved && currentView ? currentView.state.doc.sliceString(resolved.to, Math.min(currentView.state.doc.length, resolved.to + 600)) : "",
           avoidOutputs: request.avoidOutputs,
           alternativeReading: request.alternativeReading,
           alternativeCorrectedReading: request.alternativeCorrectedReading,
@@ -469,6 +496,7 @@ export function useConversion({
             anchor: request.anchor,
             conversionStrategy: conversion.conversionStrategy,
             changes: conversion.changes,
+            session: conversion.session,
             inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,
@@ -522,6 +550,7 @@ export function useConversion({
             reviewKana: conversion.reviewKana,
             conversionStrategy: conversion.conversionStrategy,
             changes: conversion.changes,
+            session: conversion.session,
             inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,
@@ -578,6 +607,7 @@ export function useConversion({
         anchor: nextAnchor,
         conversionStrategy: conversion.conversionStrategy,
         changes: conversion.changes,
+        session: conversion.session,
         inputCompletionLevel,
         inputCompletionApplied: conversion.inputCompletionApplied,
         inputCompletionSourceKana: conversion.inputCompletionSourceKana,
@@ -724,6 +754,14 @@ export function useConversion({
   );
 
   const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
+    if (suggestion.session) {
+      suggestion.session.state = "accepted";
+      suggestion.session.locked = true;
+      const selected = suggestion.session.candidates.find(c => c.id === suggestion.session!.selectedId);
+      if (selected?.kind === "conversion" && selected.result.changes?.readingAssessment?.status === "verified") {
+        recordConversionChoice(selected.result.reviewKana, selected.result.text);
+      }
+    }
     invalidatePredictiveSuggestions(false);
     const view = editorViewRef.current;
     const nextAnchor: ConversionAnchor = {
@@ -750,6 +788,7 @@ export function useConversion({
       anchor: nextAnchor,
       conversionStrategy: suggestion.conversionStrategy,
       changes: suggestion.changes,
+      session: suggestion.session,
       inputCompletionLevel: suggestion.inputCompletionLevel,
       inputCompletionApplied: suggestion.inputCompletionApplied,
       inputCompletionSourceKana: suggestion.inputCompletionSourceKana,
@@ -775,7 +814,9 @@ export function useConversion({
     });
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
 
-  const handleDismissGhost = useCallback(() => {
+  const handleDismissGhost = useCallback((suggestion?: GhostConversionSuggestion) => {
+    const session = suggestion?.session ?? editorViewRef.current?.state.field(ghostSuggestionField).suggestion?.session;
+    if (session) session.state = "dismissed";
     invalidatePredictiveSuggestions(false);
     setStatus({
       kind: "idle",
@@ -799,6 +840,16 @@ export function useConversion({
           message: "元のテキストが変わったため、Ghost suggestion を閉じました。",
         });
         return;
+      }
+
+      if (suggestion.session) {
+        const next = nextSessionCandidate(suggestion.session);
+        if (next) {
+          view.dispatch({ effects: showGhostSuggestion.of({ ...suggestion, convertedText: next.text,
+            reviewKana: next.reviewKana, changes: next.changes, session: next.session }) });
+          setStatus({ kind: "success", message: "保持している別候補を表示しました。Tabで確定できます。" });
+          return;
+        }
       }
 
       const request: PendingConversion = {
@@ -919,6 +970,16 @@ export function useConversion({
   }, [enqueueConversion]);
 
   const handleAlternativeHistory = useCallback((item: ConversionHistoryItem) => {
+    const view = editorViewRef.current;
+    const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor) : null;
+    if (item.session && item.session.candidates.length > 1 && view && resolved) {
+      const session = { ...item.session, state: "open" as const, locked: true };
+      const next = nextSessionCandidate(session) ?? sessionResult(session);
+      view.dispatch({ effects: showGhostSuggestion.of({ id: createId("conversion"), from: resolved.from, to: resolved.to,
+        originalText: resolved.matchedText, convertedText: next.text, inputText: item.input, reviewKana: next.reviewKana,
+        changes: next.changes, session, source: "history", retryOf: item.id, inputCompletionLevel: item.inputCompletionLevel }) });
+      return true;
+    }
     const request: PendingConversion = {
       id: createId("conversion"),
       anchor: item.anchor,
@@ -1007,7 +1068,10 @@ export function useConversion({
           request.range.text,
           request.settings,
           undefined,
-          { documentVocabulary: request.documentVocabulary },
+          { documentVocabulary: request.documentVocabulary, kanaEngine: request.settings.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+            contextBefore: editorViewRef.current?.state.doc.sliceString(Math.max(0, request.range.from - 1200), request.range.from),
+            contextAfter: editorViewRef.current?.state.doc.sliceString(request.range.to, Math.min(editorViewRef.current.state.doc.length, request.range.to + 600)),
+          },
         );
         if (
           request.epoch !== predictiveSuggestionEpochRef.current ||
@@ -1049,6 +1113,7 @@ export function useConversion({
             reviewKana: conversion.reviewKana,
             conversionStrategy: conversion.conversionStrategy,
             changes: conversion.changes,
+            session: conversion.session,
             inputCompletionLevel: request.settings.inputCompletionLevel,
             inputCompletionApplied: conversion.inputCompletionApplied,
             inputCompletionSourceKana: conversion.inputCompletionSourceKana,

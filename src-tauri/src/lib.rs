@@ -5,6 +5,12 @@ use std::time::Duration;
 
 mod companion;
 
+#[tauri::command]
+async fn kana_engine_request(request: kana_engine::Request) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || kana_engine::execute(request))
+        .await.map_err(|error| error.to_string())?
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OllamaRequest {
@@ -257,6 +263,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(companion::CompanionManager::default())
         .invoke_handler(tauri::generate_handler![
+            kana_engine_request,
             ollama_tags,
             ollama_generate,
             lmstudio_models,

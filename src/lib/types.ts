@@ -25,6 +25,7 @@ export interface AppSettings {
   modelName: string;
   autoConvert: boolean;
   conversionMode: "replace" | "ghost";
+  conversionEngine?: "local" | "llm";
   triggers: {
     space: boolean;
     period: boolean;
@@ -41,6 +42,7 @@ export interface AppSettings {
   inputPauseTiming: InputPauseTiming;
   useDocumentVocabulary: boolean;
   userDictionary: UserDictionaryEntry[];
+  personalDictionary?: import("./kanaEngine").PersonalWord[];
   think: boolean;
 }
 
@@ -48,6 +50,7 @@ export type SharedConversionSettings = Pick<
   AppSettings,
   | "autoConvert"
   | "conversionMode"
+  | "conversionEngine"
   | "triggers"
   | "punctuationConversion"
   | "conversionPrompt"
@@ -55,6 +58,7 @@ export type SharedConversionSettings = Pick<
   | "inputPauseTiming"
   | "useDocumentVocabulary"
   | "userDictionary"
+  | "personalDictionary"
 >;
 
 export interface ConversionRange {
@@ -109,6 +113,7 @@ export interface ConversionAnchor {
 }
 
 export interface GhostConversionSuggestion {
+  session?: import("./conversionSession").ConversionSession;
   changes?: import("./conversionChanges").ConversionChanges;
   id: string;
   from: number;
@@ -153,6 +158,7 @@ export interface PendingConversion {
 export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
 
 export interface ConversionHistoryItem {
+  session?: import("./conversionSession").ConversionSession;
   /** Intended reading retained for spelling exploration, even for legacy text responses. */
   reviewKana?: string;
   changes?: import("./conversionChanges").ConversionChanges;

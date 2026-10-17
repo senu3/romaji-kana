@@ -84,7 +84,7 @@ interface MarkdownEditorProps {
   onSaveFile: () => void;
   onSaveFileAs: () => void;
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
-  onDismissGhost: () => void;
+  onDismissGhost: (suggestion?: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
@@ -159,6 +159,11 @@ class GhostTextWidget extends WidgetType {
     hint.textContent = `${presentation.label}  ${explicitAcceptance
       ? this.candidate.conversionStrategy === "speculative" ? "Tabで確定  Escで破棄" : "Tabで確定  Ctrl/Cmd+/で別候補  Escで破棄"
       : "Tab/句読点で確定  Ctrl/Cmd+/で別候補  Escで破棄"}`;
+    if (this.candidate.session && this.candidate.session.candidates.length > 1) {
+      const session = this.candidate.session;
+      const index = session.candidates.findIndex(c => c.id === session.selectedId);
+      hint.textContent += `  ${index + 1}/${session.candidates.length}`;
+    }
 
     if ((this.candidate.inputCompletionAdditions ?? []).length > 0) {
       const diff = document.createElement("span");
@@ -230,11 +235,13 @@ export const ghostSuggestionField = StateField.define<GhostState>({
       const to = transaction.changes.mapPos(suggestion.to, -1);
       const mapped = { ...suggestion, from, to };
       const currentText = transaction.state.doc.sliceString(from, to);
+      if (currentText !== mapped.originalText && suggestion.session) suggestion.session.state = "dismissed";
       suggestion = currentText === mapped.originalText ? mapped : null;
     }
 
     for (const effect of transaction.effects) {
       if (effect.is(showGhostSuggestion)) {
+        if (suggestion?.session && suggestion.session !== effect.value.session && suggestion.session.state === "open") suggestion.session.state = "dismissed";
         suggestion = effect.value;
       }
 
@@ -1034,7 +1041,7 @@ export function MarkdownEditor({
         effects: clearGhostSuggestion.of(suggestion.id),
         userEvent: "input.speculativeDismiss",
       });
-      onDismissGhostRef.current();
+      onDismissGhostRef.current(suggestion);
       return true;
     }
 
@@ -1098,7 +1105,7 @@ export function MarkdownEditor({
     }
 
     view.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
-    onDismissGhostRef.current();
+    onDismissGhostRef.current(suggestion);
     return true;
   }
 

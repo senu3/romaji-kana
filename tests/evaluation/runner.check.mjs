@@ -61,7 +61,7 @@ for (const format of ["plain", "structured"]) {
       });
       await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
       try {
-        const base = ["--provider", provider, "--model", "mock-model", "--url", `http://127.0.0.1:${server.address().port}`, "--case", "basic-02", "--repeats", "2"];
+        const base = ["--engine", "llm", "--provider", provider, "--model", "mock-model", "--url", `http://127.0.0.1:${server.address().port}`, "--case", "basic-02", "--repeats", "2"];
         const ok = await run([...base, "--out", join(dir, "ok")]);
         assert.equal(ok.code, 0, ok.output);
         const rows = (await readFile(join(dir, "ok/trials.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);

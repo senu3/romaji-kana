@@ -279,7 +279,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const enabledDictionaryCount = settings.userDictionary.filter(
     (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
-  ).length;
+  ).length + (settings.personalDictionary ?? []).filter(entry => entry.enabled).length;
 
   return (
     <main className="app-shell">
@@ -364,6 +364,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           {activePanel === "dictionary" ? (
             <DictionaryModal
               entries={settings.userDictionary}
+              personalWords={settings.personalDictionary ?? []}
+              onPersonalWordsChange={(personalDictionary) => setSettings(value => ({ ...value, personalDictionary }))}
               documentVocabularyProfile={documentVocabularyProfile}
               useDocumentVocabulary={settings.useDocumentVocabulary}
               onUseDocumentVocabularyChange={(useDocumentVocabulary) =>

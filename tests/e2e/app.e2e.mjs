@@ -74,6 +74,9 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
     localStorage.clear();
+    // Keep the legacy model-contract regression suite independent of dictionary coverage.
+    // The real Rust-engine UI is exercised in local-engine.e2e.mjs.
+    localStorage.setItem("romaji-kana-settings", JSON.stringify({ conversionEngine: "llm" }));
     localStorage.setItem(
       "romaji-kana-document-session",
       JSON.stringify({ kind: "new", content: "restored unsaved draft." }),
@@ -95,9 +98,10 @@ try {
   });
   await page.route("**/api/generate", async (route) => {
     const body = route.request().postDataJSON();
+    const target = body.prompt?.split("Prepared kana (conversion target):\n")[1]?.trim() ?? body.prompt;
     if (body.prompt) {
       conversionRequestCount += 1;
-      conversionPrompts.push(body.prompt);
+      conversionPrompts.push(target);
       conversionSystems.push(body.system ?? "");
       activeConversionRequests += 1;
       maxActiveConversionRequests = Math.max(maxActiveConversionRequests, activeConversionRequests);
@@ -587,12 +591,11 @@ try {
       vocabularySystem.includes("Return exactly one JSON object"),
     "One structured request should contain both completion and conversion instructions.",
   );
+  const beforeWordCompletion = await editorText(page);
   await page.keyboard.press(",");
   await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
-  assert.ok(
-    (await editorText(page)).endsWith("ありがとう。、"),
-    "Punctuation should accept a valid word-completion candidate.",
-  );
+  assert.equal(await editorText(page), beforeWordCompletion + ",",
+    "Reading verification must not implicitly authorize an unrequested completion.");
   await page.keyboard.press("Control+Z");
   await page.keyboard.press("Control+Enter");
   await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
@@ -911,6 +914,7 @@ function readEditorDocument({ contains, linesOnly } = {}) {
 }
 
 function conversionResponseForPrompt(prompt, system = "") {
+  prompt = prompt?.split("Prepared kana (conversion target):\n")[1]?.trim() ?? prompt;
   if (system.includes("one speculative Japanese writing candidate")) {
     return JSON.stringify({ completedKana: "ありがとう。", convertedText: system.includes("- 有難う。") ? "有り難う。" : "有難う。" });
   }

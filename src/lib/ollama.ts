@@ -8,6 +8,7 @@ import {
   isUsableConversionResult,
 } from "./conversionPolicy";
 import type { AppSettings } from "./types";
+import { createConversionSession, sessionResult } from "./conversionSession";
 import { withLegacyCompletionMetadata } from "./conversionCompatibility";
 
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
@@ -33,8 +34,12 @@ export async function convertRomajiToJapaneseDetailed(
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = withLegacyCompletionMetadata(await convertInputOnce(input, settings, transport, attemptOptions));
-    return attemptOptions.speculativeMode ? { ...candidate, conversionStrategy: "speculative" as const }
+    const result = attemptOptions.speculativeMode ? { ...candidate, conversionStrategy: "speculative" as const }
       : attemptOptions.completionMode ? { ...candidate, conversionStrategy: "completion" as const } : candidate;
+    if (!options.kanaEngine || result.session || result.suggestionRejected) return result;
+    return sessionResult(createConversionSession(input, [{ id: "proposal-0",
+      kind: result.conversionStrategy === "speculative" || settings.inputCompletionLevel === "sentence" ? "proposal"
+        : result.changes?.kind === "correction" ? "correction" : "completion", result }], options));
   };
   const result = await runAttempt(requestOptions);
   if (isUsableConversionResult(result, options)) {
