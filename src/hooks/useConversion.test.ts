@@ -37,6 +37,19 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
 
+  it("keeps explicit ownership when its source moves during an edit", async () => {
+    const response = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(response.promise);
+    const { hook, view } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon")); });
+    act(() => { view.dispatch({ changes: { from: 0, insert: "前の文です。\n" } }); });
+    const from = view.state.doc.toString().indexOf("hon");
+    act(() => { expect(hook.current.handleConvert(range("hon", "typing", from))).toBe(false); });
+    await act(async () => { response.resolve({ text: "本", reviewKana: "ほん" }); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.from).toBe(from);
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+  });
+
   it("shows predictive dictionary candidates immediately and releases the next conversion before ranking", async () => {
     const ranking = deferred<void>();
     const sessions = ["hon", "yomu"].map((input, i) => createConversionSession(input, [

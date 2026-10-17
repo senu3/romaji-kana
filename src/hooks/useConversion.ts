@@ -778,6 +778,7 @@ export function useConversion({
       }
 
       setRecentRetryItem(null);
+      requestsRef.current.refresh(editorViewRef.current?.state.doc.toString() ?? "");
       requestsRef.current.register(request.id, request.anchor);
       const current = editorViewRef.current;
       const visible = current?.state.field(ghostSuggestionField).suggestion;
@@ -1263,7 +1264,8 @@ export function useConversion({
       if (visible && rangesOverlap(visible, range) &&
           (visible.session?.locked || (visible.trigger && !isPredictiveSuggestionTrigger(visible.trigger)))) return false;
       const id = createId("suggestion");
-      if (!requestsRef.current.register(id, range, true)) return false;
+      requestsRef.current.refresh(view.state.doc.toString());
+      if (!requestsRef.current.register(id, { ...range, originalText: range.text }, true)) return false;
       if (predictiveSuggestionQueueRef.current) requestsRef.current.finish(predictiveSuggestionQueueRef.current.id);
 
       const settingsSnapshot: AppSettings = {
@@ -1301,7 +1303,7 @@ export function useConversion({
       return enqueuePredictiveSuggestion(range);
     }
 
-    if (hasMatchingPendingEditorConversion(conversionQueueRef.current, range)) {
+    if (hasMatchingPendingEditorConversion(conversionQueueRef.current.filter(request => requestsRef.current.valid(request.id)), range)) {
       return false;
     }
 

@@ -1,4 +1,6 @@
-interface Range { from: number; to: number }
+import { resolveConversionAnchor } from "./historyAnchor";
+
+interface Range { from: number; to: number; originalText?: string }
 export interface ConversionLease {
   id: string;
   range?: Range;
@@ -29,6 +31,15 @@ export class ConversionRequests {
   }
 
   get(id: string): ConversionLease | undefined { return this.active.get(id); }
+  refresh(documentText: string): void {
+    for (const lease of this.active.values()) {
+      if (!lease.range?.originalText || lease.controller.signal.aborted) continue;
+      const resolved = resolveConversionAnchor(documentText, { ...lease.range,
+        originalText: lease.range.originalText, docVersion: 0 });
+      if (resolved) lease.range = { ...lease.range, from: resolved.from, to: resolved.to };
+      else this.cancel(lease.id);
+    }
+  }
   valid(id: string): boolean {
     const lease = this.active.get(id);
     return Boolean(lease && !lease.controller.signal.aborted);
