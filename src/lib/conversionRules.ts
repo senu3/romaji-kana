@@ -77,7 +77,8 @@ export const wordCompletionRule = {
   prompt(): string[] {
     return [this.guidance[0], `Append at most ${this.maximumAddedKana} kana immediately before terminal punctuation.`, this.guidance[1],
       `Allowed already-started endings (with a preceding stem): ${this.startedEndings.map(([prefix, ending]) => `${prefix} → ${ending}`).join("; ")}. Do not infer a negative or past ending from a shorter ambiguous prefix.`,
-      "The entire appended suffix must stay inside the final Japanese word already started in correctedKana. New word boundaries are rejected by Japanese word segmentation. If the boundary is unclear, leave correctedKana unchanged.",
+      "When the input clearly ends in a verbal stem plus an already-started ending, prefer finishing that ending to inventing an uncommon homophonic noun. Keep correctedKana as the unfinished input and put the completed ending in convertedText and completedKana.",
+      "The entire appended suffix must complete the final word or already-started ending in correctedKana. A plausible lexical completion with uncertain segmentation may be offered as an unverified preview; this never permits a new phrase, tense or negation. If the intended word itself is unclear, leave correctedKana unchanged.",
       'When completing a word, also return wordCompletion: {"sourceKana":"かくに","completedKana":"かくにん","convertedText":"確認"}. These fields describe ONLY the final word, without terminal punctuation or preceding words. sourceKana must be a nonempty suffix of correctedKana; completedKana must retain it as a prefix; convertedText must be the final single word of the output. Do not declare a phrase as a word.'];
   },
 } as const;

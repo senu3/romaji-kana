@@ -1,5 +1,5 @@
 {
-  "version": "0.1-draft",
+  "version": "0.2-draft",
   "defaults": {
     "inputCompletionLevel": "none",
     "punctuationConversion": { "periodToJapanese": true, "commaToJapanese": true },
@@ -32,7 +32,7 @@
       "id": "reading-01", "category": "reading", "input": "hashi.",
       "acceptableExamples": ["橋。", "箸。", "端。", "はし。"],
       "criteria": ["文脈がないため同音の複数解釈を許容する", "橋を渡る等の動作を追加しない"],
-      "notes": "ひらがなのみの結果では推測フォールバックがあり得る。戦略と棄却を別途記録する。"
+      "notes": "ひらがなのみでも成功候補として扱う。漢字候補の読みは独立確認とは限らない。"
     },
     {
       "id": "reading-02", "category": "reading", "input": "hashiwowataru.",
@@ -146,7 +146,7 @@
       "settingsOverrides": { "inputCompletionLevel": "word" },
       "acceptableExamples": ["ありがとう。"],
       "criteria": ["末尾の未完成語を補完する", "ございます等の敬語や句を足さない", "追加表示は とう が根拠のある例であり、元からある あ を追加扱いしない"],
-      "notes": "ひらがなのみの候補ではフォールバックや棄却も記録する。例文との一致だけで結果を採点しない。"
+      "notes": "ひらがなのみでも成功候補として扱う。例文との一致だけで結果を採点しない。"
     },
     {
       "id": "word-02", "category": "word", "input": "ashita.",
@@ -193,6 +193,80 @@
       "acceptableExamples": ["予算は1500円です。"],
       "criteria": ["文章化しても金額を維持する", "支払済みや税込み等の情報を追加しない"],
       "criticalChecks": ["1500 を厳密に維持する"]
+    },
+    {
+      "id": "word-05", "category": "word", "input": "yomima.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["読みます。", "よみます。"],
+      "criteria": ["入力済みの ま を ます まで完成させる", "読み間のような不自然な表記を成功としない", "本文と申告読みを別々に確認する"],
+      "criticalChecks": ["ませんやましたへ変更しない"]
+    },
+    {
+      "id": "word-06", "category": "word", "input": "ikimase.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["行きません。", "いきません。"],
+      "criteria": ["ませ を ません まで完成させる", "生かせと申告読みいきませの不一致を見逃さない"],
+      "criticalChecks": ["否定を肯定や過去へ変えない"]
+    },
+    {
+      "id": "word-07", "category": "word", "input": "yomimashi.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["読みました。", "よみました。"],
+      "criteria": ["入力済みの まし を ました まで完成させる", "未入力の内容や目的語を足さない"]
+    },
+    {
+      "id": "word-08", "category": "word", "input": "yomi.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["読み。", "よみ。"],
+      "criteria": ["ま・ませ・ましが未入力なので丁寧な語尾を新設しない"],
+      "criticalChecks": ["ます・ません・ましたを推測で追加しない"]
+    },
+    {
+      "id": "word-09", "category": "word", "input": "shoruinokakuni.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["書類の確認。", "しょるいのかくにん。"],
+      "criteria": ["末尾のかくにをかくにんまで補う", "句の追加をせず、追加はんだけとする", "モデルの語申告と読みの独立確認を混同しない"]
+    },
+    {
+      "id": "word-10", "category": "word", "input": "shizengengosyo.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["自然言語処理。", "しぜんげんごしょり。"],
+      "criteria": ["複合語末尾のしょをしょりまで補う", "正当な補完の棄却と未確認候補の保持を分けて記録する", "処理します等の句を追加しない"]
+    },
+    {
+      "id": "word-11", "category": "word", "input": "ashitanoyotteiwokakuni.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["明日の予定を確認。"],
+      "criteria": ["よっていの局所修正と、かくにへのんの追加を区別する", "追加表示に削除したっや元からあるをを含めない"]
+    },
+    {
+      "id": "reading-05", "category": "reading", "input": "身長wohakaru.",
+      "acceptableExamples": ["身長を測る。"],
+      "criteria": ["保護済みの身長を前方文脈として測るの表記選択に使う", "文脈を変換対象へ重複挿入しない", "読みが同じでも身長を図るは自然さを不合格にする"]
+    },
+    {
+      "id": "reading-06", "category": "reading", "input": "体重wohakaru.",
+      "acceptableExamples": ["体重を量る。", "体重を測る。"],
+      "criteria": ["前方の保護語に合った表記を選ぶ", "同じはかるの読みを維持する", "新しい数値や測定結果を創作しない"]
+    },
+    {
+      "id": "reading-07", "category": "reading", "input": "`前の文脈は10時`honwoyomu.",
+      "acceptableExamples": ["前の文脈は10時本を読む。"],
+      "criteria": ["前方文脈を変換対象に含めず本を読むだけを生成する", "保護部分以外の本を読むの自然さを評価する"],
+      "criticalChecks": ["10や前の文脈を追加・重複しない"]
+    },
+    {
+      "id": "protected-05", "category": "protected", "input": "ashita10jiniikanai.",
+      "settingsOverrides": { "inputCompletionLevel": "word" },
+      "acceptableExamples": ["明日10時に行かない。"],
+      "criteria": ["10じとじゅうじの正規化と漢字の読みの独立確認を区別する", "正規化前のモデル申告がログに残る"],
+      "criticalChecks": ["本文の10を維持する", "否定を維持する"]
+    },
+    {
+      "id": "protected-06", "category": "protected", "input": "10ko.",
+      "acceptableExamples": ["10個。", "10こ。"],
+      "criteria": ["助数詞の音便じゅっこは現在の数字正規化対象外として記録する", "候補の棄却を生成成功に数えない"],
+      "criticalChecks": ["本文の10を変更しない"]
     }
   ]
 }

@@ -29,7 +29,7 @@ test("dry run validates data, deterministic order, and refuses overwrite", async
     }
     const a = JSON.parse(await readFile(join(dir, "a/manifest.json"), "utf8"));
     const b = JSON.parse(await readFile(join(dir, "b/manifest.json"), "utf8"));
-    assert.equal(a.schedule.length, 96);
+    assert.equal(a.schedule.length, 132);
     assert.deepEqual(a.schedule, b.schedule);
     assert.equal(a.cases.find(c => c.id === "vocabulary-01").settings.useDocumentVocabulary, true);
     assert.equal(a.cases.find(c => c.id === "basic-01").settings.userDictionary.length, 0);
