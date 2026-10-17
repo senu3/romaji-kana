@@ -7,6 +7,7 @@ import type { InputCompletionLevel } from "./types";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule, wordCompletionRule } from "./conversionRules";
 import type { WordCompletionBoundary } from "./conversionRules";
+import { comparableKanaCharacters as comparableReadingCharacters, splitTerminalPunctuation } from "./readingComparison";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],
@@ -54,6 +55,9 @@ export function isAllowedInputCompletion(
   const sourceCharacters = comparableReadingCharacters(sourceParts.body);
   const candidateCharacters = comparableReadingCharacters(candidateParts.body);
   if (level === "word") {
+    // Horizontal spacing cleanup is notation, not a kana correction or a
+    // completion. Protection above still forbids joining ASCII tokens.
+    if (!wordBoundary && sourceParts.body.replace(/[ \t]/gu, "") === candidateParts.body.replace(/[ \t]/gu, "")) return true;
     const convertedBody = convertedText === undefined ? undefined : splitTerminalPunctuation(convertedText).body;
     const status = wordCompletionRule.boundaryStatus(sourceParts.body, candidateParts.body, convertedBody, wordBoundary);
     return (
@@ -77,27 +81,8 @@ export function isAllowedInputCompletion(
   return countSharedCharacters(sourceCharacters, candidateCharacters) >= minimumSharedCharacters;
 }
 
-function splitTerminalPunctuation(value: string): { body: string; punctuation: string } {
-  const match = value.match(/^(.*?)([。、.!?！？]*)$/u);
-  return {
-    body: match?.[1] ?? value,
-    punctuation: match?.[2] ?? "",
-  };
-}
-
 export function comparableCharacters(value: string): string[] {
   return Array.from(value).filter((character) => !/\s/u.test(character));
-}
-
-function comparableReadingCharacters(value: string): string[] {
-  return Array.from(value.normalize("NFKC"))
-    .map((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint >= 0x30a1 && codePoint <= 0x30f6
-        ? String.fromCodePoint(codePoint - 0x60)
-        : character;
-    })
-    .filter((character) => /[\p{Script=Hiragana}ー]/u.test(character));
 }
 
 function countSharedCharacters(source: string[], candidate: string[]): number {

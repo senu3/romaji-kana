@@ -1,6 +1,8 @@
 import { collectInputCompletionAdditions } from "./completionValidation";
 import { localCorrectionRule, wordCompletionRule } from "./conversionRules";
 import type { ReadingAssessment } from "./readingAssessment";
+import { normalizeComparableReading } from "./readingComparison";
+export { normalizeComparableReading } from "./readingComparison";
 
 /** A description of the observed change, independent of the requested mode
  * and generation strategy. Model readings are evidence, not semantic proof. */
@@ -16,12 +18,6 @@ export interface ConversionChanges {
   additions: string[];
   /** Observed boundary of an insertion, independent of requested mode. */
   additionKind?: "word" | "phrase" | "unverified";
-}
-
-export function normalizeComparableReading(value: string): string {
-  return value.normalize("NFKC").replace(/[ァ-ヶ]/gu, char =>
-    String.fromCharCode(char.charCodeAt(0) - 0x60),
-  ).replace(/\s/gu, "").replace(/[。、,.!?！？]+$/u, "");
 }
 
 export function classifyConversionChanges(

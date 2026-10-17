@@ -1,3 +1,5 @@
+import { normalizeNumericAlignment as normalize } from "./readingComparison";
+
 /** Only normalize an integer's pronunciation when all surrounding reading
  * matches the target. Text protection remains exact and independent. */
 const DIGITS = ["", "いち", "に", "さん", "よん", "ご", "ろく", "なな", "はち", "きゅう"];
@@ -23,8 +25,6 @@ function integerReadings(token: string): string[] {
 }
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const normalize = (value: string) => value.normalize("NFKC").replace(/[ァ-ヶ]/gu,
-  char => String.fromCharCode(char.charCodeAt(0) - 0x60)).replace(/[ \t]/gu, "");
 
 export function normalizeNumericReading(targetReading: string, reportedReading: string): { reading: string; normalized: boolean } {
   const matches = [...targetReading.matchAll(/\d+/gu)];

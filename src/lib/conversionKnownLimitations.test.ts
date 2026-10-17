@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { isAllowedInputCompletion } from "./completionValidation";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings } from "./settings";
 
@@ -7,10 +6,6 @@ import { defaultSettings } from "./settings";
 // desirable. On a fix, replace the characterization with an acceptance test in
 // the relevant regression suite. See conversionPolicy.md for the remaining work.
 describe("known conversion limitations (not acceptance criteria)", () => {
-  it("still rejects whitespace cleanup in word mode", () => {
-    expect(isAllowedInputCompletion("ほん をよむ", "ほんをよむ", "word")).toBe(false);
-  });
-
   it("returns a wrong but non-hiragana candidate without triggering typo completion", async () => {
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "あしたのよって。", convertedText: "明日の夜って。" }) });
     const result = await convertRomajiToJapaneseDetailed("ashitanoyottei.", defaultSettings, { models: vi.fn(), generate });

@@ -1,4 +1,6 @@
 import { normalizeNumericReading } from "./numericReading";
+import { normalizeReading } from "./readingComparison";
+export { normalizeReading } from "./readingComparison";
 
 /** Independent local lookup. Model output and reference vocabulary are not
  * independent verifiers. An unknown entry must return undefined. */
@@ -13,11 +15,6 @@ export interface ReadingAssessment {
   status: "verified" | "unverified" | "contradicted";
   origin: "literal" | "model" | "unavailable" | "mixed";
   proof?: "literal" | "independent" | "preserved" | "mixed";
-}
-
-export function normalizeReading(value: string): string {
-  return value.normalize("NFKC").replace(/[ァ-ヶ]/gu,
-    char => String.fromCharCode(char.charCodeAt(0) - 0x60)).replace(/\s/gu, "");
 }
 
 export function assessReading(text: string, claimed: string | undefined, modelReading: boolean, verifier?: ReadingVerifier): ReadingAssessment {

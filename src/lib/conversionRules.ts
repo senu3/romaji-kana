@@ -1,4 +1,5 @@
 import { preservesProtectedContent } from "./conversionProtection";
+import { normalizeReading } from "./readingComparison";
 
 export interface WordCompletionBoundary {
   sourceKana: string;
@@ -197,9 +198,7 @@ export const finalReadingRule = {
 
 export const faithfulConversionRule = {
   sameReading(a: string, b: string): boolean {
-    const normalize = (value: string) => value.normalize("NFKC").replace(/[ァ-ヶ]/gu,
-      char => String.fromCharCode(char.charCodeAt(0) - 0x60)).replace(/\s/gu, "");
-    return normalize(a) === normalize(b);
+    return normalizeReading(a) === normalizeReading(b);
   },
   guidance: [
     "1. Preserve the phonetic reading of the input kana.",
