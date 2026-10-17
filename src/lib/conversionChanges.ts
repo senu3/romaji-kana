@@ -1,5 +1,5 @@
 import { collectInputCompletionAdditions } from "./completionValidation";
-import { localCorrectionRule, wordCompletionRule } from "./conversionRules";
+import { localCorrectionRule, wordCompletionRule, type CompletionBoundaryStatus } from "./conversionRules";
 import type { ReadingAssessment } from "./readingAssessment";
 import { normalizeComparableReading } from "./readingComparison";
 export { normalizeComparableReading } from "./readingComparison";
@@ -26,6 +26,7 @@ export function classifyConversionChanges(
   evidence: ConversionChanges["evidence"],
   repaired = false,
   correctedReading?: string,
+  completionBoundary?: CompletionBoundaryStatus,
 ): ConversionChanges {
   const base = { sourceReading, resultReading, evidence, additions: [] as string[],
     ...(correctedReading !== undefined ? { correctedReading } : {}),
@@ -40,8 +41,7 @@ export function classifyConversionChanges(
   const completionSource = correctedReading === undefined ? source : normalizeComparableReading(correctedReading);
   const additions = collectInputCompletionAdditions(completionSource, result);
   if (additions.length) {
-    const additionKind = !result.startsWith(completionSource) || typeof Intl.Segmenter !== "function"
-      ? "unverified" : wordCompletionRule.staysInFinalWord(completionSource, result) ? "word" : "phrase";
+    const additionKind = wordCompletionRule.additionKind(completionSource, result, completionBoundary);
     return { ...base, kind: "completion", additions, additionKind };
   }
   // A local replacement/deletion/transposition is a correction candidate.

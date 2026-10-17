@@ -595,8 +595,9 @@ describe("convertRomajiToJapanese", () => {
     );
     expect(suggestionCalls).toHaveLength(1);
     expect(suggestionCalls[0]?.[2].prompt).toContain(
-      "Read-only context before the target:\nありが OpenAI",
+      "Read-only context before the target:\nありがOpenAI",
     );
+    expect(suggestionCalls[0]?.[2].prompt).toContain("Read-only input reading before the target:\nありが OpenAI");
     expect(suggestionCalls[0]?.[2].prompt).toContain("Original romaji input:\n kakuni。");
     expect(transport.generate).toHaveBeenCalledTimes(2);
   });

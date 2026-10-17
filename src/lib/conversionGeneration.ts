@@ -21,7 +21,7 @@ import { rebuildRomajiKanaResult } from "./romajiKana";
 import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 import { selectSegmentRoute } from "./conversionPolicy";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
-import { suggestionTargetPrompt, type SuggestionRequest } from "./conversionRequest";
+import { suggestionTargetPrompt, type SuggestionRequest, type ConversionRequest } from "./conversionRequest";
 import { normalizeNumericReading } from "./numericReading";
 import { ConversionResponseError, type ConversionDiagnostic } from "./conversionDiagnostics";
 
@@ -128,6 +128,21 @@ export async function kanjiizeKanaDetailed(
   transport: OllamaTransport,
   options: JapaneseConversionOptions,
 ): Promise<{ text: string; reading?: string; reportedReading?: string; numericReadingNormalized?: boolean; modelReading: boolean }> {
+  // Compatibility entry point: internal callers supply the full request.
+  return generateKanaConversion({
+    target: { originalRomaji: options.completionSourceRomaji ?? "", mechanicalReading: kana, preparedReading: kana, completionSeed: kana },
+    reference: { beforeTarget: "", documentVocabulary: options.documentVocabulary?.slice() },
+  }, settings, transport, options);
+}
+
+export async function generateKanaConversion(
+  request: ConversionRequest,
+  settings: AppSettings,
+  transport: OllamaTransport,
+  options: JapaneseConversionOptions,
+): Promise<{ text: string; reading?: string; reportedReading?: string; numericReadingNormalized?: boolean; modelReading: boolean }> {
+  const kana = request.target.preparedReading;
+  options = { ...options, documentVocabulary: request.reference.documentVocabulary?.slice() };
   const generation = kanaGenerationParameters(settings, options);
   const result = await generateWithAbort(() => transport.generate(
     settings.modelProvider,
@@ -135,7 +150,7 @@ export async function kanjiizeKanaDetailed(
     {
       model: settings.modelName,
       system: generation.system + "\n\n" + finalConversionOutputContract,
-      prompt: buildKanaKanjiUserPrompt(kana, options),
+      prompt: buildKanaKanjiUserPrompt(request, options),
       stream: false,
       think: settings.think,
       options: {
@@ -188,14 +203,15 @@ function kanaGenerationParameters(settings: AppSettings, options: JapaneseConver
   };
 }
 
-function buildKanaKanjiUserPrompt(kana: string, options: JapaneseConversionOptions): string {
+function buildKanaKanjiUserPrompt(request: ConversionRequest, options: JapaneseConversionOptions): string {
+  const kana = request.target.preparedReading;
   if (!options.completionMode && !options.speculativeMode) {
     return kana;
   }
 
   return [
     "Original romaji input:",
-    options.completionSourceRomaji?.trim() || "(not available)",
+    request.target.originalRomaji.trim() || "(not available)",
     "",
     "Mechanical kana:",
     kana,

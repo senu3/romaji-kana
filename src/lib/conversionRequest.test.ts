@@ -29,4 +29,13 @@ describe("target and reference roles", () => {
     const invalid = await convertRomajiToJapaneseDetailed("hon.", defaultSettings, { models: vi.fn(), generate }, { documentVocabulary: ["10時"] });
     expect(invalid.suggestionRejectedReason).toBe("protected");
   });
+  it("keeps the converted surface and its target reading distinct in later suggestion context", async () => {
+    const generate = vi.fn().mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "ほん", convertedText: "本" }) })
+      .mockResolvedValueOnce({ response: JSON.stringify({ completedKana: "よむ。", convertedText: "読む。" }) });
+    const result = await convertRomajiToJapaneseDetailed("hon`OpenAI`yomu.", { ...defaultSettings, inputCompletionLevel: "word" }, { models: vi.fn(), generate });
+    expect(result.text).toBe("本OpenAI読む。");
+    expect(generate.mock.calls[1][2].prompt).toContain("Read-only context before the target:\n本OpenAI");
+    expect(generate.mock.calls[1][2].prompt).toContain("Read-only input reading before the target:\nほんOpenAI");
+    expect(generate.mock.calls[1][2].prompt).toContain("Prepared kana (correction/completion target):\nよむ。");
+  });
 });

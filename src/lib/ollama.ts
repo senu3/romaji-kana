@@ -8,6 +8,7 @@ import {
   isUsableConversionResult,
 } from "./conversionPolicy";
 import type { AppSettings } from "./types";
+import { withLegacyCompletionMetadata } from "./conversionCompatibility";
 
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
 
@@ -31,7 +32,7 @@ export async function convertRomajiToJapaneseDetailed(
     ? { ...options, alternativeMode: true } : options;
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
-    const candidate = await convertInputOnce(input, settings, transport, attemptOptions);
+    const candidate = withLegacyCompletionMetadata(await convertInputOnce(input, settings, transport, attemptOptions));
     return attemptOptions.speculativeMode ? { ...candidate, conversionStrategy: "speculative" as const }
       : attemptOptions.completionMode ? { ...candidate, conversionStrategy: "completion" as const } : candidate;
   };

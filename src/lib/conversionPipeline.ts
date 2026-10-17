@@ -10,7 +10,7 @@ import {
 } from "./conversionInput";
 import {
   generateStructuredSuggestion,
-  kanjiizeKanaDetailed,
+  generateKanaConversion,
   repairLowConfidenceKana,
 } from "./conversionGeneration";
 import {
@@ -24,8 +24,8 @@ import type { OllamaTransport } from "./ollamaProxy";
 import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
 import { preservesProtectedContent } from "./conversionProtection";
-import { prepareConversionRequest } from "./conversionRequest";
-import { faithfulConversionRule } from "./conversionRules";
+import { prepareConversionRequest, type ConversionRequest } from "./conversionRequest";
+import { faithfulConversionRule, type CompletionBoundaryStatus } from "./conversionRules";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 import { assessReading, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
 
@@ -66,7 +66,7 @@ interface ConvertedSegment {
   reportedReading?: string;
   numericReadingNormalized?: boolean;
   boundaryUnverified?: boolean;
-  wordCompletion?: boolean;
+  completionBoundary?: CompletionBoundaryStatus;
   text: string;
   sourceReading: string;
   preparedReading: string;
@@ -139,15 +139,15 @@ export async function convertInputOnce(
     const repaired = route.kind === "alternative"
       ? { kana: alternateReadings?.[partIndex] ?? kanaResult.kana }
       : await repairLowConfidenceKana(kanaResult, settings, transport, options.signal);
+    const request: ConversionRequest = {
+      target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana,
+        completionSeed: route.kind === "word" ? knownWordCompletionSeed(repaired.kana) : repaired.kana },
+      reference: { beforeTarget: segments.map(segment => segment.text).join(""),
+        beforeTargetReading: segments.map(segment => segment.preparedReading).join(""), documentVocabulary },
+    };
     if (route.kind === "word" || route.kind === "sentence") {
-      const completionSeed = route.kind === "word"
-        ? knownWordCompletionSeed(repaired.kana)
-        : repaired.kana;
       const outcome = await generateStructuredSuggestion(
-        {
-          target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana, completionSeed },
-          reference: { beforeTarget: segments.map(segment => segment.preparedReading).join(""), documentVocabulary },
-        },
+        request,
         route.kind,
         settings,
         transport,
@@ -176,16 +176,14 @@ export async function convertInputOnce(
         readingAssessment: assessReading(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier),
         knownRepair: originalKana !== (suggestion.correctedKana ?? repaired.kana),
         modelReading: true,
-        wordCompletion: route.kind === "word" && !suggestion.boundaryUnverified && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana),
+        completionBoundary: route.kind === "word" && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana)
+          ? suggestion.boundaryUnverified ? "unverified" : "confirmed" : undefined,
         boundaryUnverified: suggestion.boundaryUnverified,
       });
       continue;
     }
 
-    const convertedPart = await kanjiizeKanaDetailed(repaired.kana, settings, transport, {
-      ...options,
-      completionSourceRomaji: options.completionMode ? part.value : options.completionSourceRomaji,
-    });
+    const convertedPart = await generateKanaConversion(request, settings, transport, options);
     if (convertedPart.reading !== undefined && (
       route.kind === "alternative" && !faithfulConversionRule.sameReading(repaired.kana, convertedPart.reading) ||
       route.kind === "typo-repair" && !isAllowedLocalKanaCorrection(repaired.kana, convertedPart.reading)
@@ -236,6 +234,11 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
   const hasKnownRepair = (previousCorrectedReading !== undefined && previousCorrectedReading !== sourceReading) || segments.some(segment => segment.knownRepair);
   const evidence: ConversionChanges["evidence"] = hasKnownRepair
     ? "repair-stage" : segments.some(segment => segment.modelReading) ? "model-reading" : "literal";
+  // Reuse the boundary already checked on the last target. Earlier parts
+  // must retain their readings before this proof applies to the whole result.
+  const completionBoundary = segments.slice(0, -1).every(segment => segment.finalReading !== undefined &&
+    faithfulConversionRule.sameReading(segment.preparedReading, segment.finalReading))
+    ? segments[segments.length - 1]?.completionBoundary : undefined;
 
   const result: JapaneseConversionResult = {
     text: segments.map(segment => segment.text).join(""),
@@ -245,6 +248,7 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
       sourceReading, readingAvailable ? finalReading : undefined,
       evidence, hasKnownRepair && finalReading === preparedReading,
       hasKnownRepair ? preparedReading : undefined,
+      completionBoundary,
     ),
   };
   result.changes!.readingAssessment = combineReadingAssessments(segments.map(segment => segment.readingAssessment));
@@ -255,15 +259,6 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
   if (segments.some(segment => segment.boundaryUnverified)) {
     result.changes!.wordBoundary = "unverified";
     if (result.changes?.kind === "completion") result.changes.additionKind = "unverified";
-  }
-  if (result.changes?.kind === "completion" && segments[segments.length - 1]?.wordCompletion &&
-      segments.slice(0, -1).every(segment => segment.finalReading !== undefined && faithfulConversionRule.sameReading(segment.preparedReading, segment.finalReading))) {
-    result.changes.additionKind = "word";
-  }
-  if (result.changes && ["completion", "correction", "rewrite"].includes(result.changes.kind)) {
-    result.inputCompletionApplied = true;
-    result.inputCompletionSourceKana = result.changes.sourceReading;
-    result.inputCompletionAdditions = result.changes.additions;
   }
   return result;
 }

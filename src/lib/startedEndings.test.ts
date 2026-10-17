@@ -30,4 +30,10 @@ describe("already-started endings and provisional boundaries", () => {
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(generate).toHaveBeenCalledTimes(1);
   });
+  it("uses the same uncertain boundary classification in sentence mode", async () => {
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "かくにん。", convertedText: "かくにん。" }) });
+    const result = await convertRomajiToJapaneseDetailed("kakuni.", { ...defaultSettings, inputCompletionLevel: "sentence" }, { models: vi.fn(), generate });
+    expect(result.changes).toMatchObject({ additionKind: "unverified", additions: ["ん"] });
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+  });
 });

@@ -7,6 +7,8 @@ export interface WordCompletionBoundary {
   convertedText: string;
 }
 
+export type CompletionBoundaryStatus = "confirmed" | "unverified" | "rejected";
+
 /** Generation guidance and executable limits live together. Semantic guidance
  * is deliberately separate: a character guard cannot prove intended meaning. */
 export const wordCompletionRule = {
@@ -20,7 +22,7 @@ export const wordCompletionRule = {
       /^[\p{Script=Hiragana}ー]+$/u.test(source.slice(0, -prefix.length)) &&
       candidate === source.slice(0, -prefix.length) + ending);
   },
-  boundaryStatus(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): "confirmed" | "unverified" | "rejected" {
+  boundaryStatus(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): CompletionBoundaryStatus {
     if (boundary && (!convertedText || !this.matchesDeclaredWord(source, candidate, convertedText, boundary))) return "rejected";
     if (this.staysInFinalWord(source, candidate, convertedText, boundary)) return "confirmed";
     if (boundary || !source || !candidate.startsWith(source)) return "rejected";
@@ -32,6 +34,11 @@ export const wordCompletionRule = {
     if (typeof Intl.Segmenter !== "function") return "unverified";
     const addedWords = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(suffix)].filter(segment => segment.isWordLike);
     return addedWords.length > 1 ? "rejected" : "unverified";
+  },
+  additionKind(source: string, candidate: string, assessed?: CompletionBoundaryStatus): "word" | "phrase" | "unverified" {
+    if (!candidate.startsWith(source)) return "unverified";
+    const status = assessed ?? this.boundaryStatus(source, candidate);
+    return status === "confirmed" ? "word" : status === "rejected" ? "phrase" : "unverified";
   },
   staysInFinalWord(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): boolean {
     if (source === candidate) return true;

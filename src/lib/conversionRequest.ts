@@ -16,13 +16,16 @@ export interface ConversionTarget {
 
 export interface ConversionReference {
   readonly beforeTarget: string;
+  readonly beforeTargetReading?: string;
   readonly documentVocabulary?: readonly string[];
 }
 
-export interface SuggestionRequest {
+export interface ConversionRequest {
   readonly target: ConversionTarget;
   readonly reference: ConversionReference;
 }
+
+export type SuggestionRequest = ConversionRequest;
 
 /** Only the original target supplies mandatory protection. Reference data can
  * affect spelling preferences, never the target or its protected content. */
@@ -43,6 +46,7 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
 export function suggestionTargetPrompt({ target, reference }: SuggestionRequest): string {
   return [
     "Read-only context before the target:", reference.beforeTarget.trim() || "(none)", "",
+    ...(reference.beforeTargetReading ? ["Read-only input reading before the target:", reference.beforeTargetReading, ""] : []),
     "Original romaji input:", target.originalRomaji, "",
     "Mechanical kana:", target.mechanicalReading, "",
     "Prepared kana (correction/completion target):", target.preparedReading, "",
