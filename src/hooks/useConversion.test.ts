@@ -37,6 +37,50 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
 
+  it.each(["shortcut", "period"] as const)("does not let a prediction replace a newer %s result", async trigger => {
+    const old = deferred<JapaneseConversionResult>();
+    const convert = vi.mocked(convertRomajiToJapaneseDetailed);
+    const session = createConversionSession("hon", [
+      { id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } },
+      { id: "second", kind: "conversion", result: { text: "ほん", reviewKana: "ほん" } },
+    ]);
+    convert.mockReturnValueOnce(old.promise).mockResolvedValueOnce(sessionResult(session));
+    const { hook, view } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon", "typing")); });
+    const signal = convert.mock.calls[0][3]?.signal;
+    await act(async () => { hook.current.handleConvert(range("hon", trigger)); });
+    expect(signal?.aborted).toBe(true);
+    const chosen = view.state.field(ghostSuggestionField).suggestion!;
+    await act(async () => { hook.current.handleRetryGhost(chosen); });
+    await act(async () => { old.resolve({ text: "ほん", reviewKana: "ほん" }); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.id).toBe(chosen.id);
+    expect(view.state.field(ghostSuggestionField).suggestion?.session).toBe(session);
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("ほん");
+  });
+
+  it("keeps unrelated pending work and prevents an older result taking over the display", async () => {
+    const old = deferred<JapaneseConversionResult>();
+    const convert = vi.mocked(convertRomajiToJapaneseDetailed);
+    convert.mockReturnValueOnce(old.promise).mockResolvedValueOnce({ text: "読む", reviewKana: "よむ" });
+    const { hook, view } = harness("hon yomu");
+    act(() => { hook.current.handleConvert(range("hon", "typing")); });
+    const signal = convert.mock.calls[0][3]?.signal;
+    await act(async () => { hook.current.handleConvert(range("yomu", "shortcut", 4)); });
+    expect(signal?.aborted).toBe(false);
+    await act(async () => { old.resolve({ text: "本", reviewKana: "ほん" }); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("読む");
+  });
+
+  it("does not enqueue a prediction over an explicit request", async () => {
+    const response = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(response.promise);
+    const { hook } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon")); });
+    act(() => { expect(hook.current.handleConvert(range("hon", "typing"))).toBe(false); });
+    expect(convertRomajiToJapaneseDetailed).toHaveBeenCalledTimes(1);
+    await act(async () => { response.resolve({ text: "本", reviewKana: "ほん" }); });
+  });
+
   it("passes corrected/completed readings through ghost and history alternatives, including legacy text responses", async () => {
     const changes = { kind: "completion" as const, evidence: "repair-stage" as const,
       sourceReading: "ありっが", correctedReading: "ありが", resultReading: "ありがとう", additions: ["とう"] };

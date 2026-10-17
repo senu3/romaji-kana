@@ -18,6 +18,7 @@ import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import { defaultKanaEngine } from "../lib/kanaEngine";
 import { nextSessionCandidate, sessionResult } from "../lib/conversionSession";
 import { recordConversionChoice } from "../lib/conversionLearning";
+import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
 import type {
   AppSettings,
   ConversionAnchor,
@@ -136,6 +137,7 @@ export function useConversion({
   const [now, setNow] = useState(() => Date.now());
 
   const canceledRequestsRef = useRef(new Set<string>());
+  const requestsRef = useRef(new ConversionRequests());
 
   const conversionQueueRef = useRef<PendingConversion[]>([]);
 
@@ -154,7 +156,9 @@ export function useConversion({
   const predictiveSuggestionEpochRef = useRef(0);
 
   const invalidatePredictiveSuggestions = useCallback((clearVisible = true) => {
+    requestsRef.current.cancelPredictions();
     predictiveSuggestionEpochRef.current += 1;
+    if (predictiveSuggestionQueueRef.current) requestsRef.current.finish(predictiveSuggestionQueueRef.current.id);
     predictiveSuggestionQueueRef.current = null;
     displayedSuggestionRevisionRef.current = 0;
     if (clearVisible) {
@@ -177,6 +181,7 @@ export function useConversion({
   }, [pending.length]);
 
   const clearPendingConversions = useCallback(() => {
+    requestsRef.current.clear();
     invalidatePredictiveSuggestions();
     const requests = conversionQueueRef.current;
     const runningId = runningRequestIdRef.current;
@@ -266,13 +271,14 @@ export function useConversion({
         undefined,
         {
           kanaEngine: settingsRef.current.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+          signal: requestsRef.current.get(request.id)?.controller.signal,
           anchor,
           contextBefore: view.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from),
           contextAfter: view.state.doc.sliceString(resolved.to, Math.min(view.state.doc.length, resolved.to + 600)),
           onLocalCandidates: (result) => {
             const current = editorViewRef.current;
             const position = current && resolveConversionAnchor(current.state.doc.toString(), anchor);
-            if (!current || !position || canceledRequestsRef.current.has(request.id)) return;
+            if (!current || !position || !requestsRef.current.display(request.id)) return;
             current.dispatch({ effects: showGhostSuggestion.of({
               id: request.id, from: position.from, to: position.to, originalText: position.matchedText,
               convertedText: result.text, inputText: request.originalText, reviewKana: result.reviewKana,
@@ -289,7 +295,7 @@ export function useConversion({
           documentVocabulary: request.documentVocabulary,
         },
       );
-      if (canceledRequestsRef.current.has(request.id)) {
+      if (!requestsRef.current.valid(request.id)) {
         return;
       }
       if (conversion.session && (conversion.session.state !== "open" || conversion.session.locked)) return;
@@ -335,6 +341,7 @@ export function useConversion({
         conversion.conversionStrategy === "speculative" ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
+        if (!requestsRef.current.display(request.id)) return;
         currentView.dispatch({
           effects: [
             removeLoadingDecoration.of(request.id),
@@ -451,6 +458,7 @@ export function useConversion({
         undefined,
         {
           kanaEngine: settingsRef.current.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+          signal: requestsRef.current.get(request.id)?.controller.signal,
           anchor: request.anchor,
           contextBefore: resolved && currentView ? currentView.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from) : "",
           contextAfter: resolved && currentView ? currentView.state.doc.sliceString(resolved.to, Math.min(currentView.state.doc.length, resolved.to + 600)) : "",
@@ -468,7 +476,7 @@ export function useConversion({
             : [],
         },
       );
-      if (canceledRequestsRef.current.has(request.id)) {
+      if (!requestsRef.current.valid(request.id)) {
         return;
       }
 
@@ -541,6 +549,7 @@ export function useConversion({
         conversion.conversionStrategy === "speculative" ||
         isPredictiveSuggestionTrigger(request.range?.trigger)
       ) {
+        if (!requestsRef.current.display(request.id)) return;
         latestView.dispatch({
           effects: showGhostSuggestion.of({
             id: request.id,
@@ -644,7 +653,9 @@ export function useConversion({
     try {
       while (conversionQueueRef.current.length > 0) {
         const request = conversionQueueRef.current[0];
-        if (canceledRequestsRef.current.has(request.id)) {
+        if (!requestsRef.current.valid(request.id)) {
+          requestsRef.current.finish(request.id);
+          editorViewRef.current?.dispatch({ effects: removeLoadingDecoration.of(request.id) });
           canceledRequestsRef.current.delete(request.id);
           conversionQueueRef.current = conversionQueueRef.current.slice(1);
           setPending([...conversionQueueRef.current]);
@@ -671,7 +682,7 @@ export function useConversion({
             await processEditorConversion(request);
           }
         } catch (error: unknown) {
-          if (!canceledRequestsRef.current.has(request.id)) {
+          if (requestsRef.current.valid(request.id)) {
             const message = formatConversionError(error);
             setHistory((items) =>
               prependConversionHistory(items, {
@@ -694,6 +705,7 @@ export function useConversion({
             setStatus({ kind: "error", message });
           }
         } finally {
+          requestsRef.current.finish(request.id);
           canceledRequestsRef.current.delete(request.id);
           runningRequestIdRef.current = null;
           const currentView = editorViewRef.current;
@@ -723,6 +735,13 @@ export function useConversion({
       }
 
       setRecentRetryItem(null);
+      requestsRef.current.register(request.id, request.anchor);
+      const current = editorViewRef.current;
+      const visible = current?.state.field(ghostSuggestionField).suggestion;
+      if (visible && request.anchor && rangesOverlap(visible, request.anchor)) {
+        if (visible.session) visible.session.state = "dismissed";
+        current?.dispatch({ effects: clearGhostSuggestion.of(visible.id) });
+      }
       conversionQueueRef.current = [...conversionQueueRef.current, request];
       setPending([...conversionQueueRef.current]);
       if (processingQueueRef.current) {
@@ -736,9 +755,11 @@ export function useConversion({
 
   const cancelConversion = useCallback(
     (request: PendingConversion) => {
+      requestsRef.current.cancel(request.id);
       canceledRequestsRef.current.add(request.id);
       const isRunning = runningRequestIdRef.current === request.id;
       if (!isRunning) {
+        requestsRef.current.finish(request.id);
         conversionQueueRef.current = conversionQueueRef.current.filter(
           (item) => item.id !== request.id,
         );
@@ -1077,13 +1098,15 @@ export function useConversion({
           request.settings,
           undefined,
           { documentVocabulary: request.documentVocabulary, kanaEngine: request.settings.conversionEngine === "llm" ? undefined : defaultKanaEngine,
+            signal: requestsRef.current.get(request.id)?.controller.signal,
             contextBefore: editorViewRef.current?.state.doc.sliceString(Math.max(0, request.range.from - 1200), request.range.from),
             contextAfter: editorViewRef.current?.state.doc.sliceString(request.range.to, Math.min(editorViewRef.current.state.doc.length, request.range.to + 600)),
           },
         );
         if (
           request.epoch !== predictiveSuggestionEpochRef.current ||
-          request.revision <= displayedSuggestionRevisionRef.current
+          request.revision <= displayedSuggestionRevisionRef.current ||
+          !requestsRef.current.valid(request.id)
         ) {
           return;
         }
@@ -1096,6 +1119,7 @@ export function useConversion({
         if (!currentView || currentSource !== request.range.text) {
           return;
         }
+        if (!requestsRef.current.display(request.id)) return;
 
         if (conversion.suggestionRejected) {
           displayedSuggestionRevisionRef.current = request.revision;
@@ -1143,9 +1167,11 @@ export function useConversion({
                 : "変換候補を表示しました。Tab で確定、Esc で破棄できます。",
         });
       } catch (error: unknown) {
-        if (request.epoch === predictiveSuggestionEpochRef.current) {
+        if (request.epoch === predictiveSuggestionEpochRef.current && requestsRef.current.valid(request.id)) {
           setStatus({ kind: "error", message: formatConversionError(error) });
         }
+      } finally {
+        requestsRef.current.finish(request.id);
       }
     },
     [],
@@ -1179,6 +1205,13 @@ export function useConversion({
         return false;
       }
 
+      const visible = view.state.field(ghostSuggestionField).suggestion;
+      if (visible && rangesOverlap(visible, range) &&
+          (visible.session?.locked || (visible.trigger && !isPredictiveSuggestionTrigger(visible.trigger)))) return false;
+      const id = createId("suggestion");
+      if (!requestsRef.current.register(id, range, true)) return false;
+      if (predictiveSuggestionQueueRef.current) requestsRef.current.finish(predictiveSuggestionQueueRef.current.id);
+
       const settingsSnapshot: AppSettings = {
         ...settingsRef.current,
         triggers: { ...settingsRef.current.triggers },
@@ -1190,7 +1223,7 @@ export function useConversion({
         : null;
       predictiveSuggestionRevisionRef.current += 1;
       predictiveSuggestionQueueRef.current = {
-        id: createId("suggestion"),
+        id,
         revision: predictiveSuggestionRevisionRef.current,
         epoch: predictiveSuggestionEpochRef.current,
         range,
@@ -1259,6 +1292,7 @@ export function useConversion({
   const delayedPending = pending.filter((request) => now - request.createdAt >= CANCEL_UI_DELAY_MS);
 
   useEffect(() => () => {
+    requestsRef.current.clear();
     predictiveSuggestionEpochRef.current += 1;
     predictiveSuggestionQueueRef.current = null;
   }, []);
