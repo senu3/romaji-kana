@@ -39,6 +39,58 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
+  it("clears provisional UI on direct application even when the result equals the source", async () => {
+    const session = createConversionSession("ありがとう", [{ id: "first", kind: "conversion", result: {
+      text: "ありがとう", reviewKana: "ありがとう", changes: {
+        ...classifyConversionChanges("ありがとう", "ありがとう", "literal"),
+        readingAssessment: assessReading("ありがとう", "ありがとう", false),
+      },
+    } }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(async (_input, _settings, _transport, options) => {
+      session.rerankStatus = "pending";
+      options?.onLocalCandidates?.(sessionResult(session));
+      session.rerankStatus = "applied";
+      return sessionResult(session);
+    });
+    const { hook, view } = harness("ありがとう");
+    await act(async () => { hook.current.handleConvert(range("ありがとう")); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(view.state.doc.toString()).toBe("ありがとう");
+    expect(session.state).toBe("accepted");
+    expect(hook.current.history[0].status).toBe("success");
+  });
+
+  it("clears the visible candidate when dismiss is called without a supplied suggestion", async () => {
+    const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
+    const { hook, view } = harness("hon");
+    await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
+    expect(view.state.field(ghostSuggestionField).suggestion).not.toBeNull();
+    act(() => { hook.current.handleDismissGhost(); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(session.state).toBe("dismissed");
+  });
+
+  it("preserves each candidate's strategy and completion details through navigation and history", async () => {
+    const session = createConversionSession("hon", [
+      { id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } },
+      { id: "second", kind: "correction", result: { text: "本当", reviewKana: "ほんとう", conversionStrategy: "completion",
+        inputCompletionApplied: true, inputCompletionSourceKana: "ほん", inputCompletionAdditions: ["とう"] } },
+    ]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
+    const { hook, view } = harness("hon");
+    await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
+    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    const selected = view.state.field(ghostSuggestionField).suggestion!;
+    expect(selected).toMatchObject({ conversionStrategy: "completion", inputCompletionApplied: true, inputCompletionAdditions: ["とう"] });
+    act(() => { hook.current.handleAcceptGhost(selected); });
+    act(() => { hook.current.handleAlternativeHistory(hook.current.history[0]); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ convertedText: "本", conversionStrategy: undefined });
+    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ conversionStrategy: "completion",
+      inputCompletionSourceKana: "ほん", inputCompletionAdditions: ["とう"] });
+  });
+
   it("clears an abstained provisional candidate while rescue runs and keeps romaji if all stages fail", async () => {
     const actual = await vi.importActual<typeof import("../lib/ollama")>("../lib/ollama");
     vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(actual.convertRomajiToJapaneseDetailed);

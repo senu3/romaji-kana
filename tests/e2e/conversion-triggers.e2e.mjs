@@ -70,6 +70,41 @@ try {
     await page.waitForTimeout(600);
     assert.equal(searches.length, 0, 'IME edits must not start punctuation or pause conversion');
   });
+  await scenario({ autoConvert: false }, async (page, editor) => {
+    let release;
+    const requested = new Promise(resolve => {
+      page.route('**/api/generate', async route => {
+        if (route.request().postDataJSON().prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+        resolve();
+        await new Promise(done => { release = done; });
+        await route.fulfill({ json: { response: '{"order":["candidate-1","candidate-0"]}' } });
+      });
+    });
+    await page.keyboard.type('mae\nhon');
+    await page.keyboard.press('Control+Enter');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    await requested;
+    await page.keyboard.press('ArrowUp');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Moving to another line dismisses the candidate');
+    release();
+    await page.waitForTimeout(200);
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Late ranking must not restore a candidate after cursor movement');
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), 'mae\nhon', 'Tab must not accept a candidate dismissed by cursor movement');
+  });
+  await scenario({ autoConvert: false }, async (page, editor) => {
+    await page.keyboard.type('hon');
+    await page.keyboard.press('Control+Enter');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    await page.keyboard.press('Tab');
+    await page.getByRole('button', { name: /履歴を開く/ }).click();
+    await page.locator('.history-item.success').hover();
+    await page.locator('.cm-history-preview').waitFor();
+    await editor.focus();
+    await page.keyboard.press('Tab');
+    assert.equal(await page.locator('.history-item.success').count(), 1, 'Tab on a history preview must not record another acceptance');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+  });
   await scenario({ autoConvert: false }, async (page, _editor, searches) => {
     await page.keyboard.type('mae\n```\ncode\n```\nato');
     await page.keyboard.press('Control+A');
@@ -109,5 +144,5 @@ try {
       assert.deepEqual(stages, ['correction', 'speculative']);
     });
   }
-  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, fences, numeric ranges and ordered rescue.');
+  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges and ordered rescue.');
 } finally { await browser?.close(); await server.close(); }

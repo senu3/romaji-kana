@@ -234,25 +234,40 @@ export const ghostSuggestionField = StateField.define<GhostState>({
   },
   update(value, transaction) {
     let suggestion = value.suggestion;
+    const dismiss = () => {
+      if (suggestion?.session?.state === "open") suggestion.session.state = "dismissed";
+      suggestion = null;
+    };
 
-    if (suggestion && transaction.docChanged) {
+    if (transaction.annotation(Transaction.userEvent)?.startsWith("document.")) {
+      dismiss();
+    } else if (suggestion && transaction.docChanged) {
       const from = transaction.changes.mapPos(suggestion.from, 1);
       const to = transaction.changes.mapPos(suggestion.to, -1);
-      const mapped = { ...suggestion, from, to };
-      const currentText = transaction.state.doc.sliceString(from, to);
-      if (currentText !== mapped.originalText && suggestion.session) suggestion.session.state = "dismissed";
-      suggestion = currentText === mapped.originalText ? mapped : null;
+      if (from >= to || transaction.state.doc.sliceString(from, to) !== suggestion.originalText) {
+        dismiss();
+      } else {
+        suggestion = { ...suggestion, from, to };
+      }
+    } else if (suggestion && transaction.selection) {
+      const selection = transaction.state.selection.main;
+      if (!selection.empty || selection.head < suggestion.from || selection.head > suggestion.to) dismiss();
     }
 
     for (const effect of transaction.effects) {
       if (effect.is(showGhostSuggestion)) {
-        if (suggestion?.session && suggestion.session !== effect.value.session && suggestion.session.state === "open") suggestion.session.state = "dismissed";
-        suggestion = effect.value;
+        const next = effect.value;
+        // Late responses cannot reopen a closed session or target stale text.
+        if (next.session && next.session.state !== "open") continue;
+        if (next.from < 0 || next.from >= next.to || next.to > transaction.state.doc.length ||
+            transaction.state.doc.sliceString(next.from, next.to) !== next.originalText) continue;
+        if (suggestion?.session !== next.session) dismiss();
+        suggestion = next;
       }
 
       if (effect.is(clearGhostSuggestion)) {
         if (!effect.value || suggestion?.id === effect.value) {
-          suggestion = null;
+          dismiss();
         }
       }
     }
@@ -984,7 +999,7 @@ export function MarkdownEditor({
   function acceptGhostSuggestion(view: EditorView) {
     const state = view.state.field(ghostSuggestionField);
     const suggestion = state.suggestion;
-    if (!suggestion) {
+    if (!suggestion || suggestion.previewOnly) {
       return false;
     }
 
@@ -1096,6 +1111,7 @@ export function MarkdownEditor({
       onRetryRecentRef.current();
       return true;
     }
+    if (suggestion.previewOnly) return true;
 
     const currentText = view.state.doc.sliceString(suggestion.from, suggestion.to);
     if (currentText !== suggestion.originalText) {

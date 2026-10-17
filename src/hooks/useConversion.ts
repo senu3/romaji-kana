@@ -391,7 +391,7 @@ export function useConversion({
           to: latestResolved.to,
           insert: converted,
         },
-        effects: removeLoadingDecoration.of(request.id),
+        effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)],
         userEvent: "input.convert",
       });
       if (conversion.session) conversion.session.state = "accepted";
@@ -618,6 +618,7 @@ export function useConversion({
             to: latestResolved.to,
             insert: converted,
           },
+          effects: clearGhostSuggestion.of(request.id),
           userEvent: "input.historyApply",
         });
         if (conversion.session) conversion.session.state = "accepted";
@@ -901,10 +902,12 @@ export function useConversion({
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
 
   const handleDismissGhost = useCallback((suggestion?: GhostConversionSuggestion) => {
+    suggestion ??= editorViewRef.current?.state.field(ghostSuggestionField).suggestion ?? undefined;
     if (suggestion) requestsRef.current.cancel(suggestion.id);
     syncPending();
     const session = suggestion?.session ?? editorViewRef.current?.state.field(ghostSuggestionField).suggestion?.session;
     if (session) session.state = "dismissed";
+    if (suggestion) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
     invalidatePredictiveSuggestions(false);
     setStatus({
       kind: "idle",
@@ -934,7 +937,7 @@ export function useConversion({
         const next = nextSessionCandidate(suggestion.session);
         if (next) {
           view.dispatch({ effects: showGhostSuggestion.of({ ...suggestion, convertedText: next.text,
-            reviewKana: next.reviewKana, changes: next.changes, session: next.session,
+            reviewKana: next.reviewKana, conversionStrategy: next.conversionStrategy, changes: next.changes, session: next.session,
             inputCompletionApplied: next.inputCompletionApplied, inputCompletionSourceKana: next.inputCompletionSourceKana,
             inputCompletionAdditions: next.inputCompletionAdditions }) });
           setStatus({ kind: "success", message: "保持している別候補を表示しました。Tabで確定できます。" });
@@ -1067,7 +1070,10 @@ export function useConversion({
       const next = nextSessionCandidate(session) ?? sessionResult(session);
       view.dispatch({ effects: showGhostSuggestion.of({ id: createId("conversion"), from: resolved.from, to: resolved.to,
         originalText: resolved.matchedText, convertedText: next.text, inputText: item.input, reviewKana: next.reviewKana,
-        changes: next.changes, session, source: "history", retryOf: item.id, inputCompletionLevel: item.inputCompletionLevel }) });
+        conversionStrategy: next.conversionStrategy, changes: next.changes, session, source: "history", retryOf: item.id,
+        inputCompletionLevel: item.inputCompletionLevel, inputCompletionApplied: next.inputCompletionApplied,
+        inputCompletionSourceKana: next.inputCompletionSourceKana, inputCompletionAdditions: next.inputCompletionAdditions,
+        documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision }) });
       return true;
     }
     const request: PendingConversion = {
