@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ghostSuggestionField } from "../components/MarkdownEditor";
+import { ghostSuggestionField, showGhostSuggestion } from "../components/MarkdownEditor";
 import { convertRomajiToJapaneseDetailed, type JapaneseConversionResult } from "../lib/ollama";
 import { defaultSettings } from "../lib/settings";
 import type { ConversionRange } from "../lib/types";
@@ -9,6 +9,7 @@ import { deferred, mountHook, stateEditor } from "./testUtils";
 import { useConversion } from "./useConversion";
 import { assessReading } from "../lib/readingAssessment";
 import { classifyConversionChanges } from "../lib/conversionChanges";
+import { applySessionRanking, createConversionSession, sessionResult } from "../lib/conversionSession";
 
 vi.mock("../lib/ollama", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/ollama")>(),
@@ -101,6 +102,49 @@ describe("conversion lifecycle", () => {
     expect(view.state.doc.toString()).toBe("konnichiha");
     expect(hook.current.history.map(item => item.status)).toEqual(["canceled"]);
     expect(hook.current.pending).toEqual([]);
+  });
+
+  it.each([false, true])("dismisses displayed local candidates on cancellation, including navigated=%s", async navigated => {
+    const response = deferred<JapaneseConversionResult>();
+    const session = createConversionSession("hon", [
+      { id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } },
+      { id: "second", kind: "conversion", result: { text: "ほん", reviewKana: "ほん" } },
+    ]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation((_input, _settings, _transport, options) => {
+      options?.onLocalCandidates?.(sessionResult(session));
+      return response.promise;
+    });
+    const { hook, view, options } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon")); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.session).toBe(session);
+    if (navigated) act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    act(() => { hook.current.cancelConversion(hook.current.pending[0]); });
+    expect(session.state).toBe("dismissed");
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(applySessionRanking(session, ["second", "first"])).toBe(false);
+    await act(async () => { response.resolve(sessionResult(session)); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(view.state.doc.toString()).toBe("hon");
+    expect(hook.current.history.map(item => item.status)).toEqual(["canceled"]);
+    expect(hook.current.pending).toEqual([]);
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
+  });
+
+  it("preserves an unrelated visible candidate when another request is canceled", async () => {
+    const response = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(response.promise);
+    const { hook, view } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon")); });
+    const session = createConversionSession("hon", [{ id: "other-candidate", kind: "conversion", result: { text: "本", reviewKana: "ほん" } }]);
+    act(() => {
+      view.dispatch({ effects: showGhostSuggestion.of({ id: "other-request", from: 0, to: 3,
+        originalText: "hon", inputText: "hon", convertedText: "本", source: "editor", session }) });
+      hook.current.cancelConversion(hook.current.pending[0]);
+    });
+    expect(view.state.field(ghostSuggestionField).suggestion?.id).toBe("other-request");
+    expect(session.state).toBe("open");
+    await act(async () => { response.resolve({ text: "ほん", reviewKana: "ほん" }); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.id).toBe("other-request");
   });
 
   it("serializes queued requests and still processes the next request after cancellation", async () => {

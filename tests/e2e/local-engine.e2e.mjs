@@ -72,6 +72,23 @@ try {
   assert.equal(await documentText(page), 'honwoyomu');
   assert.equal(await ghost.count(), 0, 'A dismissed session must not be resurrected');
 
+  // Canceling the request must also revoke its already displayed candidates.
+  const rankingRequest = page.waitForRequest(request => request.url().endsWith('/api/generate') && request.postDataJSON().prompt !== 'ok');
+  await typeInput('honwoyomu');
+  await rankingRequest;
+  await page.getByRole('button', { name: /履歴を開く/ }).click();
+  await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  assert.equal(await ghost.count(), 0, 'Canceled local candidates must disappear immediately');
+  await page.getByRole('button', { name: '履歴 を閉じる', exact: true }).click();
+  const rankingResponse = page.waitForResponse(response => response.url().endsWith('/api/generate'));
+  release();
+  await rankingResponse;
+  await page.waitForTimeout(150);
+  assert.equal(await ghost.count(), 0, 'Late ranking must not restore a canceled candidate');
+  await editor.focus();
+  await page.keyboard.press('Tab');
+  assert.notEqual(await documentText(page), '本を読む', 'Tab must not accept the canceled candidate');
+
   await page.getByRole('button', { name: /辞書を開く/ }).click();
   await page.getByRole('tab', { name: /個人語彙/ }).click();
   await page.getByLabel('個人語彙のかな読み').fill('てすとしゃ');
@@ -96,7 +113,7 @@ try {
   await page.keyboard.press('Escape'); release();
   await page.waitForTimeout(150);
   await context.close();
-  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, learning, personal words, prefix completion.');
+  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, cancellation, learning, personal words, prefix completion.');
 } finally { await browser?.close(); await server.close(); }
 
 async function documentText(page) {

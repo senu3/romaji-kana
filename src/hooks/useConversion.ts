@@ -749,7 +749,11 @@ export function useConversion({
 
       const view = editorViewRef.current;
       if (view) {
-        view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+        const suggestion = view.state.field(ghostSuggestionField).suggestion;
+        if (suggestion?.id === request.id && suggestion.session) {
+          suggestion.session.state = "dismissed";
+        }
+        view.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
       }
     },
     [recordCanceledConversion],
