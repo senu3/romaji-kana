@@ -21,6 +21,7 @@ export const defaultSettings: AppSettings = {
   conversionMode: "replace",
   conversionEngine: "local",
   triggers: {
+    typing: true,
     space: true,
     period: true,
     comma: true,
@@ -80,7 +81,7 @@ export function mergeSharedConversionSettings(
   return {
     ...settings,
     ...shared,
-    triggers: { ...shared.triggers },
+    triggers: { ...shared.triggers, typing: shared.triggers.typing ?? shared.triggers.space },
     punctuationConversion: { ...shared.punctuationConversion },
     userDictionary: [...shared.userDictionary],
     personalDictionary: normalizePersonalDictionary(shared.personalDictionary),
@@ -120,6 +121,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     triggers: {
       ...defaultSettings.triggers,
       ...settings.triggers,
+      typing: settings.triggers?.typing ?? settings.triggers?.space ?? defaultSettings.triggers.typing,
     },
     punctuationConversion: {
       ...defaultSettings.punctuationConversion,

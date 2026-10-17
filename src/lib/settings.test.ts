@@ -17,6 +17,16 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
+  it.each([true, false])("migrates the old shared space switch to both triggers: %s", space => {
+    storage.set("romaji-kana-settings", JSON.stringify({ triggers: { space } }));
+    expect(loadSettings().triggers).toMatchObject({ space, typing: space });
+  });
+  it("keeps independent pause and space settings after loading and sharing", () => {
+    storage.set("romaji-kana-settings", JSON.stringify({ triggers: { typing: false, space: true } }));
+    const loaded = loadSettings();
+    expect(loaded.triggers).toMatchObject({ typing: false, space: true });
+    expect(mergeSharedConversionSettings(defaultSettings, sharedConversionSettings(loaded)).triggers).toMatchObject({ typing: false, space: true });
+  });
   it("uses pause-based suggestions and discards the previous timing field", () => {
     expect(loadSettings().triggers.space).toBe(true);
     expect(loadSettings().inputPauseTiming).toBe("auto");

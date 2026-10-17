@@ -8,6 +8,7 @@ import {
   normalizeInputForPrompt,
   punctuationSuffixForGhostCommit,
   triggerFromCharacter,
+  shouldTriggerAutoConversion,
 } from "./conversion";
 import { defaultSettings } from "./settings";
 
@@ -205,9 +206,20 @@ describe("isTriggerEnabled", () => {
     expect(
       isTriggerEnabled("typing", {
         ...defaultSettings,
-        triggers: { ...defaultSettings.triggers, space: false },
+        triggers: { ...defaultSettings.triggers, typing: false },
       }),
     ).toBe(false);
+    expect(isTriggerEnabled("typing", { ...defaultSettings, triggers: { ...defaultSettings.triggers, typing: true, space: false } })).toBe(true);
+    expect(isTriggerEnabled("space", { ...defaultSettings, triggers: { ...defaultSettings.triggers, typing: false, space: true } })).toBe(true);
+  });
+});
+
+describe("automatic editing events", () => {
+  it.each(["input.paste", "input.drop", "input.type.compose", "undo", "redo", "document.open", "input.convert", undefined])("does not generate after %s", event => {
+    expect(shouldTriggerAutoConversion(event)).toBe(false);
+  });
+  it.each(["input.type", "delete.backward", "delete.selection", "input.delete"])("allows a pause preview after %s", event => {
+    expect(shouldTriggerAutoConversion(event)).toBe(true);
   });
 });
 

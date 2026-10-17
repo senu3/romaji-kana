@@ -824,6 +824,8 @@ export function useConversion({
   );
 
   const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
+    requestsRef.current.cancel(suggestion.id);
+    syncPending();
     if (suggestion.session) {
       suggestion.session.state = "accepted";
       suggestion.session.locked = true;
@@ -885,6 +887,8 @@ export function useConversion({
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
 
   const handleDismissGhost = useCallback((suggestion?: GhostConversionSuggestion) => {
+    if (suggestion) requestsRef.current.cancel(suggestion.id);
+    syncPending();
     const session = suggestion?.session ?? editorViewRef.current?.state.field(ghostSuggestionField).suggestion?.session;
     if (session) session.state = "dismissed";
     invalidatePredictiveSuggestions(false);

@@ -25,9 +25,16 @@ export function isTriggerEnabled(
     return true;
   }
   if (trigger === "typing") {
-    return settings.triggers.space;
+    return settings.triggers.typing ?? settings.triggers.space;
   }
   return settings.triggers[trigger];
+}
+
+/** Deletion can refresh a typing preview after a pause. Paste, history,
+ * document replacement and IME edits never launch generation on their own. */
+export function shouldTriggerAutoConversion(userEvent: string | undefined): boolean {
+  return Boolean(userEvent && !userEvent.includes("compose") &&
+    (userEvent.startsWith("input.type") || userEvent.startsWith("delete.") || userEvent.startsWith("input.delete")));
 }
 
 export function punctuationSuffixForGhostCommit(

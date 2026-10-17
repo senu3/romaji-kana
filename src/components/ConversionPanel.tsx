@@ -105,6 +105,7 @@ export function ConversionPanel({
   };
 
   const enabledTriggerCount = [
+    settings.triggers.typing ?? settings.triggers.space,
     settings.triggers.space,
     settings.triggers.period,
     settings.triggers.comma,
@@ -157,7 +158,7 @@ export function ConversionPanel({
 
         <AccordionSection
           title="変換タイミング"
-          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/4 条件` : "手動のみ"}
+          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/5 条件` : "手動のみ"}
           open={openAccordions.triggers}
           onToggle={() => toggleAccordion("triggers")}
         >
@@ -169,13 +170,13 @@ export function ConversionPanel({
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
               label="入力停止後に候補を生成"
-              checked={settings.triggers.space}
+              checked={settings.triggers.typing ?? settings.triggers.space}
               disabled={!settings.autoConvert}
-              onChange={(checked) => updateTriggers({ space: checked })}
+              onChange={(checked) => updateTriggers({ typing: checked })}
             />
             <div
               className={`mode-field compact-mode-field input-pause-field ${
-                settings.autoConvert && settings.triggers.space ? "" : "disabled"
+                settings.autoConvert && (settings.triggers.typing ?? settings.triggers.space) ? "" : "disabled"
               }`}
             >
               <span>入力停止の判定</span>
@@ -194,7 +195,7 @@ export function ConversionPanel({
                       name="input-pause-timing"
                       value={option}
                       checked={settings.inputPauseTiming === option}
-                      disabled={!settings.autoConvert || !settings.triggers.space}
+                      disabled={!settings.autoConvert || !(settings.triggers.typing ?? settings.triggers.space)}
                       onChange={() => update({ inputPauseTiming: option })}
                     />
                     <span>{INPUT_PAUSE_TIMING_LABELS[option]}</span>
@@ -203,6 +204,12 @@ export function ConversionPanel({
               </div>
               <small>{inputPauseTimingDescription(settings.inputPauseTiming)}</small>
             </div>
+            <CheckRow
+              label="Spaceで候補を生成"
+              checked={settings.triggers.space}
+              disabled={!settings.autoConvert}
+              onChange={(checked) => updateTriggers({ space: checked })}
+            />
             <CheckRow
               label="ピリオドで変換"
               checked={settings.triggers.period}

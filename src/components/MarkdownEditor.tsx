@@ -50,6 +50,7 @@ import {
   isTriggerEnabled,
   punctuationSuffixForGhostCommit,
   triggerFromCharacter,
+  shouldTriggerAutoConversion,
 } from "../lib/conversion";
 import {
   inputPauseDurationMs,
@@ -602,18 +603,18 @@ export function MarkdownEditor({
     reason: PredictiveRequestReason,
   ) {
     clearPredictiveSuggestionTimer();
+    const trigger: Extract<ConversionTrigger, "typing" | "space"> =
+      reason === "space" ? "space" : "typing";
     if (
       composingRef.current ||
       !settingsRef.current.autoConvert ||
-      !settingsRef.current.triggers.space ||
+      !isTriggerEnabled(trigger, settingsRef.current) ||
       !view.state.selection.main.empty
     ) {
       return;
     }
 
     const cursor = view.state.selection.main.head;
-    const trigger: Extract<ConversionTrigger, "typing" | "space"> =
-      reason === "space" ? "space" : "typing";
     const range = retainedConversionRange(view.state, cursor, trigger);
     if (!range) {
       return false;
@@ -640,7 +641,7 @@ export function MarkdownEditor({
     if (
       composingRef.current ||
       !settingsRef.current.autoConvert ||
-      !settingsRef.current.triggers.space
+      !isTriggerEnabled("typing", settingsRef.current)
     ) {
       resetPredictiveSuggestionCadence();
       return;
@@ -687,7 +688,8 @@ export function MarkdownEditor({
         resetPredictiveSuggestionCadence();
         return;
       }
-      if (shouldSuppressAutoTriggerForUserEvent(userEvent)) {
+      if (composingRef.current || Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS ||
+          shouldSuppressAutoTriggerForUserEvent(userEvent) || !shouldTriggerAutoConversion(userEvent)) {
         resetPredictiveSuggestionCadence();
         return;
       }
@@ -698,8 +700,10 @@ export function MarkdownEditor({
       }
 
       recordTypingSpeed(update, userEvent);
-      if (userEvent?.startsWith("input.delete")) {
+      if (userEvent?.startsWith("input.delete") || userEvent?.startsWith("delete.")) {
         lastPredictiveRequestRef.current = null;
+        schedulePredictiveSuggestion(update.view);
+        return;
       }
 
       const cursor = update.state.selection.main.head;
@@ -757,13 +761,14 @@ export function MarkdownEditor({
   ]);
 
   useEffect(() => {
-    if (!settings.autoConvert || !settings.triggers.space) {
+    if (!settings.autoConvert || !isTriggerEnabled("typing", settings)) {
       resetPredictiveSuggestionCadence();
     }
   }, [
     settings.autoConvert,
     settings.inputPauseTiming,
     settings.triggers.space,
+    settings.triggers.typing,
   ]);
 
   useEffect(() => {
@@ -952,6 +957,7 @@ export function MarkdownEditor({
   }
 
   function runManualConversion(view: EditorView) {
+    if (composingRef.current || Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS) return false;
     const range = extractManualConversionRange(view, "shortcut");
     if (range) {
       if (view.state.selection.main.empty) {

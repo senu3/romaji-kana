@@ -27,6 +27,7 @@ export interface AppSettings {
   conversionMode: "replace" | "ghost";
   conversionEngine?: "local" | "llm";
   triggers: {
+    typing?: boolean;
     space: boolean;
     period: boolean;
     comma: boolean;
