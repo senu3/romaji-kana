@@ -168,7 +168,9 @@ class GhostTextWidget extends WidgetType {
         .map((addition) => `「${addition}」`)
         .join("・");
       const remainingCount = (this.candidate.inputCompletionAdditions ?? []).length - visibleAdditions.length;
-      diff.textContent = `${explicitAcceptance ? "補完候補（読み未確認）" : "補完"} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
+      const diffLabel = this.candidate.changes?.readingAssessment?.status !== "verified" ? "補完候補（読み未確認）"
+        : this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified" ? "補完候補（区切り未確認）" : "補完";
+      diff.textContent = `${diffLabel} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
       diff.setAttribute(
         "aria-label",
         `${explicitAcceptance ? "モデル申告の追加候補" : "入力補完で追加"}: ${(this.candidate.inputCompletionAdditions ?? []).join("、")}`,
@@ -191,6 +193,11 @@ class GhostTextWidget extends WidgetType {
     after.textContent = "候補: ";
     after.append(suggestion);
     comparison.append(after);
+    if (this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified") {
+      const note = document.createElement("span");
+      note.textContent = "単語の区切り未確認。語の補完として確定せず、Tabで採用する候補として表示しています。";
+      comparison.append(note);
+    }
     if (this.candidate.changes?.readingAssessment?.status !== "verified") {
       const note = document.createElement("span");
       note.textContent = "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";

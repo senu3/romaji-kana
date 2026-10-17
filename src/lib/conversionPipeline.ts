@@ -63,6 +63,7 @@ function protectedRejection(result: JapaneseConversionResult): JapaneseConversio
 }
 
 interface ConvertedSegment {
+  boundaryUnverified?: boolean;
   wordCompletion?: boolean;
   text: string;
   sourceReading: string;
@@ -169,7 +170,8 @@ export async function convertInputOnce(
         readingAssessment: assessReading(suggestion.convertedText, suggestion.completedKana, true, options.readingVerifier),
         knownRepair: originalKana !== (suggestion.correctedKana ?? repaired.kana),
         modelReading: true,
-        wordCompletion: route.kind === "word" && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana),
+        wordCompletion: route.kind === "word" && !suggestion.boundaryUnverified && suggestion.completedKana !== (suggestion.correctedKana ?? repaired.kana),
+        boundaryUnverified: suggestion.boundaryUnverified,
       });
       continue;
     }
@@ -237,6 +239,10 @@ function assembleConversionResult(segments: ConvertedSegment[], previousCorrecte
     ),
   };
   result.changes!.readingAssessment = combineReadingAssessments(segments.map(segment => segment.readingAssessment));
+  if (segments.some(segment => segment.boundaryUnverified)) {
+    result.changes!.wordBoundary = "unverified";
+    if (result.changes?.kind === "completion") result.changes.additionKind = "unverified";
+  }
   if (result.changes?.kind === "completion" && segments[segments.length - 1]?.wordCompletion &&
       segments.slice(0, -1).every(segment => segment.finalReading !== undefined && faithfulConversionRule.sameReading(segment.preparedReading, segment.finalReading))) {
     result.changes.additionKind = "word";

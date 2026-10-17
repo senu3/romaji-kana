@@ -10,8 +10,31 @@ export interface WordCompletionBoundary {
  * is deliberately separate: a character guard cannot prove intended meaning. */
 export const wordCompletionRule = {
   maximumAddedKana: 12,
+  startedEndings: [
+    ["ま", "ます"], ["ませ", "ません"], ["まし", "ました"],
+    ["で", "です"], ["でし", "でした"], ["な", "ない"], ["なかっ", "なかった"],
+  ] as const,
+  completesStartedEnding(source: string, candidate: string): boolean {
+    return this.startedEndings.some(([prefix, ending]) => source.endsWith(prefix) &&
+      /^[\p{Script=Hiragana}ー]+$/u.test(source.slice(0, -prefix.length)) &&
+      candidate === source.slice(0, -prefix.length) + ending);
+  },
+  boundaryStatus(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): "confirmed" | "unverified" | "rejected" {
+    if (boundary && (!convertedText || !this.matchesDeclaredWord(source, candidate, convertedText, boundary))) return "rejected";
+    if (this.staysInFinalWord(source, candidate, convertedText, boundary)) return "confirmed";
+    if (boundary || !source || !candidate.startsWith(source)) return "rejected";
+    const suffix = candidate.slice(source.length);
+    if (!/^[\p{Script=Hiragana}ー]+$/u.test(suffix)) return "rejected";
+    // New politeness/tense/negation is not an ambiguous lexical completion.
+    if (this.startedEndings.some(([prefix, ending]) => candidate.endsWith(ending) && !source.endsWith(prefix)) ||
+        /^(?:します|しました|しません|する|ください|こと|ため|よう)/u.test(suffix)) return "rejected";
+    if (typeof Intl.Segmenter !== "function") return "unverified";
+    const addedWords = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(suffix)].filter(segment => segment.isWordLike);
+    return addedWords.length > 1 ? "rejected" : "unverified";
+  },
   staysInFinalWord(source: string, candidate: string, convertedText?: string, boundary?: WordCompletionBoundary): boolean {
     if (source === candidate) return true;
+    if (this.completesStartedEnding(source, candidate)) return true;
     if (!candidate.startsWith(source) || typeof Intl.Segmenter !== "function") return false;
     const words = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(candidate)]
       .filter(segment => segment.isWordLike);
@@ -28,6 +51,7 @@ export const wordCompletionRule = {
         candidate !== source.slice(0, -boundary.sourceKana.length) + boundary.completedKana ||
         !convertedText.endsWith(boundary.convertedText)) return false;
     if (source === candidate) return true; // No addition needs boundary proof.
+    if (this.completesStartedEnding(source, candidate)) return true;
     if (typeof Intl.Segmenter !== "function") return false;
     const surfaceWords = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(boundary.convertedText)];
     const finalSurfaceWord = [...new Intl.Segmenter("ja", { granularity: "word" }).segment(convertedText)].filter(segment => segment.isWordLike).pop();
@@ -40,10 +64,11 @@ export const wordCompletionRule = {
   },
   guidance: [
     "Complete only an unfinished final Japanese word.",
-    "Do not add particles, predicates, politeness, or a new phrase.",
+    "Do not add new particles, predicates, politeness, tense, negation, intent, or a new phrase. You may finish an inflectional ending the user already started.",
   ],
   prompt(): string[] {
     return [this.guidance[0], `Append at most ${this.maximumAddedKana} kana immediately before terminal punctuation.`, this.guidance[1],
+      `Allowed already-started endings (with a preceding stem): ${this.startedEndings.map(([prefix, ending]) => `${prefix} → ${ending}`).join("; ")}. Do not infer a negative or past ending from a shorter ambiguous prefix.`,
       "The entire appended suffix must stay inside the final Japanese word already started in correctedKana. New word boundaries are rejected by Japanese word segmentation. If the boundary is unclear, leave correctedKana unchanged.",
       'When completing a word, also return wordCompletion: {"sourceKana":"かくに","completedKana":"かくにん","convertedText":"確認"}. These fields describe ONLY the final word, without terminal punctuation or preceding words. sourceKana must be a nonempty suffix of correctedKana; completedKana must retain it as a prefix; convertedText must be the final single word of the output. Do not declare a phrase as a word.'];
   },

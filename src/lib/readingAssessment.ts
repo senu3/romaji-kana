@@ -38,9 +38,9 @@ export function combineReadingAssessments(assessments: readonly ReadingAssessmen
 }
 
 export function requiresExplicitAcceptance(candidate: {
-  changes?: { readingAssessment?: ReadingAssessment; wordBoundary?: "unverified" };
+  changes?: { readingAssessment?: ReadingAssessment; wordBoundary?: "unverified"; additionKind?: "word" | "phrase" | "unverified" };
   conversionStrategy?: string;
 }): boolean {
-  return candidate.conversionStrategy === "speculative" || candidate.changes?.wordBoundary === "unverified" ||
+  return candidate.conversionStrategy === "speculative" || candidate.changes?.wordBoundary === "unverified" || candidate.changes?.additionKind === "unverified" ||
     candidate.changes?.readingAssessment?.status !== "verified";
 }

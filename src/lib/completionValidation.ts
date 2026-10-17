@@ -18,6 +18,8 @@ const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 export interface StructuredSuggestionConversion {
+  /** Application assessment, never parsed from the model's declaration. */
+  boundaryUnverified?: boolean;
   wordCompletion?: WordCompletionBoundary;
   correctedKana?: string;
   completedKana: string;
@@ -31,6 +33,7 @@ export function isAllowedInputCompletion(
   level: Exclude<InputCompletionLevel, "none">,
   wordBoundary?: WordCompletionBoundary,
   convertedText?: string,
+  allowUnverifiedBoundary = false,
 ): boolean {
   const normalizedSource = source.trim();
   const normalizedCandidate = candidate.trim();
@@ -50,11 +53,10 @@ export function isAllowedInputCompletion(
   const candidateCharacters = comparableReadingCharacters(candidateParts.body);
   if (level === "word") {
     const convertedBody = convertedText === undefined ? undefined : splitTerminalPunctuation(convertedText).body;
+    const status = wordCompletionRule.boundaryStatus(sourceParts.body, candidateParts.body, convertedBody, wordBoundary);
     return (
       candidateParts.body.startsWith(sourceParts.body) &&
-      (!wordBoundary || (convertedBody !== undefined && wordCompletionRule.matchesDeclaredWord(sourceParts.body, candidateParts.body, convertedBody, wordBoundary))) &&
-      wordCompletionRule.staysInFinalWord(sourceParts.body, candidateParts.body,
-        convertedBody, wordBoundary) &&
+      (status === "confirmed" || allowUnverifiedBoundary && status === "unverified") &&
       candidateCharacters.length >= sourceCharacters.length &&
       candidateCharacters.length <= sourceCharacters.length + MAX_WORD_COMPLETION_KANA
     );
@@ -200,13 +202,14 @@ export function isAllowedStructuredSuggestion(
   candidate: StructuredSuggestionConversion,
   level: Exclude<InputCompletionLevel, "none">,
   options: JapaneseConversionOptions,
+  allowUnverifiedBoundary = false,
 ): boolean {
   if (!finalReadingRule.accepts(candidate, "suggestion")) {
     return false;
   }
   const correctedKana = candidate.correctedKana ?? mechanicalKana;
   if (!isAllowedLocalKanaCorrection(mechanicalKana, correctedKana) ||
-      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level, candidate.wordCompletion, candidate.convertedText)) {
+      !isAllowedInputCompletion(correctedKana, candidate.completedKana, level, candidate.wordCompletion, candidate.convertedText, allowUnverifiedBoundary)) {
     return false;
   }
 

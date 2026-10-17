@@ -675,6 +675,16 @@ try {
     return line?.textContent === "明日の予定をお願い。";
   });
   assert.equal(await editorText(page), "明日の予定をお願い。");
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("kakuni.");
+  assert.equal(await editorText(page), "kakuni.");
+  await completionGhost.filter({ hasText: "かくにん。" }).waitFor({ timeout: 5_000 }).catch(async error => {
+    throw new Error(`${error.message}; document=${await editorText(page)}; prompts=${JSON.stringify(conversionPrompts.slice(-2))}; status=${await page.locator(".status-bar").textContent()}`);
+  });
+  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完候補（区切り未確認）" }).waitFor();
+  await page.keyboard.press(".");
+  assert.equal(await editorText(page), "kakuni..", "An uncertain word boundary must not be implicitly accepted by punctuation.");
   await page.getByRole("button", { name: "変換を開く", exact: true }).click();
   await page.getByLabel("なし", { exact: true }).check({ force: true });
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
@@ -905,6 +915,9 @@ function conversionResponseForPrompt(prompt, system = "") {
     return JSON.stringify({ completedKana: "ありがとう。", convertedText: system.includes("- 有難う。") ? "有り難う。" : "有難う。" });
   }
   if (system.includes("one Japanese writing suggestion")) {
+    if (prompt?.includes("Prepared kana (correction/completion target):\nかくに。")) {
+      return JSON.stringify({ completedKana: "かくにん。", convertedText: "かくにん。" });
+    }
     if (prompt?.includes("Mechanical kana:\nあしたのよっていをおねが。")) {
       return JSON.stringify({ correctedKana: "あしたのよていをおねが。", convertedText: "明日の予定をお願い。", completedKana: "あしたのよていをおねがい。", additions: ["い"] });
     }

@@ -54,11 +54,15 @@ export async function generateStructuredSuggestion(
 
   const candidate = parseStructuredSuggestion(generatedText(result));
   const { preparedReading, completionSeed } = request.target;
-  if (!candidate || !isAllowedStructuredSuggestion(preparedReading, candidate, level, options)) {
+  if (!candidate) return null;
+  const confirmedBoundary = isAllowedStructuredSuggestion(preparedReading, candidate, level, options);
+  const provisionalBoundary = !confirmedBoundary && level === "word" && isAllowedStructuredSuggestion(preparedReading, candidate, level, options, true);
+  if (!confirmedBoundary && !provisionalBoundary) {
     return null;
   }
   return {
     ...candidate,
+    ...(provisionalBoundary ? { boundaryUnverified: true } : {}),
     additions: reportedSuggestionAdditions(
       candidate.correctedKana ?? preparedReading,
       candidate.correctedKana && candidate.correctedKana !== preparedReading
