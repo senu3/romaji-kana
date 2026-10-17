@@ -15,7 +15,8 @@ export const finalConversionOutputContract = [
   finalReadingRule.controlPrompt("final"),
 ].join("\n");
 
-export const defaultConversionPrompt = [
+/** Migration fingerprint only. Never send this retired policy as a preference. */
+export const legacyDefaultConversionPrompt = [
   "You are an advanced Japanese kana-to-kanji conversion engine.",
   "",
   "The input string is Japanese kana text produced from romaji typing.",
@@ -31,6 +32,16 @@ export const defaultConversionPrompt = [
   "5. Do not explain. Output only the converted Japanese text.",
   "6. When part of the input is difficult to convert, keep the closest readable form instead of inventing missing meaning.",
 ].join("\n");
+
+export const defaultConversionPrompt = legacyDefaultConversionPrompt
+  .replace("3. Keep hiragana when kanji conversion is uncertain.", "3. If no plausible conversion exists, report no candidate. Never return mechanical kana as a fallback.")
+  .replace("5. Do not explain. Output only the converted Japanese text.", "5. Do not explain. Follow the application's response format.")
+  .replace("6. When part of the input is difficult to convert, keep the closest readable form instead of inventing missing meaning.", "6. Never invent missing meaning. Preserve natural dictionary-backed hiragana spellings, but do not use kana passthrough to hide conversion failure.");
+
+function additionalConversionPreference(value: string): string {
+  const text = value.trim();
+  return text && text !== defaultConversionPrompt && text !== legacyDefaultConversionPrompt ? text : "None.";
+}
 
 function renderConversionExamples(examples: Array<{ input: string; convertedText: string; completedKana: string }>): string {
   return examples.map(({ input, convertedText, completedKana }) => [
@@ -138,7 +149,7 @@ export function buildInputCompletionSystemPrompt(
     "Never delete, replace, reorder, or reinterpret existing content.",
     "Never invent facts or resolve an ambiguity by adding new meaning.",
     ...levelRules,
-    "If no safe completion is clear, return the mechanical kana unchanged.",
+    "If no safe completion is clear, report no candidate. Never return the mechanical kana as a fallback.",
   ].join("\n");
 }
 
@@ -148,11 +159,7 @@ export function buildSuggestionConversionSystemPrompt(
   avoidOutputs: string[] = [],
   documentVocabulary: string[] = [],
 ): string {
-  const additionalPreference = userPrompt.trim();
-  const effectivePreference =
-    additionalPreference && additionalPreference !== defaultConversionPrompt
-      ? additionalPreference
-      : "None.";
+  const effectivePreference = additionalConversionPreference(userPrompt);
   const levelRules =
     level === "word"
       ? wordCompletionRule.prompt()
@@ -181,7 +188,7 @@ export function buildSuggestionConversionSystemPrompt(
     convertedTextLengthRule.prompt("completedKana"),
     protectedContentPrompt,
     "convertedText must express the same suggestion declared by completedKana and additions.",
-    "Use common kanji when natural. Keep hiragana when uncertain.",
+    "Use conventional natural Japanese spelling. If conversion is unavailable, report no candidate rather than echoing the mechanical kana.",
     level === "word"
       ? "Do not paraphrase the existing word. Do not explain or return Markdown fences."
       : "A nearby natural re-expression is allowed, but do not change the central intent. Do not explain or return Markdown fences.",
@@ -218,7 +225,7 @@ export function buildKanaKanjiSystemPrompt(
   completionMode = false,
   documentVocabulary: string[] = [],
 ): string {
-  const prompt = userPrompt.trim() && userPrompt.trim() !== defaultConversionPrompt ? userPrompt.trim() : "None.";
+  const prompt = additionalConversionPreference(userPrompt);
   const alternativeInstructions = formatAlternativeConversionInstructions(
     avoidOutputs,
     strictAlternative,
@@ -261,9 +268,7 @@ export function buildSpeculativeConversionSystemPrompt(
   avoidOutputs: string[] = [],
   documentVocabulary: string[] = [],
 ): string {
-  const prompt = userPrompt.trim() === defaultConversionPrompt
-    ? "None."
-    : userPrompt.trim() || "None.";
+  const prompt = additionalConversionPreference(userPrompt);
   const uniqueAvoidOutputs = Array.from(
     new Set(avoidOutputs.map((output) => output.trim()).filter(Boolean)),
   );

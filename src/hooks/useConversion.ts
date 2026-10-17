@@ -304,9 +304,9 @@ export function useConversion({
           view.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
           skipQueuedConversion(
             request,
-          conversion.suggestionRejectedReason === "unconvertible"
-            ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
-            : conversion.suggestionRejectedReason === "speculative"
+            conversion.suggestionRejectedReason === "unconvertible"
+              ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
+              : conversion.suggestionRejectedReason === "speculative"
               ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
               : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。",
           );
@@ -892,10 +892,10 @@ export function useConversion({
       kind: "success",
       message: suggestion.conversionStrategy === "speculative"
         ? "推測候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
-        : suggestion.inputCompletionApplied
-          ? "入力補完候補を確定しました。"
-          : suggestion.conversionStrategy === "completion"
-            ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+        : suggestion.conversionStrategy === "completion"
+          ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+          : suggestion.inputCompletionApplied
+            ? "入力補完候補を確定しました。"
             : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
     });
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);

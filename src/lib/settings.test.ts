@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
 import {
   defaultSettings,
   loadSettings,
@@ -17,6 +18,13 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
+  it("migrates the retired kana-fallback default without changing a custom prompt", () => {
+    storage.set("romaji-kana-settings", JSON.stringify({ conversionPrompt: legacyDefaultConversionPrompt }));
+    expect(loadSettings().conversionPrompt).toBe(defaultConversionPrompt);
+    expect(loadSettings().conversionPrompt).not.toContain("Keep hiragana when kanji conversion is uncertain");
+    storage.set("romaji-kana-settings", JSON.stringify({ conversionPrompt: "丁寧な表記を選ぶ" }));
+    expect(loadSettings().conversionPrompt).toBe("丁寧な表記を選ぶ");
+  });
   it.each([true, false])("migrates the old shared space switch to both triggers: %s", space => {
     storage.set("romaji-kana-settings", JSON.stringify({ triggers: { space } }));
     expect(loadSettings().triggers).toMatchObject({ space, typing: space });

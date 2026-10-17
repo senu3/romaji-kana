@@ -1,4 +1,4 @@
-import { defaultConversionPrompt } from "./prompts";
+import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
 import type {
   AppSettings,
   InputPauseTiming,
@@ -81,6 +81,7 @@ export function mergeSharedConversionSettings(
   return {
     ...settings,
     ...shared,
+    conversionPrompt: shared.conversionPrompt === legacyDefaultConversionPrompt ? defaultConversionPrompt : shared.conversionPrompt,
     triggers: { ...shared.triggers, typing: shared.triggers.typing ?? shared.triggers.space },
     punctuationConversion: { ...shared.punctuationConversion },
     userDictionary: [...shared.userDictionary],
@@ -106,7 +107,8 @@ function mergeSettings(settings: LegacySettings): AppSettings {
   void userHomophones;
   void conversionPreset;
   void predictiveSuggestionTiming;
-  const conversionPrompt = settings.conversionPrompt || defaultConversionPrompt;
+  const conversionPrompt = settings.conversionPrompt === legacyDefaultConversionPrompt
+    ? defaultConversionPrompt : settings.conversionPrompt || defaultConversionPrompt;
   const think = settings.think ?? thinkingMode === "on";
 
   return {
