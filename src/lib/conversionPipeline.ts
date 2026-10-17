@@ -2,7 +2,6 @@ import {
   knownWordCompletionSeed,
   preservesProtectedAsciiTokens,
 } from "./completionValidation";
-import { normalizeInputForPrompt } from "./conversion";
 import { classifyConversionChanges, type ConversionChanges } from "./conversionChanges";
 import {
   hasConvertibleRomaji,
@@ -24,25 +23,10 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import type { OllamaTransport } from "./ollamaProxy";
 import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
-import { preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
+import { preservesProtectedContent } from "./conversionProtection";
+import { prepareConversionRequest } from "./conversionRequest";
 import { faithfulConversionRule } from "./conversionRules";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
-
-function conversionParts(input: string, settings: AppSettings, options: JapaneseConversionOptions) {
-  return splitInputForConversion(normalizeInputForPrompt(input, settings), [
-    ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
-  ]);
-}
-
-function sourceProtection(parts: ReturnType<typeof splitInputForConversion>): ConversionProtection {
-  const literalTerms = parts.flatMap(part => part.type === "text" ? [] : [part.output]);
-  const source = parts.map(part => part.type !== "text" ? part.output
-    : romajiToKana(part.value).tokens.map(token =>
-      // Unknown romaji is repairable input, not an explicitly protected name.
-      token.kind === "unknown" && /^[A-Za-z]$/u.test(token.kana) ? " " : token.kana,
-    ).join("")).join("");
-  return { source, literalTerms };
-}
 
 /** Reuse the prior reading without asking the model to repair/complete again.
  * Literal anchors retain their original boundaries and never enter generation. */
@@ -114,8 +98,8 @@ export async function convertInputOnce(
   options: JapaneseConversionOptions,
 ): Promise<JapaneseConversionResult> {
   throwIfConversionAborted(options.signal);
-  const parts = conversionParts(input, settings, options);
-  const protection = sourceProtection(parts);
+  const { parts, protection, documentVocabulary } = prepareConversionRequest(input, settings, options);
+  options = { ...options, documentVocabulary };
   const isAlternative = selectSegmentRoute("none", options).kind === "alternative";
   const alternateReadings = isAlternative && options.alternativeReading !== undefined
     ? alternativeReadingParts(parts, options.alternativeReading) : undefined;
@@ -154,11 +138,11 @@ export async function convertInputOnce(
         ? knownWordCompletionSeed(repaired.kana)
         : repaired.kana;
       const suggestion = await generateStructuredSuggestion(
-        part.value,
-        repaired.kana,
-        completionSeed,
+        {
+          target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana, completionSeed },
+          reference: { beforeTarget: segments.map(segment => segment.preparedReading).join(""), documentVocabulary },
+        },
         route.kind,
-        segments.map(segment => segment.preparedReading).join(""),
         settings,
         transport,
         options,

@@ -54,7 +54,8 @@ describe("local correction before completion", () => {
     expect(result.changes).toMatchObject({ kind: "correction", sourceReading: "あなたはよくわるjひよだ", correctedReading: "あなたはよくわるじひよだ" });
     expect(generate).toHaveBeenCalledTimes(2);
     expect(generate.mock.calls[0][2].system).toContain("uncertain kana fragment");
-    expect(generate.mock.calls[1][2].prompt).toContain("Mechanical kana:\nあなたはよくわるじひよだ");
+    expect(generate.mock.calls[1][2].prompt).toContain("Mechanical kana:\nあなたはよくわるjひよだ");
+    expect(generate.mock.calls[1][2].prompt).toContain("Prepared kana (correction/completion target):\nあなたはよくわるじひよだ");
   });
   it("rejects rewrites disguised as correction and completion that deletes the corrected prefix", async () => {
     for (const candidate of [response("きょうのかいぎ。"), response("あしたのよてい。", "あしたのよて。")]) {

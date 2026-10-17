@@ -21,13 +21,11 @@ import { rebuildRomajiKanaResult } from "./romajiKana";
 import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 import { selectSegmentRoute } from "./conversionPolicy";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
+import { suggestionTargetPrompt, type SuggestionRequest } from "./conversionRequest";
 
 export async function generateStructuredSuggestion(
-  originalRomaji: string,
-  mechanicalKana: string,
-  completionSeed: string,
+  request: SuggestionRequest,
   level: Exclude<InputCompletionLevel, "none">,
-  contextBefore: string,
   settings: AppSettings,
   transport: OllamaTransport,
   options: JapaneseConversionOptions,
@@ -41,21 +39,9 @@ export async function generateStructuredSuggestion(
         level,
         settings.conversionPrompt,
         options.avoidOutputs,
-        options.documentVocabulary,
+        request.reference.documentVocabulary?.slice(),
       ),
-      prompt: [
-        "Read-only context before the target:",
-        contextBefore.trim() || "(none)",
-        "",
-        "Original romaji input:",
-        originalRomaji,
-        "",
-        "Mechanical kana:",
-        mechanicalKana,
-        "",
-        "Application completion seed:",
-        completionSeed,
-      ].join("\n"),
+      prompt: suggestionTargetPrompt(request),
       stream: false,
       think: settings.think,
       options: {
@@ -67,14 +53,15 @@ export async function generateStructuredSuggestion(
   ), options.signal);
 
   const candidate = parseStructuredSuggestion(generatedText(result));
-  if (!candidate || !isAllowedStructuredSuggestion(mechanicalKana, candidate, level, options)) {
+  const { preparedReading, completionSeed } = request.target;
+  if (!candidate || !isAllowedStructuredSuggestion(preparedReading, candidate, level, options)) {
     return null;
   }
   return {
     ...candidate,
     additions: reportedSuggestionAdditions(
-      candidate.correctedKana ?? mechanicalKana,
-      candidate.correctedKana && candidate.correctedKana !== mechanicalKana
+      candidate.correctedKana ?? preparedReading,
+      candidate.correctedKana && candidate.correctedKana !== preparedReading
         ? candidate.correctedKana : completionSeed,
       candidate,
       level,
