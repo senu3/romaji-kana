@@ -54,10 +54,11 @@ describe("model transport routing", () => {
 
   it.each(["ollama", "lmstudio"] as const)("routes remote %s requests through the paired PC", async (provider) => {
     vi.mocked(isRemoteCompanionClient).mockReturnValue(true);
+    const controller = new AbortController();
     await defaultOllamaTransport.models(provider, "http://localhost:1234", 12000);
-    await defaultOllamaTransport.generate(provider, "http://localhost:1234", body, 30000);
+    await defaultOllamaTransport.generate(provider, "http://localhost:1234", body, 30000, controller.signal);
     expect(remoteModelRequest).toHaveBeenNthCalledWith(1, "models", null, 12000);
-    expect(remoteModelRequest).toHaveBeenNthCalledWith(2, "generate", expect.objectContaining({ model: body.model, stream: false }), 30000);
+    expect(remoteModelRequest).toHaveBeenNthCalledWith(2, "generate", expect.objectContaining({ model: body.model, stream: false }), 30000, controller.signal);
     expect(invoke).not.toHaveBeenCalled();
   });
 });

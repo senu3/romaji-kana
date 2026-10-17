@@ -80,9 +80,8 @@ try {
   await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
   assert.equal(await ghost.count(), 0, 'Canceled local candidates must disappear immediately');
   await page.getByRole('button', { name: '履歴 を閉じる', exact: true }).click();
-  const rankingResponse = page.waitForResponse(response => response.url().endsWith('/api/generate'));
   release();
-  await rankingResponse;
+  // Browser cancellation may abort the request instead of delivering a response.
   await page.waitForTimeout(150);
   assert.equal(await ghost.count(), 0, 'Late ranking must not restore a canceled candidate');
   await editor.focus();

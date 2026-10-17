@@ -78,6 +78,7 @@ export interface OllamaTransport {
     baseUrl: string,
     body: LocalGenerateBody,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<LocalGenerateResponse>;
 }
 
@@ -117,12 +118,12 @@ export const defaultOllamaTransport: OllamaTransport = {
     );
   },
 
-  async generate(provider, baseUrl, body, timeoutMs) {
+  async generate(provider, baseUrl, body, timeoutMs, signal) {
     if (provider === "lmstudio") {
-      return generateLmStudioChat(baseUrl, body, timeoutMs);
+      return generateLmStudioChat(baseUrl, body, timeoutMs, signal);
     }
 
-    return generateOllama(baseUrl, body, timeoutMs);
+    return generateOllama(baseUrl, body, timeoutMs, signal);
   },
 };
 
@@ -145,9 +146,10 @@ async function generateOllama(
   baseUrl: string,
   body: LocalGenerateBody,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<OllamaGenerateResponse> {
   try {
-    return await requestOllamaGenerate(baseUrl, toOllamaGenerateBody(body), timeoutMs);
+    return await requestOllamaGenerate(baseUrl, toOllamaGenerateBody(body), timeoutMs, signal);
   } catch (error) {
     if (!body.think || !isReasoningOptionError(error)) {
       throw error;
@@ -157,6 +159,7 @@ async function generateOllama(
       baseUrl,
       toOllamaGenerateBody({ ...body, think: false }),
       timeoutMs,
+      signal,
     );
   }
 }
@@ -165,9 +168,10 @@ async function requestOllamaGenerate(
   baseUrl: string,
   body: Record<string, unknown>,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<OllamaGenerateResponse> {
   if (isRemoteCompanionClient()) {
-    return remoteModelRequest<OllamaGenerateResponse>("generate", body, timeoutMs);
+    return remoteModelRequest<OllamaGenerateResponse>("generate", body, timeoutMs, signal);
   }
   if (isTauri()) {
     return invoke<OllamaGenerateResponse>("ollama_generate", {
@@ -179,6 +183,7 @@ async function requestOllamaGenerate(
     normalizeOllamaBaseUrl(baseUrl),
     "generate",
     {
+      signal,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -226,16 +231,17 @@ async function generateLmStudioChat(
   baseUrl: string,
   body: LocalGenerateBody,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<LmStudioChatResponse> {
   try {
-    return await requestLmStudioChat(baseUrl, toLmStudioChatBody(body), timeoutMs);
+    return await requestLmStudioChat(baseUrl, toLmStudioChatBody(body), timeoutMs, signal);
   } catch (error) {
     if (!isReasoningOptionError(error)) {
       throw error;
     }
 
     if (!body.think) {
-      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs);
+      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs, signal);
     }
 
     try {
@@ -243,13 +249,14 @@ async function generateLmStudioChat(
         baseUrl,
         toLmStudioChatBody({ ...body, think: false }),
         timeoutMs,
+        signal,
       );
     } catch (retryError) {
       if (!isReasoningOptionError(retryError)) {
         throw retryError;
       }
 
-      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs);
+      return requestLmStudioChat(baseUrl, toLmStudioChatBody(body, false), timeoutMs, signal);
     }
   }
 }
@@ -258,9 +265,10 @@ async function requestLmStudioChat(
   baseUrl: string,
   body: Record<string, unknown>,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<LmStudioChatResponse> {
   if (isRemoteCompanionClient()) {
-    return remoteModelRequest<LmStudioChatResponse>("generate", body, timeoutMs);
+    return remoteModelRequest<LmStudioChatResponse>("generate", body, timeoutMs, signal);
   }
   if (isTauri()) {
     return invoke<LmStudioChatResponse>("lmstudio_chat_completions", {
@@ -272,6 +280,7 @@ async function requestLmStudioChat(
     normalizeLmStudioBaseUrl(baseUrl),
     "chat/completions",
     {
+      signal,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -303,7 +312,10 @@ async function fetchLocalJson<T>(
   providerLabel: string,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort();
+  init.signal?.addEventListener("abort", abort, { once: true });
+  if (init.signal?.aborted) controller.abort();
+  const timeout = globalThis.setTimeout(abort, timeoutMs);
 
   try {
     const response = await fetch(`${normalizedBaseUrl}/${path}`, {
@@ -319,5 +331,6 @@ async function fetchLocalJson<T>(
     return (await response.json()) as T;
   } finally {
     globalThis.clearTimeout(timeout);
+    init.signal?.removeEventListener("abort", abort);
   }
 }

@@ -18,6 +18,30 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
+  it("returns dictionary candidates before ranking and publishes the ranked result separately", async () => {
+    const h = harness();
+    let run!: () => Promise<void>;
+    const onRankedCandidates = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
+      kanaEngine: h.engine, deferRanking: task => { run = task; }, onRankedCandidates,
+    });
+    expect(result.text).toBe("記者");
+    expect(result.session?.rerankStatus).toBe("pending");
+    expect(h.generate).not.toHaveBeenCalled();
+    await run();
+    expect(onRankedCandidates.mock.calls[0][0].text).toBe("汽車");
+  });
+  it.each(["accepted", "dismissed", "locked"] as const)("skips queued ranking after %s", async state => {
+    const h = harness();
+    let run!: () => Promise<void>;
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
+      kanaEngine: h.engine, deferRanking: task => { run = task; },
+    });
+    if (state === "locked") result.session!.locked = true;
+    else result.session!.state = state;
+    await run();
+    expect(h.generate).not.toHaveBeenCalled();
+  });
   it("uses the configured local engine through the public API without a UI-specific injection", async () => {
     const h = harness();
     const spy = vi.spyOn(defaultKanaEngine, "search").mockImplementation(h.search);

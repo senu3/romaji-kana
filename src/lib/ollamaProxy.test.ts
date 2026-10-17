@@ -2,6 +2,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultOllamaTransport } from "./ollamaProxy";
 
 describe("defaultOllamaTransport", () => {
+  it.each(["ollama", "lmstudio"] as const)("aborts the %s browser request with its owning conversion", async provider => {
+    const controller = new AbortController();
+    let fetchSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url, init) => {
+      fetchSignal = init.signal;
+      return new Promise((_resolve, reject) => fetchSignal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))));
+    }));
+    const request = defaultOllamaTransport.generate(provider, "http://localhost:1234", {
+      model: "local", system: "rank", prompt: "candidates", stream: false, think: false,
+    }, 1000, controller.signal);
+    controller.abort();
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchSignal?.aborted).toBe(true);
+  });
   it.each(["ollama", "lmstudio"] as const)("preserves the ranking schema in the %s wire format", async provider => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ response: "{}" }) });
     vi.stubGlobal("fetch", fetchMock);

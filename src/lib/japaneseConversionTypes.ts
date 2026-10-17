@@ -24,6 +24,9 @@ export interface JapaneseConversionOptions {
   contextAfter?: string;
   rerank?: boolean;
   onLocalCandidates?: (result: JapaneseConversionResult) => void;
+  /** UI-owned bounded queue; omitted by evaluation callers that await ranking. */
+  deferRanking?: (run: () => Promise<void>, skip: () => void) => void;
+  onRankedCandidates?: (result: JapaneseConversionResult) => void;
   /** Local independent verification, never a reference or saved setting. */
   readingVerifier?: ReadingVerifier;
   /** Explore spelling only, holding the previous candidate's reading fixed. */

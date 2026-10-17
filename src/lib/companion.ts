@@ -116,9 +116,13 @@ export async function remoteModelRequest<T>(
   path: "models" | "generate",
   body: unknown,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timeout = window.setTimeout(abort, timeoutMs);
   try {
     return await remoteJson<T>(`/api/${path}`, {
       method: path === "models" ? "GET" : "POST",
@@ -128,6 +132,7 @@ export async function remoteModelRequest<T>(
     });
   } finally {
     window.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
   }
 }
 

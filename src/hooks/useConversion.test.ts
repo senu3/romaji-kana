@@ -37,6 +37,37 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
 
+  it("shows predictive dictionary candidates immediately and releases the next conversion before ranking", async () => {
+    const ranking = deferred<void>();
+    const sessions = ["hon", "yomu"].map((input, i) => createConversionSession(input, [
+      { id: "first", kind: "conversion", result: { text: i ? "読む" : "本", reviewKana: i ? "よむ" : "ほん" } },
+      { id: "second", kind: "conversion", result: { text: i ? "よむ" : "ほん", reviewKana: i ? "よむ" : "ほん" } },
+    ]));
+    const convert = vi.mocked(convertRomajiToJapaneseDetailed);
+    convert.mockImplementation(async (input, _settings, _transport, options) => {
+      const session = sessions[input === "hon" ? 0 : 1];
+      session.rerankStatus = "pending";
+      options?.onLocalCandidates?.(sessionResult(session));
+      options?.deferRanking?.(async () => {
+        await ranking.promise;
+        session.rerankStatus = "applied";
+        if (session.state === "open" && !session.locked) options.onRankedCandidates?.(sessionResult(session));
+      }, () => { session.rerankStatus = "skipped"; });
+      return sessionResult(session);
+    });
+    const { hook, view } = harness("hon yomu");
+    await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+    await act(async () => { hook.current.handleConvert(range("yomu", "shortcut", 4)); });
+    expect(convert).toHaveBeenCalledTimes(2);
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("読む");
+    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    await act(async () => { ranking.resolve(); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("よむ");
+    expect(view.state.doc.toString()).toBe("hon yomu");
+    expect(hook.current.pending).toHaveLength(0);
+  });
+
   it.each(["shortcut", "period"] as const)("does not let a prediction replace a newer %s result", async trigger => {
     const old = deferred<JapaneseConversionResult>();
     const convert = vi.mocked(convertRomajiToJapaneseDetailed);

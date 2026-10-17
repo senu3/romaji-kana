@@ -10,7 +10,7 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import type { AppSettings } from "./types";
 import type { OllamaTransport } from "./ollamaProxy";
 import { currentProviderBaseUrl } from "./modelProvider";
-import { generatedText, generateWithAbort, stripThinkBlock, throwIfConversionAborted } from "./generationUtils";
+import { generatedText, stripThinkBlock, throwIfConversionAborted } from "./generationUtils";
 import { isAvoidedConversionOutput } from "./completionValidation";
 import { learnedBonus } from "./conversionLearning";
 import { withLegacyCompletionMetadata } from "./conversionCompatibility";
@@ -105,7 +105,7 @@ export async function convertWordLocally(input: string, settings: AppSettings, t
   let truncated = false;
   for (const [index, reading] of plans.slice(0, 3).entries()) {
     if (!reading.startsWith(body) || reading.length <= body.length || !/^[ぁ-ゖー]+$/u.test(reading) || Array.from(reading).length > 160) continue;
-    const result = await convertLocally(input, settings, transport, { ...options, rerank: false, onLocalCandidates: undefined }, { reading: reading + punctuation });
+    const result = await convertLocally(input, settings, transport, { ...options, rerank: false, onLocalCandidates: undefined, deferRanking: undefined }, { reading: reading + punctuation });
     revision = result.session?.dictionaryRevision;
     truncated ||= result.session?.truncated ?? false;
     for (const candidate of result.session?.candidates.slice(0, 8) ?? []) {
@@ -122,13 +122,30 @@ export async function convertWordLocally(input: string, settings: AppSettings, t
 
 export async function rankConversionSession(session: ConversionSession, settings: AppSettings, transport: OllamaTransport,
   options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
+  if (options.deferRanking && options.rerank !== false && session.candidates.length > 1) {
+    session.rerankStatus = "pending";
+    options.onLocalCandidates?.(sessionResult(session));
+    options.deferRanking(async () => {
+      if (options.signal?.aborted || session.state !== "open" || session.locked) {
+        session.rerankStatus = "skipped";
+        return;
+      }
+      const result = await rankConversionSession(session, settings, transport,
+        { ...options, deferRanking: undefined, onLocalCandidates: undefined });
+      if (session.state === "open" && !session.locked) options.onRankedCandidates?.(result);
+    }, () => {
+      session.rerankStatus = "skipped";
+      if (!options.signal?.aborted && session.state === "open" && !session.locked) options.onRankedCandidates?.(sessionResult(session));
+    });
+    return sessionResult(session);
+  }
   const candidates = session.candidates;
   const reading = candidates[0].result.changes?.sourceReading ?? candidates[0].result.reviewKana;
   session.rerankStatus = candidates.length > 1 ? "pending" : "skipped";
   options.onLocalCandidates?.(sessionResult(session));
   if (candidates.length > 1 && options.rerank !== false) {
     try {
-      const response = await generateWithAbort(() => transport.generate(settings.modelProvider, currentProviderBaseUrl(settings), {
+      const response = await transport.generate(settings.modelProvider, currentProviderBaseUrl(settings), {
         model: settings.modelName, stream: false, think: false, keep_alive: "5m", options: { temperature: 0 },
         outputSchema: { type: "object", properties: { order: { type: "array", items: {
           type: "string", enum: candidates.map(c => c.id),
@@ -141,7 +158,7 @@ export async function rankConversionSession(session: ConversionSession, settings
         prompt: JSON.stringify({ reading, before: options.contextBefore ?? "", after: options.contextAfter ?? "",
           styleGuidance: settings.conversionPrompt, vocabulary: options.documentVocabulary ?? [], candidates: candidates.map(c => ({ id: c.id, text: c.result.text,
             reading: c.result.reviewKana, kind: c.kind, personalPreference: learnedBonus(c.result.reviewKana, c.result.text) })) }),
-      }, 8_000), options.signal);
+      }, 8_000, options.signal);
       const data = JSON.parse(stripThinkBlock(generatedText(response))) as { order?: unknown };
       session.rerankStatus = applySessionRanking(session, data.order) ? "applied" : session.locked || session.state !== "open" ? "skipped" : "invalid";
     } catch (error) {
