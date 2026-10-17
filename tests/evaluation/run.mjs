@@ -69,6 +69,7 @@ async function main() {
       settings: {
         ...structuredClone(defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
         modelProvider: args.provider, modelName: args.model ?? "DRY_RUN",
+        conversionEngine: args.engine === "llm" ? "llm" : "local",
         [args.provider === "ollama" ? "ollamaApiUrl" : "lmStudioApiUrl"]: endpoint.href,
         useDocumentVocabulary: Boolean(c.options?.documentVocabulary?.length),
         ...(prompt === null ? {} : { conversionPrompt: prompt }),
@@ -115,6 +116,7 @@ async function main() {
       finally { record.elapsedMs = performance.now() - started; }
     };
     const kanaEngine = {
+      complete: async (reading, words) => (await engineRequest({ operation: "complete", reading, words: words.filter(w => w.enabled) })).readings,
       search: (reading, words) => engineRequest({ operation: "search", reading, words: words.filter(w => w.enabled), limit: 24 }),
       verify: async (text, reading, words) => (await engineRequest({ operation: "verify", text, reading, words: words.filter(w => w.enabled) })).status,
     };
@@ -152,6 +154,10 @@ async function main() {
       row.elapsedMs = performance.now() - started;
       row.apiCalls = calls;
       row.apiCallCount = calls.length;
+      row.exactReferenceMatch = {
+        top: c.acceptableExamples.includes(row.result?.text),
+        pool: row.result?.session ? row.result.session.candidates.some(candidate => c.acceptableExamples.includes(candidate.result.text)) : null,
+      };
       row.engineCalls = engineCalls;
       // A timed-out model generation may still be occupying the server even if
       // production successfully fell back to the retained local candidate.
@@ -170,7 +176,10 @@ async function main() {
       const mid = Math.floor(timings.length / 2);
       groups[category] = { trials: rows.length, candidates: rows.filter(r => r.outcome === "candidate").length, rejected: rows.filter(r => r.outcome === "rejected").length, empty: rows.filter(r => r.outcome === "empty").length, errors: rows.filter(r => r.outcome === "error").length, medianMs: timings.length ? timings.length % 2 ? timings[mid] : (timings[mid - 1] + timings[mid]) / 2 : null };
     }
-    await writeFile(resolve(out, "summary.json"), JSON.stringify({ stoppedOnError: stopped, plannedTrials: schedule.length, completedTrials: measured.length, qualityStatus: "unreviewed; candidate does not mean correct", categories: groups }, null, 2));
+    await writeFile(resolve(out, "summary.json"), JSON.stringify({ stoppedOnError: stopped, plannedTrials: schedule.length, completedTrials: measured.length,
+      exactReferenceMatch: { top: measured.filter(r => r.exactReferenceMatch.top).length,
+        pool: measured.filter(r => r.exactReferenceMatch.pool === true).length, poolEvaluated: measured.filter(r => r.exactReferenceMatch.pool !== null).length },
+      qualityStatus: "unreviewed; candidate or exact example match does not mean correct", categories: groups }, null, 2));
     if (stopped) process.exitCode = 1;
   } finally { globalThis.fetch = nativeFetch; engineClient.close(); await vite.close(); }
 }

@@ -55,6 +55,7 @@ export interface LmStudioChatResponse {
 export type LocalGenerateResponse = OllamaGenerateResponse | LmStudioChatResponse;
 
 export interface LocalGenerateBody {
+  outputSchema?: Record<string, unknown>;
   model: string;
   system: string;
   prompt: string;
@@ -134,6 +135,7 @@ function toOllamaGenerateBody(body: LocalGenerateBody): Record<string, unknown> 
     think: body.think,
     options: body.options,
     keep_alive: body.keep_alive,
+    ...(body.outputSchema ? { format: body.outputSchema } : {}),
   };
 
   return nextBody;
@@ -200,6 +202,9 @@ function toLmStudioChatBody(
     ],
     stream: false,
     temperature: body.options?.temperature,
+    ...(body.outputSchema ? { response_format: { type: "json_schema", json_schema: {
+      name: "conversion_candidate_order", strict: true, schema: body.outputSchema,
+    } } } : {}),
   };
 
   if (!includeThinkingControls) {

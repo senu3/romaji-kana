@@ -28,7 +28,7 @@ import { prepareConversionRequest, type ConversionRequest } from "./conversionRe
 import { faithfulConversionRule, type CompletionBoundaryStatus } from "./conversionRules";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 import { assessReadingWithEngine, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
-import { convertLocally } from "./localConversion";
+import { convertLocally, convertWordLocally } from "./localConversion";
 
 /** Reuse the prior reading without asking the model to repair/complete again.
  * Literal anchors retain their original boundaries and never enter generation. */
@@ -107,6 +107,10 @@ export async function convertInputOnce(
   throwIfConversionAborted(options.signal);
   const purpose = selectSegmentRoute(settings.inputCompletionLevel, options).kind;
   if (options.kanaEngine && purpose === "faithful") return convertLocally(input, settings, transport, options);
+  if (options.kanaEngine && purpose === "word") {
+    const local = await convertWordLocally(input, settings, transport, options);
+    if (local) return local;
+  }
   const { parts, protection, documentVocabulary } = prepareConversionRequest(input, settings, options);
   options = { ...options, documentVocabulary };
   const isAlternative = selectSegmentRoute("none", options).kind === "alternative";

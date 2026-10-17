@@ -4,6 +4,7 @@ import type { ConversionAnchor } from "./types";
 import { createId } from "./id";
 
 export interface SessionCandidate {
+  readingPlanId?: string;
   id: string;
   kind: "conversion" | "correction" | "completion" | "proposal";
   result: JapaneseConversionResult;
@@ -11,6 +12,7 @@ export interface SessionCandidate {
   tokens?: EngineToken[];
 }
 export interface ConversionSession {
+  readingPlans: ReadingPlan[];
   id: string;
   originalInput: string;
   anchor?: ConversionAnchor;
@@ -25,10 +27,27 @@ export interface ConversionSession {
   truncated: boolean;
   dictionaryRevision?: string;
 }
+export interface ReadingPlan {
+  id: string;
+  kind: SessionCandidate["kind"];
+  sourceReading: string;
+  correctedReading?: string;
+  reading: string;
+}
 export function createConversionSession(input: string, candidates: SessionCandidate[], context: {
   anchor?: ConversionAnchor; contextBefore?: string; contextAfter?: string;
 } = {}): ConversionSession {
-  return { id: createId("session"), originalInput: input, candidates,
+  const readingPlans: ReadingPlan[] = [];
+  const planned = candidates.map(candidate => {
+    const changes = candidate.result.changes;
+    const plan = { kind: candidate.kind, sourceReading: changes?.sourceReading ?? candidate.result.reviewKana,
+      correctedReading: changes?.correctedReading, reading: changes?.resultReading ?? candidate.result.reviewKana };
+    let found = readingPlans.find(p => p.kind === plan.kind && p.sourceReading === plan.sourceReading &&
+      p.correctedReading === plan.correctedReading && p.reading === plan.reading);
+    if (!found) { found = { ...plan, id: `reading-${readingPlans.length}` }; readingPlans.push(found); }
+    return { ...candidate, readingPlanId: found.id };
+  });
+  return { id: createId("session"), originalInput: input, candidates: planned, readingPlans,
     selectedId: candidates[0]?.id ?? "", contextBefore: context.contextBefore ?? "", contextAfter: context.contextAfter ?? "",
     anchor: context.anchor ? { ...context.anchor } : undefined,
     locked: false, state: "open", rerankStatus: "skipped", truncated: false };
@@ -47,10 +66,10 @@ export function nextSessionCandidate(session: ConversionSession): JapaneseConver
 }
 export function applySessionRanking(session: ConversionSession, ids: unknown): boolean {
   if (session.locked || session.state !== "open") return false;
-  if (!Array.isArray(ids) || ids.length !== session.candidates.length || new Set(ids).size !== ids.length) return false;
+  if (!Array.isArray(ids) || !ids.length || ids.length > session.candidates.length || new Set(ids).size !== ids.length) return false;
   const candidates = new Map(session.candidates.map(c => [c.id, c]));
   if (!ids.every(id => typeof id === "string" && candidates.has(id))) return false;
-  session.candidates = ids.map(id => candidates.get(id)!);
+  session.candidates = [...ids.map(id => candidates.get(id)!), ...session.candidates.filter(c => !ids.includes(c.id))];
   session.selectedId = session.candidates[0].id;
   return true;
 }

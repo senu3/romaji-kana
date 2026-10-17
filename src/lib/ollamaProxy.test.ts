@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultOllamaTransport } from "./ollamaProxy";
 
 describe("defaultOllamaTransport", () => {
+  it.each(["ollama", "lmstudio"] as const)("preserves the ranking schema in the %s wire format", async provider => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ response: "{}" }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const schema = { type: "object", properties: { order: { type: "array", items: { type: "string", enum: ["c0", "c1"] } } }, required: ["order"] };
+    await defaultOllamaTransport.generate(provider, "http://localhost:1234", {
+      model: "local", system: "rank", prompt: "candidates", stream: false, think: false, outputSchema: schema,
+    }, 100);
+    const wire = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(provider === "ollama" ? wire.format : wire.response_format.json_schema.schema).toEqual(schema);
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
   });

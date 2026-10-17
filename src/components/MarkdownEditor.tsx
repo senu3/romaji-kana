@@ -205,7 +205,10 @@ class GhostTextWidget extends WidgetType {
     }
     if (this.candidate.changes?.readingAssessment?.status !== "verified") {
       const note = document.createElement("span");
-      note.textContent = "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
+      const origin = this.candidate.changes?.readingAssessment?.origin;
+      note.textContent = origin === "dictionary" || origin === "literal"
+        ? "入力の読み未確認。候補を確認してTabで採用してください。"
+        : "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
       comparison.append(note);
     }
     if (this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {

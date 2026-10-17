@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { preservesProtectedContent } from "./conversionProtection";
 import { normalizeInputForPrompt } from "./conversion";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 describe("source protection across conversion routes", () => {
   it.each(["none", "word", "sentence"] as const)("rejects numeric loss in %s mode", async level => {

@@ -277,6 +277,8 @@ export function useConversion({
               id: request.id, from: position.from, to: position.to, originalText: position.matchedText,
               convertedText: result.text, inputText: request.originalText, reviewKana: result.reviewKana,
               changes: result.changes, session: result.session, trigger: request.range?.trigger,
+              inputCompletionApplied: result.inputCompletionApplied, inputCompletionSourceKana: result.inputCompletionSourceKana,
+              inputCompletionAdditions: result.inputCompletionAdditions,
               inputCompletionLevel, source: request.source, documentVocabulary: request.documentVocabulary,
             }) });
           },
@@ -846,7 +848,9 @@ export function useConversion({
         const next = nextSessionCandidate(suggestion.session);
         if (next) {
           view.dispatch({ effects: showGhostSuggestion.of({ ...suggestion, convertedText: next.text,
-            reviewKana: next.reviewKana, changes: next.changes, session: next.session }) });
+            reviewKana: next.reviewKana, changes: next.changes, session: next.session,
+            inputCompletionApplied: next.inputCompletionApplied, inputCompletionSourceKana: next.inputCompletionSourceKana,
+            inputCompletionAdditions: next.inputCompletionAdditions }) });
           setStatus({ kind: "success", message: "保持している別候補を表示しました。Tabで確定できます。" });
           return;
         }

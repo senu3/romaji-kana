@@ -10,6 +10,12 @@ await mkdir(output, { recursive: true });
 const names = [...Array.from({ length: 10 }, (_, i) => `dictionary0${i}.txt`),
   'connection_single_column.txt', 'id.def', 'dictionary_filter.tsv'];
 const manifest = { revision, source: base, files: [] };
+for (const [url, name] of [[base + 'README.txt', 'NOTICE.txt'], [base + 'README.md', 'MOZC-DICTIONARY.md'],
+  [`https://raw.githubusercontent.com/google/mozc/${revision}/LICENSE`, 'MOZC-LICENSE']]) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
+  await writeFile(new URL(name, output), Buffer.from(await response.arrayBuffer()));
+}
 for (const name of names) {
   const response = await fetch(base + name);
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);

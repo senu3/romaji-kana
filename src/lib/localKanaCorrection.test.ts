@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { isAllowedInputCompletion, parseStructuredSuggestion } from "./completionValidation";
 import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 const response = (correctedKana: string, completedKana = correctedKana, convertedText = completedKana) =>
   ({ response: JSON.stringify({ correctedKana, completedKana, convertedText }) });

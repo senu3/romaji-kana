@@ -6,6 +6,18 @@
 
 ## 実行方法
 
+現在の標準は `--engine hybrid`（Rust辞書候補＋LLMの選択）。`--engine llm` で従来のLLM生成、`--engine local` で辞書のみを比較できる。localは通常変換のケースに限り、モデル指定は不要。修正・補完・推測のケースをlocalへ渡すと実行前にエラーにする。
+
+```sh
+npm run eval:run -- --engine local --case basic-01,basic-02 --repeats 1
+npm run eval:run -- --engine hybrid --model YOUR_MODEL --case basic-01,basic-02
+npm run eval:run -- --engine llm --model YOUR_MODEL --case basic-01,basic-02
+```
+
+manifestには方式と辞書リビジョン・ファイルハッシュも保存する。trialの `engineCalls` に辞書要求と応答、`apiCalls` にモデル通信を別々に保存する。`exactReferenceMatch.top` と `pool` は許容例への完全一致を数える補助指標で、人手による正解判定・品質合格率ではない。複数の正解表記があり得るため、不一致を誤変換と断定しない。
+
+再順位付けが失敗してローカル候補へ戻った場合でも、モデル通信の失敗はログに残す。タイムアウト後の処理がサーバーに残る可能性があるため、評価ランナーは通信失敗時に次のケースへ進まない。Rustプロセスのビルド・初回読込を含むため、初回はウォームアップとして測定外にする。
+
 リポジトリ直下で実行します。既存のNode.js・Viteを使い、追加パッケージは不要です。
 
 ```sh

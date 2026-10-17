@@ -85,8 +85,18 @@ try {
   assert.ok(latestCandidates.some(c => c.text === '試験社'));
   await page.keyboard.press('Escape'); release();
   await page.waitForTimeout(150);
+  await page.getByRole('button', { name: '変換を開く', exact: true }).click();
+  await page.getByRole('radiogroup', { name: '入力補完レベル' }).getByText('単語', { exact: true }).click();
+  await page.getByRole('button', { name: '変換 を閉じる' }).click();
+  await typeInput('tesutoshi.');
+  await page.waitForTimeout(100);
+  assert.ok(latestCandidates.some(c => c.text === '試験社。' && c.kind === 'completion'));
+  await page.getByText(/単語の区切り未確認/).waitFor();
+  assert.equal(await documentText(page), 'tesutoshi.');
+  await page.keyboard.press('Escape'); release();
+  await page.waitForTimeout(150);
   await context.close();
-  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, learning, personal words.');
+  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, learning, personal words, prefix completion.');
 } finally { await browser?.close(); await server.close(); }
 
 async function documentText(page) {

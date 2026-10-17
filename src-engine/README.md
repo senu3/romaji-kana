@@ -16,7 +16,10 @@ used by Tauri and the development/evaluation JSON-lines process. Reading and tok
 offsets in this protocol count Unicode scalar values, not JavaScript UTF-16 units.
 
 Search builds a reading lattice, computes Viterbi prefix costs, then enumerates
-complete paths with backward A*. N-best is deduplicated by surface text. A literal
+complete paths with backward A*. N-best is deduplicated by surface text. A pool
+of up to 128 entries is diversified by token-boundary pattern before the requested
+number of entries is selected. Prefix completion proposes up to three extended
+readings; it does not prove the intended word boundary. A literal fallback
 candidate is always retained. Budgets: 160 input scalars, 30,000 nodes, 50,000 queued
 paths, 10,000 expansions, 32 requested results plus the literal fallback. Budget
 exhaustion is reported, never interpreted as an impossible pronunciation.

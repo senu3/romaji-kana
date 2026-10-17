@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { classifyConversionChanges } from "./conversionChanges";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 describe("observed conversion changes", () => {
   it("normalizes spacing, kana width and terminal punctuation without claiming completion", () => {

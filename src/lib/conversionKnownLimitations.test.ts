@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 // These characterize unresolved issues; passing does NOT mean the behavior is
 // desirable. On a fix, replace the characterization with an acceptance test in

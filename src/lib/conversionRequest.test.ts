@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { prepareConversionRequest, suggestionTargetPrompt } from "./conversionRequest";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 describe("target and reference roles", () => {
   it("snapshots vocabulary without adding its numbers or syntax to source protection", () => {

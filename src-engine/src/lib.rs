@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{BTreeMap, BinaryHeap, HashSet},
     io::Read,
     sync::OnceLock,
 };
@@ -81,7 +81,7 @@ struct Entry {
 
 #[derive(Default)]
 struct Trie {
-    children: HashMap<char, Trie>,
+    children: BTreeMap<char, Trie>,
     entries: Vec<usize>,
 }
 impl Trie {
@@ -101,6 +101,28 @@ impl Trie {
             };
             node = next;
             found.extend(node.entries.iter().map(|&id| (start + offset + 1, id)));
+        }
+        found
+    }
+
+    fn completions(&self, prefix: &[char]) -> Vec<usize> {
+        let mut node = self;
+        for ch in prefix {
+            let Some(next) = node.children.get(ch) else {
+                return vec![];
+            };
+            node = next;
+        }
+        let mut stack = vec![node];
+        let mut found = Vec::new();
+        let mut visited = 0;
+        while let Some(node) = stack.pop() {
+            visited += 1;
+            if visited > 4096 || found.len() >= 256 {
+                break;
+            }
+            found.extend(&node.entries);
+            stack.extend(node.children.values().rev());
         }
         found
     }
@@ -346,7 +368,7 @@ impl Engine {
                         tokens,
                     });
                 }
-                if candidates.len() >= limit {
+                if candidates.len() >= (limit * 4).min(128) {
                     break;
                 }
                 continue;
@@ -368,8 +390,31 @@ impl Engine {
                 });
             }
         }
+        // Reserve space for distinct boundary patterns before filling by cost.
+        // Surface variants of one segmentation must not exhaust the whole pool.
+        let mut boundary_counts = BTreeMap::<Vec<usize>, usize>::new();
+        let mut diverse = Vec::new();
+        let mut deferred = Vec::new();
+        for candidate in candidates {
+            let signature = candidate.tokens.iter().map(|t| t.to).collect::<Vec<_>>();
+            let count = boundary_counts.entry(signature).or_default();
+            if *count < (limit / 2).max(1) && diverse.len() < limit {
+                *count += 1;
+                diverse.push(candidate);
+            } else {
+                deferred.push(candidate);
+            }
+        }
+        for candidate in deferred {
+            if diverse.len() < limit {
+                diverse.push(candidate);
+            }
+        }
+        let mut candidates = diverse;
+        candidates.sort_by_key(|c| c.cost);
         // Ensure the exact input can be explicitly selected, even after a search budget is exhausted.
-        if seen.insert(request.reading.clone()) {
+        let seen: HashSet<String> = candidates.iter().map(|c| c.text.clone()).collect();
+        if !seen.contains(&request.reading) {
             candidates.push(Candidate {
                 text: request.reading.clone(),
                 reading: request.reading.clone(),
@@ -396,6 +441,60 @@ impl Engine {
             truncated,
             dictionary_revision: "0136c35782536cb43d710575c311cd4185982738",
         })
+    }
+
+    /// Prefix completion proposes readings; it never silently changes typed characters.
+    pub fn complete(&self, reading: &str, words: &[UserWord]) -> Vec<String> {
+        let chars: Vec<char> = reading.chars().collect();
+        if chars.len() < 2
+            || chars.len() > MAX_READING
+            || !chars
+                .iter()
+                .all(|c| ('ぁ'..='ゖ').contains(c) || *c == 'ー')
+        {
+            return vec![];
+        }
+        for start in 0..chars.len() - 1 {
+            let prefix = &chars[start..];
+            let before: String = chars[..start].iter().collect();
+            let mut found: Vec<(usize, i32, String)> = Vec::new();
+            for index in self.trie.completions(prefix) {
+                let entry = &self.entries[index];
+                let length = entry.reading.chars().count();
+                if length > prefix.len() && length <= prefix.len() + 12 {
+                    found.push((
+                        length - prefix.len(),
+                        entry.cost,
+                        format!("{before}{}", entry.reading),
+                    ));
+                }
+            }
+            for word in words {
+                let key: Vec<char> = word.reading.chars().collect();
+                if key.len() > prefix.len()
+                    && key.len() <= prefix.len() + 12
+                    && key.starts_with(prefix)
+                {
+                    found.push((
+                        key.len() - prefix.len(),
+                        3000,
+                        format!("{before}{}", word.reading),
+                    ));
+                }
+            }
+            found.sort();
+            let mut seen = HashSet::new();
+            let results: Vec<String> = found
+                .into_iter()
+                .map(|(_, _, key)| key)
+                .filter(|key| key.chars().count() <= MAX_READING && seen.insert(key.clone()))
+                .take(3)
+                .collect();
+            if !results.is_empty() {
+                return results;
+            }
+        }
+        vec![]
     }
 
     /// Existence of a surface/reading alignment, independent of ranked N-best results.
@@ -476,6 +575,12 @@ impl PartialOrd for Path {
 #[derive(Deserialize)]
 #[serde(tag = "operation", rename_all = "camelCase")]
 pub enum Request {
+    Notices,
+    Complete {
+        reading: String,
+        #[serde(default)]
+        words: Vec<UserWord>,
+    },
     Search {
         #[serde(flatten)]
         request: SearchRequest,
@@ -489,6 +594,17 @@ pub enum Request {
 }
 pub fn execute(request: Request) -> Result<serde_json::Value, String> {
     match request {
+        Request::Notices => Ok(serde_json::json!({
+            "revision": "0136c35782536cb43d710575c311cd4185982738",
+            "notice": include_str!("../data/NOTICE.txt"),
+            "license": include_str!("../data/MOZC-LICENSE"),
+        })),
+        Request::Complete { reading, words } => {
+            if words.len() > 500 {
+                return Err("Too many personal words".into());
+            }
+            Ok(serde_json::json!({ "readings": engine()?.complete(&reading, &words) }))
+        }
         Request::Search { request } => {
             serde_json::to_value(engine()?.search(&request)?).map_err(|e| e.to_string())
         }
@@ -566,6 +682,24 @@ mod tests {
                 limit: 16
             })
             .is_err());
+    }
+
+    #[test]
+    fn prefix_completions_only_extend_the_entered_reading() {
+        let engine = engine().unwrap();
+        let words = vec![UserWord {
+            id: "user".into(),
+            reading: "てすとしゃ".into(),
+            text: "試験社".into(),
+            pos: "organization".into(),
+        }];
+        let completions = engine.complete("てすとし", &words);
+        assert!(completions.iter().any(|r| r == "てすとしゃ"));
+        assert!(completions
+            .iter()
+            .all(|r| r.starts_with("てすとし") && r.chars().count() > 4));
+        assert!(engine.complete("あ", &[]).is_empty());
+        assert!(engine.complete("10じ", &[]).is_empty());
     }
     #[test]
     fn astar_matches_exhaustive_paths_in_a_tiny_dictionary() {

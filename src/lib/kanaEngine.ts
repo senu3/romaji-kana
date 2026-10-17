@@ -23,6 +23,7 @@ export interface EngineToken {
 export interface EngineCandidate { text: string; reading: string; cost: number; tokens: EngineToken[] }
 export interface EngineSearchResult { candidates: EngineCandidate[]; truncated: boolean; dictionaryRevision: string }
 export interface KanaEngine {
+  complete?(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<readonly string[]>;
   search(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<EngineSearchResult>;
   verify(text: string, reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<"verified" | "unverified" | "contradicted">;
 }
@@ -44,6 +45,9 @@ async function request<T>(body: object, signal?: AbortSignal): Promise<T> {
   return result;
 }
 export const defaultKanaEngine: KanaEngine = {
+  complete: async (reading, words, signal) => (await request<{ readings: string[] }>({
+    operation: "complete", reading, words: words.filter(w => w.enabled),
+  }, signal)).readings,
   search: (reading, words, signal) => request<EngineSearchResult>({ operation: "search", reading, words: words.filter(w => w.enabled), limit: 24 }, signal),
   verify: async (text, reading, words, signal) => (await request<{ status: "verified" | "unverified" | "contradicted" }>({
     operation: "verify", text, reading, words: words.filter(w => w.enabled),

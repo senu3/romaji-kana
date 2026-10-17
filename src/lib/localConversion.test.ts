@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings } from "./settings";
-import type { EngineCandidate, KanaEngine } from "./kanaEngine";
+import { defaultKanaEngine, type EngineCandidate, type KanaEngine } from "./kanaEngine";
 import { nextSessionCandidate } from "./conversionSession";
 import { romajiToKana } from "./romajiKana";
+import { requiresExplicitAcceptance } from "./readingAssessment";
 
 function candidate(text: string, reading = "きしゃ", cost = 100): EngineCandidate {
   return { text, reading, cost, tokens: [{ text, reading, from: 0, to: Array.from(reading).length,
@@ -17,6 +18,15 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
+  it("uses the configured local engine through the public API without a UI-specific injection", async () => {
+    const h = harness();
+    const spy = vi.spyOn(defaultKanaEngine, "search").mockImplementation(h.search);
+    try {
+      const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport);
+      expect(result.session?.dictionaryRevision).toBe("test");
+      expect(spy).toHaveBeenCalledWith("きしゃ", [], undefined);
+    } finally { spy.mockRestore(); }
+  });
   it("selects only retained candidates by ID and preserves their dictionary paths", async () => {
     const h = harness();
     const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
@@ -32,7 +42,7 @@ describe("local faithful conversion", () => {
   it.each([
     { order: ["invented", "candidate-0", "candidate-2"] },
     { order: ["candidate-0", "candidate-0", "candidate-2"] },
-    { order: ["candidate-1"] },
+    { order: [] },
     { convertedText: "記事を追加しました" },
   ])("falls back to local order for invalid ranking %j", async response => {
     const h = harness();
@@ -40,6 +50,14 @@ describe("local faithful conversion", () => {
     const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine });
     expect(result.text).toBe("記者");
     expect(result.session?.rerankStatus).toBe("invalid");
+  });
+  it("promotes a valid short list and keeps all remaining candidates in local order", async () => {
+    const h = harness();
+    h.generate.mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1"] }) });
+    const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.text).toBe("汽車");
+    expect(result.session?.candidates.map(c => c.id)).toEqual(["candidate-1", "candidate-0", "candidate-2"]);
+    expect(h.generate.mock.calls[0][2].outputSchema.properties.order.items.enum).toEqual(["candidate-0", "candidate-1", "candidate-2"]);
   });
   it("retains local results on a failed model connection", async () => {
     const h = harness();
@@ -84,5 +102,18 @@ describe("local faithful conversion", () => {
     await expect(convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
       kanaEngine: h.engine, signal: controller.signal, onLocalCandidates: () => controller.abort(),
     })).rejects.toMatchObject({ name: "AbortError" });
+  });
+  it("converts dictionary prefix completions as separate reading plans requiring explicit acceptance", async () => {
+    const h = harness();
+    h.engine.complete = vi.fn().mockResolvedValue(["しょるい", "しょり"]);
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading === "しょるい" ? "書類" : "処理", reading)], truncated: false, dictionaryRevision: "test" }));
+    const result = await convertRomajiToJapaneseDetailed("sho.", { ...defaultSettings, inputCompletionLevel: "word" }, h.transport,
+      { kanaEngine: h.engine, rerank: false });
+    expect(result.text).toBe("書類。");
+    expect(result.changes).toMatchObject({ kind: "completion", sourceReading: "しょ。", resultReading: "しょるい。" });
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+    expect(result.session?.readingPlans.map(p => p.reading)).toEqual(["しょるい。", "しょり。"]);
+    expect(result.session?.candidates.every(c => c.kind === "completion")).toBe(true);
+    expect(h.generate).not.toHaveBeenCalled();
   });
 });

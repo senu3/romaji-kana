@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizeNumericReading } from "./numericReading";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
-import { defaultSettings } from "./settings";
+import { defaultSettings as applicationSettings } from "./settings";
+// These tests exercise the legacy model-generation contract.
+const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 describe("source-aligned integer readings", () => {
   it.each([

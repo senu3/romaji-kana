@@ -10,6 +10,7 @@ import {
 import type { AppSettings } from "./types";
 import { createConversionSession, sessionResult } from "./conversionSession";
 import { withLegacyCompletionMetadata } from "./conversionCompatibility";
+import { defaultKanaEngine } from "./kanaEngine";
 
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
 
@@ -28,6 +29,7 @@ export async function convertRomajiToJapaneseDetailed(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
+  options = { ...options, kanaEngine: options.kanaEngine ?? (settings.conversionEngine === "llm" ? undefined : defaultKanaEngine) };
   const explicitRescue = options.completionMode || options.speculativeMode;
   const requestOptions = !explicitRescue && hasAvoidOutputs(options.avoidOutputs)
     ? { ...options, alternativeMode: true } : options;
