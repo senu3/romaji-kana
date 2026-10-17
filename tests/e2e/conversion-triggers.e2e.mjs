@@ -82,5 +82,32 @@ try {
     assert.equal(await page.locator('.cm-ghost-source').textContent(), 'nedanwa1.5endesu.');
     assert.match(await page.locator('.cm-ghost-text-suggestion').textContent(), /1\.5/);
   });
-  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, fences and numeric ranges.');
+  for (const succeeds of [false, true]) {
+    await scenario({ autoConvert: false }, async (page, editor) => {
+      const stages = [];
+      await page.route('**/api/kana-engine', route => route.fulfill({ json: { candidates: [], dictionaryRevision: 'test', truncated: false } }));
+      await page.route('**/api/generate', route => {
+        const body = route.request().postDataJSON();
+        if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+        const speculative = body.system.includes('speculative Japanese');
+        stages.push(speculative ? 'speculative' : 'correction');
+        return route.fulfill({ json: { response: JSON.stringify({ convertedText: speculative && succeeds ? '本' : 'ほん', completedKana: 'ほん' }) } });
+      });
+      await page.keyboard.type('hon');
+      await page.keyboard.press('Control+Enter');
+      if (succeeds) {
+        await page.locator('.cm-ghost-text-suggestion').waitFor();
+        assert.equal(await editor.innerText().then(text => text.startsWith('hon')), true);
+        assert.match(await page.locator('.cm-ghost-text-hint').textContent(), /推測候補/);
+        await page.keyboard.press('Tab');
+        assert.equal(await editor.innerText(), '本');
+      } else {
+        await page.getByText('通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。', { exact: true }).first().waitFor();
+        assert.equal(await editor.innerText(), 'hon');
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+      }
+      assert.deepEqual(stages, ['correction', 'speculative']);
+    });
+  }
+  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, fences, numeric ranges and ordered rescue.');
 } finally { await browser?.close(); await server.close(); }

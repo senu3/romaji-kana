@@ -11,6 +11,8 @@ import type { AppSettings } from "./types";
 import { createConversionSession, sessionResult } from "./conversionSession";
 import { withLegacyCompletionMetadata } from "./conversionCompatibility";
 import { defaultKanaEngine } from "./kanaEngine";
+import { ConversionResponseError } from "./conversionDiagnostics";
+import { faithfulConversionRule } from "./conversionRules";
 
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
 
@@ -20,7 +22,7 @@ export async function convertRomajiToJapanese(
   transport: OllamaTransport = defaultOllamaTransport,
 ): Promise<string> {
   const result = await convertRomajiToJapaneseDetailed(input, settings, transport);
-  return result.text;
+  return result.suggestionRejected ? input : result.text;
 }
 
 export async function convertRomajiToJapaneseDetailed(
@@ -33,6 +35,8 @@ export async function convertRomajiToJapaneseDetailed(
   const explicitRescue = options.completionMode || options.speculativeMode;
   const requestOptions = !explicitRescue && hasAvoidOutputs(options.avoidOutputs)
     ? { ...options, alternativeMode: true } : options;
+  const automaticRescue = options.autoRescue !== false && settings.conversionEngine !== "llm" &&
+    settings.inputCompletionLevel === "none" && !explicitRescue && !requestOptions.alternativeMode;
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = withLegacyCompletionMetadata(await convertInputOnce(input, settings, transport, attemptOptions));
@@ -43,7 +47,49 @@ export async function convertRomajiToJapaneseDetailed(
       kind: result.conversionStrategy === "speculative" || settings.inputCompletionLevel === "sentence" ? "proposal"
         : result.changes?.kind === "correction" ? "correction" : "completion", result }], options));
   };
-  const result = await runAttempt(requestOptions);
+  const runRescue = async (first: JapaneseConversionResult): Promise<JapaneseConversionResult> => {
+    options.onRescueStart?.();
+    const attempts: NonNullable<JapaneseConversionResult["attempts"]> = [{
+      stage: "normal", outcome: "rejected", detail: first.rejectionDetail,
+    }];
+    for (const stage of ["correction", "speculative"] as const) {
+      throwIfConversionAborted(options.signal);
+      let candidate: JapaneseConversionResult;
+      try {
+        candidate = await runAttempt({ ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined,
+          requireStructuredResponse: true, alternativeMode: false, completionMode: stage === "correction", speculativeMode: stage === "speculative" });
+      } catch (error) {
+        // Malformed candidates can be rescued; transport failures and user
+        // cancellation are not evidence of unconvertible input.
+        if (!(error instanceof ConversionResponseError)) throw error;
+        candidate = { text: "", reviewKana: first.reviewKana, suggestionRejected: true,
+          suggestionRejectedReason: "unconvertible", rejectionDetail: error.diagnostic };
+      }
+      const unchangedKana = candidate.text === candidate.reviewKana && candidate.changes?.sourceReading !== undefined &&
+        faithfulConversionRule.sameReading(candidate.changes.sourceReading, candidate.reviewKana);
+      const usable = isUsableConversionResult(candidate, options) && !unchangedKana;
+      attempts.push({ stage, outcome: usable ? "candidate" : "rejected", detail: unchangedKana ? "no-candidate" : candidate.rejectionDetail });
+      if (usable) return { ...candidate, attempts };
+    }
+    // Rejected candidates never replace the editor's original romaji.
+    return { text: "", reviewKana: first.reviewKana, suggestionRejected: true,
+      suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate", attempts };
+  };
+  let rescue: Promise<JapaneseConversionResult> | undefined;
+  const resolveNormal = async (candidate: JapaneseConversionResult): Promise<JapaneseConversionResult> => {
+    if (!automaticRescue || candidate.session?.rerankStatus === "pending" || isUsableConversionResult(candidate, options)) return candidate;
+    if (candidate.suggestionRejectedReason === "protected") return candidate;
+    rescue ??= runRescue(candidate);
+    return rescue;
+  };
+  const initialOptions = automaticRescue && options.onRankedCandidates ? { ...requestOptions,
+    onRankedCandidates: async (candidate: JapaneseConversionResult) => {
+      const resolved = await resolveNormal(candidate);
+      throwIfConversionAborted(options.signal);
+      await options.onRankedCandidates?.(resolved);
+    },
+  } : requestOptions;
+  const result = await resolveNormal(await runAttempt(initialOptions));
   if (isUsableConversionResult(result, options)) {
     return result;
   }

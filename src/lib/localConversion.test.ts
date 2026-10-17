@@ -14,7 +14,7 @@ function harness() {
   const search = vi.fn().mockResolvedValue({ candidates: [candidate("記者"), candidate("汽車", "きしゃ", 200)],
     truncated: false, dictionaryRevision: "test" });
   const engine: KanaEngine = { search, verify: vi.fn().mockResolvedValue("unverified") };
-  const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1", "candidate-0", "candidate-2"] }) });
+  const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1", "candidate-0"] }) });
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
@@ -66,7 +66,6 @@ describe("local faithful conversion", () => {
   it.each([
     { order: ["invented", "candidate-0", "candidate-2"] },
     { order: ["candidate-0", "candidate-0", "candidate-2"] },
-    { order: [] },
     { convertedText: "記事を追加しました" },
   ])("falls back to local order for invalid ranking %j", async response => {
     const h = harness();
@@ -80,8 +79,8 @@ describe("local faithful conversion", () => {
     h.generate.mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1"] }) });
     const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, { kanaEngine: h.engine });
     expect(result.text).toBe("汽車");
-    expect(result.session?.candidates.map(c => c.id)).toEqual(["candidate-1", "candidate-0", "candidate-2"]);
-    expect(h.generate.mock.calls[0][2].outputSchema.properties.order.items.enum).toEqual(["candidate-0", "candidate-1", "candidate-2"]);
+    expect(result.session?.candidates.map(c => c.id)).toEqual(["candidate-1", "candidate-0"]);
+    expect(h.generate.mock.calls[0][2].outputSchema.properties.order.items.enum).toEqual(["candidate-0", "candidate-1"]);
   });
   it("retains local results on a failed model connection", async () => {
     const h = harness();
@@ -103,7 +102,8 @@ describe("local faithful conversion", () => {
     const h = harness();
     h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading, reading)], truncated: false, dictionaryRevision: "test" }));
     const input = "dseu";
-    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false });
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false, autoRescue: false });
+    expect(result.suggestionRejectedReason).toBe("unconvertible");
     expect(result.reviewKana).toBe(romajiToKana(input).kana);
     expect(h.generate).not.toHaveBeenCalled();
   });
@@ -131,8 +131,7 @@ describe("local faithful conversion", () => {
     expect(result.session?.candidates.map(c => c.result.text)).not.toContain(`記${control}者`);
     expect(onLocalCandidates.mock.calls[0][0].session.candidates.map((c: { result: JapaneseConversionResult }) => c.result.text))
       .not.toContain(`記${control}者`);
-    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).candidates.map((c: { text: string }) => c.text))
-      .not.toContain(`記${control}者`);
+    expect(h.generate).not.toHaveBeenCalled();
   });
   it("rejects forbidden controls in the reading as well as in candidate text", async () => {
     const h = harness();

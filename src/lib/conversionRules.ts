@@ -230,12 +230,12 @@ export const typoCompletionRule = {
     "Repair only the minimum romaji or kana needed to produce a natural Japanese sentence.",
     "Do not paraphrase, summarize, or replace words whose reading already makes sense.",
     "Do not add new information. Keep the output close to the original wording.",
-    "If the intended repair is still unclear, keep the uncertain part in hiragana rather than inventing meaning.",
+    "If the intended repair is still unclear, report no candidate rather than returning the mechanical kana or inventing meaning.",
   ],
 } as const;
 
 export const speculativeRule = {
-  /** Existing fallback heuristic; this is weaker than semantic/script guidance. */
+  /** Script inspection for diagnostics; script choice alone is not failure. */
   isHiraganaOnlyCandidate(value: string): boolean {
     const hasHiragana = /[\u3041-\u3096]/u.test(value);
     const hasNonHiraganaWriting = /[\u30a1-\u30ff\u3400-\u9fff々〆ヵヶA-Za-z]/u.test(value);
@@ -244,11 +244,8 @@ export const speculativeRule = {
   guidance: [
     "Infer the user's most plausible intended Japanese from both the original romaji and the mechanical kana.",
     "This is not another strict kana-to-kanji pass. It is a suggestion, so you may resolve an ambiguous reading, minimally repair a likely typing error, or use a nearby natural expression with the same intent.",
-    "When the standard spelling itself is all hiragana, prefer a concise semantic re-expression containing common kanji instead of forcing ateji.",
     "Keep the central intent and tone close to the input. Never invent an unrelated sentence or new facts.",
-    "A valid result must contain at least one common kanji or katakana character.",
-    "Returning only hiragana is invalid in this pass, even when all-hiragana would normally be the standard spelling.",
-    "Prefer a natural candidate containing common kanji or katakana.",
-    "Never force obscure ateji or unnatural kanji merely to avoid hiragana.",
+    "Use conventional natural Japanese spelling. A genuinely inferred word may be written in hiragana; never paraphrase solely to force kanji.",
+    "Never return the unchanged mechanical kana as a substitute for an unavailable candidate. Report no candidate when the intent cannot be inferred.",
   ],
 } as const;

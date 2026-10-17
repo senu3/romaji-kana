@@ -15,7 +15,6 @@ import {
 } from "./conversionGeneration";
 import {
   isAllowedSpeculativeConversion,
-  isHiraganaOnlyConversion,
   selectSegmentRoute,
 } from "./conversionPolicy";
 import { throwIfConversionAborted } from "./generationUtils";
@@ -145,6 +144,8 @@ export async function convertInputOnce(
     // Spelling exploration reuses a fixed reading; it never repairs it again.
     const repaired = route.kind === "alternative"
       ? { kana: alternateReadings?.[partIndex] ?? kanaResult.kana }
+      : route.kind === "typo-repair" || route.kind === "speculative"
+        ? { kana: kanaResult.kana }
       : await repairLowConfidenceKana(kanaResult, settings, transport, options.signal);
     const request: ConversionRequest = {
       target: { originalRomaji: part.value, mechanicalReading: kanaResult.kana, preparedReading: repaired.kana,
@@ -191,6 +192,8 @@ export async function convertInputOnce(
     }
 
     const convertedPart = await generateKanaConversion(request, settings, transport, options);
+    if (!convertedPart.text) return { text: "", reviewKana: repaired.kana, suggestionRejected: true,
+      suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate" };
     if (convertedPart.reading !== undefined && (
       route.kind === "alternative" && !faithfulConversionRule.sameReading(repaired.kana, convertedPart.reading) ||
       route.kind === "typo-repair" && !isAllowedLocalKanaCorrection(repaired.kana, convertedPart.reading)
@@ -226,7 +229,7 @@ export async function convertInputOnce(
        !preserves(segments.map(segment => segment.finalReading).join("")))) {
     return protectedRejection(result);
   }
-  if (options.speculativeMode && (isHiraganaOnlyConversion(result.text) ||
+  if (options.speculativeMode && (result.text.trim() === protection.source.trim() ||
       !isAllowedSpeculativeConversion(protection.source, result.text))) {
     return { text: "", reviewKana: result.reviewKana, suggestionRejected: true, suggestionRejectedReason: "speculative", rejectionDetail: "speculative-policy" };
   }

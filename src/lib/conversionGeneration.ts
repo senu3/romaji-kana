@@ -52,6 +52,7 @@ export async function generateStructuredSuggestion(
       keep_alive: "5m",
     },
     30_000,
+    ...(options.signal ? [options.signal] as const : [] as const),
   ), options.signal);
 
   const parsed = parseStructuredSuggestion(generatedText(result));
@@ -159,12 +160,20 @@ export async function generateKanaConversion(
       keep_alive: "5m",
     },
     30_000,
+    ...(options.signal ? [options.signal] as const : [] as const),
   ), options.signal);
 
   const rawText = generatedText(result);
   const text = stripThinkBlock(rawText).trim();
   if (!text) {
     throw new Error(`${providerLabel(settings)} returned an empty conversion.`);
+  }
+
+  if (text.startsWith("{")) {
+    try {
+      const abstention = JSON.parse(text);
+      if (abstention.convertedText === "" && abstention.completedKana === "") return { text: "", reading: kana, modelReading: false };
+    } catch { /* Malformed JSON is reported below as a response-format error. */ }
   }
 
   const structured = parseStructuredSuggestion(text);
@@ -176,7 +185,7 @@ export async function generateKanaConversion(
     return { text: structured.convertedText, reading: numericReading.reading, reportedReading: structured.completedKana,
       numericReadingNormalized: numericReading.normalized, modelReading: true };
   }
-  if (/^(?:\{|```json)/u.test(text)) throw new ConversionResponseError("response-format", "変換結果の形式を読み取れませんでした。");
+  if (options.requireStructuredResponse || /^(?:\{|```json)/u.test(text)) throw new ConversionResponseError("response-format", "変換結果の形式を読み取れませんでした。");
   // Older/custom providers can still return plain text. Do not invent a
   // reading for Kanji output from that response.
   return { text, reading: literalCandidateReading(text), modelReading: false };
@@ -230,6 +239,7 @@ async function repairKanaSpan(
       keep_alive: "5m",
     },
     30_000,
+    ...(signal ? [signal] as const : [] as const),
   ), signal);
 
   const fragment = cleanKanaFragment(generatedText(result));

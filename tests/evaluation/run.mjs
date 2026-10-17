@@ -146,7 +146,7 @@ async function main() {
       row.firstDictionaryCandidateMs = null;
       try {
         row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, {
-          ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid" }),
+          ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
           onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
         });
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";

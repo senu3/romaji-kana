@@ -15,7 +15,7 @@ export function candidatePresentation(candidate: CandidateMetadata) {
     return { label: "単語補完", description: "末尾の未完成の単語を補う候補です。" };
   }
   if (candidate.conversionStrategy === "completion") {
-    return { label: "補完変換", description: "通常の変換で候補が得られず、入力を補って生成した候補です。" };
+    return { label: "誤字修正候補", description: "通常変換で候補が得られず、誤字修正を試した候補です。内容を確認して採用してください。" };
   }
   return { label: "通常変換", description: "入力の読みをもとに表記を変換した候補です。" };
 }

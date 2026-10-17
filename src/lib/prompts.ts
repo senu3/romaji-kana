@@ -269,12 +269,12 @@ export function buildSpeculativeConversionSystemPrompt(
   );
 
   return [
-    "You generate one speculative Japanese writing candidate when ordinary kana-kanji conversion returned only hiragana.",
+    "You generate one speculative Japanese writing candidate after ordinary conversion and minimal typo correction could not produce a usable candidate.",
     ...speculativeRule.guidance,
     convertedTextLengthRule.prompt("input"),
     protectedContentPrompt,
     "Produce one Japanese candidate. Do not explain or use Markdown fences. Follow the response contract.",
-    "If no plausible non-hiragana candidate exists, return the mechanical kana unchanged; the application will discard it.",
+    'If no plausible candidate exists, return {"convertedText":"","completedKana":""}. Never echo the mechanical kana as a fallback.',
     uniqueAvoidOutputs.length > 0 ? "Do not return these previous candidates exactly:" : "",
     ...uniqueAvoidOutputs.map((output) => `- ${output}`),
     "",
@@ -285,11 +285,10 @@ export function buildSpeculativeConversionSystemPrompt(
     prompt,
     "",
     "Examples for this speculative pass:",
-    "Original romaji: arigatou / Mechanical kana: ありがとう / Candidate: 感謝します",
-    "Original romaji: ohayougozaimasu / Mechanical kana: おはようございます / Candidate: 良い朝ですね",
+    "Do not turn a greeting into a different phrase merely to introduce kanji.",
     "Original romaji: yoroshikuonegaishimasu / Mechanical kana: よろしくおねがいします / Candidate: 宜しくお願いします",
     "",
-    "Final check: output one candidate only. Use at least one common kanji or katakana unless no plausible candidate exists. Never output an avoided candidate.",
+    "Final check: output at most one plausible candidate. Preserve the author's intent. Never output an avoided candidate or a mechanical-kana fallback.",
   ].filter(Boolean).join("\n");
 }
 
@@ -359,7 +358,7 @@ function formatAlternativeConversionInstructions(
     "When replacing an avoided output, first check whether it omitted kana from the input reading; choose a candidate that preserves every kana sound.",
     "Do not return the entire input in hiragana unless every kana-kanji candidate would be clearly wrong.",
     "Keep the same reading and do not paraphrase just to be different.",
-    "If no different spelling with the same reading exists, return the reading unchanged. Never repair, complete, or re-express it merely to avoid a previous output. The application will not switch this request to typo repair or speculation.",
+    'If no different spelling with the same reading exists, return {"convertedText":"","completedKana":""}. Never return the reading unchanged as a fallback. Never repair, complete, or re-express it merely to avoid a previous output. The application will not switch this request to typo repair or speculation.',
   ].filter(Boolean).join("\n");
 }
 

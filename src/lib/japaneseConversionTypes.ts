@@ -14,7 +14,8 @@ export interface JapaneseConversionResult {
   inputCompletionAdditions?: string[];
   suggestionRejected?: boolean;
   rejectionDetail?: ConversionDiagnostic;
-  suggestionRejectedReason?: "diverged" | "speculative" | "protected" | "reading";
+  suggestionRejectedReason?: "diverged" | "speculative" | "protected" | "reading" | "unconvertible";
+  attempts?: Array<{ stage: "normal" | "correction" | "speculative"; outcome: "candidate" | "rejected"; detail?: ConversionDiagnostic }>;
 }
 
 export interface JapaneseConversionOptions {
@@ -26,7 +27,12 @@ export interface JapaneseConversionOptions {
   onLocalCandidates?: (result: JapaneseConversionResult) => void;
   /** UI-owned bounded queue; omitted by evaluation callers that await ranking. */
   deferRanking?: (run: () => Promise<void>, skip: () => void) => void;
-  onRankedCandidates?: (result: JapaneseConversionResult) => void;
+  onRankedCandidates?: (result: JapaneseConversionResult) => void | Promise<void>;
+  /** Disable correction/speculation for dictionary-only measurements. */
+  autoRescue?: boolean;
+  onRescueStart?: () => void;
+  /** Rescue stages must supply a reading, not legacy unvalidated plain text. */
+  requireStructuredResponse?: boolean;
   /** Local independent verification, never a reference or saved setting. */
   readingVerifier?: ReadingVerifier;
   /** Explore spelling only, holding the previous candidate's reading fixed. */

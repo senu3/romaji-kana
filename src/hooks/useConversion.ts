@@ -161,7 +161,9 @@ export function useConversion({
       };
       rankingQueueRef.current.schedule(async () => {
         try { await run(); }
-        catch { /* An aborted ranking keeps the already displayed dictionary candidate. */ }
+        catch (error) {
+          if (requestsRef.current.valid(id)) setStatus({ kind: "error", message: formatConversionError(error) });
+        }
         finally { finish(); }
       }, () => { skip(); finish(); });
     }, [syncPending]);
@@ -299,10 +301,12 @@ export function useConversion({
         if (conversion.session && (conversion.session.state !== "open" || conversion.session.locked)) return;
 
         if (conversion.suggestionRejected) {
-          view.dispatch({ effects: removeLoadingDecoration.of(request.id) });
+          view.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
           skipQueuedConversion(
             request,
-            conversion.suggestionRejectedReason === "speculative"
+          conversion.suggestionRejectedReason === "unconvertible"
+            ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
+            : conversion.suggestionRejectedReason === "speculative"
               ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
               : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。",
           );
@@ -375,7 +379,7 @@ export function useConversion({
             : inputCompletionLevel !== "none"
               ? "サジェストを生成しました。Tab で確定、Esc で破棄できます。"
               : conversion.conversionStrategy === "completion"
-                ? "補完変換候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
+                ? "誤字修正候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
                 : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。",
         });
         return;
@@ -428,7 +432,7 @@ export function useConversion({
         message: conversion.inputCompletionApplied
           ? "入力補完を適用しました。元に戻すとローマ字に戻ります。"
           : conversion.conversionStrategy === "completion"
-            ? "補完変換で変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。"
+            ? "誤字修正で変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。"
             : "変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。",
       });
       };
@@ -441,6 +445,11 @@ export function useConversion({
           signal: requestsRef.current.get(request.id)?.controller.signal,
           deferRanking: deferRanking(request.id, request),
           onRankedCandidates: applyConversion,
+          onRescueStart: () => {
+            if (!requestsRef.current.valid(request.id)) return;
+            editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
+            setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正・推測を試しています。" });
+          },
           anchor,
           contextBefore: view.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from),
           contextAfter: view.state.doc.sliceString(resolved.to, Math.min(view.state.doc.length, resolved.to + 600)),
@@ -494,6 +503,7 @@ export function useConversion({
         if (conversion.session && (conversion.session.state !== "open" || conversion.session.locked)) return;
 
         if (conversion.suggestionRejected) {
+          currentView?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
           skipQueuedConversion(
             request,
             conversion.suggestionRejectedReason === "speculative"
@@ -534,7 +544,7 @@ export function useConversion({
             message: conversion.inputCompletionApplied
               ? "入力補完で履歴から再変換しました。適用先がないため結果のみ保存しました。"
               : conversion.conversionStrategy === "completion"
-                ? "補完変換で履歴から再変換しました。適用先がないため結果のみ保存しました。"
+                ? "誤字修正で履歴から再変換しました。適用先がないため結果のみ保存しました。"
                 : "履歴から再変換しました。適用先がないため結果のみ保存しました。",
           });
           return;
@@ -596,7 +606,7 @@ export function useConversion({
               : inputCompletionLevel !== "none"
                 ? "履歴からサジェストを生成しました。Tab で適用、Esc で破棄できます。"
                 : conversion.conversionStrategy === "completion"
-                  ? "履歴から補完変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
+                  ? "履歴から誤字修正候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
                   : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。",
           });
           return;
@@ -650,7 +660,7 @@ export function useConversion({
         message: conversion.inputCompletionApplied
           ? "入力補完で履歴の変換を適用しました。"
           : conversion.conversionStrategy === "completion"
-            ? "補完変換で履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
+            ? "誤字修正で履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
             : latestResolved.matchedBy === "nearby"
               ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
               : "履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。",
@@ -666,6 +676,9 @@ export function useConversion({
           anchor: request.anchor,
           deferRanking: deferRanking(request.id, request),
           onRankedCandidates: applyConversion,
+          onRescueStart: () => {
+            if (requestsRef.current.valid(request.id)) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
+          },
           contextBefore: resolved && currentView ? currentView.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from) : "",
           contextAfter: resolved && currentView ? currentView.state.doc.sliceString(resolved.to, Math.min(currentView.state.doc.length, resolved.to + 600)) : "",
           avoidOutputs: request.avoidOutputs,
@@ -882,7 +895,7 @@ export function useConversion({
         : suggestion.inputCompletionApplied
           ? "入力補完候補を確定しました。"
           : suggestion.conversionStrategy === "completion"
-            ? "補完変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+            ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
             : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
     });
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
@@ -1216,6 +1229,9 @@ export function useConversion({
             deferRanking: deferRanking(request.id),
             onLocalCandidates: applyConversion,
             onRankedCandidates: applyConversion,
+            onRescueStart: () => {
+              if (requestsRef.current.valid(request.id)) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
+            },
             contextBefore: editorViewRef.current?.state.doc.sliceString(Math.max(0, request.range.from - 1200), request.range.from),
             contextAfter: editorViewRef.current?.state.doc.sliceString(request.range.to, Math.min(editorViewRef.current.state.doc.length, request.range.to + 600)),
           },

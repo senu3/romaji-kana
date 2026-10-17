@@ -412,30 +412,18 @@ impl Engine {
         }
         let mut candidates = diverse;
         candidates.sort_by_key(|c| c.cost);
-        // Ensure the exact input can be explicitly selected, even after a search budget is exhausted.
-        let seen: HashSet<String> = candidates.iter().map(|c| c.text.clone()).collect();
-        if !seen.contains(&request.reading) {
-            candidates.push(Candidate {
-                text: request.reading.clone(),
-                reading: request.reading.clone(),
-                cost: i64::MAX / 2,
-                tokens: chars
-                    .iter()
-                    .enumerate()
-                    .map(|(i, ch)| Token {
-                        reading: ch.to_string(),
-                        text: ch.to_string(),
-                        from: i,
-                        to: i + 1,
-                        source: "literal".into(),
-                        entry_id: format!("literal:{i}"),
-                        lid: NOUN,
-                        rid: NOUN,
-                        word_cost: 12_000,
-                    })
-                    .collect(),
-            });
-        }
+        // Unknown kana must trigger correction/speculation in the application,
+        // never become a normal passthrough candidate. Dictionary-backed kana
+        // spellings remain valid; non-kana literals can still be preserved.
+        candidates.retain(|candidate| {
+            candidate.tokens.iter().all(|token| {
+                token.source != "literal"
+                    || !token
+                        .reading
+                        .chars()
+                        .any(|ch| ('\u{3040}'..='\u{30ff}').contains(&ch))
+            })
+        });
         Ok(SearchResult {
             candidates,
             truncated,
@@ -674,7 +662,21 @@ mod tests {
             })
             .unwrap();
         assert!(result.candidates.iter().any(|c| c.text == "試験社"));
-        assert!(result.candidates.iter().any(|c| c.text == "てすとしゃ"));
+        assert!(result
+            .candidates
+            .iter()
+            .all(|c| c.tokens.iter().all(|t| t.source != "literal")));
+        let greeting = engine
+            .search(&SearchRequest {
+                reading: "ありがとう".into(),
+                words: vec![],
+                limit: 16,
+            })
+            .unwrap();
+        assert!(greeting
+            .candidates
+            .iter()
+            .any(|c| c.text == "ありがとう" && c.tokens.iter().all(|t| t.source != "literal")));
         assert!(engine
             .search(&SearchRequest {
                 reading: "あ".repeat(161),

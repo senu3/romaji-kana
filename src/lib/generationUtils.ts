@@ -19,6 +19,7 @@ export function generateWithAbort<T>(
   return new Promise<T>((resolve, reject) => {
     const abort = () => reject(new DOMException("変換候補の生成を中止しました。", "AbortError"));
     signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
     promise.then(
       (value) => {
         signal.removeEventListener("abort", abort);

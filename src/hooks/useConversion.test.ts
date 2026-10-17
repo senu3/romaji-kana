@@ -10,6 +10,8 @@ import { useConversion } from "./useConversion";
 import { assessReading } from "../lib/readingAssessment";
 import { classifyConversionChanges } from "../lib/conversionChanges";
 import { applySessionRanking, createConversionSession, sessionResult } from "../lib/conversionSession";
+import { defaultKanaEngine } from "../lib/kanaEngine";
+import { defaultOllamaTransport } from "../lib/ollamaProxy";
 
 vi.mock("../lib/ollama", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/ollama")>(),
@@ -35,7 +37,32 @@ function harness(content = "konnichiha") {
 }
 
 describe("conversion lifecycle", () => {
-  beforeEach(() => vi.mocked(convertRomajiToJapaneseDetailed).mockReset());
+  beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
+
+  it("clears an abstained provisional candidate while rescue runs and keeps romaji if all stages fail", async () => {
+    const actual = await vi.importActual<typeof import("../lib/ollama")>("../lib/ollama");
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(actual.convertRomajiToJapaneseDetailed);
+    const candidates = ["本", "奔"].map(text => ({ text, reading: "ほん", cost: 100,
+      tokens: [{ text, reading: "ほん", from: 0, to: 2, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100 }] }));
+    vi.spyOn(defaultKanaEngine, "search").mockResolvedValue({ candidates, truncated: false, dictionaryRevision: "test" });
+    const ranking = deferred<{ response: string }>();
+    const correction = deferred<{ response: string }>();
+    const echo = { response: JSON.stringify({ convertedText: "ほん", completedKana: "ほん" }) };
+    const generate = vi.spyOn(defaultOllamaTransport, "generate").mockReturnValueOnce(ranking.promise)
+      .mockReturnValueOnce(correction.promise).mockResolvedValue(echo);
+    const { hook, view } = harness("hon");
+    await act(async () => { hook.current.handleConvert(range("hon")); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+    await act(async () => { ranking.resolve({ response: '{"order":[]}' }); });
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(view.state.doc.toString()).toBe("hon");
+    await act(async () => { correction.resolve(echo); });
+    expect(generate).toHaveBeenCalledTimes(3);
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(view.state.doc.toString()).toBe("hon");
+    expect(hook.current.history[0].status).toBe("skipped");
+    expect(hook.current.pending).toHaveLength(0);
+  });
 
   it("keeps explicit ownership when its source moves during an edit", async () => {
     const response = deferred<JapaneseConversionResult>();

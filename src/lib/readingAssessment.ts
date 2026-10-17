@@ -58,6 +58,6 @@ export function requiresExplicitAcceptance(candidate: {
   changes?: { kind?: string; readingAssessment?: ReadingAssessment; wordBoundary?: "unverified"; additionKind?: "word" | "phrase" | "unverified" };
   conversionStrategy?: string;
 }): boolean {
-  return candidate.conversionStrategy === "speculative" || ["correction", "completion", "rewrite"].includes(candidate.changes?.kind ?? "") || candidate.changes?.wordBoundary === "unverified" || candidate.changes?.additionKind === "unverified" ||
+  return candidate.conversionStrategy === "speculative" || candidate.conversionStrategy === "completion" || ["correction", "completion", "rewrite"].includes(candidate.changes?.kind ?? "") || candidate.changes?.wordBoundary === "unverified" || candidate.changes?.additionKind === "unverified" ||
     candidate.changes?.readingAssessment?.status !== "verified";
 }

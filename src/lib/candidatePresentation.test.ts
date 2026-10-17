@@ -9,7 +9,7 @@ describe("candidate presentation", () => {
   it("distinguishes sentence suggestions, word completion, and fallback conversion", () => {
     expect(candidatePresentation({ inputCompletionLevel: "sentence" }).label).toBe("文章提案");
     expect(candidatePresentation({ inputCompletionLevel: "word" }).label).toBe("単語補完");
-    expect(candidatePresentation({ conversionStrategy: "completion", inputCompletionLevel: "none" }).label).toBe("補完変換");
+    expect(candidatePresentation({ conversionStrategy: "completion", inputCompletionLevel: "none" }).label).toBe("誤字修正候補");
     expect(candidatePresentation({}).label).toBe("通常変換");
   });
 });
