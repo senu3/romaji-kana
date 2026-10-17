@@ -76,14 +76,17 @@ describe("route guidance and executable guards", () => {
     expect(buildSuggestionConversionSystemPrompt("word", defaultConversionPrompt)).toContain("max(24, completedKana length * 2)");
   });
 
-  it("keeps final-reading shape validation shared with explicit control-character differences", () => {
+  it("uses the same control-character policy for final and suggestion readings", () => {
     const multiline = { completedKana: "あ\nい", convertedText: "あ\nい" };
     expect(finalReadingRule.accepts(multiline, "final")).toBe(true);
-    expect(finalReadingRule.accepts(multiline, "suggestion")).toBe(false);
+    expect(finalReadingRule.accepts(multiline, "suggestion")).toBe(true);
     for (const mode of ["final", "suggestion"] as const) {
       expect(finalReadingRule.accepts({ completedKana: "本", convertedText: "本" }, mode)).toBe(false);
       expect(finalReadingRule.accepts({ completedKana: "10じ", convertedText: "11時" }, mode)).toBe(false);
       expect(finalReadingRule.accepts({ completedKana: "ほん", convertedText: "本\u0000" }, mode)).toBe(false);
+      expect(finalReadingRule.accepts({ completedKana: "ほん\u0001", convertedText: "本" }, mode)).toBe(false);
+      expect(finalReadingRule.accepts({ completedKana: "ほん\u0085", convertedText: "本" }, mode)).toBe(false);
+      expect(finalReadingRule.accepts({ completedKana: "あ\nい", convertedText: "あい" }, mode)).toBe(false);
     }
   });
 });

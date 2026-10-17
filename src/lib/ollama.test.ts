@@ -206,7 +206,8 @@ describe("convertRomajiToJapanese", () => {
     expect(generate.mock.calls[0][2].system).toContain("mododuki may be a typo of motoduki");
     expect(generate.mock.calls[0][2].system).not.toContain("Complete only an unfinished final Japanese word.");
     expect(generate.mock.calls[0][2].system).not.toContain('- "無関係な語"');
-    expect(generate.mock.calls[0][2].prompt).toBe("Original romaji input:\ngaidorainnimododukihenkansitekudasai\n\nMechanical kana:\nがいどらいんにもどづきへんかんしてください");
+    expect(generate.mock.calls[0][2].prompt).toContain("Original romaji input:\ngaidorainnimododukihenkansitekudasai\n\nMechanical kana:\nがいどらいんにもどづきへんかんしてください");
+    expect(generate.mock.calls[0][2].prompt).toContain("Prepared kana (conversion target):\nがいどらいんにもどづきへんかんしてください");
   });
   it("uses a later non-kana alternative instead of returning kana immediately", async () => {
     const transport = {
@@ -317,7 +318,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "かくにん。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nかくにん。"),
       }),
       30_000,
     );
@@ -799,7 +800,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "についてかくにん。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nについてかくにん。"),
       }),
       30_000,
     );
@@ -844,7 +845,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "いく。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nいく。"),
       }),
       30_000,
     );
@@ -883,7 +884,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.not.stringContaining("openair"),
-        prompt: "いく。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nいく。"),
       }),
       30_000,
     );
@@ -915,7 +916,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: " について かくにん。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\n について かくにん。"),
       }),
       30_000,
     );
@@ -954,7 +955,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.not.stringContaining("迎賓館"),
-        prompt: "にいこうとおもいます。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nにいこうとおもいます。"),
       }),
       30_000,
     );
@@ -995,7 +996,7 @@ describe("convertRomajiToJapanese", () => {
       "http://localhost:11434",
       expect.objectContaining({
         system: expect.not.stringContaining("openair"),
-        prompt: "いく。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nいく。"),
       }),
       30_000,
     );
@@ -1072,7 +1073,7 @@ describe("convertRomajiToJapanese", () => {
       "ollama",
       "http://localhost:11434",
       expect.objectContaining({
-        prompt: "をかくにんします。",
+        prompt: expect.stringContaining("Prepared kana (conversion target):\nをかくにんします。"),
       }),
       30_000,
     );

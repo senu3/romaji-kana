@@ -177,21 +177,16 @@ export const convertedTextLengthRule = {
 
 export const finalReadingRule = {
   forbiddenKanji: /[\p{Script=Han}々〆]/u,
-  forbiddenControls: /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u,
-  // Existing suggestion behavior rejects every control in text, while final
-  // conversion permits tabs/newlines. Keep that route difference explicit.
-  forbiddenSuggestionTextControls: /\p{Cc}/u,
-  accepts(candidate: { completedKana: string; convertedText: string }, route: "final" | "suggestion"): boolean {
+  // Tabs and CR/LF are ordinary document whitespace; all other C0/C1
+  // controls are forbidden in both text and readings, in every route.
+  forbiddenControls: /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/u,
+  accepts(candidate: { completedKana: string; convertedText: string }, _route: "final" | "suggestion"): boolean {
     if (!candidate.completedKana || !candidate.convertedText || this.forbiddenKanji.test(candidate.completedKana)) return false;
-    const controlsValid = route === "final"
-      ? !this.forbiddenControls.test(candidate.completedKana + candidate.convertedText)
-      : !this.forbiddenSuggestionTextControls.test(candidate.convertedText);
+    const controlsValid = !this.forbiddenControls.test(candidate.completedKana + candidate.convertedText);
     return controlsValid && preservesProtectedContent(candidate.completedKana, candidate.convertedText);
   },
-  controlPrompt(route: "final" | "suggestion"): string {
-    return route === "final"
-      ? "Neither completedKana nor convertedText may contain ASCII control characters other than tabs and line breaks."
-      : "convertedText must not contain control characters, including tabs and line breaks.";
+  controlPrompt(_route: "final" | "suggestion"): string {
+    return "Neither completedKana nor convertedText may contain C0/C1 control characters other than tabs and line breaks. Preserve the original number of line breaks.";
   },
   guidance: [
     "After writing convertedText, transcribe THAT TEXT into completedKana. Read its kanji with their correct pronunciation, even if the input contained a misspelling.",

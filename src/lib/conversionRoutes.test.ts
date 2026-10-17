@@ -111,7 +111,8 @@ describe("alternative spelling versus typo rescue", () => {
       });
     expect(result.text).toBe("OpenAI明日の予定をお願い。");
     expect(result.changes).toMatchObject({ kind: "completion", correctedReading: "OpenAIあしたのよていをおねが。", additions: ["い"], additionKind: "word" });
-    expect(generate.mock.calls[0][2].prompt).toBe("あしたのよていをおねがい。");
+    expect(generate.mock.calls[0][2].prompt).toContain("Prepared kana (conversion target):\nあしたのよていをおねがい。");
+    expect(generate.mock.calls[0][2].prompt).toContain("Read-only context before the target:\nOpenAI");
   });
   it("rejects a previous reading that lost protected original digits before any API call", async () => {
     const generate = vi.fn();

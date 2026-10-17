@@ -25,4 +25,13 @@ describe("comparison policies keep protection separate", () => {
     expect(result.changes).toMatchObject({ kind: "notation", additions: [] });
     expect(generate).toHaveBeenCalledTimes(1);
   });
+  it.each(["none", "word", "sentence"] as const)("preserves multiline targets in %s mode", async level => {
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ completedKana: "ほん。\nよむ。", convertedText: "本。\n読む。" }) });
+    const result = await convertRomajiToJapaneseDetailed("hon.\nyomu.", { ...defaultSettings, inputCompletionLevel: level }, { models: vi.fn(), generate });
+    expect(result.text).toBe("本。\n読む。");
+    expect(result.changes?.kind).toBe("notation");
+    generate.mockResolvedValue({ response: JSON.stringify({ completedKana: "ほん。よむ。", convertedText: "本。読む。" }) });
+    const removed = await convertRomajiToJapaneseDetailed("hon.\nyomu.", { ...defaultSettings, inputCompletionLevel: level }, { models: vi.fn(), generate });
+    expect(removed.suggestionRejected).toBe(true);
+  });
 });

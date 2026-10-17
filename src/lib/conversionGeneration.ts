@@ -21,7 +21,7 @@ import { rebuildRomajiKanaResult } from "./romajiKana";
 import type { AppSettings, InputCompletionLevel, RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 import { selectSegmentRoute } from "./conversionPolicy";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
-import { suggestionTargetPrompt, type SuggestionRequest, type ConversionRequest } from "./conversionRequest";
+import { suggestionTargetPrompt, finalTargetPrompt, referenceContextInstruction, type SuggestionRequest, type ConversionRequest } from "./conversionRequest";
 import { normalizeNumericReading } from "./numericReading";
 import { ConversionResponseError, type ConversionDiagnostic } from "./conversionDiagnostics";
 
@@ -37,7 +37,7 @@ export async function generateStructuredSuggestion(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: buildSuggestionConversionSystemPrompt(
+      system: referenceContextInstruction + "\n\n" + buildSuggestionConversionSystemPrompt(
         level,
         settings.conversionPrompt,
         options.avoidOutputs,
@@ -149,8 +149,8 @@ export async function generateKanaConversion(
     currentProviderBaseUrl(settings),
     {
       model: settings.modelName,
-      system: generation.system + "\n\n" + finalConversionOutputContract,
-      prompt: buildKanaKanjiUserPrompt(request, options),
+      system: referenceContextInstruction + "\n\n" + generation.system + "\n\n" + finalConversionOutputContract,
+      prompt: finalTargetPrompt(request, Boolean(options.completionMode || options.speculativeMode)),
       stream: false,
       think: settings.think,
       options: {
@@ -201,21 +201,6 @@ function kanaGenerationParameters(settings: AppSettings, options: JapaneseConver
     ),
     temperature: typoRepair ? 0.35 : options.alternativeAttempt ? 0.25 : 0.1,
   };
-}
-
-function buildKanaKanjiUserPrompt(request: ConversionRequest, options: JapaneseConversionOptions): string {
-  const kana = request.target.preparedReading;
-  if (!options.completionMode && !options.speculativeMode) {
-    return kana;
-  }
-
-  return [
-    "Original romaji input:",
-    request.target.originalRomaji.trim() || "(not available)",
-    "",
-    "Mechanical kana:",
-    kana,
-  ].join("\n");
 }
 
 async function repairKanaSpan(
