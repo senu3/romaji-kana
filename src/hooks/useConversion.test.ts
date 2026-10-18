@@ -39,6 +39,41 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
+  it.each(["word", "sentence"] as const)("uses normal conversion despite stale %s settings for manual, pause and history requests", async level => {
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "あと自動変換が", reviewKana: "あとじどうへんかんが" });
+    const { hook, view, options } = harness("atozidouhennkannga");
+    options.settingsRef.current.inputCompletionLevel = level;
+    await act(async () => { hook.current.handleConvert(range("atozidouhennkannga")); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
+    act(() => { hook.current.invalidatePredictiveSuggestions(); });
+    await act(async () => { hook.current.handleConvert(range("atozidouhennkannga", "typing")); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
+    const before = vi.mocked(convertRomajiToJapaneseDetailed).mock.calls.length;
+    await act(async () => { hook.current.handleAlternativeHistory({ id: "old", status: "success", input: "atozidouhennkannga",
+      output: "あとじどうへんかんが", inputCompletionLevel: level, modelName: "old", createdAt: 0, source: "editor",
+      anchor: { from: 0, to: view.state.doc.length, originalText: view.state.doc.toString(), docVersion: 0 } }); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.calls.length).toBeGreaterThan(before);
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.alternativeReading).toBeUndefined();
+  });
+
+  it.each(["word", "sentence"] as const)("restarts an old %s ghost from its original input instead of cycling completion candidates", async level => {
+    const session = createConversionSession("hon", [
+      { id: "first", kind: "conversion", result: { text: "本当", reviewKana: "ほんとう" } },
+      { id: "second", kind: "conversion", result: { text: "本当だ", reviewKana: "ほんとうだ" } },
+    ]);
+    const { hook, view } = harness("hon");
+    const suggestion = { id: "old-completion", from: 0, to: 3, originalText: "hon", inputText: "hon",
+      convertedText: "本当", reviewKana: "ほんとう", inputCompletionLevel: level, source: "editor" as const, session };
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(suggestion) }); });
+    await act(async () => { hook.current.handleRetryGhost(suggestion); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[0]).toBe("hon");
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.alternativeReading).toBeUndefined();
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+  });
+
   it("clears provisional UI on direct application even when the result equals the source", async () => {
     const session = createConversionSession("ありがとう", [{ id: "first", kind: "conversion", result: {
       text: "ありがとう", reviewKana: "ありがとう", changes: {

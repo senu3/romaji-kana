@@ -3,6 +3,7 @@ import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompt
 import {
   defaultSettings,
   loadSettings,
+  saveSettings,
   mergeSharedConversionSettings,
   sharedConversionSettings,
 } from "./settings";
@@ -18,6 +19,15 @@ beforeEach(() => {
 });
 
 describe("loadSettings", () => {
+  it.each(["word", "sentence"] as const)("retires saved and shared %s input completion without changing other preferences", level => {
+    storage.set("romaji-kana-settings", JSON.stringify({ ...defaultSettings, inputCompletionLevel: level, modelName: "existing-model", conversionMode: "ghost" }));
+    expect(loadSettings()).toMatchObject({ inputCompletionLevel: "none", modelName: "existing-model", conversionMode: "ghost" });
+    const old = { ...defaultSettings, inputCompletionLevel: level };
+    expect(sharedConversionSettings(old).inputCompletionLevel).toBe("none");
+    expect(mergeSharedConversionSettings(defaultSettings, { ...sharedConversionSettings(old), inputCompletionLevel: level }).inputCompletionLevel).toBe("none");
+    saveSettings(old);
+    expect(JSON.parse(storage.get("romaji-kana-settings")!).inputCompletionLevel).toBe("none");
+  });
   it("migrates the retired kana-fallback default without changing a custom prompt", () => {
     storage.set("romaji-kana-settings", JSON.stringify({ conversionPrompt: legacyDefaultConversionPrompt }));
     expect(loadSettings().conversionPrompt).toBe(defaultConversionPrompt);
@@ -134,12 +144,12 @@ describe("loadSettings", () => {
     expect(loadSettings().inputCompletionLevel).toBe("none");
   });
 
-  it("restores supported input completion levels", () => {
+  it("does not restore retired input completion levels", () => {
     storage.set(
       "romaji-kana-settings",
       JSON.stringify({ ...defaultSettings, inputCompletionLevel: "sentence" }),
     );
-    expect(loadSettings().inputCompletionLevel).toBe("sentence");
+    expect(loadSettings().inputCompletionLevel).toBe("none");
   });
 
   it("keeps document vocabulary opt-in and restores an explicit choice", () => {
@@ -175,7 +185,7 @@ describe("loadSettings", () => {
 
     expect(merged.modelName).toBe("desktop-model");
     expect(merged.conversionMode).toBe("ghost");
-    expect(merged.inputCompletionLevel).toBe("word");
+    expect(merged.inputCompletionLevel).toBe("none");
     expect(merged.inputPauseTiming).toBe("auto");
   });
 });

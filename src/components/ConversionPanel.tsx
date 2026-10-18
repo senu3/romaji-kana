@@ -5,7 +5,6 @@ import {
   useId,
   useState,
 } from "react";
-import { inputCompletionLabels } from "../lib/prompts";
 import { defaultSettings } from "../lib/settings";
 import {
   formatShortcutLabel,
@@ -15,10 +14,8 @@ import {
 import type {
   AppSettings,
   InputPauseTiming,
-  InputCompletionLevel,
 } from "../lib/types";
 
-const INPUT_COMPLETION_OPTIONS: InputCompletionLevel[] = ["none", "word", "sentence"];
 const INPUT_PAUSE_TIMING_OPTIONS: InputPauseTiming[] = [
   "early",
   "auto",
@@ -52,7 +49,7 @@ export function ConversionPanel({
   const resultHeadingId = useId();
 
   const update = (patch: Partial<AppSettings>) => {
-    onChange({ ...settings, ...patch });
+    onChange({ ...settings, ...patch, inputCompletionLevel: "none" });
   };
 
   const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
@@ -289,39 +286,9 @@ export function ConversionPanel({
           />
         </AccordionSection>
 
-        <fieldset className="input-completion-options">
-          <legend>入力補完</legend>
-          <p className="input-completion-intro">
-            読みを保つ変換と、書き進めるサジェストを切り替えます。
-          </p>
-          <div
-            className="segmented-control input-completion-levels"
-            role="radiogroup"
-            aria-label="入力補完レベル"
-          >
-            {INPUT_COMPLETION_OPTIONS.map((option) => (
-              <label className={settings.inputCompletionLevel === option ? "selected" : ""} key={option}>
-                <input
-                  type="radio"
-                  name="input-completion-level"
-                  value={option}
-                  checked={settings.inputCompletionLevel === option}
-                  onChange={() => update({ inputCompletionLevel: option })}
-                />
-                <span>{inputCompletionLabels[option]}</span>
-              </label>
-            ))}
-          </div>
-          <div className="input-completion-preview" aria-live="polite">
-            <span>{inputCompletionDescription(settings.inputCompletionLevel)}</span>
-            <code>{inputCompletionExample(settings.inputCompletionLevel)}</code>
-          </div>
-          {settings.inputCompletionLevel !== "none" ? (
-            <p className="input-completion-safety">
-              単語・文章は直接置換せず、確認できるサジェストとして表示します。
-            </p>
-          ) : null}
-        </fieldset>
+        <p className="panel-note">
+          通常変換は入力の読みを保ちます。誤字修正・推測の候補は、内容を確認してTabで採用します。
+        </p>
 
         <details className="advanced-prompt">
           <summary>詳細な変換指示</summary>
@@ -404,24 +371,4 @@ function CheckRow({
       />
     </label>
   );
-}
-
-function inputCompletionDescription(level: InputCompletionLevel): string {
-  if (level === "word") {
-    return "途中で切れた最後の単語を補い、表記まで提案します。";
-  }
-  if (level === "sentence") {
-    return "入力を残しながら、自然な続きや文末まで提案します。";
-  }
-  return "入力の読みを変えず、そのまま変換します。";
-}
-
-function inputCompletionExample(level: InputCompletionLevel): string {
-  if (level === "word") {
-    return "ariga → ありがとう";
-  }
-  if (level === "sentence") {
-    return "asita kaigi 10ji → 明日の会議は10時です";
-  }
-  return "ariga → ありが";
 }

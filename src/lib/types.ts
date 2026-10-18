@@ -39,6 +39,7 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
+  /** Retired UI setting; the app persists/shares none. Other values support legacy evaluation. */
   inputCompletionLevel: InputCompletionLevel;
   inputPauseTiming: InputPauseTiming;
   useDocumentVocabulary: boolean;

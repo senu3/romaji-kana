@@ -292,8 +292,7 @@ export function useConversion({
         return;
       }
 
-      const inputCompletionLevel =
-        request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel;
+      const inputCompletionLevel = "none" as const;
       const applyConversion = (conversion: JapaneseConversionResult) => {
         if (!requestsRef.current.valid(request.id)) {
           return;
@@ -493,8 +492,7 @@ export function useConversion({
         return;
       }
 
-      const inputCompletionLevel =
-        request.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel;
+      const inputCompletionLevel = "none" as const;
       const applyConversion = (conversion: JapaneseConversionResult) => {
         if (!requestsRef.current.valid(request.id)) {
           return;
@@ -933,7 +931,8 @@ export function useConversion({
         return;
       }
 
-      if (suggestion.session) {
+      const retiredCompletion = suggestion.inputCompletionLevel && suggestion.inputCompletionLevel !== "none";
+      if (suggestion.session && !retiredCompletion) {
         const next = nextSessionCandidate(suggestion.session);
         if (next) {
           view.dispatch({ effects: showGhostSuggestion.of({ ...suggestion, convertedText: next.text,
@@ -967,12 +966,11 @@ export function useConversion({
         source: suggestion.source,
         status: "queued",
         retryOf: suggestion.retryOf ?? suggestion.id,
-        avoidOutputs: collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
-        alternativeReading: suggestion.changes?.resultReading ?? suggestion.reviewKana,
-        alternativeCorrectedReading: suggestion.changes?.correctedReading,
-        alternativeAdditionKind: suggestion.changes?.additionKind,
-        inputCompletionLevel:
-          suggestion.inputCompletionLevel ?? settingsRef.current.inputCompletionLevel,
+        avoidOutputs: retiredCompletion ? undefined : collectAvoidOutputs(suggestion.avoidOutputs, suggestion.convertedText),
+        alternativeReading: retiredCompletion ? undefined : suggestion.changes?.resultReading ?? suggestion.reviewKana,
+        alternativeCorrectedReading: retiredCompletion ? undefined : suggestion.changes?.correctedReading,
+        alternativeAdditionKind: retiredCompletion ? undefined : suggestion.changes?.additionKind,
+        inputCompletionLevel: "none",
         documentVocabulary: suggestion.documentVocabulary,
         documentVocabularyRevision: suggestion.documentVocabularyRevision,
       };
@@ -1054,7 +1052,7 @@ export function useConversion({
       createdAt: Date.now(),
       source: "history",
       status: "queued",
-      inputCompletionLevel: item.inputCompletionLevel,
+      inputCompletionLevel: "none",
       documentVocabulary: item.documentVocabulary,
       documentVocabularyRevision: item.documentVocabularyRevision,
     };
@@ -1063,6 +1061,7 @@ export function useConversion({
   }, [enqueueConversion]);
 
   const handleAlternativeHistory = useCallback((item: ConversionHistoryItem) => {
+    if (item.inputCompletionLevel && item.inputCompletionLevel !== "none") return handleRerunHistory(item);
     const view = editorViewRef.current;
     const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor) : null;
     if (item.session && item.session.candidates.length > 1 && view && resolved) {
@@ -1071,7 +1070,7 @@ export function useConversion({
       view.dispatch({ effects: showGhostSuggestion.of({ id: createId("conversion"), from: resolved.from, to: resolved.to,
         originalText: resolved.matchedText, convertedText: next.text, inputText: item.input, reviewKana: next.reviewKana,
         conversionStrategy: next.conversionStrategy, changes: next.changes, session, source: "history", retryOf: item.id,
-        inputCompletionLevel: item.inputCompletionLevel, inputCompletionApplied: next.inputCompletionApplied,
+        inputCompletionLevel: "none", inputCompletionApplied: next.inputCompletionApplied,
         inputCompletionSourceKana: next.inputCompletionSourceKana, inputCompletionAdditions: next.inputCompletionAdditions,
         documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision }) });
       return true;
@@ -1088,13 +1087,13 @@ export function useConversion({
       alternativeReading: item.changes?.resultReading ?? item.reviewKana,
       alternativeCorrectedReading: item.changes?.correctedReading,
       alternativeAdditionKind: item.changes?.additionKind,
-      inputCompletionLevel: item.inputCompletionLevel,
+      inputCompletionLevel: "none",
       documentVocabulary: item.documentVocabulary,
       documentVocabularyRevision: item.documentVocabularyRevision,
     };
 
     return enqueueConversion(request);
-  }, [enqueueConversion]);
+  }, [enqueueConversion, handleRerunHistory]);
 
   const dismissRecentRetryChip = useCallback(() => {
     setRecentRetryItem(null);
@@ -1292,6 +1291,7 @@ export function useConversion({
 
       const settingsSnapshot: AppSettings = {
         ...settingsRef.current,
+        inputCompletionLevel: "none",
         triggers: { ...settingsRef.current.triggers },
         punctuationConversion: { ...settingsRef.current.punctuationConversion },
         userDictionary: [...settingsRef.current.userDictionary],
@@ -1346,7 +1346,7 @@ export function useConversion({
       docVersion: docVersionRef.current,
       source: "editor",
       status: "queued",
-      inputCompletionLevel: settingsRef.current.inputCompletionLevel,
+      inputCompletionLevel: "none",
       documentVocabulary: vocabularyProfile?.terms.length
         ? [...vocabularyProfile.terms]
         : undefined,

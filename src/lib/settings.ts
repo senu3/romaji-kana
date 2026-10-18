@@ -2,7 +2,6 @@ import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompt
 import type {
   AppSettings,
   InputPauseTiming,
-  InputCompletionLevel,
   SharedConversionSettings,
   UserDictionaryEntry,
 } from "./types";
@@ -55,7 +54,7 @@ export function loadSettings(): AppSettings {
 }
 
 export function saveSettings(settings: AppSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, inputCompletionLevel: "none" }));
 }
 
 export function sharedConversionSettings(settings: AppSettings): SharedConversionSettings {
@@ -66,7 +65,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
     triggers: settings.triggers,
     punctuationConversion: settings.punctuationConversion,
     conversionPrompt: settings.conversionPrompt,
-    inputCompletionLevel: settings.inputCompletionLevel,
+    inputCompletionLevel: "none",
     inputPauseTiming: settings.inputPauseTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
     userDictionary: settings.userDictionary,
@@ -81,6 +80,7 @@ export function mergeSharedConversionSettings(
   return {
     ...settings,
     ...shared,
+    inputCompletionLevel: "none",
     conversionPrompt: shared.conversionPrompt === legacyDefaultConversionPrompt ? defaultConversionPrompt : shared.conversionPrompt,
     triggers: { ...shared.triggers, typing: shared.triggers.typing ?? shared.triggers.space },
     punctuationConversion: { ...shared.punctuationConversion },
@@ -116,7 +116,7 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     ...currentSettings,
     conversionPrompt,
     think,
-    inputCompletionLevel: normalizeInputCompletionLevel(settings.inputCompletionLevel),
+    inputCompletionLevel: "none",
     conversionEngine: settings.conversionEngine === "llm" ? "llm" : "local",
     inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
@@ -132,12 +132,6 @@ function mergeSettings(settings: LegacySettings): AppSettings {
     userDictionary: normalizeUserDictionary(settings.userDictionary),
     personalDictionary: normalizePersonalDictionary(settings.personalDictionary),
   };
-}
-
-function normalizeInputCompletionLevel(value: unknown): InputCompletionLevel {
-  return value === "none" || value === "word" || value === "sentence"
-    ? value
-    : defaultSettings.inputCompletionLevel;
 }
 
 function normalizeInputPauseTiming(value: unknown): InputPauseTiming {

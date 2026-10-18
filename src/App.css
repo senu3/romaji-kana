@@ -2168,57 +2168,6 @@ h3 {
   padding: 16px;
 }
 
-.input-completion-options {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  border: 0;
-  padding: 0;
-}
-
-.input-completion-options legend {
-  padding: 0;
-  color: var(--theme-text, #123f3b);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.input-completion-intro,
-.input-completion-safety {
-  margin: 0;
-  color: var(--theme-muted, #536966);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.input-completion-levels {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.input-completion-preview {
-  display: grid;
-  gap: 6px;
-  min-height: 58px;
-  border-radius: 7px;
-  padding: 10px 11px;
-  background: var(--theme-chrome, #f2f8f7);
-  color: var(--theme-text, #365a56);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.input-completion-preview code {
-  width: fit-content;
-  color: var(--theme-accent, #0b6b64);
-  font:
-    700 12px/1.45 ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
-    monospace;
-}
-
-.input-completion-safety {
-  color: var(--theme-warning, #72520f);
-}
-
 .document-vocabulary-toggle {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

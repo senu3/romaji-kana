@@ -146,32 +146,21 @@ try {
   const applyMethodSegment = page
     .getByRole("group", { name: "変換結果の適用方法" })
     .locator("button.selected");
-  const inputCompletionGroup = page.getByRole("radiogroup", { name: "入力補完レベル" });
-  const inputCompletionSegment = inputCompletionGroup.locator("label.selected");
+  assert.equal(await page.getByRole("radiogroup", { name: "入力補完レベル" }).count(), 0);
   const expectedSegmentVisual = await selectedSegmentVisual(applyMethodSegment);
   assert.deepEqual(
     await page
-      .locator(".conversion-result-settings, .input-completion-options")
+      .locator(".conversion-result-settings")
       .evaluateAll((sections) =>
         sections.map((section) => getComputedStyle(section).borderBottomWidth),
       ),
-    ["0px", "0px"],
+    ["0px"],
     "Conversion panel sections should use spacing instead of stray horizontal rules.",
-  );
-  assert.deepEqual(
-    await selectedSegmentVisual(inputCompletionSegment),
-    expectedSegmentVisual,
-    "Apply method and input completion should share the same selected-state colors.",
   );
   assert.deepEqual(
     setupProviderSegmentVisual,
     expectedSegmentVisual,
     "Setup provider and conversion controls should share the same selected-state colors.",
-  );
-  assert.equal(
-    await applyMethodSegment.evaluate((element) => element.getBoundingClientRect().height),
-    await inputCompletionSegment.evaluate((element) => element.getBoundingClientRect().height),
-    "Conversion segmented controls should share the same desktop height.",
   );
   await page
     .locator(".inspector-drawer .accordion-trigger")
@@ -186,11 +175,6 @@ try {
     await page.getByRole("radio", { name: "自動", exact: true }).isChecked(),
     true,
     "Input pause timing should adapt to typing speed by default.",
-  );
-  assert.equal(
-    await page.getByRole("radio", { name: "なし", exact: true }).isChecked(),
-    true,
-    "Faithful conversion should remain the default to avoid an extra model request.",
   );
   await page.getByLabel("Enterで変換（IME 変換中は無視）").check();
   assert.equal(
@@ -537,160 +521,7 @@ try {
 
   await page.getByRole("button", { name: "変換を開く" }).click();
   await page.getByRole("region", { name: "変換設定" }).waitFor();
-  assert.equal(await page.getByLabel("なし", { exact: true }).isChecked(), true);
-  await page.getByLabel("単語", { exact: true }).check({ force: true });
-  await page.getByText("ariga → ありがとう", { exact: true }).waitFor();
-  await page.waitForFunction(() => {
-    const rawSettings = localStorage.getItem("romaji-kana-settings");
-    return rawSettings
-      ? JSON.parse(rawSettings).inputCompletionLevel === "word" &&
-          JSON.parse(rawSettings).useDocumentVocabulary === true
-      : false;
-  });
-  await page.getByRole("button", { name: "変換 を閉じる" }).click();
-
-  conversionRequestCount = 0;
-  conversionPrompts.length = 0;
-  conversionSystems.length = 0;
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+End");
-  await page.keyboard.type("ariga.");
-  const completionGhost = page.locator(".cm-ghost-text-suggestion");
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
-  await page.locator(".cm-ghost-text-hint").filter({ hasText: "単語補完" }).waitFor();
-  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完 +「とう」" }).waitFor();
-  const comparison = page.getByRole("group", { name: "候補の比較" });
-  assert.ok((await comparison.textContent()).includes("変換前:"));
-  assert.ok((await comparison.textContent()).includes("補完前の読み:"));
-  assert.ok((await comparison.textContent()).includes("候補: ありがとう。"));
-  if (process.env.E2E_CANDIDATE_SCREENSHOT) {
-    await page.getByRole("combobox", { name: "表示テーマ" }).selectOption("dark");
-    await page.waitForFunction(() => getComputedStyle(document.querySelector(".rail-button")).color === "rgb(224, 233, 237)");
-    await page.screenshot({ path: process.env.E2E_CANDIDATE_SCREENSHOT });
-    await page.getByRole("combobox", { name: "表示テーマ" }).selectOption("system");
-  }
-  assert.equal(
-    conversionRequestCount,
-    1,
-    "A valid hiragana word completion should not request speculative rewriting.",
-  );
-  assert.equal(
-    await page.locator(".cm-ghost-source").textContent(),
-    "ariga.",
-    "Input completion should stay as a ghost candidate even when direct replacement is selected.",
-  );
-  const vocabularySystem = conversionSystems.find((system) =>
-    system.includes("Document vocabulary reference:"),
-  );
-  assert.ok(
-    vocabularySystem?.includes('- "要件定義"') &&
-      vocabularySystem.includes('- "ローカルモデル"'),
-    "Kana-kanji conversion should receive the queued document vocabulary snapshot.",
-  );
-  assert.ok(
-    vocabularySystem?.includes("Complete only an unfinished final Japanese word.") &&
-      vocabularySystem.includes("Return exactly one JSON object"),
-    "One structured request should contain both completion and conversion instructions.",
-  );
-  const beforeWordCompletion = await editorText(page);
-  await page.keyboard.press(",");
-  await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
-  assert.equal(await editorText(page), beforeWordCompletion + ",",
-    "Reading verification must not implicitly authorize an unrequested completion.");
-  await page.keyboard.press("Control+Z");
-  await page.keyboard.press("Control+Enter");
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
-  await page.keyboard.press("Escape");
-  await page.locator(".cm-ghost-text-suggestion").waitFor({ state: "detached" });
-  assert.ok(
-    (await editorText(page)).endsWith("ariga."),
-    "Escape should dismiss a word-completion candidate without changing the romaji source.",
-  );
-  await page.keyboard.press("Control+Enter");
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
-  conversionPrompts.length = 0;
-  conversionSystems.length = 0;
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+/");
-  await completionGhost.filter({ hasText: "有難う。" }).waitFor();
-  const ghostRetryVocabularySystem = conversionSystems.find((system) =>
-    system.includes("Document vocabulary reference:"),
-  );
-  assert.ok(
-    ghostRetryVocabularySystem?.includes('- "要件定義"') &&
-      ghostRetryVocabularySystem.includes('- "ローカルモデル"'),
-    "Ghost retry should preserve the original vocabulary snapshot.",
-  );
-  await page.keyboard.press("Tab");
-  await page.getByRole("button", { name: "辞書を開く、2 件有効" }).click();
-  await page.getByRole("tab", { name: /文書から検出/ }).click();
-  await page.getByLabel("文書の語彙に合わせる").uncheck();
-  await page.getByRole("button", { name: "辞書 を閉じる" }).click();
-  await page.getByRole("button", { name: /履歴を開く/ }).click();
-  await page
-    .locator(".history-item")
-    .filter({ hasText: "ariga." })
-    .first()
-    .getByText(/文書語彙 \d+/)
-    .waitFor();
-  await page.getByRole("button", { name: "履歴 を閉じる" }).click();
-  await page.getByRole("button", { name: "変換を開く" }).click();
-  await page.getByLabel("なし", { exact: true }).check({ force: true });
-  await page.getByRole("button", { name: "変換 を閉じる" }).click();
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+End");
-  await page.keyboard.insertText("\n新用語を確認します。");
-  conversionPrompts.length = 0;
-  conversionSystems.length = 0;
-  await page.getByRole("button", { name: /履歴を開く/ }).click();
-  await page
-    .locator(".history-item")
-    .filter({ hasText: "ariga." })
-    .first()
-    .getByRole("button", { name: "再試行" })
-    .click();
-  await completionGhost.filter({ hasText: "ありがとう。" }).waitFor();
-  const historyRetryVocabularySystem = conversionSystems.find((system) =>
-    system.includes("Document vocabulary reference:"),
-  );
-  assert.ok(
-    historyRetryVocabularySystem?.includes('- "要件定義"') &&
-      !historyRetryVocabularySystem.includes("新用語"),
-    "History retry should use the original snapshot instead of the current document vocabulary.",
-  );
-  await page.keyboard.press("Escape");
-
-  // Local correction and completion must retain the original until adoption.
-  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
-  await page.getByLabel("単語", { exact: true }).check({ force: true });
-  await page.getByRole("button", { name: "変換 を閉じる" }).click();
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+A");
-  conversionRequestCount = 0;
-  await page.keyboard.type("ashitanoyotteiwoonega.");
-  await completionGhost.filter({ hasText: "明日の予定をお願い。" }).waitFor();
-  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完候補（読み未確認） +「い」" }).waitFor();
-  assert.equal(await editorText(page), "ashitanoyotteiwoonega.");
-  assert.equal(conversionRequestCount, 1, "Local correction and completion should share one request.");
-  await page.keyboard.press("Tab");
-  await page.waitForFunction(() => {
-    const line = document.querySelector(".cm-line")?.cloneNode(true);
-    line?.querySelectorAll('[contenteditable="false"], .cm-ghost-text, .cm-placeholder').forEach(widget => widget.remove());
-    return line?.textContent === "明日の予定をお願い。";
-  });
-  assert.equal(await editorText(page), "明日の予定をお願い。");
-  await page.locator(".cm-content").click();
-  await page.keyboard.press("Control+A");
-  await page.keyboard.type("kakuni.");
-  assert.equal(await editorText(page), "kakuni.");
-  await completionGhost.filter({ hasText: "かくにん。" }).waitFor({ timeout: 5_000 }).catch(async error => {
-    throw new Error(`${error.message}; document=${await editorText(page)}; prompts=${JSON.stringify(conversionPrompts.slice(-2))}; status=${await page.locator(".status-bar").textContent()}`);
-  });
-  await page.locator(".cm-ghost-text-diff").filter({ hasText: "補完候補（区切り未確認）" }).waitFor();
-  await page.keyboard.press(".");
-  assert.equal(await editorText(page), "kakuni..", "An uncertain word boundary must not be implicitly accepted by punctuation.");
-  await page.getByRole("button", { name: "変換を開く", exact: true }).click();
-  await page.getByLabel("なし", { exact: true }).check({ force: true });
+  assert.equal(await page.getByRole("radiogroup", { name: "入力補完レベル" }).count(), 0);
   await page.getByRole("button", { name: "変換 を閉じる" }).click();
 
   conversionRequestCount = 0;
