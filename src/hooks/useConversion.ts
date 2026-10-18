@@ -16,7 +16,8 @@ import { createId } from "../lib/id";
 import { buildProtectedDictionaryEntries, convertRomajiToJapaneseDetailed } from "../lib/ollama";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import { defaultKanaEngine } from "../lib/kanaEngine";
-import { nextSessionCandidate, sessionResult } from "../lib/conversionSession";
+import { createConversionSession, nextSessionCandidate, sessionResult, type ConversionSession } from "../lib/conversionSession";
+import { normalizeReading } from "../lib/readingComparison";
 import { recordConversionChoice } from "../lib/conversionLearning";
 import { RankingQueue } from "../lib/rankingQueue";
 import type { JapaneseConversionResult } from "../lib/japaneseConversionTypes";
@@ -36,6 +37,15 @@ const CANCEL_UI_DELAY_MS = 1_200;
 const RECENT_RETRY_CHIP_TIMEOUT_MS = 8_000;
 
 const MAX_CONVERSION_HISTORY_ITEMS = 100;
+
+interface CandidateListTarget {
+  item: ConversionHistoryItem;
+  ghost?: GhostConversionSuggestion;
+  session: ConversionSession;
+  anchor: ConversionAnchor;
+  documentText: string;
+  docVersion: number;
+}
 
 interface PredictiveSuggestionRequest {
   id: string;
@@ -136,6 +146,8 @@ export function useConversion({
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
 
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
+  const [candidateList, setCandidateList] = useState<CandidateListTarget | null>(null);
+  const closeCandidateList = useCallback(() => setCandidateList(null), []);
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -184,6 +196,7 @@ export function useConversion({
   const predictiveSuggestionEpochRef = useRef(0);
 
   const invalidatePredictiveSuggestions = useCallback((clearVisible = true) => {
+    setCandidateList(null);
     requestsRef.current.cancelPredictions();
     predictiveSuggestionEpochRef.current += 1;
     if (predictiveSuggestionQueueRef.current) requestsRef.current.finish(predictiveSuggestionQueueRef.current.id);
@@ -381,8 +394,8 @@ export function useConversion({
             : inputCompletionLevel !== "none"
               ? "サジェストを生成しました。Tab で確定、Esc で破棄できます。"
               : conversion.conversionStrategy === "completion"
-                ? "誤字修正候補を生成しました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。"
-                : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で別候補を試せます。",
+                ? "誤字修正候補を生成しました。Tab で確定、Ctrl/Cmd+/ で候補一覧を開けます。"
+                : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で候補一覧を開けます。",
         });
         return;
       }
@@ -434,8 +447,8 @@ export function useConversion({
         message: conversion.inputCompletionApplied
           ? "入力補完を適用しました。元に戻すとローマ字に戻ります。"
           : conversion.conversionStrategy === "completion"
-            ? "誤字修正で変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。"
-            : "変換しました。Ctrl/Cmd+/ で別候補を試せます。元に戻すとローマ字に戻ります。",
+            ? "誤字修正で変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。"
+            : "変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。",
       });
       };
       const conversion = await convertRomajiToJapaneseDetailed(
@@ -610,8 +623,8 @@ export function useConversion({
               : inputCompletionLevel !== "none"
                 ? "履歴からサジェストを生成しました。Tab で適用、Esc で破棄できます。"
                 : conversion.conversionStrategy === "completion"
-                  ? "履歴から誤字修正候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。"
-                  : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で別候補を試せます。",
+                  ? "履歴から誤字修正候補を生成しました。Tab で適用、Ctrl/Cmd+/ で候補一覧を開けます。"
+                  : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で候補一覧を開けます。",
           });
           return;
         }
@@ -665,10 +678,10 @@ export function useConversion({
         message: conversion.inputCompletionApplied
           ? "入力補完で履歴の変換を適用しました。"
           : conversion.conversionStrategy === "completion"
-            ? "誤字修正で履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
+            ? "誤字修正で履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
             : latestResolved.matchedBy === "nearby"
-              ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。"
-              : "履歴の変換を適用しました。Ctrl/Cmd+/ で別候補を試せます。",
+              ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
+              : "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。",
       });
       };
       const conversion = await convertRomajiToJapaneseDetailed(
@@ -822,6 +835,7 @@ export function useConversion({
 
   const cancelConversion = useCallback(
     (request: PendingConversion) => {
+      setCandidateList(null);
       requestsRef.current.cancel(request.id);
       canceledRequestsRef.current.add(request.id);
       const isRunning = runningRequestIdRef.current === request.id || rankingRequestsRef.current.has(request.id);
@@ -901,12 +915,12 @@ export function useConversion({
     setStatus({
       kind: "success",
       message: suggestion.conversionStrategy === "speculative"
-        ? "推測候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+        ? "推測候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。"
         : suggestion.conversionStrategy === "completion"
-          ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。"
+          ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。"
           : suggestion.inputCompletionApplied
             ? "入力補完候補を確定しました。"
-            : "変換候補を確定しました。Ctrl/Cmd+/ で別候補を試せます。",
+            : "変換候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。",
     });
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
 
@@ -1110,13 +1124,51 @@ export function useConversion({
     setRecentRetryItem(null);
   }, []);
 
+  const openCandidateList = useCallback((item: ConversionHistoryItem, ghost?: GhostConversionSuggestion) => {
+    const view = editorViewRef.current;
+    const resolved = view && item.anchor && resolveConversionAnchor(view.state.doc.toString(), item.anchor);
+    if (!view || !resolved || !item.output || ghost?.previewOnly) return false;
+    if (ghost && view.state.field(ghostSuggestionField).suggestion?.id !== ghost.id) return false;
+    invalidatePredictiveSuggestions(false);
+    const reading = item.changes?.resultReading ?? item.reviewKana;
+    const stored = item.inputCompletionLevel && item.inputCompletionLevel !== "none" ? undefined : item.session;
+    // A visible list keeps its order even if an older ranking request finishes.
+    if (stored) stored.locked = true;
+    const seen = new Set<string>();
+    const candidates = reading ? (stored?.candidates ?? []).filter(candidate => {
+      const result = candidate.result;
+      if (result.suggestionRejected || !result.text.trim() ||
+        normalizeReading(result.changes?.resultReading ?? result.reviewKana) !== normalizeReading(reading) || seen.has(result.text)) return false;
+      seen.add(result.text);
+      return true;
+    }) : [];
+    if (!candidates.some(candidate => candidate.result.text === item.output)) candidates.unshift({ id: "current",
+      kind: "conversion", result: { text: item.output, reviewKana: reading ?? "", changes: item.changes,
+        conversionStrategy: item.conversionStrategy } });
+    const session = createConversionSession(item.input, candidates);
+    session.selectedId = candidates.find(candidate => candidate.result.text === item.output)!.id;
+    session.locked = true;
+    setCandidateList({ item, ghost, session, documentText: view.state.doc.toString(), docVersion: docVersionRef.current,
+      anchor: { from: resolved.from, to: resolved.to, originalText: resolved.matchedText, docVersion: docVersionRef.current } });
+    return true;
+  }, [invalidatePredictiveSuggestions]);
+
+  const openGhostCandidates = useCallback((ghost: GhostConversionSuggestion) => openCandidateList({
+    id: ghost.id, input: ghost.inputText, output: ghost.convertedText, reviewKana: ghost.reviewKana, changes: ghost.changes,
+    session: ghost.session, status: "success", source: ghost.source, createdAt: Date.now(), modelName: settingsRef.current.modelName,
+    inputCompletionLevel: ghost.inputCompletionLevel, conversionStrategy: ghost.conversionStrategy,
+    avoidOutputs: ghost.avoidOutputs, documentVocabulary: ghost.documentVocabulary,
+    documentVocabularyRevision: ghost.documentVocabularyRevision,
+    anchor: { from: ghost.from, to: ghost.to, originalText: ghost.originalText, docVersion: docVersionRef.current },
+  }, ghost), [openCandidateList]);
+
   const retryRecentConversion = useCallback(() => {
     if (!recentRetryItem) {
       return false;
     }
 
-    return handleAlternativeHistory(recentRetryItem);
-  }, [handleAlternativeHistory, recentRetryItem]);
+    return openCandidateList(recentRetryItem);
+  }, [openCandidateList, recentRetryItem]);
 
   const handleSpeculateHistory = useCallback((item: ConversionHistoryItem) => {
     const view = editorViewRef.current;
@@ -1147,6 +1199,49 @@ export function useConversion({
       documentVocabularyRevision: suggestion.documentVocabularyRevision });
   }, [handleSpeculateHistory]);
 
+  const candidateListIsCurrent = useCallback(() => {
+    const view = editorViewRef.current;
+    if (!candidateList || !view || view.state.doc.toString() !== candidateList.documentText || docVersionRef.current !== candidateList.docVersion ||
+      (candidateList.ghost && view.state.field(ghostSuggestionField).suggestion?.id !== candidateList.ghost.id)) {
+      setCandidateList(null);
+      setStatus({ kind: "warning", message: "本文や候補が変わったため、候補一覧を閉じました。" });
+      return false;
+    }
+    return true;
+  }, [candidateList]);
+
+  const selectListedCandidate = useCallback((id: string) => {
+    if (!candidateListIsCurrent() || !candidateList) return;
+    const candidate = candidateList.session.candidates.find(candidate => candidate.id === id);
+    if (!candidate) return;
+    const { item, anchor, session, ghost } = candidateList;
+    session.selectedId = id;
+    const next = candidate.result;
+    setCandidateList(null);
+    editorViewRef.current!.dispatch({ effects: showGhostSuggestion.of({ id: ghost?.id ?? createId("conversion"),
+      from: anchor.from, to: anchor.to, originalText: anchor.originalText, inputText: item.input,
+      convertedText: next.text, reviewKana: next.reviewKana, changes: next.changes, conversionStrategy: next.conversionStrategy,
+      inputCompletionLevel: "none", inputCompletionApplied: next.inputCompletionApplied,
+      inputCompletionSourceKana: next.inputCompletionSourceKana, inputCompletionAdditions: next.inputCompletionAdditions,
+      session, source: ghost?.source ?? "history", retryOf: item.id, avoidOutputs: item.avoidOutputs,
+      documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision }) });
+    editorViewRef.current!.focus();
+    setStatus({ kind: "success", message: "候補を選びました。Tabで採用、Escで破棄できます。" });
+  }, [candidateList, candidateListIsCurrent]);
+
+  const speculateFromCandidateList = useCallback(() => {
+    if (!candidateListIsCurrent() || !candidateList) return;
+    setCandidateList(null);
+    handleSpeculateHistory(candidateList.item);
+  }, [candidateList, candidateListIsCurrent, handleSpeculateHistory]);
+
+  const searchFromCandidateList = useCallback(() => {
+    if (!candidateListIsCurrent() || !candidateList) return;
+    setCandidateList(null);
+    if (candidateList.ghost) handleRetryGhost({ ...candidateList.ghost, session: undefined });
+    else handleAlternativeHistory({ ...candidateList.item, session: undefined });
+  }, [candidateList, candidateListIsCurrent, handleRetryGhost, handleAlternativeHistory]);
+
   useEffect(() => {
     if (!recentRetryItem) {
       return;
@@ -1164,6 +1259,7 @@ export function useConversion({
   useEffect(() => {
     if (
       !recentRetryItem ||
+      candidateList ||
       activePanel ||
       !setupComplete
     ) {
@@ -1191,6 +1287,7 @@ export function useConversion({
     return () => document.removeEventListener("keydown", retryOnShortcut);
   }, [
     activePanel,
+    candidateList,
     recentRetryItem,
     retryRecentConversion,
     setupComplete,
@@ -1424,6 +1521,13 @@ export function useConversion({
     handleAcceptGhost,
     handleDismissGhost,
     handleRetryGhost,
+    candidateList,
+    closeCandidateList,
+    openCandidateList,
+    openGhostCandidates,
+    selectListedCandidate,
+    speculateFromCandidateList,
+    searchFromCandidateList,
     handleSpeculateGhost,
     handleSpeculateHistory,
     retryRecentConversion,

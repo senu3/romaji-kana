@@ -39,6 +39,75 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
+  const candidateSession = () => createConversionSession("kisha", [
+    { id: "one", kind: "conversion", result: { text: "記者", reviewKana: "きしゃ" } },
+    { id: "two", kind: "conversion", result: { text: "汽車", reviewKana: "きしゃ" } },
+    { id: "typo", kind: "correction", result: { text: "会社", reviewKana: "かいしゃ" } },
+  ]);
+
+  it("lists only the same reading, freezes late ranking and previews a selected stored candidate", () => {
+    const { hook, view } = harness("kisha");
+    const session = candidateSession();
+    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session };
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
+    expect(hook.current.candidateList?.session.candidates.map(c => c.result.text)).toEqual(["記者", "汽車"]);
+    expect(applySessionRanking(session, ["two", "one", "typo"])).toBe(false);
+    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
+    act(() => { hook.current.selectListedCandidate("two"); });
+    expect(hook.current.candidateList).toBeNull();
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("汽車");
+    expect(view.state.doc.toString()).toBe("kisha");
+  });
+
+  it("previews a history candidate without overwriting the committed output or mutating the accepted session", () => {
+    const { hook, view } = harness("記者");
+    const session = candidateSession(); session.state = "accepted";
+    act(() => { hook.current.openCandidateList({ id: "old", input: "kisha", output: "記者", reviewKana: "きしゃ", session,
+      status: "success", source: "editor", createdAt: 0, modelName: "test",
+      anchor: { from: 0, to: 2, originalText: "kisha", appliedText: "記者", docVersion: 0 } }); });
+    act(() => { hook.current.selectListedCandidate("two"); });
+    expect(view.state.doc.toString()).toBe("記者");
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("汽車");
+    expect(session.selectedId).toBe("one");
+    expect(session.state).toBe("accepted");
+  });
+
+  it("does not change the document or generate when a candidate list is dismissed", () => {
+    const { hook, view } = harness("kisha");
+    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
+    act(() => { hook.current.closeCandidateList(); });
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("記者");
+    expect(view.state.doc.toString()).toBe("kisha");
+    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
+  });
+
+  it("rejects a list selection after the target document has changed", () => {
+    const { hook, view } = harness("kisha");
+    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
+    act(() => { view.dispatch({ changes: { from: 0, to: 5, insert: "changed" } }); hook.current.selectListedCandidate("two"); });
+    expect(hook.current.candidateList).toBeNull();
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(view.state.doc.toString()).toBe("changed");
+  });
+
+  it("starts speculation only when the explicit action inside the list is chosen", async () => {
+    const { hook, view } = harness("kisha");
+    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "会社", reviewKana: "かいしゃ", conversionStrategy: "speculative" });
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
+    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
+    await act(async () => { hook.current.speculateFromCandidateList(); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]).toMatchObject({ userRequestedSpeculation: true, avoidOutputs: ["記者"] });
+    expect(view.state.doc.toString()).toBe("kisha");
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("会社");
+  });
+
   it("explicitly speculates from a ghost's original romaji and context instead of its held candidates", async () => {
     const { hook, view, options } = harness("資料をkakuniしてください。");
     options.settingsRef.current.conversionMode = "replace";

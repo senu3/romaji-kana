@@ -41,19 +41,36 @@ try {
   assert.equal(modelCalls, 1);
   assert.ok(latestCandidates.some(c => c.text === '本を読む'));
   await page.keyboard.press('Control+/');
-  const selected = await ghost.textContent();
-  assert.notEqual(selected, '本を読む');
+  const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
+  await list.waitFor();
+  const candidateButtons = list.getByRole('list', { name: '同じ読みの候補' }).getByRole('button');
+  assert.ok(await candidateButtons.count() > 1);
+  const selected = await candidateButtons.nth(1).locator('span').textContent();
   release();
   await page.waitForTimeout(200);
+  assert.equal(await candidateButtons.nth(1).locator('span').textContent(), selected, 'Late ranking must not reorder an open list');
+  await candidateButtons.nth(1).click();
   assert.equal(await ghost.textContent(), selected, 'Late ranking must not move the selected candidate');
   assert.equal(modelCalls, 1, 'Stored candidate navigation must not call the model');
   await page.keyboard.press('Tab');
   assert.equal(await documentText(page), selected);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-conversion-learning-v1'))[0].text), selected);
   await page.keyboard.press('Control+/');
+  await list.waitFor();
+  await candidateButtons.first().click();
   await ghost.waitFor();
   assert.equal(modelCalls, 1, 'History alternatives also use the retained candidate set');
   await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: /履歴を開く/ }).click();
+  await page.locator('.history-item').first().getByRole('button', { name: 'ほかの候補', exact: true }).click();
+  await list.waitFor();
+  const historyButton = list.locator('.candidate-list-options button[aria-pressed="false"]').first();
+  const historyText = await historyButton.locator('span').textContent();
+  await historyButton.click();
+  await page.keyboard.press('Tab');
+  assert.equal(await documentText(page), historyText, 'Selecting from history must return focus to the editor for Tab acceptance');
+  assert.equal(modelCalls, 1, 'History list selection must not generate');
 
   await typeInput('kisha');
   await page.waitForTimeout(100);

@@ -443,8 +443,9 @@ try {
     .locator(".history-item")
     .filter({ hasText: "ichi." })
     .first()
-    .getByRole("button", { name: "別候補" })
+    .getByRole("button", { name: "ほかの候補" })
     .click();
+  await page.getByRole('dialog', { name: 'ほかの候補' }).getByRole('button', { name: '同じ読みの候補を探す', exact: true }).click();
   await acceptUnverifiedCandidate(page, "壱。");
   await waitForEditorText(page, "壱。二。");
   assert.deepEqual(conversionPrompts, ["いち。"]);
@@ -559,10 +560,11 @@ try {
       (await page.locator(".status-bar").textContent()) ?? ""
     }`,
   );
-  await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl/Cmd+/で別候補" }).waitFor();
+  await page.locator(".cm-ghost-text-hint").filter({ hasText: "Ctrl/Cmd+/でほかの候補" }).waitFor();
   await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "三。" }).waitFor();
   assert.equal(await editorText(page), "san.", "A displayed candidate must not count as committed document text.");
   await page.keyboard.press("Control+/");
+  await page.getByRole('dialog', { name: 'ほかの候補' }).getByRole('button', { name: '同じ読みの候補を探す', exact: true }).click();
   await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "参。" }).waitFor();
   assert.equal(await editorText(page), "san.", "An alternative must leave the source intact until acceptance.");
   assert.deepEqual(conversionPrompts, ["さん。", "さん。"]);
@@ -580,8 +582,9 @@ try {
     .locator(".history-item")
     .filter({ hasText: "san." })
     .first()
-    .getByRole("button", { name: "別候補" })
+    .getByRole("button", { name: "ほかの候補" })
     .click();
+  await page.getByRole('dialog', { name: 'ほかの候補' }).getByRole('button', { name: '同じ読みの候補を探す', exact: true }).click();
   await page.locator(".cm-ghost-text-hint").waitFor();
   await page.locator(".cm-ghost-text-suggestion").filter({ hasText: "參。" }).waitFor();
   assert.equal(await editorText(page), "参。", "History previews must not replace committed text before Tab.");

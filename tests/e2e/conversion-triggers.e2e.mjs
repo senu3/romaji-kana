@@ -104,13 +104,27 @@ try {
       for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowRight');
       await page.keyboard.press('Control+Enter');
       if (entry === 'ghost') await page.locator('.cm-ghost-text-suggestion').waitFor();
-      else await page.getByRole('complementary', { name: '別候補への再変換' }).waitFor();
+      else await page.getByRole('complementary', { name: '変換結果の見直し' }).waitFor();
       assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
       if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();
-      const action = entry === 'ghost' ? page.locator('.cm-ghost-speculate')
-        : entry === 'recent' ? page.locator('.recent-retry-chip').getByRole('button', { name: '意図と違うので推測し直す' })
-        : page.locator('.history-item').getByRole('button', { name: '意図と違うので推測し直す' });
+      const action = entry === 'ghost' ? page.locator('.cm-ghost-candidates')
+        : entry === 'recent' ? page.locator('.recent-retry-chip-main')
+        : page.locator('.history-item').getByRole('button', { name: 'ほかの候補' });
       await action.click();
+      const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
+      await list.waitFor();
+      assert.equal(proposals, 0, 'Opening the list must not speculate');
+      if (entry === 'ghost') {
+        await page.keyboard.press('Escape');
+        assert.equal(await list.count(), 0, 'Escape must close only the list');
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').textContent(), '角煮');
+        await action.click();
+        await page.setViewportSize({ width: 390, height: 520 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        assert.notEqual(await list.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'The candidate list must have an opaque surface');
+        await page.screenshot({ path: 'node_modules/.conversion-tmp/candidate-list-mobile.png', fullPage: true });
+      }
+      await list.getByRole('button', { name: '読みも含めて見直す', exact: true }).click();
       if (entry === 'recent') {
         await page.getByText('意図に合う推測候補を作れませんでした。本文は変更していません。', { exact: true }).first().waitFor();
         assert.equal(await editor.innerText(), '資料を角煮してください。');
@@ -123,7 +137,7 @@ try {
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         if (entry === 'ghost') await page.screenshot({ path: 'node_modules/.conversion-tmp/speculate-mobile.png', fullPage: true });
-        await editor.click();
+        await editor.focus();
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), '資料を確認してください。');
       }

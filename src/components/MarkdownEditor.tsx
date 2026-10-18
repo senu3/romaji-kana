@@ -88,7 +88,6 @@ interface MarkdownEditorProps {
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   onDismissGhost: (suggestion?: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
-  onSpeculateGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
 }
@@ -142,7 +141,7 @@ interface GhostState {
   decorations: DecorationSet;
 }
 
-const speculateGhost = Facet.define<(suggestion: GhostConversionSuggestion) => void>();
+const openGhostCandidates = Facet.define<(suggestion: GhostConversionSuggestion) => void>();
 
 class GhostTextWidget extends WidgetType {
   constructor(private readonly candidate: GhostConversionSuggestion) {
@@ -162,9 +161,7 @@ class GhostTextWidget extends WidgetType {
 
     const hint = document.createElement("span");
     hint.className = "cm-ghost-text-hint";
-    hint.textContent = `${presentation.label}  ${explicitAcceptance
-      ? this.candidate.conversionStrategy === "speculative" ? "Tabで確定  Escで破棄" : "Tabで確定  Ctrl/Cmd+/で別候補  Escで破棄"
-      : "Tab/句読点で確定  Ctrl/Cmd+/で別候補  Escで破棄"}`;
+    hint.textContent = `${presentation.label}  ${explicitAcceptance ? "Tabで確定" : "Tab/句読点で確定"}  Ctrl/Cmd+/でほかの候補  Escで破棄`;
     if (this.candidate.session && this.candidate.session.candidates.length > 1) {
       const session = this.candidate.session;
       const index = session.candidates.findIndex(c => c.id === session.selectedId);
@@ -232,11 +229,11 @@ class GhostTextWidget extends WidgetType {
     if (!this.candidate.previewOnly) {
       const retry = document.createElement("button");
       retry.type = "button";
-      retry.className = "cm-ghost-speculate";
-      retry.textContent = "意図と違うので推測し直す";
-      retry.title = "元の入力と文脈から、読みの変更も含めて推測します。本文は採用するまで変わりません。";
+      retry.className = "cm-ghost-candidates";
+      retry.textContent = "ほかの候補";
+      retry.title = "同じ読みの候補一覧を開きます。読みも含めた見直しも選べます。";
       retry.onmousedown = event => event.preventDefault();
-      retry.onclick = () => view.state.facet(speculateGhost)[0]?.(this.candidate);
+      retry.onclick = () => view.state.facet(openGhostCandidates)[0]?.(this.candidate);
       element.append(retry);
     }
     return element;
@@ -379,7 +376,7 @@ const theme = EditorView.theme({
   ".cm-ghost-text-suggestion": {
     marginRight: "8px",
   },
-  ".cm-ghost-speculate": {
+  ".cm-ghost-candidates": {
     display: "inline-block",
     margin: "4px",
     padding: "4px 8px",
@@ -583,7 +580,6 @@ export function MarkdownEditor({
   onAcceptGhost,
   onDismissGhost,
   onRetryGhost,
-  onSpeculateGhost,
   onRetryRecent,
   registerView,
 }: MarkdownEditorProps) {
@@ -596,7 +592,6 @@ export function MarkdownEditor({
   const onAcceptGhostRef = useRef(onAcceptGhost);
   const onDismissGhostRef = useRef(onDismissGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
-  const onSpeculateGhostRef = useRef(onSpeculateGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
@@ -798,7 +793,6 @@ export function MarkdownEditor({
     onAcceptGhostRef.current = onAcceptGhost;
     onDismissGhostRef.current = onDismissGhost;
     onRetryGhostRef.current = onRetryGhost;
-    onSpeculateGhostRef.current = onSpeculateGhost;
     onRetryRecentRef.current = onRetryRecent;
     settingsRef.current = settings;
   }, [
@@ -808,7 +802,6 @@ export function MarkdownEditor({
     onDocumentChanged,
     onEditorStatusChange,
     onRetryGhost,
-    onSpeculateGhost,
     onRetryRecent,
     settings,
   ]);
@@ -839,9 +832,9 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
-        speculateGhost.of(suggestion => {
+        openGhostCandidates.of(suggestion => {
           clearPredictiveSuggestionTimer();
-          onSpeculateGhostRef.current(suggestion);
+          onRetryGhostRef.current(suggestion);
         }),
         unconvertedRanges,
         theme,
@@ -1147,6 +1140,7 @@ export function MarkdownEditor({
   }
 
   function retryGhostSuggestion(view: EditorView) {
+    clearPredictiveSuggestionTimer();
     const state = view.state.field(ghostSuggestionField);
     const suggestion = state.suggestion;
     if (!suggestion) {

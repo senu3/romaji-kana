@@ -1616,6 +1616,87 @@ h3 {
   color: var(--theme-warning, #9a3412);
 }
 
+.candidate-list-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(680px, calc(100dvh - 32px));
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 16px 48px var(--theme-shadow, rgb(18 63 59 / 20%));
+  overflow: auto;
+}
+
+.candidate-list-dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+.candidate-list-content {
+  padding: 18px;
+}
+
+.candidate-list-content header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.candidate-list-content h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.candidate-list-content p {
+  margin: 12px 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.candidate-list-options {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-list-options button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.candidate-list-options button:hover,
+.candidate-list-options button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.candidate-list-options small {
+  flex-shrink: 0;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.candidate-list-content footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .recent-retry-chip {
   position: fixed;
   right: 76px;

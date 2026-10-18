@@ -12,6 +12,7 @@ import {
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { CompanionPanel } from "./components/CompanionPanel";
 import { ConversionPanel } from "./components/ConversionPanel";
+import { CandidateList } from "./components/CandidateList";
 import { DictionaryModal } from "./components/DictionaryModal";
 import { HistoryPanel, RecentRetryChip } from "./components/HistoryPanel";
 import { type EditorDocumentStatus, MarkdownEditor } from "./components/MarkdownEditor";
@@ -111,9 +112,13 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     handleConvert,
     handleAcceptGhost,
     handleDismissGhost,
-    handleRetryGhost,
-    handleSpeculateGhost,
-    handleSpeculateHistory,
+    candidateList,
+    closeCandidateList,
+    openCandidateList,
+    openGhostCandidates,
+    selectListedCandidate,
+    speculateFromCandidateList,
+    searchFromCandidateList,
     retryRecentConversion,
     history,
     recentRetryItem,
@@ -121,7 +126,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     delayedPending,
     cancelConversion,
     handleRerunHistory,
-    handleAlternativeHistory,
     previewHistoryGhost,
     clearHistoryGhost,
   } = useConversion({
@@ -190,9 +194,10 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   });
 
   const handleDocumentChanged = useCallback((documentText: string) => {
+    closeCandidateList();
     persistDocumentChange(documentText);
     syncDocumentChange(documentText);
-  }, [persistDocumentChange, syncDocumentChange]);
+  }, [closeCandidateList, persistDocumentChange, syncDocumentChange]);
 
   const { handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs } = useDocumentFiles({
     documentEpochRef,
@@ -312,8 +317,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onSaveFileAs={handleSaveFileAs}
         onAcceptGhost={handleAcceptGhost}
         onDismissGhost={handleDismissGhost}
-        onRetryGhost={handleRetryGhost}
-        onSpeculateGhost={handleSpeculateGhost}
+        onRetryGhost={openGhostCandidates}
         onRetryRecent={retryRecentConversion}
         registerView={registerView}
       />
@@ -334,7 +338,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         <RecentRetryChip
           item={recentRetryItem}
           onRetry={retryRecentConversion}
-          onSpeculate={() => handleSpeculateHistory(recentRetryItem)}
           onDismiss={dismissRecentRetryChip}
         />
       ) : null}
@@ -359,8 +362,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
               pending={delayedPending}
               onCancel={cancelConversion}
               onRerun={handleRerunHistory}
-              onAlternative={handleAlternativeHistory}
-              onSpeculate={handleSpeculateHistory}
+              onAlternative={openCandidateList}
               onPreview={previewHistoryGhost}
               onPreviewEnd={clearHistoryGhost}
               onClose={closeActivePanel}
@@ -427,6 +429,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           onSkip={closeModelSettings}
         />
       ) : null}
+      {candidateList ? <CandidateList session={candidateList.session} onSelect={selectListedCandidate}
+        onSearch={searchFromCandidateList} onSpeculate={speculateFromCandidateList} onClose={closeCandidateList} /> : null}
       <StatusBar
         status={status}
         pending={delayedPending}

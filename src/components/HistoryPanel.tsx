@@ -5,12 +5,10 @@ import type { ConversionHistoryItem, PendingConversion } from "../lib/types";
 export function RecentRetryChip({
   item,
   onRetry,
-  onSpeculate,
   onDismiss,
 }: {
   item: ConversionHistoryItem;
   onRetry: () => void;
-  onSpeculate: () => void;
   onDismiss: () => void;
 }) {
   return (
@@ -21,29 +19,25 @@ export function RecentRetryChip({
           ? "completion"
           : ""
         }`}
-      aria-label="別候補への再変換"
+      aria-label="変換結果の見直し"
     >
       <button
         className="recent-retry-chip-main"
         type="button"
         onClick={onRetry}
-        title="別候補を再生成"
+        title="ほかの候補を開く"
       >
         <RotateCcw size={15} aria-hidden="true" />
         <span className="recent-retry-chip-text">
-          {`${candidatePresentation(item).label}: ${item.output ?? "出力なし"} の別候補を試す`}
+          {`${candidatePresentation(item).label}: ${item.output ?? "出力なし"} · ほかの候補`}
         </span>
         <kbd>Ctrl/Cmd+/</kbd>
-      </button>
-      <button className="history-action-button" type="button" onClick={onSpeculate}
-        title="元の入力と文脈から、読みの変更も含めて推測します">
-        意図と違うので推測し直す
       </button>
       <button
         className="recent-retry-chip-dismiss"
         type="button"
         onClick={onDismiss}
-        aria-label="別候補チップを閉じる"
+        aria-label="候補チップを閉じる"
         title="閉じる"
       >
         <X size={15} aria-hidden="true" />
@@ -58,7 +52,6 @@ export function HistoryPanel({
   onCancel,
   onRerun,
   onAlternative,
-  onSpeculate,
   onPreview,
   onPreviewEnd,
   onClose,
@@ -68,7 +61,6 @@ export function HistoryPanel({
   onCancel: (request: PendingConversion) => void;
   onRerun: (item: ConversionHistoryItem) => void;
   onAlternative: (item: ConversionHistoryItem) => void;
-  onSpeculate: (item: ConversionHistoryItem) => void;
   onPreview: (item: ConversionHistoryItem) => void;
   onPreviewEnd: (item: ConversionHistoryItem) => void;
   onClose: () => void;
@@ -85,7 +77,7 @@ export function HistoryPanel({
                   {request.retryOf
                     ? request.status === "queued"
                       ? "再試行待ち"
-                      : request.userRequestedSpeculation ? "意図を推測中" : "別候補を生成中"
+                      : request.userRequestedSpeculation ? "意図を推測中" : "同じ読みの候補を生成中"
                     : request.status === "queued"
                       ? "待機中"
                       : request.source === "history"
@@ -181,8 +173,8 @@ export function HistoryPanel({
                 <button
                   className="history-action-button"
                   type="button"
-                  disabled={!item.output}
-                  title={item.output ? "前回結果を避けて別候補を生成します" : "出力がないため別候補は生成できません"}
+                  disabled={!item.output || !item.anchor}
+                  title={item.output ? "ほかの候補の一覧を開きます" : "出力がないため候補一覧は開けません"}
                   onFocus={() => onPreview(item)}
                   onClick={() => {
                     onPreviewEnd(item);
@@ -191,12 +183,7 @@ export function HistoryPanel({
                   }}
                 >
                   <RotateCcw size={13} aria-hidden="true" />
-                  別候補
-                </button>
-                <button className="history-action-button" type="button" disabled={!item.output || !item.anchor}
-                  title="元の入力と文脈から、読みの変更も含めて推測します。採用するまで本文は変わりません。"
-                  onClick={() => { onPreviewEnd(item); onSpeculate(item); onClose(); }}>
-                  意図と違うので推測し直す
+                  ほかの候補
                 </button>
               </div>
             </article>
