@@ -13,6 +13,7 @@ import { withLegacyCompletionMetadata } from "./conversionCompatibility";
 import { defaultKanaEngine } from "./kanaEngine";
 import { ConversionResponseError } from "./conversionDiagnostics";
 import { faithfulConversionRule } from "./conversionRules";
+import { searchMissingLetter } from "./missingLetterCorrection";
 
 const ALTERNATIVE_CONVERSION_FAILED_MESSAGE = "別候補に変換できませんでした。";
 
@@ -56,7 +57,9 @@ export async function convertRomajiToJapaneseDetailed(
       throwIfConversionAborted(options.signal);
       let candidate: JapaneseConversionResult;
       try {
-        candidate = await runAttempt({ ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined,
+        const searched = stage === "correction" && options.missingLetterCorrection !== false
+          ? await searchMissingLetter(input, settings, transport, options) : undefined;
+        candidate = searched ?? await runAttempt({ ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined,
           requireStructuredResponse: true, alternativeMode: false, completionMode: stage === "correction", speculativeMode: stage === "speculative" });
       } catch (error) {
         // Malformed candidates can be rescued; transport failures and user

@@ -7,7 +7,7 @@ import { requiresExplicitAcceptance } from "./readingAssessment";
 
 const json = (text: string, reading: string) => ({ response: JSON.stringify({ convertedText: text, completedKana: reading }) });
 function harness(candidates: EngineCandidate[] = []) {
-  const engine: KanaEngine = { search: vi.fn().mockResolvedValue({ candidates, truncated: false, dictionaryRevision: "test" }), verify: vi.fn().mockResolvedValue("verified") };
+  const engine: KanaEngine = { search: vi.fn(async reading => ({ candidates: candidates.filter(c => c.reading === reading), truncated: false, dictionaryRevision: "test" })), verify: vi.fn().mockResolvedValue("verified") };
   const generate = vi.fn();
   return { engine, generate, transport: { models: vi.fn(), generate } };
 }

@@ -96,7 +96,7 @@ describe("conversion lifecycle", () => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(actual.convertRomajiToJapaneseDetailed);
     const candidates = ["本", "奔"].map(text => ({ text, reading: "ほん", cost: 100,
       tokens: [{ text, reading: "ほん", from: 0, to: 2, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100 }] }));
-    vi.spyOn(defaultKanaEngine, "search").mockResolvedValue({ candidates, truncated: false, dictionaryRevision: "test" });
+    vi.spyOn(defaultKanaEngine, "search").mockImplementation(async reading => ({ candidates: candidates.filter(c => c.reading === reading), truncated: false, dictionaryRevision: "test" }));
     const ranking = deferred<{ response: string }>();
     const correction = deferred<{ response: string }>();
     const echo = { response: JSON.stringify({ convertedText: "ほん", completedKana: "ほん" }) };

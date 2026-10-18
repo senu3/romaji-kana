@@ -63,6 +63,20 @@ test("validates rescue cases with unspecified acceptable text and route expectat
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("records the experimental missing-letter switch and comparison set", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "kana-missing-letter-"));
+  try {
+    for (const mode of ["on", "off"]) {
+      const result = await run(["--dry-run", "--dataset", "tests/evaluation/missing-letter.json", "--missing-letter", mode, "--out", join(dir, mode)]);
+      assert.equal(result.code, 0, result.output);
+      const manifest = JSON.parse(await readFile(join(dir, mode, "manifest.json"), "utf8"));
+      assert.equal(manifest.cases.length, 12);
+      assert.ok(manifest.cases.every(c => c.options.missingLetterCorrection === (mode === "on")));
+    }
+    assert.equal((await run(["--dry-run", "--missing-letter", "invalid"])).code, 1);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 for (const format of ["plain", "structured"]) {
   for (const provider of ["ollama", "lmstudio"]) {
     test(`${provider}/${format}: real pipeline records HTTP attempts and stops on 503`, async () => {

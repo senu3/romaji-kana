@@ -18,6 +18,7 @@ const { values: args } = parseArgs({ options: {
   out: { type: "string" }, prompt: { type: "string" }, note: { type: "string", default: "" },
   engine: { type: "string", default: "hybrid" },
   dataset: { type: "string", default: "tests/evaluation/cases.json" },
+  "missing-letter": { type: "string", default: "on" },
 } });
 
 if (args.help) {
@@ -25,6 +26,7 @@ if (args.help) {
   --provider ollama|lmstudio  --url http://localhost:PORT
   --engine hybrid|local|llm
   --dataset tests/evaluation/holdout.json
+  --missing-letter on|off
   --repeats 3  --seed 20260922  --case basic-01,basic-02
   --prompt FILE  --note TEXT  --out NEW_DIRECTORY  --dry-run
 Dry run validates cases and writes the schedule without contacting a model.
@@ -36,6 +38,7 @@ Actual runs include one unscored warmup and stop on the first request error.`);
 async function main() {
   if (!["ollama", "lmstudio"].includes(args.provider)) throw new Error("Invalid provider");
   if (!["hybrid", "local", "llm"].includes(args.engine)) throw new Error("Invalid engine");
+  if (!["on", "off"].includes(args["missing-letter"])) throw new Error("Invalid missing-letter mode");
   const repeats = Number(args.repeats), seed = Number(args.seed);
   if (!Number.isSafeInteger(repeats) || repeats < 1 || repeats > 100) throw new Error("repeats must be 1..100");
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error("seed must be uint32");
@@ -80,7 +83,7 @@ async function main() {
         useDocumentVocabulary: Boolean(c.options?.documentVocabulary?.length),
         ...(prompt === null ? {} : { conversionPrompt: prompt }),
       },
-      options: structuredClone({ documentVocabulary, ...c.options }),
+      options: structuredClone({ documentVocabulary, ...c.options, missingLetterCorrection: args["missing-letter"] === "on" }),
     }));
     let state = seed;
     const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
@@ -149,11 +152,13 @@ async function main() {
       const row = { ...trial, category: c.category, mode: c.settings.inputCompletionLevel, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options: c.options };
       row.firstDictionaryCandidateMs = null;
       row.rescueStartedMs = null;
+      row.missingLetterSearches = [];
       try {
         row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, {
           ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
           onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
           onRescueStart: () => { row.rescueStartedMs = performance.now() - started; },
+          onMissingLetterSearch: metrics => { row.missingLetterSearches.push(metrics); },
         });
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";
         row.route = observeRoute(row.result, c.expectedRoutes);

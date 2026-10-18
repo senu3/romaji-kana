@@ -9,6 +9,7 @@ export interface JapaneseConversionResult {
   reviewKana: string;
   changes?: ConversionChanges;
   conversionStrategy?: "completion" | "speculative";
+  romajiCorrection?: { partIndex: number; offset: number; inserted: string; before: string; after: string };
   inputCompletionApplied?: boolean;
   inputCompletionSourceKana?: string;
   inputCompletionAdditions?: string[];
@@ -30,6 +31,9 @@ export interface JapaneseConversionOptions {
   onRankedCandidates?: (result: JapaneseConversionResult) => void | Promise<void>;
   /** Disable correction/speculation for dictionary-only measurements. */
   autoRescue?: boolean;
+  /** Experimental branch: search one internal missing romaji letter before model repair. */
+  missingLetterCorrection?: boolean;
+  onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;
   onRescueStart?: () => void;
   /** Rescue stages must supply a reading, not legacy unvalidated plain text. */
   requireStructuredResponse?: boolean;

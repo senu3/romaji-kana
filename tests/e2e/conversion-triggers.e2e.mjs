@@ -144,5 +144,49 @@ try {
       assert.deepEqual(stages, ['correction', 'speculative']);
     });
   }
+  for (const cancel of [false, true]) {
+    await scenario({ autoConvert: false }, async (page, editor) => {
+      const reading = 'かいぎのじかんをかえないでください';
+      const text = '会議の時間を変えないでください';
+      await page.route('**/api/kana-engine', route => {
+        const requested = route.request().postDataJSON().reading;
+        return route.fulfill({ json: { candidates: requested === reading ? [{ text, reading, cost: 100,
+          tokens: [{ text, reading, from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }] : [],
+          dictionaryRevision: 'test', truncated: false } });
+      });
+      let release;
+      let sawSelection;
+      const selection = new Promise(resolve => { sawSelection = resolve; });
+      await page.route('**/api/generate', async route => {
+        const body = route.request().postDataJSON();
+        if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+        const prompt = JSON.parse(body.prompt);
+        assert.equal(prompt.originalInput, 'kaiginojkanwokaenaidekudasai.');
+        assert.equal(prompt.candidates[0].kind, 'correction');
+        sawSelection();
+        await new Promise(resolve => { release = resolve; });
+        await route.fulfill({ json: { response: JSON.stringify({ order: [prompt.candidates[0].id] }) } });
+      });
+      await page.keyboard.type('kaiginojkanwokaenaidekudasai.');
+      await page.keyboard.press('Control+Enter');
+      await selection;
+      assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.', 'Dictionary repair must not replace the original while ranking');
+      if (cancel) {
+        await page.getByRole('button', { name: /履歴を開く/ }).click();
+        await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      }
+      release();
+      if (cancel) {
+        await page.waitForTimeout(200);
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Canceled correction must not reappear');
+        assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.');
+      } else {
+        await page.locator('.cm-ghost-text-suggestion').waitFor();
+        assert.match(await page.locator('.cm-ghost-text-hint').textContent(), /誤字修正候補/);
+        await page.keyboard.press('Tab');
+        assert.equal(await editor.innerText(), `${text}。`);
+      }
+    });
+  }
   console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges and ordered rescue.');
 } finally { await browser?.close(); await server.close(); }
