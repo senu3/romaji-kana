@@ -14,7 +14,7 @@ import {
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { Compartment, EditorState, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
 import {
   highlightSelectionMatches,
   openSearchPanel,
@@ -88,6 +88,7 @@ interface MarkdownEditorProps {
   onAcceptGhost: (suggestion: GhostConversionSuggestion) => void;
   onDismissGhost: (suggestion?: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
+  onSpeculateGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   registerView: (view: EditorView | null) => void;
 }
@@ -141,13 +142,16 @@ interface GhostState {
   decorations: DecorationSet;
 }
 
+const speculateGhost = Facet.define<(suggestion: GhostConversionSuggestion) => void>();
+
 class GhostTextWidget extends WidgetType {
   constructor(private readonly candidate: GhostConversionSuggestion) {
     super();
   }
 
-  toDOM() {
+  toDOM(view: EditorView) {
     const presentation = candidatePresentation(this.candidate);
+    const speculative = this.candidate.conversionStrategy === "speculative";
     const explicitAcceptance = requiresExplicitAcceptance(this.candidate);
     const element = document.createElement("span");
     element.className = "cm-ghost-text";
@@ -175,7 +179,7 @@ class GhostTextWidget extends WidgetType {
         .map((addition) => `「${addition}」`)
         .join("・");
       const remainingCount = (this.candidate.inputCompletionAdditions ?? []).length - visibleAdditions.length;
-      const diffLabel = this.candidate.changes?.readingAssessment?.status !== "verified" ? "補完候補（読み未確認）"
+      const diffLabel = speculative ? "読みの追加" : this.candidate.changes?.readingAssessment?.status !== "verified" ? "補完候補（読み未確認）"
         : this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified" ? "補完候補（区切り未確認）" : "補完";
       diff.textContent = `${diffLabel} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
       diff.setAttribute(
@@ -191,7 +195,7 @@ class GhostTextWidget extends WidgetType {
     const before = document.createElement("span");
     before.textContent = `変換前: ${this.candidate.originalText}`;
     comparison.append(before);
-    if (this.candidate.inputCompletionSourceKana) {
+    if (this.candidate.inputCompletionSourceKana && !speculative) {
       const reading = document.createElement("span");
       reading.textContent = `補完前の読み: ${this.candidate.inputCompletionSourceKana}`;
       comparison.append(reading);
@@ -200,7 +204,12 @@ class GhostTextWidget extends WidgetType {
     after.textContent = "候補: ";
     after.append(suggestion);
     comparison.append(after);
-    if (this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified") {
+    if (this.candidate.conversionStrategy === "speculative" && this.candidate.changes?.resultReading) {
+      const reading = document.createElement("span");
+      reading.textContent = `読みの比較: ${this.candidate.changes.sourceReading} → ${this.candidate.changes.resultReading}`;
+      comparison.append(reading);
+    }
+    if (!speculative && (this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified")) {
       const note = document.createElement("span");
       note.textContent = "単語の区切り未確認。語の補完として確定せず、Tabで採用する候補として表示しています。";
       comparison.append(note);
@@ -213,13 +222,23 @@ class GhostTextWidget extends WidgetType {
         : "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
       comparison.append(note);
     }
-    if (this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {
+    if (!speculative && this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {
       const note = document.createElement("span");
       note.textContent = "補足・言い換えあり。追加箇所は特定できません。";
       comparison.append(note);
     }
     element.prepend(comparison);
     element.append(hint);
+    if (!this.candidate.previewOnly) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "cm-ghost-speculate";
+      retry.textContent = "意図と違うので推測し直す";
+      retry.title = "元の入力と文脈から、読みの変更も含めて推測します。本文は採用するまで変わりません。";
+      retry.onmousedown = event => event.preventDefault();
+      retry.onclick = () => view.state.facet(speculateGhost)[0]?.(this.candidate);
+      element.append(retry);
+    }
     return element;
   }
 
@@ -359,6 +378,21 @@ const theme = EditorView.theme({
   },
   ".cm-ghost-text-suggestion": {
     marginRight: "8px",
+  },
+  ".cm-ghost-speculate": {
+    display: "inline-block",
+    margin: "4px",
+    padding: "4px 8px",
+    maxWidth: "100%",
+    whiteSpace: "normal",
+    font: "inherit",
+    fontSize: "12px",
+    fontStyle: "normal",
+    color: "var(--theme-text, #123f3b)",
+    backgroundColor: "var(--theme-chrome, #f3f8f6)",
+    border: "1px solid var(--theme-border, #b5d7d1)",
+    borderRadius: "6px",
+    cursor: "pointer",
   },
   ".cm-ghost-comparison": {
     display: "inline-flex",
@@ -549,6 +583,7 @@ export function MarkdownEditor({
   onAcceptGhost,
   onDismissGhost,
   onRetryGhost,
+  onSpeculateGhost,
   onRetryRecent,
   registerView,
 }: MarkdownEditorProps) {
@@ -561,6 +596,7 @@ export function MarkdownEditor({
   const onAcceptGhostRef = useRef(onAcceptGhost);
   const onDismissGhostRef = useRef(onDismissGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
+  const onSpeculateGhostRef = useRef(onSpeculateGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
@@ -762,6 +798,7 @@ export function MarkdownEditor({
     onAcceptGhostRef.current = onAcceptGhost;
     onDismissGhostRef.current = onDismissGhost;
     onRetryGhostRef.current = onRetryGhost;
+    onSpeculateGhostRef.current = onSpeculateGhost;
     onRetryRecentRef.current = onRetryRecent;
     settingsRef.current = settings;
   }, [
@@ -771,6 +808,7 @@ export function MarkdownEditor({
     onDocumentChanged,
     onEditorStatusChange,
     onRetryGhost,
+    onSpeculateGhost,
     onRetryRecent,
     settings,
   ]);
@@ -801,6 +839,10 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        speculateGhost.of(suggestion => {
+          clearPredictiveSuggestionTimer();
+          onSpeculateGhostRef.current(suggestion);
+        }),
         unconvertedRanges,
         theme,
         syntaxHighlighting(highlightStyle),

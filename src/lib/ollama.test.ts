@@ -20,6 +20,43 @@ const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as con
 import { protectedContentPrompt } from "./conversionProtection";
 
 describe("convertRomajiToJapanese", () => {
+  it("reinterprets a user-rejected valid conversion without dictionary selection or fixed-reading retries", async () => {
+    const transport = { models: vi.fn(), generate: vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: "確認", completedKana: "かくにん" }) }) };
+    const engine = { search: vi.fn(), complete: vi.fn(), verify: vi.fn().mockResolvedValue("verified") };
+    const result = await convertRomajiToJapaneseDetailed("kakuni", applicationSettings, transport, {
+      userRequestedSpeculation: true, kanaEngine: engine, avoidOutputs: ["角煮"],
+      alternativeMode: true, alternativeReading: "かくに", contextBefore: "資料を", contextAfter: "してください。",
+    });
+    expect(result).toMatchObject({ text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" });
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+    expect(engine.search).not.toHaveBeenCalled();
+    expect(engine.complete).not.toHaveBeenCalled();
+    const request = transport.generate.mock.calls[0]![2];
+    expect(request.system).toContain("user explicitly rejected");
+    expect(request.system).toContain("rejected only for this target occurrence");
+    expect(request.system).toContain('- "角煮"');
+    expect(request.system).not.toContain("after ordinary conversion and minimal typo correction could not");
+    expect(request.prompt).toContain("kakuni");
+    expect(request.prompt).toContain("かくに");
+    expect(request.prompt).toContain("資料を");
+    expect(request.prompt).toContain("してください。");
+    expect(request.outputSchema).toBeDefined();
+  });
+
+  it.each([
+    { convertedText: "角煮", completedKana: "かくに" },
+    { convertedText: "", completedKana: "" },
+    { convertedText: "かくに", completedKana: "かくに" },
+  ])("rejects an unusable explicit speculation: $convertedText", async response => {
+    const transport = { models: vi.fn(), generate: vi.fn().mockResolvedValue({ response: JSON.stringify(response) }) };
+    const result = await convertRomajiToJapaneseDetailed("kakuni", defaultSettings, transport, {
+      userRequestedSpeculation: true, avoidOutputs: ["角煮"],
+    });
+    expect(result.suggestionRejected).toBe(true);
+    expect(result.text).toBe("");
+    expect(transport.generate).toHaveBeenCalledTimes(1);
+  });
+
   it("stops a stale suggestion when its abort signal is canceled", async () => {
     const transport = {
       models: vi.fn(),
@@ -1170,7 +1207,7 @@ describe("convertRomajiToJapanese", () => {
     expect(prompt).toContain("one speculative Japanese writing candidate");
     expect(prompt).toContain("Never invent an unrelated sentence");
     expect(prompt).toContain(protectedContentPrompt);
-    expect(prompt).toContain("- ありがとう。");
+    expect(prompt).toContain('- "ありがとう。"');
     expect(prompt).toContain('- "有難う"');
   });
 

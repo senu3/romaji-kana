@@ -50,6 +50,8 @@ export interface JapaneseConversionOptions {
   /** Explicit typo-repair request (legacy name); never a spelling retry policy. */
   completionMode?: boolean;
   speculativeMode?: boolean;
+  /** The user rejected a valid conversion in this occurrence; reinterpret the original input. */
+  userRequestedSpeculation?: boolean;
   completionSourceRomaji?: string;
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
   documentVocabulary?: string[];

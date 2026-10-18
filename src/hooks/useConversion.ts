@@ -84,6 +84,7 @@ function hasDuplicatePendingHistoryConversion(
     request.source === "history" &&
     request.originalText === next.originalText &&
     request.retryOf === next.retryOf &&
+    request.userRequestedSpeculation === next.userRequestedSpeculation &&
     request.alternativeReading === next.alternativeReading &&
     request.alternativeCorrectedReading === next.alternativeCorrectedReading &&
     request.alternativeAdditionKind === next.alternativeAdditionKind &&
@@ -235,6 +236,7 @@ export function useConversion({
       prependConversionHistory(items, {
         id: request.id,
         status: "canceled",
+        conversionStrategy: request.userRequestedSpeculation ? "speculative" : undefined,
         input: request.originalText,
         error: "ユーザーがキャンセルしました。",
         modelName: settingsRef.current.modelName,
@@ -257,6 +259,7 @@ export function useConversion({
       prependConversionHistory(items, {
         id: request.id,
         status: "skipped",
+        conversionStrategy: request.userRequestedSpeculation ? "speculative" : undefined,
         input: request.originalText,
         error: message,
         modelName: settingsRef.current.modelName,
@@ -467,6 +470,7 @@ export function useConversion({
           },
           avoidOutputs: request.avoidOutputs,
           alternativeReading: request.alternativeReading,
+          userRequestedSpeculation: request.userRequestedSpeculation,
           alternativeCorrectedReading: request.alternativeCorrectedReading,
           alternativeAdditionKind: request.alternativeAdditionKind,
           documentVocabulary: request.documentVocabulary,
@@ -504,7 +508,9 @@ export function useConversion({
           currentView?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
           skipQueuedConversion(
             request,
-            conversion.suggestionRejectedReason === "speculative"
+            request.userRequestedSpeculation
+              ? "意図に合う推測候補を作れませんでした。本文は変更していません。"
+              : conversion.suggestionRejectedReason === "speculative"
               ? "適切な推測候補を作れなかったため、ローマ字を残しました。"
               : "候補を安全に適用できなかったため、履歴からのサジェストを表示しませんでした。",
           );
@@ -682,10 +688,12 @@ export function useConversion({
           contextAfter: resolved && currentView ? currentView.state.doc.sliceString(resolved.to, Math.min(currentView.state.doc.length, resolved.to + 600)) : "",
           avoidOutputs: request.avoidOutputs,
           alternativeReading: request.alternativeReading,
+          userRequestedSpeculation: request.userRequestedSpeculation,
           alternativeCorrectedReading: request.alternativeCorrectedReading,
           alternativeAdditionKind: request.alternativeAdditionKind,
           documentVocabulary: request.documentVocabulary,
-          protectedDictionaryEntries: resolved
+          // Unconverted romaji is the target, not a protected ASCII spelling.
+          protectedDictionaryEntries: resolved && resolved.matchedText !== request.originalText
             ? buildProtectedDictionaryEntries(
               request.originalText,
               resolved.matchedText,
@@ -723,7 +731,9 @@ export function useConversion({
         setStatus({
           kind: "loading",
           message:
-            request.retryOf
+            request.userRequestedSpeculation
+              ? `"${request.originalText}" の意図を推測し直しています`
+              : request.retryOf
               ? `"${request.originalText}" の別候補を試しています`
               : request.source === "history"
                 ? `"${request.originalText}" を再変換しています`
@@ -743,6 +753,7 @@ export function useConversion({
               prependConversionHistory(items, {
                 id: request.id,
                 status: "error",
+                conversionStrategy: request.userRequestedSpeculation ? "speculative" : undefined,
                 input: request.originalText,
                 error: message,
                 modelName: settingsRef.current.modelName,
@@ -1107,6 +1118,35 @@ export function useConversion({
     return handleAlternativeHistory(recentRetryItem);
   }, [handleAlternativeHistory, recentRetryItem]);
 
+  const handleSpeculateHistory = useCallback((item: ConversionHistoryItem) => {
+    const view = editorViewRef.current;
+    const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor) : null;
+    if (!view || !resolved || !item.output) {
+      setStatus({ kind: "warning", message: "元の箇所を確認できないため、推測し直せません。" });
+      return false;
+    }
+    const visible = view.state.field(ghostSuggestionField).suggestion;
+    if (visible && rangesOverlap(visible, resolved)) requestsRef.current.cancel(visible.id);
+    invalidatePredictiveSuggestions();
+    return enqueueConversion({ id: createId("conversion"), source: "history", status: "queued",
+      originalText: item.input, createdAt: Date.now(), docVersion: docVersionRef.current,
+      anchor: { ...item.anchor!, from: resolved.from, to: resolved.to, originalText: resolved.matchedText },
+      retryOf: item.id, userRequestedSpeculation: true, inputCompletionLevel: "none",
+      avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
+      documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision });
+  }, [enqueueConversion, invalidatePredictiveSuggestions]);
+
+  const handleSpeculateGhost = useCallback((suggestion: GhostConversionSuggestion) => {
+    const view = editorViewRef.current;
+    if (!view || suggestion.previewOnly || view.state.field(ghostSuggestionField).suggestion?.id !== suggestion.id ||
+      view.state.doc.sliceString(suggestion.from, suggestion.to) !== suggestion.originalText) return false;
+    return handleSpeculateHistory({ id: suggestion.id, input: suggestion.inputText, output: suggestion.convertedText,
+      status: "success", source: suggestion.source, createdAt: Date.now(), modelName: settingsRef.current.modelName,
+      anchor: { from: suggestion.from, to: suggestion.to, originalText: suggestion.originalText, docVersion: docVersionRef.current },
+      avoidOutputs: suggestion.avoidOutputs, documentVocabulary: suggestion.documentVocabulary,
+      documentVocabularyRevision: suggestion.documentVocabularyRevision });
+  }, [handleSpeculateHistory]);
+
   useEffect(() => {
     if (!recentRetryItem) {
       return;
@@ -1384,6 +1424,8 @@ export function useConversion({
     handleAcceptGhost,
     handleDismissGhost,
     handleRetryGhost,
+    handleSpeculateGhost,
+    handleSpeculateHistory,
     retryRecentConversion,
     history,
     recentRetryItem,

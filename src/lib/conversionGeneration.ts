@@ -200,7 +200,7 @@ function kanaGenerationParameters(settings: AppSettings, options: JapaneseConver
   if (route.kind === "speculative") {
     return {
       system: buildSpeculativeConversionSystemPrompt(
-        settings.conversionPrompt, options.avoidOutputs ?? [], options.documentVocabulary ?? [],
+        settings.conversionPrompt, options.avoidOutputs ?? [], options.documentVocabulary ?? [], options.userRequestedSpeculation,
       ),
       temperature: 0.45,
     };

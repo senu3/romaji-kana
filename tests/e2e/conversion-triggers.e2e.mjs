@@ -73,6 +73,63 @@ try {
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-settings')).inputCompletionLevel), 'none');
     });
   }
+  for (const entry of ['ghost', 'recent', 'history']) {
+    await scenario({ autoConvert: false, conversionMode: entry === 'ghost' ? 'ghost' : 'replace' }, async (page, editor) => {
+      await page.route('**/api/kana-engine', route => {
+        const request = route.request().postDataJSON();
+        if (request.operation === 'verify') return route.fulfill({ json: { status: 'verified' } });
+        assert.equal(request.reading, 'かくに');
+        return route.fulfill({ json: { candidates: [{ text: '角煮', reading: 'かくに', cost: 100,
+          tokens: [{ text: '角煮', reading: 'かくに', from: 0, to: 3, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }],
+          dictionaryRevision: 'test', truncated: false } });
+      });
+      let proposals = 0;
+      await page.route('**/api/generate', route => {
+        const body = route.request().postDataJSON();
+        if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+        assert.match(body.system, /user explicitly rejected/);
+        assert.match(body.system, /rejected only for this target occurrence/);
+        assert.match(body.system, /"角煮"/);
+        assert.match(body.prompt, /Original romaji input:\nkakuni/);
+        assert.match(body.prompt, /資料を/);
+        assert.match(body.prompt, /してください。/);
+        proposals++;
+        return route.fulfill({ json: { response: JSON.stringify(entry === 'recent'
+          ? { convertedText: '角煮', completedKana: 'かくに' }
+          : { convertedText: '確認', completedKana: 'かくにん' }) } });
+      });
+      await page.keyboard.insertText('資料をkakuniしてください。');
+      await page.keyboard.press('Control+Home');
+      for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+      for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowRight');
+      await page.keyboard.press('Control+Enter');
+      if (entry === 'ghost') await page.locator('.cm-ghost-text-suggestion').waitFor();
+      else await page.getByRole('complementary', { name: '別候補への再変換' }).waitFor();
+      assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
+      if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();
+      const action = entry === 'ghost' ? page.locator('.cm-ghost-speculate')
+        : entry === 'recent' ? page.locator('.recent-retry-chip').getByRole('button', { name: '意図と違うので推測し直す' })
+        : page.locator('.history-item').getByRole('button', { name: '意図と違うので推測し直す' });
+      await action.click();
+      if (entry === 'recent') {
+        await page.getByText('意図に合う推測候補を作れませんでした。本文は変更していません。', { exact: true }).first().waitFor();
+        assert.equal(await editor.innerText(), '資料を角煮してください。');
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+      } else {
+        await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '確認' }).waitFor();
+        assert.match(await page.locator('.cm-ghost-comparison').textContent(), /かくに → かくにん/);
+        const doc = await editor.evaluate(element => { const clone = element.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(e => e.remove()); return clone.textContent; });
+        assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
+        await page.setViewportSize({ width: 390, height: 520 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        if (entry === 'ghost') await page.screenshot({ path: 'node_modules/.conversion-tmp/speculate-mobile.png', fullPage: true });
+        await editor.click();
+        await page.keyboard.press('Tab');
+        assert.equal(await editor.innerText(), '資料を確認してください。');
+      }
+      assert.equal(proposals, 1, 'Explicit reinterpretation must issue only one proposal');
+    });
+  }
   await scenario({ triggers: { typing: true, space: true } }, async (page, editor, searches) => {
     await editor.evaluate(element => {
       const data = new DataTransfer();
@@ -211,5 +268,5 @@ try {
       }
     });
   }
-  console.log('Conversion trigger E2E passed: independent pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges and ordered rescue.');
+  console.log('Conversion trigger E2E passed: pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges, ordered rescue and user-requested speculation.');
 } finally { await browser?.close(); await server.close(); }

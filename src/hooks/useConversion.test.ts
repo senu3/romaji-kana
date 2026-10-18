@@ -39,6 +39,49 @@ function harness(content = "konnichiha") {
 describe("conversion lifecycle", () => {
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
+  it("explicitly speculates from a ghost's original romaji and context instead of its held candidates", async () => {
+    const { hook, view, options } = harness("資料をkakuniしてください。");
+    options.settingsRef.current.conversionMode = "replace";
+    const session = createConversionSession("kakuni", [
+      { id: "first", kind: "conversion", result: { text: "角煮", reviewKana: "かくに" } },
+      { id: "second", kind: "conversion", result: { text: "カクニ", reviewKana: "かくに" } },
+    ]);
+    const suggestion = { id: "normal", from: 3, to: 9, originalText: "kakuni", inputText: "kakuni",
+      convertedText: "角煮", source: "editor" as const, session, reviewKana: "かくに" };
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(suggestion) }); });
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" });
+    await act(async () => { hook.current.handleSpeculateGhost(suggestion); });
+    expect(session.state).toBe("dismissed");
+    const call = vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall!;
+    expect(call[0]).toBe("kakuni");
+    expect(call[3]).toMatchObject({ userRequestedSpeculation: true, avoidOutputs: ["角煮"], contextBefore: "資料を", contextAfter: "してください。" });
+    expect(call[3]?.alternativeReading).toBeUndefined();
+    expect(call[3]?.protectedDictionaryEntries).toEqual([]);
+    expect(view.state.doc.toString()).toBe("資料をkakuniしてください。");
+    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ convertedText: "確認", conversionStrategy: "speculative" });
+  });
+
+  it.each(["rejected", "canceled"] as const)("keeps an applied conversion when explicit speculation is %s", async outcome => {
+    const { hook, view } = harness("資料を角煮してください。");
+    const result = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(result.promise);
+    act(() => { hook.current.handleSpeculateHistory({ id: "applied", status: "success", input: "kakuni", output: "角煮",
+      modelName: "test", createdAt: 0, source: "editor", anchor: { from: 3, to: 5, originalText: "kakuni", appliedText: "角煮", docVersion: 0 } }); });
+    if (outcome === "canceled") act(() => { hook.current.cancelConversion(hook.current.pending[0]); });
+    await act(async () => { result.resolve(outcome === "rejected"
+      ? { text: "", reviewKana: "かくに", suggestionRejected: true, suggestionRejectedReason: "speculative" }
+      : { text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" }); });
+    expect(view.state.doc.toString()).toBe("資料を角煮してください。");
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+  });
+
+  it("does not speculate from an edited or stale ghost", () => {
+    const { hook } = harness("edited");
+    act(() => { hook.current.handleSpeculateGhost({ id: "old", from: 0, to: 6, originalText: "kakuni", inputText: "kakuni",
+      convertedText: "角煮", source: "editor" }); });
+    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
+  });
+
   it.each(["word", "sentence"] as const)("uses normal conversion despite stale %s settings for manual, pause and history requests", async level => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "あと自動変換が", reviewKana: "あとじどうへんかんが" });
     const { hook, view, options } = harness("atozidouhennkannga");

@@ -139,6 +139,7 @@ export interface GhostConversionSuggestion {
 }
 
 export interface PendingConversion {
+  userRequestedSpeculation?: boolean;
   alternativeAdditionKind?: import("./conversionChanges").ConversionChanges["additionKind"];
   alternativeReading?: string;
   alternativeCorrectedReading?: string;

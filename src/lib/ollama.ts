@@ -32,6 +32,9 @@ export async function convertRomajiToJapaneseDetailed(
   transport: OllamaTransport = defaultOllamaTransport,
   options: JapaneseConversionOptions = {},
 ): Promise<JapaneseConversionResult> {
+  if (options.userRequestedSpeculation) options = { ...options, speculativeMode: true, completionMode: false,
+    alternativeMode: false, alternativeReading: undefined, alternativeCorrectedReading: undefined,
+    alternativeAdditionKind: undefined, requireStructuredResponse: true };
   options = { ...options, kanaEngine: options.kanaEngine ?? (settings.conversionEngine === "llm" ? undefined : defaultKanaEngine) };
   const explicitRescue = options.completionMode || options.speculativeMode;
   const requestOptions = !explicitRescue && hasAvoidOutputs(options.avoidOutputs)
@@ -98,7 +101,8 @@ export async function convertRomajiToJapaneseDetailed(
   }
 
   if (explicitRescue || !hasAvoidOutputs(options.avoidOutputs)) {
-    return result;
+    return options.userRequestedSpeculation ? { ...result, text: "", suggestionRejected: true,
+      suggestionRejectedReason: "speculative" } : result;
   }
 
   for (const attempt of alternativeConversionAttempts(requestOptions)) {

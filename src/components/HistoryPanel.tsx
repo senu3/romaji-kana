@@ -5,10 +5,12 @@ import type { ConversionHistoryItem, PendingConversion } from "../lib/types";
 export function RecentRetryChip({
   item,
   onRetry,
+  onSpeculate,
   onDismiss,
 }: {
   item: ConversionHistoryItem;
   onRetry: () => void;
+  onSpeculate: () => void;
   onDismiss: () => void;
 }) {
   return (
@@ -33,6 +35,10 @@ export function RecentRetryChip({
         </span>
         <kbd>Ctrl/Cmd+/</kbd>
       </button>
+      <button className="history-action-button" type="button" onClick={onSpeculate}
+        title="元の入力と文脈から、読みの変更も含めて推測します">
+        意図と違うので推測し直す
+      </button>
       <button
         className="recent-retry-chip-dismiss"
         type="button"
@@ -52,6 +58,7 @@ export function HistoryPanel({
   onCancel,
   onRerun,
   onAlternative,
+  onSpeculate,
   onPreview,
   onPreviewEnd,
   onClose,
@@ -61,6 +68,7 @@ export function HistoryPanel({
   onCancel: (request: PendingConversion) => void;
   onRerun: (item: ConversionHistoryItem) => void;
   onAlternative: (item: ConversionHistoryItem) => void;
+  onSpeculate: (item: ConversionHistoryItem) => void;
   onPreview: (item: ConversionHistoryItem) => void;
   onPreviewEnd: (item: ConversionHistoryItem) => void;
   onClose: () => void;
@@ -77,7 +85,7 @@ export function HistoryPanel({
                   {request.retryOf
                     ? request.status === "queued"
                       ? "再試行待ち"
-                      : "別候補を生成中"
+                      : request.userRequestedSpeculation ? "意図を推測中" : "別候補を生成中"
                     : request.status === "queued"
                       ? "待機中"
                       : request.source === "history"
@@ -134,7 +142,7 @@ export function HistoryPanel({
                 </div>
                 {item.inputCompletionSourceKana ? (
                   <div className="history-line">
-                    <dt>補完前の読み</dt>
+                    <dt>{item.conversionStrategy === "speculative" ? "元の読み" : "補完前の読み"}</dt>
                     <dd>{item.inputCompletionSourceKana}</dd>
                   </div>
                 ) : null}
@@ -150,7 +158,7 @@ export function HistoryPanel({
                     }`}
                   title={
                     item.inputCompletionApplied && item.inputCompletionSourceKana
-                      ? `補完前: ${item.inputCompletionSourceKana}`
+                      ? `${item.conversionStrategy === "speculative" ? "元の読み" : "補完前"}: ${item.inputCompletionSourceKana}`
                       : candidatePresentation(item).description
                   }
                 >
@@ -184,6 +192,11 @@ export function HistoryPanel({
                 >
                   <RotateCcw size={13} aria-hidden="true" />
                   別候補
+                </button>
+                <button className="history-action-button" type="button" disabled={!item.output || !item.anchor}
+                  title="元の入力と文脈から、読みの変更も含めて推測します。採用するまで本文は変わりません。"
+                  onClick={() => { onPreviewEnd(item); onSpeculate(item); onClose(); }}>
+                  意図と違うので推測し直す
                 </button>
               </div>
             </article>

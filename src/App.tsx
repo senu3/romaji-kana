@@ -112,6 +112,8 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     handleAcceptGhost,
     handleDismissGhost,
     handleRetryGhost,
+    handleSpeculateGhost,
+    handleSpeculateHistory,
     retryRecentConversion,
     history,
     recentRetryItem,
@@ -311,6 +313,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onAcceptGhost={handleAcceptGhost}
         onDismissGhost={handleDismissGhost}
         onRetryGhost={handleRetryGhost}
+        onSpeculateGhost={handleSpeculateGhost}
         onRetryRecent={retryRecentConversion}
         registerView={registerView}
       />
@@ -331,6 +334,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         <RecentRetryChip
           item={recentRetryItem}
           onRetry={retryRecentConversion}
+          onSpeculate={() => handleSpeculateHistory(recentRetryItem)}
           onDismiss={dismissRecentRetryChip}
         />
       ) : null}
@@ -356,6 +360,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
               onCancel={cancelConversion}
               onRerun={handleRerunHistory}
               onAlternative={handleAlternativeHistory}
+              onSpeculate={handleSpeculateHistory}
               onPreview={previewHistoryGhost}
               onPreviewEnd={clearHistoryGhost}
               onClose={closeActivePanel}
