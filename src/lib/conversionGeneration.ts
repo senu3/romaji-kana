@@ -152,6 +152,10 @@ export async function generateKanaConversion(
       model: settings.modelName,
       system: referenceContextInstruction + "\n\n" + generation.system + "\n\n" + finalConversionOutputContract,
       prompt: finalTargetPrompt(request, Boolean(options.completionMode || options.speculativeMode)),
+      ...(options.requireStructuredResponse ? { outputSchema: {
+        type: "object", properties: { convertedText: { type: "string" }, completedKana: { type: "string" } },
+        required: ["convertedText", "completedKana"], additionalProperties: false,
+      } } : {}),
       stream: false,
       think: settings.think,
       options: {

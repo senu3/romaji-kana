@@ -50,6 +50,19 @@ test("keeps the unused comparison set separate from the regression set", async (
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("validates rescue cases with unspecified acceptable text and route expectations", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "kana-rescue-"));
+  try {
+    const result = await run(["--dry-run", "--dataset", "tests/evaluation/rescue-holdout.json", "--out", join(dir, "run")]);
+    assert.equal(result.code, 0, result.output);
+    const manifest = JSON.parse(await readFile(join(dir, "run/manifest.json"), "utf8"));
+    assert.equal(manifest.cases.length, 12);
+    assert.equal(manifest.schedule.length, 36);
+    assert.deepEqual(manifest.cases.find(c => c.id === "rescue-11").acceptableExamples, []);
+    assert.deepEqual(manifest.cases.find(c => c.id === "rescue-11").expectedRoutes, ["rejected"]);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 for (const format of ["plain", "structured"]) {
   for (const provider of ["ollama", "lmstudio"]) {
     test(`${provider}/${format}: real pipeline records HTTP attempts and stops on 503`, async () => {
@@ -85,6 +98,7 @@ for (const format of ["plain", "structured"]) {
         assert.equal(rows[1].review.usable, null);
         assert.equal(rows[1].firstDictionaryCandidateMs, null);
         assert.equal(rows[1].rankingCompletionMs, null);
+        assert.deepEqual(rows[1].route, { finalRoute: "normal", expectedRoutes: null, matchesExpectation: null });
         assert.equal(rows[1].apiCallCount, provider === "ollama" ? 1 : 2);
         assert.equal(requests[0].path, provider === "ollama" ? "/api/generate" : "/v1/chat/completions");
         assert.equal(requests[0].body.stream, false);

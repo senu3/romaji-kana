@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import { createKanaEngineClient } from "../../tools/kana-engine-client.mjs";
+import { finalRoutes, observeRoute, summarizeRoutes } from "./routes.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { values: args } = parseArgs({ options: {
@@ -47,7 +48,10 @@ async function main() {
   const dataset = JSON.parse(source);
   const ids = new Set();
   for (const c of dataset.cases) {
-    if (!c.id || ids.has(c.id) || !c.input || !c.category || !c.criteria?.length || !c.acceptableExamples?.length) throw new Error(`Invalid case: ${c.id}`);
+    if (!c.id || ids.has(c.id) || !c.input || !c.category || !c.criteria?.length || !Array.isArray(c.acceptableExamples)) throw new Error(`Invalid case: ${c.id}`);
+    if (c.expectedRoutes !== undefined && (!Array.isArray(c.expectedRoutes) || !c.expectedRoutes.length ||
+        c.expectedRoutes.some(route => !finalRoutes.includes(route)))) throw new Error(`Invalid expectedRoutes: ${c.id}`);
+    if (!c.acceptableExamples.length && !c.expectedRoutes) throw new Error(`Empty examples require expectedRoutes: ${c.id}`);
     if (!["none", "word", "sentence"].includes(c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel)) throw new Error(`Invalid mode: ${c.id}`);
     ids.add(c.id);
   }
@@ -144,24 +148,27 @@ async function main() {
       const started = performance.now();
       const row = { ...trial, category: c.category, mode: c.settings.inputCompletionLevel, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options: c.options };
       row.firstDictionaryCandidateMs = null;
+      row.rescueStartedMs = null;
       try {
         row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, {
           ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
           onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
+          onRescueStart: () => { row.rescueStartedMs = performance.now() - started; },
         });
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";
+        row.route = observeRoute(row.result, c.expectedRoutes);
       } catch (error) {
         row.outcome = "error"; row.error = String(error);
         if (error?.diagnostic) row.errorDiagnostic = error.diagnostic;
         stopped = true;
       }
       row.elapsedMs = performance.now() - started;
-      row.rankingCompletionMs = args.engine === "hybrid" && row.result?.session && row.firstDictionaryCandidateMs !== null ? row.elapsedMs : null;
+      row.rankingCompletionMs = args.engine === "hybrid" && row.firstDictionaryCandidateMs !== null ? row.rescueStartedMs ?? row.elapsedMs : null;
       row.apiCalls = calls;
       row.apiCallCount = calls.length;
       row.exactReferenceMatch = {
-        top: c.acceptableExamples.includes(row.result?.text),
-        pool: row.result?.session ? row.result.session.candidates.some(candidate => c.acceptableExamples.includes(candidate.result.text)) : null,
+        top: c.acceptableExamples.length ? c.acceptableExamples.includes(row.result?.text) : null,
+        pool: c.acceptableExamples.length && row.result?.session ? row.result.session.candidates.some(candidate => c.acceptableExamples.includes(candidate.result.text)) : null,
       };
       row.engineCalls = engineCalls;
       // A timed-out model generation may still be occupying the server even if
@@ -182,7 +189,9 @@ async function main() {
       groups[category] = { trials: rows.length, candidates: rows.filter(r => r.outcome === "candidate").length, rejected: rows.filter(r => r.outcome === "rejected").length, empty: rows.filter(r => r.outcome === "empty").length, errors: rows.filter(r => r.outcome === "error").length, medianMs: timings.length ? timings.length % 2 ? timings[mid] : (timings[mid - 1] + timings[mid]) / 2 : null };
     }
     await writeFile(resolve(out, "summary.json"), JSON.stringify({ stoppedOnError: stopped, plannedTrials: schedule.length, completedTrials: measured.length,
+      routes: summarizeRoutes(measured),
       exactReferenceMatch: { top: measured.filter(r => r.exactReferenceMatch.top).length,
+        topEvaluated: measured.filter(r => r.exactReferenceMatch.top !== null).length,
         pool: measured.filter(r => r.exactReferenceMatch.pool === true).length, poolEvaluated: measured.filter(r => r.exactReferenceMatch.pool !== null).length },
       qualityStatus: "unreviewed; candidate or exact example match does not mean correct", categories: groups }, null, 2));
     if (stopped) process.exitCode = 1;

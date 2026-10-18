@@ -40,6 +40,9 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(result.attempts?.map(a => [a.stage, a.outcome])).toEqual([["normal", "rejected"], ["correction", "candidate"]]);
     expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(h.generate.mock.calls[0][2].outputSchema).toEqual({ type: "object",
+      properties: { convertedText: { type: "string" }, completedKana: { type: "string" } },
+      required: ["convertedText", "completedKana"], additionalProperties: false });
   });
   it("discards an unchanged reading echo and tries speculation once", async () => {
     const h = harness();
@@ -51,6 +54,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(h.generate.mock.calls[0][2].system).toContain("minimally repair");
     expect(h.generate.mock.calls[1][2].system).toContain("speculative Japanese");
+    expect(h.generate.mock.calls[1][2].outputSchema.required).toEqual(["convertedText", "completedKana"]);
   });
   it("allows an inferred natural hiragana word without inventing a kanji paraphrase", async () => {
     const h = harness();

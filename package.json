@@ -13,7 +13,7 @@
     "test:e2e:triggers": "node tests/e2e/conversion-triggers.e2e.mjs",
     "test:engine": "cargo test --manifest-path src-engine/Cargo.toml",
     "eval:run": "node tests/evaluation/run.mjs",
-    "eval:test": "node --test tests/evaluation/runner.check.mjs",
+    "eval:test": "node --test tests/evaluation/runner.check.mjs tests/evaluation/routes.check.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
