@@ -3,7 +3,7 @@ import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
 // These tests exercise the legacy model-generation contract.
 const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
-import { ConversionResponseError } from "./conversionDiagnostics";
+import { ConversionResponseError } from "../../../src/lib/conversionDiagnostics";
 
 describe("conversion failure diagnostics", () => {
   it.each([

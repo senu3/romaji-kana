@@ -1,3 +1,4 @@
+// Evaluation-only conversion baseline: a89d523. Never import from production.
 import type { JapaneseConversionResult } from "./japaneseConversionTypes";
 
 /** Project observed changes into the legacy API once, at the public boundary.

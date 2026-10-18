@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeNumericReading } from "./numericReading";
+import { normalizeNumericReading } from "../../../src/lib/numericReading";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
 // These tests exercise the legacy model-generation contract.

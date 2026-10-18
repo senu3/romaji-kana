@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeReading, normalizeComparableReading, normalizeNumericAlignment, splitTerminalPunctuation } from "./readingComparison";
+import { normalizeReading, normalizeComparableReading, normalizeNumericAlignment, splitTerminalPunctuation } from "../../../src/lib/readingComparison";
 import { isAllowedInputCompletion } from "./completionValidation";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";

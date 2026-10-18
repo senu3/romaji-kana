@@ -468,7 +468,7 @@ fn update_shared_conversion_settings(
         "triggers",
         "punctuationConversion",
         "conversionPrompt",
-        "inputCompletionLevel",
+        "personalDictionary",
         "inputPauseTiming",
         "useDocumentVocabulary",
         "userDictionary",
@@ -489,9 +489,6 @@ fn update_shared_conversion_settings(
             .get(key)
             .ok_or_else(|| format!("変換設定に {key} がありません。"))?;
         current.insert(key.to_string(), value.clone());
-    }
-    for key in ["personalDictionary", "conversionEngine"] {
-        if let Some(value) = incoming.get(key) { current.insert(key.to_string(), value.clone()); }
     }
     shared.settings_updated_by = request.client_id;
 
@@ -666,7 +663,7 @@ mod tests {
             "triggers": { "period": true, "comma": true, "enter": false, "manualShortcut": "Mod-Enter" },
             "punctuationConversion": { "periodToJapanese": true, "commaToJapanese": true },
             "conversionPrompt": "desktop prompt",
-            "inputCompletionLevel": "none",
+            "personalDictionary": [],
             "inputPauseTiming": "auto",
             "useDocumentVocabulary": false,
             "userDictionary": [],
@@ -684,7 +681,7 @@ mod tests {
                     "triggers": { "period": false, "comma": true, "enter": true, "manualShortcut": "Mod-Enter" },
                     "punctuationConversion": { "periodToJapanese": false, "commaToJapanese": true },
                     "conversionPrompt": "mobile prompt",
-                    "inputCompletionLevel": "word",
+                    "personalDictionary": [],
                     "inputPauseTiming": "deliberate",
                     "useDocumentVocabulary": true,
                     "userDictionary": []

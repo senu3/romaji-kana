@@ -1,5 +1,5 @@
-import { candidatePresentation } from "../lib/candidatePresentation";
 import { Loader2, RotateCcw, X } from "lucide-react";
+import { candidatePresentation } from "../lib/candidatePresentation";
 import type { ConversionHistoryItem, PendingConversion } from "../lib/types";
 
 export function RecentRetryChip({
@@ -13,11 +13,10 @@ export function RecentRetryChip({
 }) {
   return (
     <aside
-      className={`recent-retry-chip ${item.conversionStrategy === "completion" ||
-          item.conversionStrategy === "speculative" ||
-          item.inputCompletionApplied
-          ? "completion"
-          : ""
+      className={`recent-retry-chip ${item.conversionStrategy === "correction" ||
+        item.conversionStrategy === "speculative"
+        ? "review"
+        : ""
         }`}
       aria-label="変換結果の見直し"
     >
@@ -132,10 +131,10 @@ export function HistoryPanel({
                   <dt>変換前</dt>
                   <dd>{item.input}</dd>
                 </div>
-                {item.inputCompletionSourceKana ? (
+                {item.changes?.sourceReading ? (
                   <div className="history-line">
-                    <dt>{item.conversionStrategy === "speculative" ? "元の読み" : "補完前の読み"}</dt>
-                    <dd>{item.inputCompletionSourceKana}</dd>
+                    <dt>元の読み</dt>
+                    <dd>{item.changes?.sourceReading}</dd>
                   </div>
                 ) : null}
                 <div className="history-line">
@@ -146,13 +145,8 @@ export function HistoryPanel({
               <div className="rerun-meta">
                 <span className="history-model">{item.modelName}</span>
                 <span
-                  className={`history-completion-level ${item.inputCompletionApplied ? "applied" : ""
-                    }`}
-                  title={
-                    item.inputCompletionApplied && item.inputCompletionSourceKana
-                      ? `${item.conversionStrategy === "speculative" ? "元の読み" : "補完前"}: ${item.inputCompletionSourceKana}`
-                      : candidatePresentation(item).description
-                  }
+                  className="history-route"
+                  title={candidatePresentation(item).description}
                 >
                   {candidatePresentation(item).label}
                 </span>

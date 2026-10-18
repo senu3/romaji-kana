@@ -11,7 +11,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, conversionMode: 'ghost', conversionEngine: 'local' }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, conversionMode: 'ghost' }));
   });
   const page = await context.newPage();
   let modelCalls = 0;
@@ -122,7 +122,7 @@ try {
   assert.equal(await page.getByRole('radiogroup', { name: '入力補完レベル' }).count(), 0);
   await page.getByRole('button', { name: '変換 を閉じる' }).click();
   await context.close();
-  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, cancellation, learning, personal words, retired completion UI.');
+  console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, cancellation, learning, personal words, current conversion UI.');
 } finally { await browser?.close(); await server.close(); }
 
 async function documentText(page) {

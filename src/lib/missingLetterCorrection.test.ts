@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import { missingLetterReadings, searchMissingLetter } from "./missingLetterCorrection";
-import { defaultSettings } from "./settings";
 import type { KanaEngine } from "./kanaEngine";
-import { requiresExplicitAcceptance } from "./readingAssessment";
+import { missingLetterReadings, searchMissingLetter } from "./missingLetterCorrection";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
+import { requiresExplicitAcceptance } from "./readingAssessment";
+import { defaultSettings } from "./settings";
 
 function harness() {
-  const engine: KanaEngine = { verify: vi.fn(), search: vi.fn(async reading => ({
-    dictionaryRevision: "test", truncated: false,
-    candidates: reading === "じかん" ? [{ text: "時間", reading, cost: 100, tokens: [{ text: "時間", reading,
-      from: 0, to: 3, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100 }] }] : [],
-  })) };
+  const engine: KanaEngine = {
+    verify: vi.fn(), search: vi.fn(async reading => ({
+      dictionaryRevision: "test", truncated: false,
+      candidates: reading === "じかん" ? [{
+        text: "時間", reading, cost: 100, tokens: [{
+          text: "時間", reading,
+          from: 0, to: 3, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100
+        }]
+      }] : [],
+    }))
+  };
   const transport = { models: vi.fn(), generate: vi.fn().mockResolvedValue({ response: '{"order":["repair-0"]}' }) };
   return { engine, transport };
 }
@@ -34,8 +40,10 @@ describe("single missing romaji letter", () => {
   it("ranks dictionary-backed repairs, including a single candidate, without changing original input", async () => {
     const { engine, transport } = harness();
     const result = await searchMissingLetter("jkan", defaultSettings, transport, { kanaEngine: engine });
-    expect(result).toMatchObject({ text: "時間", reviewKana: "じかん", conversionStrategy: "completion",
-      romajiCorrection: { before: "jkan", after: "jikan", inserted: "i" }, changes: { kind: "correction", sourceReading: "jかん", correctedReading: "じかん" } });
+    expect(result).toMatchObject({
+      text: "時間", reviewKana: "じかん", conversionStrategy: "correction",
+      romajiCorrection: { before: "jkan", after: "jikan", inserted: "i" }, changes: { kind: "correction", sourceReading: "jかん", correctedReading: "じかん" }
+    });
     expect(requiresExplicitAcceptance(result!)).toBe(true);
     expect(result!.session!.originalInput).toBe("jkan");
     expect(transport.generate).toHaveBeenCalledOnce();

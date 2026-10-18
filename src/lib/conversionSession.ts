@@ -1,12 +1,12 @@
+import { createId } from "./id";
 import type { JapaneseConversionResult } from "./japaneseConversionTypes";
 import type { EngineToken } from "./kanaEngine";
 import type { ConversionAnchor } from "./types";
-import { createId } from "./id";
 
 export interface SessionCandidate {
   readingPlanId?: string;
   id: string;
-  kind: "conversion" | "correction" | "completion" | "proposal";
+  kind: "conversion" | "correction" | "proposal";
   result: JapaneseConversionResult;
   cost?: number;
   tokens?: EngineToken[];
@@ -40,30 +40,28 @@ export function createConversionSession(input: string, candidates: SessionCandid
   const readingPlans: ReadingPlan[] = [];
   const planned = candidates.map(candidate => {
     const changes = candidate.result.changes;
-    const plan = { kind: candidate.kind, sourceReading: changes?.sourceReading ?? candidate.result.reviewKana,
-      correctedReading: changes?.correctedReading, reading: changes?.resultReading ?? candidate.result.reviewKana };
+    const plan = {
+      kind: candidate.kind, sourceReading: changes?.sourceReading ?? candidate.result.reviewKana,
+      correctedReading: changes?.correctedReading, reading: changes?.resultReading ?? candidate.result.reviewKana
+    };
     let found = readingPlans.find(p => p.kind === plan.kind && p.sourceReading === plan.sourceReading &&
       p.correctedReading === plan.correctedReading && p.reading === plan.reading);
     if (!found) { found = { ...plan, id: `reading-${readingPlans.length}` }; readingPlans.push(found); }
     return { ...candidate, readingPlanId: found.id };
   });
-  return { id: createId("session"), originalInput: input, candidates: planned, readingPlans,
+  return {
+    id: createId("session"), originalInput: input, candidates: planned, readingPlans,
     selectedId: candidates[0]?.id ?? "", contextBefore: context.contextBefore ?? "", contextAfter: context.contextAfter ?? "",
     anchor: context.anchor ? { ...context.anchor } : undefined,
-    locked: false, state: "open", rerankStatus: "skipped", truncated: false };
+    locked: false, state: "open", rerankStatus: "skipped", truncated: false
+  };
 }
 export function sessionResult(session: ConversionSession): JapaneseConversionResult {
   const candidate = session.candidates.find(c => c.id === session.selectedId);
   if (!candidate) throw new Error("変換候補がありません。");
   return { ...candidate.result, session };
 }
-export function nextSessionCandidate(session: ConversionSession): JapaneseConversionResult | undefined {
-  if (session.state !== "open" || session.candidates.length < 2) return undefined;
-  session.locked = true;
-  const index = session.candidates.findIndex(c => c.id === session.selectedId);
-  session.selectedId = session.candidates[(index + 1) % session.candidates.length].id;
-  return sessionResult(session);
-}
+
 export function applySessionRanking(session: ConversionSession, ids: unknown): boolean {
   if (session.locked || session.state !== "open") return false;
   if (!Array.isArray(ids) || !ids.length || ids.length > session.candidates.length || new Set(ids).size !== ids.length) return false;

@@ -1,18 +1,16 @@
-import type { ProtectedDictionaryEntry } from "./conversionInput";
 import type { ConversionChanges } from "./conversionChanges";
-import type { ReadingVerifier } from "./readingAssessment";
 import type { ConversionDiagnostic } from "./conversionDiagnostics";
+import type { ProtectedDictionaryEntry } from "./conversionInput";
+import type { ReadingVerifier } from "./readingAssessment";
 
 export interface JapaneseConversionResult {
   session?: import("./conversionSession").ConversionSession;
   text: string;
   reviewKana: string;
   changes?: ConversionChanges;
-  conversionStrategy?: "completion" | "speculative";
+  conversionStrategy?: "correction" | "speculative";
   romajiCorrection?: { partIndex: number; offset: number; inserted: string; before: string; after: string };
-  inputCompletionApplied?: boolean;
-  inputCompletionSourceKana?: string;
-  inputCompletionAdditions?: string[];
+
   suggestionRejected?: boolean;
   rejectionDetail?: ConversionDiagnostic;
   suggestionRejectedReason?: "diverged" | "speculative" | "protected" | "reading" | "unconvertible";
@@ -20,6 +18,7 @@ export interface JapaneseConversionResult {
 }
 
 export interface JapaneseConversionOptions {
+  purpose?: "normal" | "correction" | "speculative";
   kanaEngine?: import("./kanaEngine").KanaEngine;
   anchor?: import("./types").ConversionAnchor;
   contextBefore?: string;
@@ -35,24 +34,15 @@ export interface JapaneseConversionOptions {
   missingLetterCorrection?: boolean;
   onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;
   onRescueStart?: () => void;
-  /** Rescue stages must supply a reading, not legacy unvalidated plain text. */
-  requireStructuredResponse?: boolean;
+
   /** Local independent verification, never a reference or saved setting. */
   readingVerifier?: ReadingVerifier;
-  /** Explore spelling only, holding the previous candidate's reading fixed. */
-  alternativeMode?: boolean;
-  alternativeReading?: string;
-  alternativeCorrectedReading?: string;
-  alternativeAdditionKind?: ConversionChanges["additionKind"];
+
   avoidOutputs?: string[];
-  strictAlternative?: boolean;
-  alternativeAttempt?: number;
-  /** Explicit typo-repair request (legacy name); never a spelling retry policy. */
-  completionMode?: boolean;
-  speculativeMode?: boolean;
+
   /** The user rejected a valid conversion in this occurrence; reinterpret the original input. */
   userRequestedSpeculation?: boolean;
-  completionSourceRomaji?: string;
+
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
   documentVocabulary?: string[];
   signal?: AbortSignal;

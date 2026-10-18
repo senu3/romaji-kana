@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { preservesProtectedContent } from "./conversionProtection";
-import { normalizeInputForPrompt } from "./conversion";
+import { preservesProtectedContent } from "../../../src/lib/conversionProtection";
+import { normalizeInputForPrompt } from "../../../src/lib/conversion";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
 // These tests exercise the legacy model-generation contract.

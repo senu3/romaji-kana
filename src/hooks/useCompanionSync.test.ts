@@ -25,7 +25,7 @@ vi.mock("../lib/companion", () => ({
 function snapshot(content = "PC document", revision = 1): CompanionSnapshot {
   return {
     document: { content, revision, fileName: "draft.md", updatedBy: "desktop" },
-    settings: { ...defaultSettings, inputCompletionLevel: "word" },
+    settings: { ...defaultSettings, inputPauseTiming: "early" },
     settingsUpdatedBy: "desktop",
   };
 }
@@ -82,7 +82,7 @@ describe("companion synchronization lifecycle", () => {
     const second = deferred<CompanionSnapshot>();
     vi.mocked(updateCompanionDocument).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const { hook } = harness();
-    await act(async () => {});
+    await act(async () => { });
     act(() => hook.current.syncDocumentChange("first"));
     await act(async () => { await vi.advanceTimersByTimeAsync(180); });
     act(() => hook.current.syncDocumentChange("second"));
@@ -100,14 +100,14 @@ describe("companion synchronization lifecycle", () => {
     const second = deferred<CompanionSnapshot>();
     vi.mocked(updateCompanionConversionSettings).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     const { hook } = harness();
-    await act(async () => {});
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "none" })));
+    await act(async () => { });
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "deliberate" })));
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "early" })));
     expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(1);
     await act(async () => { first.resolve(snapshot()); });
     expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(2);
     await act(async () => { await vi.advanceTimersByTimeAsync(650); });
-    expect(hook.current.settings.inputCompletionLevel).toBe("none");
+    expect(hook.current.settings.inputPauseTiming).toBe("early");
     await act(async () => { second.resolve(snapshot()); });
   });
 
@@ -116,7 +116,7 @@ describe("companion synchronization lifecycle", () => {
     const first = deferred<CompanionSnapshot>();
     vi.mocked(updateCompanionDocument).mockReturnValueOnce(first.promise);
     const { hook } = harness();
-    await act(async () => {});
+    await act(async () => { });
     act(() => hook.current.syncDocumentChange("first"));
     await act(async () => { await vi.advanceTimersByTimeAsync(180); });
     act(() => hook.current.syncDocumentChange("newer"));
@@ -133,9 +133,9 @@ describe("companion synchronization lifecycle", () => {
     const first = deferred<CompanionSnapshot>();
     vi.mocked(updateCompanionConversionSettings).mockReturnValueOnce(first.promise);
     const { hook } = harness();
-    await act(async () => {});
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "none" })));
+    await act(async () => { });
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "deliberate" })));
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "early" })));
     hook.unmount();
     await act(async () => { first.resolve(snapshot()); });
     expect(updateCompanionConversionSettings).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe("companion synchronization lifecycle", () => {
     vi.mocked(getCompanionState).mockResolvedValue(snapshot());
     vi.mocked(updateCompanionDocument).mockRejectedValueOnce(new Error("offline"));
     const { hook, editor, applyRemoteDocument } = harness();
-    await act(async () => {});
+    await act(async () => { });
     act(() => {
       editor.view.dispatch({ changes: { from: 0, to: editor.view.state.doc.length, insert: "unsent" } });
       hook.current.syncDocumentChange("unsent");
@@ -161,10 +161,10 @@ describe("companion synchronization lifecycle", () => {
     vi.mocked(getCompanionState).mockResolvedValue(snapshot());
     vi.mocked(updateCompanionConversionSettings).mockRejectedValueOnce(new Error("offline"));
     const { hook } = harness();
-    await act(async () => {});
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
+    await act(async () => { });
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "deliberate" })));
     await act(async () => { await vi.advanceTimersByTimeAsync(1300); });
-    expect(hook.current.settings.inputCompletionLevel).toBe("sentence");
+    expect(hook.current.settings.inputPauseTiming).toBe("deliberate");
     expect(getCompanionState).toHaveBeenCalledTimes(1);
   });
 
@@ -173,7 +173,7 @@ describe("companion synchronization lifecycle", () => {
     const { hook, applyRemoteDocument } = harness();
     await act(async () => { });
     expect(applyRemoteDocument).toHaveBeenCalledExactlyOnceWith("PC document");
-    expect(hook.current.settings.inputCompletionLevel).toBe("word");
+    expect(hook.current.settings.inputPauseTiming).toBe("early");
     await act(async () => { await vi.advanceTimersByTimeAsync(650); });
     expect(applyRemoteDocument).toHaveBeenCalledTimes(1);
     expect(updateCompanionDocument).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("companion synchronization lifecycle", () => {
     act(() => hook.current.syncDocumentChange("local edit"));
     await act(async () => { await vi.advanceTimersByTimeAsync(180); });
     expect(updateCompanionDocument).toHaveBeenCalledExactlyOnceWith("local edit", "draft.md", expect.any(String));
-    await act(async () => hook.current.setSettings(value => ({ ...value, inputCompletionLevel: "sentence" })));
+    await act(async () => hook.current.setSettings(value => ({ ...value, inputPauseTiming: "deliberate" })));
     expect(updateCompanionConversionSettings).toHaveBeenCalledExactlyOnceWith(
       sharedConversionSettings(hook.current.settings), expect.any(String),
     );

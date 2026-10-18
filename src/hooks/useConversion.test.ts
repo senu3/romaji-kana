@@ -2,16 +2,16 @@
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ghostSuggestionField, showGhostSuggestion } from "../components/MarkdownEditor";
+import { classifyConversionChanges } from "../lib/conversionChanges";
+import { applySessionRanking, createConversionSession, sessionResult } from "../lib/conversionSession";
+import { defaultKanaEngine } from "../lib/kanaEngine";
 import { convertRomajiToJapaneseDetailed, type JapaneseConversionResult } from "../lib/ollama";
+import { defaultOllamaTransport } from "../lib/ollamaProxy";
+import { assessReading } from "../lib/readingAssessment";
 import { defaultSettings } from "../lib/settings";
 import type { ConversionRange } from "../lib/types";
 import { deferred, mountHook, stateEditor } from "./testUtils";
 import { useConversion } from "./useConversion";
-import { assessReading } from "../lib/readingAssessment";
-import { classifyConversionChanges } from "../lib/conversionChanges";
-import { applySessionRanking, createConversionSession, sessionResult } from "../lib/conversionSession";
-import { defaultKanaEngine } from "../lib/kanaEngine";
-import { defaultOllamaTransport } from "../lib/ollamaProxy";
 
 vi.mock("../lib/ollama", async (importOriginal) => ({
   ...await importOriginal<typeof import("../lib/ollama")>(),
@@ -36,6 +36,13 @@ function harness(content = "konnichiha") {
   return { hook, ...editor, options };
 }
 
+function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "view">) {
+  const ghost = view.state.field(ghostSuggestionField).suggestion!;
+  const id = ghost.session!.candidates.find(c => c.id !== ghost.session!.selectedId)!.id;
+  act(() => { hook.current.openGhostCandidates(ghost); });
+  act(() => { hook.current.selectListedCandidate(id); });
+}
+
 describe("conversion lifecycle", () => {
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
@@ -48,8 +55,10 @@ describe("conversion lifecycle", () => {
   it("lists only the same reading, freezes late ranking and previews a selected stored candidate", () => {
     const { hook, view } = harness("kisha");
     const session = candidateSession();
-    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
-      reviewKana: "きしゃ", source: "editor" as const, session };
+    const ghost = {
+      id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session
+    };
     act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
     expect(hook.current.candidateList?.session.candidates.map(c => c.result.text)).toEqual(["記者", "汽車"]);
     expect(applySessionRanking(session, ["two", "one", "typo"])).toBe(false);
@@ -57,15 +66,20 @@ describe("conversion lifecycle", () => {
     act(() => { hook.current.selectListedCandidate("two"); });
     expect(hook.current.candidateList).toBeNull();
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("汽車");
+    expect(view.state.field(ghostSuggestionField).suggestion?.session?.selectedId).toBe("two");
     expect(view.state.doc.toString()).toBe("kisha");
   });
 
   it("previews a history candidate without overwriting the committed output or mutating the accepted session", () => {
     const { hook, view } = harness("記者");
     const session = candidateSession(); session.state = "accepted";
-    act(() => { hook.current.openCandidateList({ id: "old", input: "kisha", output: "記者", reviewKana: "きしゃ", session,
-      status: "success", source: "editor", createdAt: 0, modelName: "test",
-      anchor: { from: 0, to: 2, originalText: "kisha", appliedText: "記者", docVersion: 0 } }); });
+    act(() => {
+      hook.current.openCandidateList({
+        id: "old", input: "kisha", output: "記者", reviewKana: "きしゃ", session,
+        status: "success", source: "editor", createdAt: 0, modelName: "test",
+        anchor: { from: 0, to: 2, originalText: "kisha", appliedText: "記者", docVersion: 0 }
+      });
+    });
     act(() => { hook.current.selectListedCandidate("two"); });
     expect(view.state.doc.toString()).toBe("記者");
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("汽車");
@@ -75,8 +89,10 @@ describe("conversion lifecycle", () => {
 
   it("does not change the document or generate when a candidate list is dismissed", () => {
     const { hook, view } = harness("kisha");
-    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
-      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    const ghost = {
+      id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession()
+    };
     act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
     act(() => { hook.current.closeCandidateList(); });
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("記者");
@@ -86,8 +102,10 @@ describe("conversion lifecycle", () => {
 
   it("rejects a list selection after the target document has changed", () => {
     const { hook, view } = harness("kisha");
-    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
-      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    const ghost = {
+      id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession()
+    };
     act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
     act(() => { view.dispatch({ changes: { from: 0, to: 5, insert: "changed" } }); hook.current.selectListedCandidate("two"); });
     expect(hook.current.candidateList).toBeNull();
@@ -97,8 +115,10 @@ describe("conversion lifecycle", () => {
 
   it("starts speculation only when the explicit action inside the list is chosen", async () => {
     const { hook, view } = harness("kisha");
-    const ghost = { id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
-      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession() };
+    const ghost = {
+      id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session: candidateSession()
+    };
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "会社", reviewKana: "かいしゃ", conversionStrategy: "speculative" });
     act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
     expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
@@ -108,91 +128,35 @@ describe("conversion lifecycle", () => {
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("会社");
   });
 
-  it("explicitly speculates from a ghost's original romaji and context instead of its held candidates", async () => {
-    const { hook, view, options } = harness("資料をkakuniしてください。");
-    options.settingsRef.current.conversionMode = "replace";
-    const session = createConversionSession("kakuni", [
-      { id: "first", kind: "conversion", result: { text: "角煮", reviewKana: "かくに" } },
-      { id: "second", kind: "conversion", result: { text: "カクニ", reviewKana: "かくに" } },
-    ]);
-    const suggestion = { id: "normal", from: 3, to: 9, originalText: "kakuni", inputText: "kakuni",
-      convertedText: "角煮", source: "editor" as const, session, reviewKana: "かくに" };
-    act(() => { view.dispatch({ effects: showGhostSuggestion.of(suggestion) }); });
-    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" });
-    await act(async () => { hook.current.handleSpeculateGhost(suggestion); });
-    expect(session.state).toBe("dismissed");
-    const call = vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall!;
-    expect(call[0]).toBe("kakuni");
-    expect(call[3]).toMatchObject({ userRequestedSpeculation: true, avoidOutputs: ["角煮"], contextBefore: "資料を", contextAfter: "してください。" });
-    expect(call[3]?.alternativeReading).toBeUndefined();
-    expect(call[3]?.protectedDictionaryEntries).toEqual([]);
-    expect(view.state.doc.toString()).toBe("資料をkakuniしてください。");
-    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ convertedText: "確認", conversionStrategy: "speculative" });
-  });
-
   it.each(["rejected", "canceled"] as const)("keeps an applied conversion when explicit speculation is %s", async outcome => {
     const { hook, view } = harness("資料を角煮してください。");
     const result = deferred<JapaneseConversionResult>();
     vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(result.promise);
-    act(() => { hook.current.handleSpeculateHistory({ id: "applied", status: "success", input: "kakuni", output: "角煮",
-      modelName: "test", createdAt: 0, source: "editor", anchor: { from: 3, to: 5, originalText: "kakuni", appliedText: "角煮", docVersion: 0 } }); });
+    act(() => {
+      hook.current.handleSpeculateHistory({
+        id: "applied", status: "success", input: "kakuni", output: "角煮",
+        modelName: "test", createdAt: 0, source: "editor", anchor: { from: 3, to: 5, originalText: "kakuni", appliedText: "角煮", docVersion: 0 }
+      });
+    });
     if (outcome === "canceled") act(() => { hook.current.cancelConversion(hook.current.pending[0]); });
-    await act(async () => { result.resolve(outcome === "rejected"
-      ? { text: "", reviewKana: "かくに", suggestionRejected: true, suggestionRejectedReason: "speculative" }
-      : { text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" }); });
+    await act(async () => {
+      result.resolve(outcome === "rejected"
+        ? { text: "", reviewKana: "かくに", suggestionRejected: true, suggestionRejectedReason: "speculative" }
+        : { text: "確認", reviewKana: "かくにん", conversionStrategy: "speculative" });
+    });
     expect(view.state.doc.toString()).toBe("資料を角煮してください。");
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
   });
 
-  it("does not speculate from an edited or stale ghost", () => {
-    const { hook } = harness("edited");
-    act(() => { hook.current.handleSpeculateGhost({ id: "old", from: 0, to: 6, originalText: "kakuni", inputText: "kakuni",
-      convertedText: "角煮", source: "editor" }); });
-    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
-  });
-
-  it.each(["word", "sentence"] as const)("uses normal conversion despite stale %s settings for manual, pause and history requests", async level => {
-    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "あと自動変換が", reviewKana: "あとじどうへんかんが" });
-    const { hook, view, options } = harness("atozidouhennkannga");
-    options.settingsRef.current.inputCompletionLevel = level;
-    await act(async () => { hook.current.handleConvert(range("atozidouhennkannga")); });
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
-    act(() => { hook.current.invalidatePredictiveSuggestions(); });
-    await act(async () => { hook.current.handleConvert(range("atozidouhennkannga", "typing")); });
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
-    const before = vi.mocked(convertRomajiToJapaneseDetailed).mock.calls.length;
-    await act(async () => { hook.current.handleAlternativeHistory({ id: "old", status: "success", input: "atozidouhennkannga",
-      output: "あとじどうへんかんが", inputCompletionLevel: level, modelName: "old", createdAt: 0, source: "editor",
-      anchor: { from: 0, to: view.state.doc.length, originalText: view.state.doc.toString(), docVersion: 0 } }); });
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.calls.length).toBeGreaterThan(before);
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.alternativeReading).toBeUndefined();
-  });
-
-  it.each(["word", "sentence"] as const)("restarts an old %s ghost from its original input instead of cycling completion candidates", async level => {
-    const session = createConversionSession("hon", [
-      { id: "first", kind: "conversion", result: { text: "本当", reviewKana: "ほんとう" } },
-      { id: "second", kind: "conversion", result: { text: "本当だ", reviewKana: "ほんとうだ" } },
-    ]);
-    const { hook, view } = harness("hon");
-    const suggestion = { id: "old-completion", from: 0, to: 3, originalText: "hon", inputText: "hon",
-      convertedText: "本当", reviewKana: "ほんとう", inputCompletionLevel: level, source: "editor" as const, session };
-    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
-    act(() => { view.dispatch({ effects: showGhostSuggestion.of(suggestion) }); });
-    await act(async () => { hook.current.handleRetryGhost(suggestion); });
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[0]).toBe("hon");
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[1].inputCompletionLevel).toBe("none");
-    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.alternativeReading).toBeUndefined();
-    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
-  });
-
   it("clears provisional UI on direct application even when the result equals the source", async () => {
-    const session = createConversionSession("ありがとう", [{ id: "first", kind: "conversion", result: {
-      text: "ありがとう", reviewKana: "ありがとう", changes: {
-        ...classifyConversionChanges("ありがとう", "ありがとう", "literal"),
-        readingAssessment: assessReading("ありがとう", "ありがとう", false),
-      },
-    } }]);
+    const session = createConversionSession("ありがとう", [{
+      id: "first", kind: "conversion", result: {
+        text: "ありがとう", reviewKana: "ありがとう", changes: {
+          ...classifyConversionChanges("ありがとう", "ありがとう", "literal"),
+          readingAssessment: assessReading("ありがとう", "ありがとう", false),
+        },
+      }
+    }]);
     vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(async (_input, _settings, _transport, options) => {
       session.rerankStatus = "pending";
       options?.onLocalCandidates?.(sessionResult(session));
@@ -218,31 +182,13 @@ describe("conversion lifecycle", () => {
     expect(session.state).toBe("dismissed");
   });
 
-  it("preserves each candidate's strategy and completion details through navigation and history", async () => {
-    const session = createConversionSession("hon", [
-      { id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } },
-      { id: "second", kind: "correction", result: { text: "本当", reviewKana: "ほんとう", conversionStrategy: "completion",
-        inputCompletionApplied: true, inputCompletionSourceKana: "ほん", inputCompletionAdditions: ["とう"] } },
-    ]);
-    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
-    const { hook, view } = harness("hon");
-    await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
-    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
-    const selected = view.state.field(ghostSuggestionField).suggestion!;
-    expect(selected).toMatchObject({ conversionStrategy: "completion", inputCompletionApplied: true, inputCompletionAdditions: ["とう"] });
-    act(() => { hook.current.handleAcceptGhost(selected); });
-    act(() => { hook.current.handleAlternativeHistory(hook.current.history[0]); });
-    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ convertedText: "本", conversionStrategy: undefined });
-    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
-    expect(view.state.field(ghostSuggestionField).suggestion).toMatchObject({ conversionStrategy: "completion",
-      inputCompletionSourceKana: "ほん", inputCompletionAdditions: ["とう"] });
-  });
-
   it("clears an abstained provisional candidate while rescue runs and keeps romaji if all stages fail", async () => {
     const actual = await vi.importActual<typeof import("../lib/ollama")>("../lib/ollama");
     vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(actual.convertRomajiToJapaneseDetailed);
-    const candidates = ["本", "奔"].map(text => ({ text, reading: "ほん", cost: 100,
-      tokens: [{ text, reading: "ほん", from: 0, to: 2, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100 }] }));
+    const candidates = ["本", "奔"].map(text => ({
+      text, reading: "ほん", cost: 100,
+      tokens: [{ text, reading: "ほん", from: 0, to: 2, source: "mozc" as const, entryId: "test", lid: 0, rid: 0, wordCost: 100 }]
+    }));
     vi.spyOn(defaultKanaEngine, "search").mockImplementation(async reading => ({ candidates: candidates.filter(c => c.reading === reading), truncated: false, dictionaryRevision: "test" }));
     const ranking = deferred<{ response: string }>();
     const correction = deferred<{ response: string }>();
@@ -300,7 +246,7 @@ describe("conversion lifecycle", () => {
     await act(async () => { hook.current.handleConvert(range("yomu", "shortcut", 4)); });
     expect(convert).toHaveBeenCalledTimes(2);
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("読む");
-    act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    chooseNext({ hook, view });
     await act(async () => { ranking.resolve(); });
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("よむ");
     expect(view.state.doc.toString()).toBe("hon yomu");
@@ -321,10 +267,10 @@ describe("conversion lifecycle", () => {
     await act(async () => { hook.current.handleConvert(range("hon", trigger)); });
     expect(signal?.aborted).toBe(true);
     const chosen = view.state.field(ghostSuggestionField).suggestion!;
-    await act(async () => { hook.current.handleRetryGhost(chosen); });
+    chooseNext({ hook, view });
     await act(async () => { old.resolve({ text: "ほん", reviewKana: "ほん" }); });
     expect(view.state.field(ghostSuggestionField).suggestion?.id).toBe(chosen.id);
-    expect(view.state.field(ghostSuggestionField).suggestion?.session).toBe(session);
+    expect(view.state.field(ghostSuggestionField).suggestion?.session?.selectedId).toBe("second");
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("ほん");
   });
 
@@ -351,36 +297,13 @@ describe("conversion lifecycle", () => {
     await act(async () => { response.resolve({ text: "本", reviewKana: "ほん" }); });
   });
 
-  it("passes corrected/completed readings through ghost and history alternatives, including legacy text responses", async () => {
-    const changes = { kind: "completion" as const, evidence: "repair-stage" as const,
-      sourceReading: "ありっが", correctedReading: "ありが", resultReading: "ありがとう", additions: ["とう"] };
-    const legacyChanges = { kind: "unknown" as const, evidence: "unavailable" as const,
-      sourceReading: "ありっが", correctedReading: "ありが", additions: [] };
-    const convert = vi.mocked(convertRomajiToJapaneseDetailed);
-    convert.mockResolvedValueOnce({ text: "ありがとう", reviewKana: "ありがとう", changes, inputCompletionApplied: true })
-      .mockResolvedValue({ text: "有難う", reviewKana: "ありがとう", changes: legacyChanges });
-    const { hook, view, options } = harness("arigga");
-    options.settingsRef.current.inputCompletionLevel = "word";
-    await act(async () => { hook.current.handleConvert(range("arigga")); });
-    const first = view.state.field(ghostSuggestionField).suggestion!;
-    await act(async () => { hook.current.handleRetryGhost(first); });
-    expect(convert.mock.calls[1][3]).toMatchObject({ alternativeReading: "ありがとう", alternativeCorrectedReading: "ありが", avoidOutputs: ["ありがとう"] });
-    const alternative = view.state.field(ghostSuggestionField).suggestion!;
-    await act(async () => { hook.current.handleAcceptGhost(alternative); });
-    const history = hook.current.history[0];
-    expect(history.reviewKana).toBe("ありがとう");
-    await act(async () => { hook.current.handleAlternativeHistory(history); });
-    expect(convert.mock.calls[2][3]).toMatchObject({ alternativeReading: "ありがとう", alternativeCorrectedReading: "ありが" });
-  });
-
   it("preserves observed changes when a candidate is accepted into history", async () => {
     const changes = {
       kind: "notation" as const, evidence: "model-reading" as const,
       sourceReading: "ほんをよむ", resultReading: "ほんをよむ", additions: [],
     };
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本を読む", reviewKana: "ほんをよむ", changes });
-    const { hook, view, options } = harness("honwoyomu");
-    options.settingsRef.current.inputCompletionLevel = "sentence";
+    const { hook, view } = harness("honwoyomu");
     await act(async () => { hook.current.handleConvert(range("honwoyomu")); });
     const suggestion = view.state.field(ghostSuggestionField).suggestion;
     expect(suggestion?.changes).toEqual(changes);
@@ -431,7 +354,7 @@ describe("conversion lifecycle", () => {
     const { hook, view, options } = harness("hon");
     act(() => { hook.current.handleConvert(range("hon")); });
     expect(view.state.field(ghostSuggestionField).suggestion?.session).toBe(session);
-    if (navigated) act(() => { hook.current.handleRetryGhost(view.state.field(ghostSuggestionField).suggestion!); });
+    if (navigated) chooseNext({ hook, view });
     act(() => { hook.current.cancelConversion(hook.current.pending[0]); });
     expect(session.state).toBe("dismissed");
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
@@ -451,8 +374,12 @@ describe("conversion lifecycle", () => {
     act(() => { hook.current.handleConvert(range("hon")); });
     const session = createConversionSession("hon", [{ id: "other-candidate", kind: "conversion", result: { text: "本", reviewKana: "ほん" } }]);
     act(() => {
-      view.dispatch({ effects: showGhostSuggestion.of({ id: "other-request", from: 0, to: 3,
-        originalText: "hon", inputText: "hon", convertedText: "本", source: "editor", session }) });
+      view.dispatch({
+        effects: showGhostSuggestion.of({
+          id: "other-request", from: 0, to: 3,
+          originalText: "hon", inputText: "hon", convertedText: "本", source: "editor", session
+        })
+      });
       hook.current.cancelConversion(hook.current.pending[0]);
     });
     expect(view.state.field(ghostSuggestionField).suggestion?.id).toBe("other-request");
@@ -473,10 +400,14 @@ describe("conversion lifecycle", () => {
     act(() => hook.current.cancelConversion(hook.current.pending[0]));
     await act(async () => { first.resolve({ text: "こんにちは", reviewKana: "こんにちは" }); });
     expect(convertRomajiToJapaneseDetailed).toHaveBeenCalledTimes(2);
-    await act(async () => { second.resolve({ text: "さようなら", reviewKana: "さようなら", changes: {
-      ...classifyConversionChanges("さようなら", "さようなら", "literal"),
-      readingAssessment: assessReading("さようなら", "さようなら", false),
-    } }); });
+    await act(async () => {
+      second.resolve({
+        text: "さようなら", reviewKana: "さようなら", changes: {
+          ...classifyConversionChanges("さようなら", "さようなら", "literal"),
+          readingAssessment: assessReading("さようなら", "さようなら", false),
+        }
+      });
+    });
     expect(view.state.doc.toString()).toBe("konnichiha さようなら");
     expect(hook.current.history.map(item => item.status)).toEqual(["success", "canceled"]);
   });

@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { ConversionSession } from "../lib/conversionSession";
 
-export function CandidateList({ session, onSelect, onSearch, onSpeculate, onClose }: {
+export function CandidateList({ session, onSelect, onSpeculate, onClose }: {
   session: ConversionSession;
   onSelect: (id: string) => void;
-  onSearch: () => void;
   onSpeculate: () => void;
   onClose: () => void;
 }) {
@@ -40,12 +39,7 @@ export function CandidateList({ session, onSelect, onSearch, onSpeculate, onClos
             </li>
           ))}
         </ul>
-        {session.candidates.length < 2 ? (
-          <div className="candidate-list-empty">
-            <p>ほかの表記は保持されていません。</p>
-            <button type="button" className="history-action-button" onClick={() => choose(onSearch)}>同じ読みの候補を探す</button>
-          </div>
-        ) : null}
+        {session.candidates.length < 2 ? <p>ほかの表記はありません。</p> : null}
         <footer>
           <button type="button" className="history-action-button" onClick={() => choose(onSpeculate)}>読みも含めて見直す</button>
           <p>意図に合う候補がないときに、元の入力と文脈から推測します。結果は採用するまで本文に入りません。</p>

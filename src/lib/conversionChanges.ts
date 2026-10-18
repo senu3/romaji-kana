@@ -1,5 +1,5 @@
-import { collectInputCompletionAdditions } from "./completionValidation";
-import { localCorrectionRule, wordCompletionRule, type CompletionBoundaryStatus } from "./conversionRules";
+import { collectReadingAdditions } from "./conversionOutput";
+import { localCorrectionRule } from "./conversionRules";
 import type { ReadingAssessment } from "./readingAssessment";
 import { normalizeComparableReading } from "./readingComparison";
 export { normalizeComparableReading } from "./readingComparison";
@@ -8,16 +8,16 @@ export { normalizeComparableReading } from "./readingComparison";
  * and generation strategy. Model readings are evidence, not semantic proof. */
 export interface ConversionChanges {
   readingAssessment?: ReadingAssessment;
-  wordBoundary?: "unverified";
-  kind: "notation" | "completion" | "correction" | "rewrite" | "unknown";
+
+  kind: "notation" | "addition" | "correction" | "rewrite" | "unknown";
   evidence: "literal" | "dictionary-path" | "model-reading" | "repair-stage" | "unavailable";
   sourceReading: string;
   resultReading?: string;
-  /** Validated reading after local correction, before any completion. */
+  /** Validated reading after local correction, before the final output. */
   correctedReading?: string;
   additions: string[];
   /** Observed boundary of an insertion, independent of requested mode. */
-  additionKind?: "word" | "phrase" | "unverified";
+
 }
 
 export function classifyConversionChanges(
@@ -26,9 +26,9 @@ export function classifyConversionChanges(
   evidence: ConversionChanges["evidence"],
   repaired = false,
   correctedReading?: string,
-  completionBoundary?: CompletionBoundaryStatus,
 ): ConversionChanges {
-  const base = { sourceReading, resultReading, evidence, additions: [] as string[],
+  const base = {
+    sourceReading, resultReading, evidence, additions: [] as string[],
     ...(correctedReading !== undefined ? { correctedReading } : {}),
   };
   if (resultReading === undefined) return { ...base, kind: "unknown", evidence: "unavailable" };
@@ -38,11 +38,10 @@ export function classifyConversionChanges(
   // A known repair stage may replace or delete characters. Do not guess that
   // any small arbitrary model rewrite is necessarily a typing correction.
   if (repaired) return { ...base, kind: "correction" };
-  const completionSource = correctedReading === undefined ? source : normalizeComparableReading(correctedReading);
-  const additions = collectInputCompletionAdditions(completionSource, result);
+  const correctedSource = correctedReading === undefined ? source : normalizeComparableReading(correctedReading);
+  const additions = collectReadingAdditions(correctedSource, result);
   if (additions.length) {
-    const additionKind = wordCompletionRule.additionKind(completionSource, result, completionBoundary);
-    return { ...base, kind: "completion", additions, additionKind };
+    return { ...base, kind: "addition", additions, };
   }
   // A local replacement/deletion/transposition is a correction candidate.
   // This describes the edit shape, not proof of the author's intended meaning.

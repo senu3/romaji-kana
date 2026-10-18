@@ -1,0 +1,210 @@
+// Evaluation-only conversion baseline: a89d523. Never import from production.
+export type ConversionTrigger =
+  | "typing"
+  | "space"
+  | "period"
+  | "comma"
+  | "enter"
+  | "shortcut";
+
+export type ModelProvider = "ollama" | "lmstudio";
+export type InputCompletionLevel = "none" | "word" | "sentence";
+export type InputPauseTiming = "early" | "auto" | "deliberate";
+
+export interface UserDictionaryEntry {
+  id: string;
+  reading: string;
+  output: string;
+  note: string;
+  enabled: boolean;
+}
+
+export interface AppSettings {
+  modelProvider: ModelProvider;
+  ollamaApiUrl: string;
+  lmStudioApiUrl: string;
+  modelName: string;
+  autoConvert: boolean;
+  conversionMode: "replace" | "ghost";
+  conversionEngine?: "local" | "llm";
+  triggers: {
+    typing?: boolean;
+    space: boolean;
+    period: boolean;
+    comma: boolean;
+    enter: boolean;
+    manualShortcut: string;
+  };
+  punctuationConversion: {
+    periodToJapanese: boolean;
+    commaToJapanese: boolean;
+  };
+  conversionPrompt: string;
+  /** Retired UI setting; the app persists/shares none. Other values support legacy evaluation. */
+  inputCompletionLevel: InputCompletionLevel;
+  inputPauseTiming: InputPauseTiming;
+  useDocumentVocabulary: boolean;
+  userDictionary: UserDictionaryEntry[];
+  personalDictionary?: import("./kanaEngine").PersonalWord[];
+  think: boolean;
+}
+
+export type SharedConversionSettings = Pick<
+  AppSettings,
+  | "autoConvert"
+  | "conversionMode"
+  | "conversionEngine"
+  | "triggers"
+  | "punctuationConversion"
+  | "conversionPrompt"
+  | "inputCompletionLevel"
+  | "inputPauseTiming"
+  | "useDocumentVocabulary"
+  | "userDictionary"
+  | "personalDictionary"
+>;
+
+export interface ConversionRange {
+  from: number;
+  to: number;
+  text: string;
+  trigger: ConversionTrigger;
+}
+
+export type RomajiKanaTokenKind =
+  | "exact"
+  | "sokuon"
+  | "n"
+  | "punctuation"
+  | "unknown"
+  | "repaired";
+
+export interface RomajiKanaToken {
+  romaji: string;
+  kana: string;
+  inputFrom: number;
+  inputTo: number;
+  kanaFrom: number;
+  kanaTo: number;
+  confidence: number;
+  kind: RomajiKanaTokenKind;
+}
+
+export interface RomajiKanaSpan {
+  romaji: string;
+  kana: string;
+  inputFrom: number;
+  inputTo: number;
+  kanaFrom: number;
+  kanaTo: number;
+  contextKana: string;
+  sourceRomaji: string;
+}
+
+export interface RomajiKanaResult {
+  kana: string;
+  tokens: RomajiKanaToken[];
+  lowConfidenceSpans: RomajiKanaSpan[];
+}
+
+export interface ConversionAnchor {
+  from: number;
+  to: number;
+  originalText: string;
+  appliedText?: string;
+  docVersion: number;
+}
+
+export interface GhostConversionSuggestion {
+  session?: import("./conversionSession").ConversionSession;
+  changes?: import("./conversionChanges").ConversionChanges;
+  id: string;
+  from: number;
+  to: number;
+  originalText: string;
+  convertedText: string;
+  inputText: string;
+  reviewKana?: string;
+  conversionStrategy?: "completion" | "speculative";
+  inputCompletionLevel?: InputCompletionLevel;
+  inputCompletionApplied?: boolean;
+  inputCompletionSourceKana?: string;
+  inputCompletionAdditions?: string[];
+  trigger?: ConversionTrigger;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
+  source: "editor" | "history";
+  retryOf?: string;
+  avoidOutputs?: string[];
+  previewOnly?: boolean;
+}
+
+export interface PendingConversion {
+  userRequestedSpeculation?: boolean;
+  alternativeAdditionKind?: import("./conversionChanges").ConversionChanges["additionKind"];
+  alternativeReading?: string;
+  alternativeCorrectedReading?: string;
+  id: string;
+  range?: ConversionRange;
+  anchor?: ConversionAnchor;
+  originalText: string;
+  createdAt: number;
+  docVersion?: number;
+  source: "editor" | "history";
+  status: "queued" | "running";
+  retryOf?: string;
+  avoidOutputs?: string[];
+  inputCompletionLevel?: InputCompletionLevel;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
+}
+
+export type ConversionHistoryStatus = "success" | "error" | "skipped" | "canceled";
+
+export interface ConversionHistoryItem {
+  session?: import("./conversionSession").ConversionSession;
+  /** Intended reading retained for spelling exploration, even for legacy text responses. */
+  reviewKana?: string;
+  changes?: import("./conversionChanges").ConversionChanges;
+  id: string;
+  status: ConversionHistoryStatus;
+  input: string;
+  output?: string;
+  error?: string;
+  modelName: string;
+  createdAt: number;
+  source: "editor" | "history";
+  anchor?: ConversionAnchor;
+  conversionStrategy?: "completion" | "speculative";
+  inputCompletionLevel?: InputCompletionLevel;
+  inputCompletionApplied?: boolean;
+  inputCompletionSourceKana?: string;
+  documentVocabulary?: string[];
+  documentVocabularyRevision?: string;
+  retryOf?: string;
+  avoidOutputs?: string[];
+}
+
+export interface LocalModel {
+  name: string;
+  modifiedAt?: string;
+  size?: number;
+}
+
+export type OllamaModel = LocalModel;
+
+export type LocalModelConnectionStatus =
+  | { kind: "idle"; message: string }
+  | { kind: "checking"; message: string }
+  | { kind: "connected"; message: string; checkedAt: number }
+  | { kind: "warning"; message: string; checkedAt: number }
+  | { kind: "error"; message: string; checkedAt: number };
+
+export type OllamaConnectionStatus = LocalModelConnectionStatus;
+
+export type ConversionStatus =
+  | { kind: "idle"; message: string }
+  | { kind: "loading"; message: string }
+  | { kind: "success"; message: string }
+  | { kind: "warning"; message: string }
+  | { kind: "error"; message: string };

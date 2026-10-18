@@ -1,14 +1,15 @@
-import { preservesProtectedContent } from "./conversionProtection";
+// Evaluation-only conversion baseline: a89d523. Never import from production.
+import { preservesProtectedContent } from "../../../src/lib/conversionProtection";
 import { MAX_WORD_COMPLETION_KANA } from "./conversionLimits";
-export { countCharacter, preservesProtectedAsciiTokens, preservesProtectedSuggestionSyntax } from "./conversionProtection";
-import { stripThinkBlock } from "./generationUtils";
+export { countCharacter, preservesProtectedAsciiTokens, preservesProtectedSuggestionSyntax } from "../../../src/lib/conversionProtection";
+import { stripThinkBlock } from "../../../src/lib/generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import type { InputCompletionLevel } from "./types";
-import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { isAllowedLocalKanaCorrection } from "../../../src/lib/localKanaCorrection";
 import { convertedTextLengthRule, declaredSuggestionAdditionRule, finalReadingRule, sentenceCompletionRule, wordCompletionRule } from "./conversionRules";
 import type { WordCompletionBoundary } from "./conversionRules";
-import { comparableKanaCharacters as comparableReadingCharacters, splitTerminalPunctuation } from "./readingComparison";
-import type { ConversionDiagnostic } from "./conversionDiagnostics";
+import { comparableKanaCharacters as comparableReadingCharacters, splitTerminalPunctuation } from "../../../src/lib/readingComparison";
+import type { ConversionDiagnostic } from "../../../src/lib/conversionDiagnostics";
 
 const SAFE_WORD_COMPLETION_SEEDS: ReadonlyArray<readonly [string, string]> = [
   ["ありが", "ありがとう"],

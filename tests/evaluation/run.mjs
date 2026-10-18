@@ -67,16 +67,19 @@ async function main() {
   const prompt = args.prompt ? await readFile(resolve(args.prompt), "utf8") : null;
   const vite = await createServer({ root, configFile: false, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: "custom" });
   const nativeFetch = globalThis.fetch;
-  const engineClient = createKanaEngineClient();
+  const engineClient = createKanaEngineClient({ evaluation: true });
   try {
     const { defaultSettings } = await vite.ssrLoadModule("/src/lib/settings.ts");
+    const { defaultSettings: comparisonSettings } = await vite.ssrLoadModule("/tests/evaluation/legacy/settings.ts");
     const { convertRomajiToJapaneseDetailed } = await vite.ssrLoadModule("/src/lib/ollama.ts");
+    const { convertRomajiToJapaneseDetailed: compareLegacy } = await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts");
     const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
     const { documentVocabulary, ...defaults } = dataset.defaults;
     const configured = cases.map(c => ({
       ...c,
       settings: {
-        ...structuredClone(defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
+        ...structuredClone(args.engine === "llm" || (c.settingsOverrides?.inputCompletionLevel ?? defaults.inputCompletionLevel) !== "none" || c.options?.alternativeMode
+          ? comparisonSettings : defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
         modelProvider: args.provider, modelName: args.model ?? "DRY_RUN",
         conversionEngine: args.engine === "llm" ? "llm" : "local",
         [args.provider === "ollama" ? "ollamaApiUrl" : "lmStudioApiUrl"]: endpoint.href,
@@ -154,8 +157,13 @@ async function main() {
       row.rescueStartedMs = null;
       row.missingLetterSearches = [];
       try {
-        row.result = await convertRomajiToJapaneseDetailed(c.input, c.settings, defaultOllamaTransport, {
+        const comparison = args.engine === "llm" || c.settings.inputCompletionLevel !== "none" || c.options.alternativeMode;
+        row.implementation = comparison ? "legacy-evaluation" : "production";
+        const convert = comparison ? compareLegacy : convertRomajiToJapaneseDetailed;
+        row.result = await convert(c.input, c.settings, defaultOllamaTransport, {
           ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
+          ...(!comparison && c.options.completionMode ? { purpose: "correction" } : {}),
+          ...(!comparison && c.options.speculativeMode ? { purpose: "speculative" } : {}),
           onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
           onRescueStart: () => { row.rescueStartedMs = performance.now() - started; },
           onMissingLetterSearch: metrics => { row.missingLetterSearches.push(metrics); },

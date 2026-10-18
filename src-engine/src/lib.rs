@@ -105,6 +105,7 @@ impl Trie {
         found
     }
 
+    #[cfg(feature = "evaluation")]
     fn completions(&self, prefix: &[char]) -> Vec<usize> {
         let mut node = self;
         for ch in prefix {
@@ -432,6 +433,7 @@ impl Engine {
     }
 
     /// Prefix completion proposes readings; it never silently changes typed characters.
+    #[cfg(feature = "evaluation")]
     pub fn complete(&self, reading: &str, words: &[UserWord]) -> Vec<String> {
         let chars: Vec<char> = reading.chars().collect();
         if chars.len() < 2
@@ -564,6 +566,7 @@ impl PartialOrd for Path {
 #[serde(tag = "operation", rename_all = "camelCase")]
 pub enum Request {
     Notices,
+    #[cfg(feature = "evaluation")]
     Complete {
         reading: String,
         #[serde(default)]
@@ -587,6 +590,7 @@ pub fn execute(request: Request) -> Result<serde_json::Value, String> {
             "notice": include_str!("../data/NOTICE.txt"),
             "license": include_str!("../data/MOZC-LICENSE"),
         })),
+        #[cfg(feature = "evaluation")]
         Request::Complete { reading, words } => {
             if words.len() > 500 {
                 return Err("Too many personal words".into());
@@ -611,6 +615,13 @@ pub fn execute(request: Request) -> Result<serde_json::Value, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[cfg(not(feature = "evaluation"))]
+    fn production_rejects_retired_completion_requests() {
+        assert!(serde_json::from_value::<super::Request>(serde_json::json!({
+            "operation": "complete", "reading": "てすとし", "words": []
+        })).is_err());
+    }
     use super::*;
     #[test]
     fn real_dictionary_provides_paths_and_independent_reading_evidence() {
@@ -687,6 +698,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "evaluation")]
     fn prefix_completions_only_extend_the_entered_reading() {
         let engine = engine().unwrap();
         let words = vec![UserWord {

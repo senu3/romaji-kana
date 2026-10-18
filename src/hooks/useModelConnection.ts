@@ -1,7 +1,7 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatOllamaConnectionError } from "../lib/appErrors";
-import { providerLabel } from "../lib/ollama";
+import { providerLabel } from "../lib/modelProvider";
 import { checkOllamaConnection, listLocalModels } from "../lib/ollamaConnection";
 import { defaultSettings } from "../lib/settings";
 import type {

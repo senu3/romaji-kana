@@ -108,6 +108,7 @@ for (const format of ["plain", "structured"]) {
         assert.equal(rows[0].phase, "warmup");
         assert.equal(rows[1].result.text, "本を読む。");
         assert.ok(rows.every(row => row.outcome === "candidate"));
+        assert.ok(rows.every(row => row.implementation === "legacy-evaluation"));
         assert.equal(rows[1].result.changes.kind, format === "structured" ? "notation" : "unknown");
         assert.equal(rows[1].review.usable, null);
         assert.equal(rows[1].firstDictionaryCandidateMs, null);

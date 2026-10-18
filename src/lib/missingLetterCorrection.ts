@@ -1,13 +1,13 @@
-import { prepareConversionRequest } from "./conversionRequest";
-import { romajiToKana } from "./romajiKana";
-import { localCorrectionRule } from "./conversionRules";
 import { preservesProtectedContent } from "./conversionProtection";
-import { convertLocally, rankConversionSession } from "./localConversion";
+import { prepareConversionRequest } from "./conversionRequest";
+import { localCorrectionRule } from "./conversionRules";
 import { createConversionSession, type SessionCandidate } from "./conversionSession";
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
-import type { AppSettings } from "./types";
+import { convertLocally, rankConversionSession } from "./localConversion";
 import type { OllamaTransport } from "./ollamaProxy";
+import { romajiToKana } from "./romajiKana";
+import type { AppSettings } from "./types";
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz";
 const MAX_ROMAJI = 96;
@@ -28,7 +28,7 @@ export function missingLetterReadings(value: string) {
     const end = start + run[0].length;
     if (/[A-Za-z_:/.-]/.test(value[start - 1] ?? "") || /[A-Za-z_:/-]/.test(value[end] ?? "")) continue;
     // Appending a suffix is completion, not missing-letter correction.
-    for (let offset = start; offset < end; offset++) for (const inserted of ALPHABET) {
+    for (let offset = start;offset < end;offset++) for (const inserted of ALPHABET) {
       const repaired = value.slice(0, offset) + inserted + value.slice(offset);
       const kana = romajiToKana(repaired);
       if (kana.lowConfidenceSpans.length || seen.has(kana.kana) || markers(original.kana) !== markers(kana.kana)) continue;
@@ -51,16 +51,18 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
   const metrics = { generated: 0, searched: 0, engineCalls: 0, candidates: 0, truncated: false, searchMs: 0, elapsedMs: 0 };
   const pool: SessionCandidate[] = [];
   const cache = new Map<string, Awaited<ReturnType<typeof options.kanaEngine.search>>>();
-  const engine = { ...options.kanaEngine, search: async (reading: string) => {
-    throwIfConversionAborted(options.signal);
-    if (cache.has(reading)) return cache.get(reading)!;
-    if (metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; return { candidates: [], truncated: true, dictionaryRevision: "" }; }
-    metrics.engineCalls++;
-    const result = await options.kanaEngine!.search(reading, settings.personalDictionary ?? [], options.signal);
-    metrics.truncated ||= result.truncated;
-    cache.set(reading, result);
-    return result;
-  } };
+  const engine = {
+    ...options.kanaEngine, search: async (reading: string) => {
+      throwIfConversionAborted(options.signal);
+      if (cache.has(reading)) return cache.get(reading)!;
+      if (metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; return { candidates: [], truncated: true, dictionaryRevision: "" }; }
+      metrics.engineCalls++;
+      const result = await options.kanaEngine!.search(reading, settings.personalDictionary ?? [], options.signal);
+      metrics.truncated ||= result.truncated;
+      cache.set(reading, result);
+      return result;
+    }
+  };
   let revision: string | undefined;
   try {
     for (const [partIndex, part] of parts.entries()) {
@@ -72,13 +74,17 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
         throwIfConversionAborted(options.signal);
         if (metrics.searched >= MAX_PLANS || metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; break; }
         metrics.searched++;
-        const result = await convertLocally(input, settings, transport, { ...options, kanaEngine: engine, rerank: false,
-          onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined }, { correction: { partIndex, value: plan.value } });
+        const result = await convertLocally(input, settings, transport, {
+          ...options, kanaEngine: engine, rerank: false,
+          onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined
+        }, { correction: { partIndex, value: plan.value } });
         revision = result.session?.dictionaryRevision ?? revision;
         for (const candidate of result.session?.candidates.slice(0, 3) ?? []) {
           if (!preservesProtectedContent(protection.source, candidate.result.text, protection.literalTerms)) continue;
-          pool.push({ ...candidate, id: `repair-${pool.length}`, kind: "correction", cost: candidate.cost! + INSERTION_PENALTY,
-            result: { ...candidate.result, romajiCorrection: { partIndex, offset: plan.offset, inserted: plan.inserted, before: part.value, after: plan.value } } });
+          pool.push({
+            ...candidate, id: `repair-${pool.length}`, kind: "correction", cost: candidate.cost! + INSERTION_PENALTY,
+            result: { ...candidate.result, romajiCorrection: { partIndex, offset: plan.offset, inserted: plan.inserted, before: part.value, after: plan.value } }
+          });
         }
       }
     }
@@ -96,8 +102,10 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     const session = createConversionSession(input, candidates, options);
     session.dictionaryRevision = revision;
     session.truncated = metrics.truncated;
-    return await rankConversionSession(session, settings, transport, { ...options,
-      onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined });
+    return await rankConversionSession(session, settings, transport, {
+      ...options,
+      onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined
+    });
   } finally {
     metrics.elapsedMs = performance.now() - started;
     options.onMissingLetterSearch?.(metrics);

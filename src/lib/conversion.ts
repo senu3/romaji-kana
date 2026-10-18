@@ -1,7 +1,6 @@
 import { excludedRanges, isNumericSeparator, isPendingNumericSeparator, isSentenceBoundary } from "./conversionBoundaries";
 import type { AppSettings, ConversionRange, ConversionTrigger } from "./types";
 
-
 export function triggerFromCharacter(
   character: string,
 ): Exclude<ConversionTrigger, "shortcut"> | null {
@@ -25,7 +24,7 @@ export function isTriggerEnabled(
     return true;
   }
   if (trigger === "typing") {
-    return settings.triggers.typing ?? settings.triggers.space;
+    return settings.triggers.typing;
   }
   return settings.triggers[trigger];
 }
@@ -73,7 +72,7 @@ export function extractConversionRange(
   const markdownBoundary = getMarkdownLineBoundary(line.text);
   let start = line.from + markdownBoundary;
 
-  for (let index = lineOffset - 1; index >= markdownBoundary; index -= 1) {
+  for (let index = lineOffset - 1;index >= markdownBoundary;index -= 1) {
     if (isSentenceBoundary(line.text, index) && !isInsideExcludedMarkdown(doc, line.from + index)) {
       const isTriggerChar = line.from + index === safeCursor - 1;
       if (!isTriggerChar) {
@@ -211,7 +210,7 @@ function startOffsetAfterExistingJapanese(text: string): number {
 function findTrailingRomajiBoundaryAfterJapaneseText(text: string): number {
   let boundary = -1;
 
-  for (let index = 0; index < text.length; index += 1) {
+  for (let index = 0;index < text.length;index += 1) {
     const char = text[index] ?? "";
     const previous = text[index - 1] ?? "";
 

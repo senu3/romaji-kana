@@ -1,18 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapaneseDetailed, type JapaneseConversionResult } from "./ollama";
-import { defaultSettings } from "./settings";
 import { defaultKanaEngine, type EngineCandidate, type KanaEngine } from "./kanaEngine";
-import { nextSessionCandidate } from "./conversionSession";
+import { convertRomajiToJapaneseDetailed, type JapaneseConversionResult } from "./ollama";
 import { romajiToKana } from "./romajiKana";
-import { requiresExplicitAcceptance } from "./readingAssessment";
+import { defaultSettings } from "./settings";
+function nextSessionCandidate(session: NonNullable<JapaneseConversionResult["session"]>) { session.locked = true; session.selectedId = session.candidates.find(c => c.id !== session.selectedId)!.id; return session.candidates.find(c => c.id === session.selectedId)!.result; }
 
 function candidate(text: string, reading = "きしゃ", cost = 100): EngineCandidate {
-  return { text, reading, cost, tokens: [{ text, reading, from: 0, to: Array.from(reading).length,
-    source: "mozc", entryId: text, lid: 1851, rid: 1851, wordCost: cost }] };
+  return {
+    text, reading, cost, tokens: [{
+      text, reading, from: 0, to: Array.from(reading).length,
+      source: "mozc", entryId: text, lid: 1851, rid: 1851, wordCost: cost
+    }]
+  };
 }
 function harness() {
-  const search = vi.fn().mockResolvedValue({ candidates: [candidate("記者"), candidate("汽車", "きしゃ", 200)],
-    truncated: false, dictionaryRevision: "test" });
+  const search = vi.fn().mockResolvedValue({
+    candidates: [candidate("記者"), candidate("汽車", "きしゃ", 200)],
+    truncated: false, dictionaryRevision: "test"
+  });
   const engine: KanaEngine = { search, verify: vi.fn().mockResolvedValue("unverified") };
   const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ order: ["candidate-1", "candidate-0"] }) });
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
@@ -122,8 +127,10 @@ describe("local faithful conversion", () => {
   });
   it.each(["\u0001", "\u007f", "\u0085", "\u009f"])("filters forbidden controls before ranking or displaying local candidates: %j", async control => {
     const h = harness();
-    h.search.mockResolvedValue({ candidates: [candidate(`記${control}者`), candidate("汽車", "きしゃ", 200)],
-      truncated: false, dictionaryRevision: "test" });
+    h.search.mockResolvedValue({
+      candidates: [candidate(`記${control}者`), candidate("汽車", "きしゃ", 200)],
+      truncated: false, dictionaryRevision: "test"
+    });
     const onLocalCandidates = vi.fn();
     const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport,
       { kanaEngine: h.engine, onLocalCandidates });
@@ -155,17 +162,5 @@ describe("local faithful conversion", () => {
       kanaEngine: h.engine, signal: controller.signal, onLocalCandidates: () => controller.abort(),
     })).rejects.toMatchObject({ name: "AbortError" });
   });
-  it("converts dictionary prefix completions as separate reading plans requiring explicit acceptance", async () => {
-    const h = harness();
-    h.engine.complete = vi.fn().mockResolvedValue(["しょるい", "しょり"]);
-    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading === "しょるい" ? "書類" : "処理", reading)], truncated: false, dictionaryRevision: "test" }));
-    const result = await convertRomajiToJapaneseDetailed("sho.", { ...defaultSettings, inputCompletionLevel: "word" }, h.transport,
-      { kanaEngine: h.engine, rerank: false });
-    expect(result.text).toBe("書類。");
-    expect(result.changes).toMatchObject({ kind: "completion", sourceReading: "しょ。", resultReading: "しょるい。" });
-    expect(requiresExplicitAcceptance(result)).toBe(true);
-    expect(result.session?.readingPlans.map(p => p.reading)).toEqual(["しょるい。", "しょり。"]);
-    expect(result.session?.candidates.every(c => c.kind === "completion")).toBe(true);
-    expect(h.generate).not.toHaveBeenCalled();
-  });
+
 });

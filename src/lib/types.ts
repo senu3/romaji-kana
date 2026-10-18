@@ -7,7 +7,7 @@ export type ConversionTrigger =
   | "shortcut";
 
 export type ModelProvider = "ollama" | "lmstudio";
-export type InputCompletionLevel = "none" | "word" | "sentence";
+
 export type InputPauseTiming = "early" | "auto" | "deliberate";
 
 export interface UserDictionaryEntry {
@@ -25,9 +25,9 @@ export interface AppSettings {
   modelName: string;
   autoConvert: boolean;
   conversionMode: "replace" | "ghost";
-  conversionEngine?: "local" | "llm";
+
   triggers: {
-    typing?: boolean;
+    typing: boolean;
     space: boolean;
     period: boolean;
     comma: boolean;
@@ -39,8 +39,7 @@ export interface AppSettings {
     commaToJapanese: boolean;
   };
   conversionPrompt: string;
-  /** Retired UI setting; the app persists/shares none. Other values support legacy evaluation. */
-  inputCompletionLevel: InputCompletionLevel;
+
   inputPauseTiming: InputPauseTiming;
   useDocumentVocabulary: boolean;
   userDictionary: UserDictionaryEntry[];
@@ -52,11 +51,9 @@ export type SharedConversionSettings = Pick<
   AppSettings,
   | "autoConvert"
   | "conversionMode"
-  | "conversionEngine"
   | "triggers"
   | "punctuationConversion"
   | "conversionPrompt"
-  | "inputCompletionLevel"
   | "inputPauseTiming"
   | "useDocumentVocabulary"
   | "userDictionary"
@@ -124,11 +121,8 @@ export interface GhostConversionSuggestion {
   convertedText: string;
   inputText: string;
   reviewKana?: string;
-  conversionStrategy?: "completion" | "speculative";
-  inputCompletionLevel?: InputCompletionLevel;
-  inputCompletionApplied?: boolean;
-  inputCompletionSourceKana?: string;
-  inputCompletionAdditions?: string[];
+  conversionStrategy?: "correction" | "speculative";
+
   trigger?: ConversionTrigger;
   documentVocabulary?: string[];
   documentVocabularyRevision?: string;
@@ -140,9 +134,7 @@ export interface GhostConversionSuggestion {
 
 export interface PendingConversion {
   userRequestedSpeculation?: boolean;
-  alternativeAdditionKind?: import("./conversionChanges").ConversionChanges["additionKind"];
-  alternativeReading?: string;
-  alternativeCorrectedReading?: string;
+
   id: string;
   range?: ConversionRange;
   anchor?: ConversionAnchor;
@@ -153,7 +145,7 @@ export interface PendingConversion {
   status: "queued" | "running";
   retryOf?: string;
   avoidOutputs?: string[];
-  inputCompletionLevel?: InputCompletionLevel;
+
   documentVocabulary?: string[];
   documentVocabularyRevision?: string;
 }
@@ -162,7 +154,7 @@ export type ConversionHistoryStatus = "success" | "error" | "skipped" | "cancele
 
 export interface ConversionHistoryItem {
   session?: import("./conversionSession").ConversionSession;
-  /** Intended reading retained for spelling exploration, even for legacy text responses. */
+  /** Observed reading of the selected candidate. */
   reviewKana?: string;
   changes?: import("./conversionChanges").ConversionChanges;
   id: string;
@@ -174,10 +166,8 @@ export interface ConversionHistoryItem {
   createdAt: number;
   source: "editor" | "history";
   anchor?: ConversionAnchor;
-  conversionStrategy?: "completion" | "speculative";
-  inputCompletionLevel?: InputCompletionLevel;
-  inputCompletionApplied?: boolean;
-  inputCompletionSourceKana?: string;
+  conversionStrategy?: "correction" | "speculative";
+
   documentVocabulary?: string[];
   documentVocabularyRevision?: string;
   retryOf?: string;

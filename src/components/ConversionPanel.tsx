@@ -49,7 +49,7 @@ export function ConversionPanel({
   const resultHeadingId = useId();
 
   const update = (patch: Partial<AppSettings>) => {
-    onChange({ ...settings, ...patch, inputCompletionLevel: "none" });
+    onChange({ ...settings, ...patch, });
   };
 
   const updateTriggers = (patch: Partial<AppSettings["triggers"]>) => {
@@ -116,13 +116,6 @@ export function ConversionPanel({
   return (
     <section className="floating-panel prompt-panel conversion-panel" aria-label="変換設定">
       <div className="conversion-panel-content">
-        <label className="field"><span>通常変換の方式</span>
-          <select aria-label="通常変換の方式" value={settings.conversionEngine ?? "local"}
-            onChange={event => update({ conversionEngine: event.currentTarget.value as "local" | "llm" })}>
-            <option value="local">辞書候補をAIが選択</option>
-            <option value="llm">AIが候補を生成（比較用）</option>
-          </select>
-        </label>
         <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
           <h3 id={resultHeadingId}>変換結果</h3>
           <div className="mode-field">
@@ -172,9 +165,8 @@ export function ConversionPanel({
               onChange={(checked) => updateTriggers({ typing: checked })}
             />
             <div
-              className={`mode-field compact-mode-field input-pause-field ${
-                settings.autoConvert && (settings.triggers.typing ?? settings.triggers.space) ? "" : "disabled"
-              }`}
+              className={`mode-field compact-mode-field input-pause-field ${settings.autoConvert && (settings.triggers.typing ?? settings.triggers.space) ? "" : "disabled"
+                }`}
             >
               <span>入力停止の判定</span>
               <div

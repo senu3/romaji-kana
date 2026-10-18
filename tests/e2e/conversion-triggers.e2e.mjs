@@ -13,7 +13,7 @@ try {
     await context.addInitScript(settings => {
       localStorage.clear();
       localStorage.setItem('romaji-kana-settings', JSON.stringify({
-        conversionEngine: 'local', conversionMode: 'ghost', inputPauseTiming: 'early', ...settings,
+        conversionMode: 'ghost', inputPauseTiming: 'early', ...settings,
       }));
     }, settings);
     const page = await context.newPage();
@@ -50,29 +50,6 @@ try {
     await page.locator('.cm-ghost-text-suggestion').waitFor();
     assert.equal(searches.length, 1, 'Space works independently of pause');
   });
-  for (const level of ['word', 'sentence']) {
-    await scenario({ inputCompletionLevel: level }, async (page, editor) => {
-      const reading = 'あとじどうへんかんが';
-      await page.route('**/api/kana-engine', route => {
-        const request = route.request().postDataJSON();
-        assert.equal(request.operation, 'search', 'Saved completion modes must not invoke prefix completion');
-        assert.equal(request.reading, reading);
-        return route.fulfill({ json: { candidates: [{ text: 'あと自動変換が', reading, cost: 100,
-          tokens: [{ text: 'あと自動変換が', reading, from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }],
-          dictionaryRevision: 'test', truncated: false } });
-      });
-      await page.keyboard.type('atozidouhennkannga');
-      await page.locator('.cm-ghost-text-suggestion').waitFor();
-      assert.equal(await page.locator('.cm-ghost-text-suggestion').textContent(), 'あと自動変換が');
-      await page.keyboard.press('Tab');
-      assert.equal(await editor.innerText(), 'あと自動変換が');
-      await page.getByRole('button', { name: /変換を開く/ }).click();
-      assert.equal(await page.getByRole('radiogroup', { name: '入力補完レベル' }).count(), 0);
-      await page.setViewportSize({ width: 390, height: 520 });
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-settings')).inputCompletionLevel), 'none');
-    });
-  }
   for (const entry of ['ghost', 'recent', 'history']) {
     await scenario({ autoConvert: false, conversionMode: entry === 'ghost' ? 'ghost' : 'replace' }, async (page, editor) => {
       await page.route('**/api/kana-engine', route => {

@@ -1,12 +1,12 @@
-import { defaultConversionPrompt, legacyDefaultConversionPrompt } from "./prompts";
+import type { PersonalWord } from "./kanaEngine";
+import { defaultConversionPrompt } from "./prompts";
+import { normalizeKanaWidth } from "./readingComparison";
 import type {
   AppSettings,
   InputPauseTiming,
   SharedConversionSettings,
   UserDictionaryEntry,
 } from "./types";
-import type { PersonalWord } from "./kanaEngine";
-import { normalizeKanaWidth } from "./readingComparison";
 
 const STORAGE_KEY = "romaji-kana-settings";
 const MAX_USER_DICTIONARY_ENTRIES = 50;
@@ -18,7 +18,7 @@ export const defaultSettings: AppSettings = {
   modelName: "gemma3",
   autoConvert: true,
   conversionMode: "replace",
-  conversionEngine: "local",
+
   triggers: {
     typing: true,
     space: true,
@@ -32,7 +32,7 @@ export const defaultSettings: AppSettings = {
     commaToJapanese: true,
   },
   conversionPrompt: defaultConversionPrompt,
-  inputCompletionLevel: "none",
+
   inputPauseTiming: "auto",
   useDocumentVocabulary: false,
   userDictionary: [],
@@ -54,18 +54,18 @@ export function loadSettings(): AppSettings {
 }
 
 export function saveSettings(settings: AppSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, inputCompletionLevel: "none" }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(mergeSettings(settings)));
 }
 
 export function sharedConversionSettings(settings: AppSettings): SharedConversionSettings {
   return {
     autoConvert: settings.autoConvert,
     conversionMode: settings.conversionMode,
-    conversionEngine: settings.conversionEngine ?? "local",
+
     triggers: settings.triggers,
     punctuationConversion: settings.punctuationConversion,
     conversionPrompt: settings.conversionPrompt,
-    inputCompletionLevel: "none",
+
     inputPauseTiming: settings.inputPauseTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
     userDictionary: settings.userDictionary,
@@ -80,57 +80,26 @@ export function mergeSharedConversionSettings(
   return {
     ...settings,
     ...shared,
-    inputCompletionLevel: "none",
-    conversionPrompt: shared.conversionPrompt === legacyDefaultConversionPrompt ? defaultConversionPrompt : shared.conversionPrompt,
-    triggers: { ...shared.triggers, typing: shared.triggers.typing ?? shared.triggers.space },
+
+    conversionPrompt: shared.conversionPrompt,
+    triggers: { ...shared.triggers },
     punctuationConversion: { ...shared.punctuationConversion },
     userDictionary: [...shared.userDictionary],
     personalDictionary: normalizePersonalDictionary(shared.personalDictionary),
   };
 }
 
-type LegacySettings = Partial<AppSettings> & {
-  thinkingMode?: "auto" | "on" | "off";
-  userHomophones?: unknown;
-  conversionPreset?: unknown;
-  predictiveSuggestionTiming?: unknown;
-};
-
-function mergeSettings(settings: LegacySettings): AppSettings {
-  const {
-    thinkingMode,
-    userHomophones,
-    conversionPreset,
-    predictiveSuggestionTiming,
-    ...currentSettings
-  } = settings;
-  void userHomophones;
-  void conversionPreset;
-  void predictiveSuggestionTiming;
-  const conversionPrompt = settings.conversionPrompt === legacyDefaultConversionPrompt
-    ? defaultConversionPrompt : settings.conversionPrompt || defaultConversionPrompt;
-  const think = settings.think ?? thinkingMode === "on";
-
+function mergeSettings(settings: Partial<AppSettings>): AppSettings {
+  const picked = Object.fromEntries(Object.keys(defaultSettings).filter(key => key in settings).map(key => [key, settings[key as keyof AppSettings]]));
   return {
-    ...defaultSettings,
-    ...currentSettings,
-    conversionPrompt,
-    think,
-    inputCompletionLevel: "none",
-    conversionEngine: settings.conversionEngine === "llm" ? "llm" : "local",
+    ...defaultSettings, ...picked,
+    conversionPrompt: settings.conversionPrompt || defaultConversionPrompt,
+    think: settings.think === true,
     inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
-    triggers: {
-      ...defaultSettings.triggers,
-      ...settings.triggers,
-      typing: settings.triggers?.typing ?? settings.triggers?.space ?? defaultSettings.triggers.typing,
-    },
-    punctuationConversion: {
-      ...defaultSettings.punctuationConversion,
-      ...settings.punctuationConversion,
-    },
-    userDictionary: normalizeUserDictionary(settings.userDictionary),
-    personalDictionary: normalizePersonalDictionary(settings.personalDictionary),
+    triggers: { ...defaultSettings.triggers, ...settings.triggers },
+    punctuationConversion: { ...defaultSettings.punctuationConversion, ...settings.punctuationConversion },
+    userDictionary: normalizeUserDictionary(settings.userDictionary), personalDictionary: normalizePersonalDictionary(settings.personalDictionary)
   };
 }
 
@@ -181,7 +150,9 @@ export function normalizePersonalDictionary(entries: unknown): PersonalWord[] {
     const text = readString(entry.text).trim();
     if (!/^[ぁ-ゖー]+$/u.test(reading) || Array.from(reading).length > 80 || !text ||
       Array.from(text).length > 80 || /\p{Cc}/u.test(text)) return [];
-    return [{ id: readString(entry.id) || `word-${index}`, reading, text,
-      pos: ["proper", "person", "organization"].includes(entry.pos) ? entry.pos : "noun", enabled: entry.enabled !== false }];
+    return [{
+      id: readString(entry.id) || `word-${index}`, reading, text,
+      pos: ["proper", "person", "organization"].includes(entry.pos) ? entry.pos : "noun", enabled: entry.enabled !== false
+    }];
   }).slice(0, 500);
 }

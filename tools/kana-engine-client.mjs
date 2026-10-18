@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
-export function createKanaEngineClient() {
+export function createKanaEngineClient({ evaluation = false } = {}) {
   const root = fileURLToPath(new URL('../', import.meta.url));
   let child;
   let building;
@@ -13,7 +13,8 @@ export function createKanaEngineClient() {
   async function start() {
     if (closed) throw new Error('Kana engine client is closed');
     if (!building) building = new Promise((resolveBuild, reject) => {
-      const build = spawn('cargo', ['build', '--release', '--manifest-path', 'src-engine/Cargo.toml'],
+      const build = spawn('cargo', ['build', '--release', '--manifest-path', 'src-engine/Cargo.toml',
+        ...(evaluation ? ['--features', 'evaluation', '--target-dir', 'src-engine/target/evaluation'] : [])],
         { cwd: root, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
       let diagnostics = '';
       build.stderr.on('data', bytes => { diagnostics = (diagnostics + bytes).slice(-4000); });
@@ -23,7 +24,7 @@ export function createKanaEngineClient() {
     await building;
     if (closed) throw new Error('Kana engine client is closed');
     if (child) return;
-    const process = spawn(resolve(root, 'src-engine/target/release/kana-engine' + (globalThis.process.platform === 'win32' ? '.exe' : '')),
+    const process = spawn(resolve(root, 'src-engine/target/' + (evaluation ? 'evaluation/' : '') + 'release/kana-engine' + (globalThis.process.platform === 'win32' ? '.exe' : '')),
       [], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
     child = process;
     createInterface({ input: process.stdout }).on('line', line => {

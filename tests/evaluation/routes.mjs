@@ -4,7 +4,7 @@ export const finalRoutes = ["normal", "correction", "speculative", "rejected"];
 export function observeRoute(result, expectedRoutes) {
   const finalRoute = result.suggestionRejected ? "rejected"
     : !result.text?.trim() ? "empty"
-    : result.conversionStrategy === "completion" ? "correction"
+    : ["completion", "correction"].includes(result.conversionStrategy) ? "correction"
     : result.conversionStrategy === "speculative" ? "speculative" : "normal";
   return { finalRoute, expectedRoutes: expectedRoutes ?? null,
     matchesExpectation: expectedRoutes ? expectedRoutes.includes(finalRoute) : null };

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { isAllowedInputCompletion, isAllowedStructuredSuggestion, reportedSuggestionAdditions } from "./completionValidation";
 import { isAllowedSpeculativeConversion } from "./conversionPolicy";
-import { protectedContentPrompt } from "./conversionProtection";
+import { protectedContentPrompt } from "../../../src/lib/conversionProtection";
 import { finalReadingRule, fragmentRepairRule } from "./conversionRules";
-import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { isAllowedLocalKanaCorrection } from "../../../src/lib/localKanaCorrection";
 import { buildKanaKanjiSystemPrompt, buildKanaRepairSystemPrompt, buildSpeculativeConversionSystemPrompt, buildSuggestionConversionSystemPrompt, defaultConversionPrompt } from "./prompts";
 
 describe("route guidance and executable guards", () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { assessReading, requiresExplicitAcceptance } from "./readingAssessment";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
+import { assessReading, requiresExplicitAcceptance } from "./readingAssessment";
 import { defaultSettings as applicationSettings } from "./settings";
-// These tests exercise the legacy model-generation contract.
-const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
+const defaultSettings = applicationSettings;
+const engine = { search: vi.fn(), verify: vi.fn().mockResolvedValue("unverified") };
 
 describe("independent reading evidence", () => {
   it("does not equate internally consistent model fields with independent verification", () => {
@@ -19,7 +19,7 @@ describe("independent reading evidence", () => {
   });
   it("retains an unverified model candidate with explicitly provisional change information", async () => {
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: "書類の確認。", completedKana: "しょるいのかくに。" }) });
-    const result = await convertRomajiToJapaneseDetailed("shoruinokakuni.", defaultSettings, { models: vi.fn(), generate });
+    const result = await convertRomajiToJapaneseDetailed("shoruinokakuni.", defaultSettings, { models: vi.fn(), generate }, { purpose: "speculative", kanaEngine: engine });
     expect(result.text).toBe("書類の確認。");
     expect(result.changes?.readingAssessment?.status).toBe("unverified");
     expect(requiresExplicitAcceptance(result)).toBe(true);
@@ -28,6 +28,7 @@ describe("independent reading evidence", () => {
   it("rejects a contradicted reading when an independent verifier is available", async () => {
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: "確認。", completedKana: "かくに。" }) });
     const result = await convertRomajiToJapaneseDetailed("kakuni.", defaultSettings, { models: vi.fn(), generate }, {
+      purpose: "speculative", kanaEngine: engine,
       readingVerifier: { lookupReadings: () => ["かくにん。"] },
     });
     expect(result).toMatchObject({ text: "", suggestionRejectedReason: "reading" });

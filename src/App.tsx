@@ -1,7 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import "./theme.css";
 import {
   AppRail,
   AppTitleBar,
@@ -10,9 +9,9 @@ import {
   StatusBar,
 } from "./components/AppChrome";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { CandidateList } from "./components/CandidateList";
 import { CompanionPanel } from "./components/CompanionPanel";
 import { ConversionPanel } from "./components/ConversionPanel";
-import { CandidateList } from "./components/CandidateList";
 import { DictionaryModal } from "./components/DictionaryModal";
 import { HistoryPanel, RecentRetryChip } from "./components/HistoryPanel";
 import { type EditorDocumentStatus, MarkdownEditor } from "./components/MarkdownEditor";
@@ -32,6 +31,7 @@ import { basename } from "./lib/fileSystem";
 import { defaultConversionPrompt } from "./lib/prompts";
 import { defaultSettings, loadSettings, saveSettings } from "./lib/settings";
 import type { AppSettings, ConversionStatus } from "./lib/types";
+import "./theme.css";
 
 function App() {
   return (
@@ -118,7 +118,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     openGhostCandidates,
     selectListedCandidate,
     speculateFromCandidateList,
-    searchFromCandidateList,
     retryRecentConversion,
     history,
     recentRetryItem,
@@ -430,7 +429,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         />
       ) : null}
       {candidateList ? <CandidateList session={candidateList.session} onSelect={selectListedCandidate}
-        onSearch={searchFromCandidateList} onSpeculate={speculateFromCandidateList} onClose={closeCandidateList} /> : null}
+        onSpeculate={speculateFromCandidateList} onClose={closeCandidateList} /> : null}
       <StatusBar
         status={status}
         pending={delayedPending}

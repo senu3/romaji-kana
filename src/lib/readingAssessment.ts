@@ -1,6 +1,6 @@
+import type { KanaEngine, PersonalWord } from "./kanaEngine";
 import { normalizeNumericReading } from "./numericReading";
 import { normalizeReading } from "./readingComparison";
-import type { KanaEngine, PersonalWord } from "./kanaEngine";
 export { normalizeReading } from "./readingComparison";
 
 /** Independent local lookup. Model output and reference vocabulary are not
@@ -49,15 +49,16 @@ export function combineReadingAssessments(assessments: readonly ReadingAssessmen
     : assessments.some(value => value.status === "unverified") ? "unverified" : "verified";
   const origins = new Set(assessments.map(value => value.origin));
   const proofs = new Set(assessments.map(value => value.proof));
-  return { status, origin: origins.size === 1 ? assessments[0].origin : "mixed",
+  return {
+    status, origin: origins.size === 1 ? assessments[0].origin : "mixed",
     ...(status === "verified" ? { proof: proofs.size === 1 ? assessments[0]?.proof ?? "preserved" : "mixed" } : {}),
   };
 }
 
 export function requiresExplicitAcceptance(candidate: {
-  changes?: { kind?: string; readingAssessment?: ReadingAssessment; wordBoundary?: "unverified"; additionKind?: "word" | "phrase" | "unverified" };
+  changes?: { kind?: string; readingAssessment?: ReadingAssessment; };
   conversionStrategy?: string;
 }): boolean {
-  return candidate.conversionStrategy === "speculative" || candidate.conversionStrategy === "completion" || ["correction", "completion", "rewrite"].includes(candidate.changes?.kind ?? "") || candidate.changes?.wordBoundary === "unverified" || candidate.changes?.additionKind === "unverified" ||
+  return candidate.conversionStrategy === "speculative" || candidate.conversionStrategy === "correction" || ["correction", "addition", "rewrite"].includes(candidate.changes?.kind ?? "") ||
     candidate.changes?.readingAssessment?.status !== "verified";
 }

@@ -1,5 +1,4 @@
 import {
-  ChevronLeft,
   ChevronRight,
   RefreshCw,
   SlidersHorizontal,
@@ -11,17 +10,6 @@ import type {
   OllamaConnectionStatus,
   OllamaModel,
 } from "../lib/types";
-
-interface SettingsPanelProps {
-  settings: AppSettings;
-  ollamaModels: OllamaModel[];
-  ollamaConnection: OllamaConnectionStatus;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
-  onChange: (settings: AppSettings) => void;
-  onCheckOllama: () => void;
-  onProviderSelected?: (modelProvider: ModelProvider) => void;
-}
 
 type SettingsContentMode = "full" | "setup";
 
@@ -35,46 +23,6 @@ export interface SettingsContentProps {
   setupModelProvider?: ModelProvider | null;
   headingId?: string;
   mode?: SettingsContentMode;
-}
-
-export function SettingsPanel({
-  settings,
-  ollamaModels,
-  ollamaConnection,
-  collapsed,
-  onToggleCollapsed,
-  onChange,
-  onCheckOllama,
-  onProviderSelected,
-}: SettingsPanelProps) {
-  return (
-    <aside className={`settings-panel ${collapsed ? "collapsed" : ""}`}>
-      <button
-        className="panel-toggle"
-        type="button"
-        onClick={onToggleCollapsed}
-        aria-label={collapsed ? "モデルを開く" : "モデルを閉じる"}
-      >
-        {collapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-      </button>
-
-      {collapsed ? (
-        <div className="collapsed-mark" aria-hidden="true">
-          <SlidersHorizontal size={19} />
-          <span>モデル</span>
-        </div>
-      ) : (
-        <SettingsContent
-          settings={settings}
-          ollamaModels={ollamaModels}
-          ollamaConnection={ollamaConnection}
-          onChange={onChange}
-          onCheckOllama={onCheckOllama}
-          onProviderSelected={onProviderSelected}
-        />
-      )}
-    </aside>
-  );
 }
 
 export function SettingsContent({
@@ -133,155 +81,155 @@ export function SettingsContent({
 
   return (
     <div className="settings-content">
-          <div className="settings-heading">
-            <SlidersHorizontal size={20} aria-hidden="true" />
-            <div>
-              <p className="eyebrow">ローカルAI</p>
-              <h2 id={headingId}>モデル設定</h2>
-            </div>
-          </div>
+      <div className="settings-heading">
+        <SlidersHorizontal size={20} aria-hidden="true" />
+        <div>
+          <p className="eyebrow">ローカルAI</p>
+          <h2 id={headingId}>モデル設定</h2>
+        </div>
+      </div>
 
-          <fieldset className="field provider-field">
-            <legend>プロバイダー</legend>
-            <div className="segmented-control provider-control" role="radiogroup" aria-label="モデルプロバイダー">
-              <label className={activeProvider === "ollama" ? "selected" : ""}>
-                <input
-                  type="radio"
-                  name={providerRadioName}
-                  value="ollama"
-                  checked={activeProvider === "ollama"}
-                  onChange={() => updateProvider("ollama")}
-                />
-                <span>Ollama</span>
-              </label>
-              <label className={activeProvider === "lmstudio" ? "selected" : ""}>
-                <input
-                  type="radio"
-                  name={providerRadioName}
-                  value="lmstudio"
-                  checked={activeProvider === "lmstudio"}
-                  onChange={() => updateProvider("lmstudio")}
-                />
-                <span>LM Studio</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <label className="field">
-            <span>{providerName} API URL</span>
+      <fieldset className="field provider-field">
+        <legend>プロバイダー</legend>
+        <div className="segmented-control provider-control" role="radiogroup" aria-label="モデルプロバイダー">
+          <label className={activeProvider === "ollama" ? "selected" : ""}>
             <input
-              value={currentApiUrl}
-              disabled={!hasProvider}
-              onChange={(event) => updateCurrentApiUrl(event.currentTarget.value)}
-              placeholder={
-                activeProvider === "lmstudio"
-                  ? "http://localhost:1234"
-                  : activeProvider === "ollama"
-                    ? "http://localhost:11434"
-                    : "プロバイダーを選択してください"
-              }
+              type="radio"
+              name={providerRadioName}
+              value="ollama"
+              checked={activeProvider === "ollama"}
+              onChange={() => updateProvider("ollama")}
             />
+            <span>Ollama</span>
           </label>
-
-          <div className="field model-field">
-            <span>モデル</span>
-            <div className="model-combobox">
-              <input
-                ref={modelInputRef}
-                value={hasProvider ? settings.modelName : ""}
-                disabled={!hasProvider}
-                onChange={(event) => {
-                  update({ modelName: event.currentTarget.value });
-                  setModelListOpen(true);
-                }}
-                onFocus={() => setModelListOpen(true)}
-                onClick={() => setModelListOpen(true)}
-                onBlur={() => window.setTimeout(() => setModelListOpen(false), 120)}
-                placeholder={hasProvider ? "gemma3" : "プロバイダーを選択してください"}
-                role="combobox"
-                aria-expanded={modelListOpen}
-                aria-controls={modelOptionsId}
-                aria-autocomplete="list"
-              />
-              <button
-                className="model-list-toggle"
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                disabled={!hasProvider}
-                onClick={() => {
-                  setModelListOpen((open) => !open);
-                  modelInputRef.current?.focus();
-                }}
-                aria-label="ローカルモデルを表示"
-              >
-                <ChevronRight size={16} aria-hidden="true" />
-              </button>
-              {modelListOpen ? (
-                <div className="model-options" id={modelOptionsId} role="listbox">
-                  {sortedModelNames.length === 0 ? (
-                    <p>
-                      {hasProvider
-                        ? `${providerName} のモデルを読み込んでいます。見つからない場合は接続チェックで再確認できます。`
-                        : "プロバイダーを選択するとモデル一覧を読み込みます。"}
-                    </p>
-                  ) : (
-                    sortedModelNames.map((modelName) => (
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={settings.modelName === modelName}
-                        className={settings.modelName === modelName ? "selected" : ""}
-                        key={modelName}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          update({ modelName });
-                          setModelListOpen(false);
-                          modelInputRef.current?.focus();
-                        }}
-                      >
-                        {modelName}
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : null}
-            </div>
-            <CheckRow
-              label={settings.think ? "Thinkingモード" : "Thinkingモード（OFF推奨）"}
-              checked={settings.think}
-              onChange={(checked) => update({ think: checked })}
+          <label className={activeProvider === "lmstudio" ? "selected" : ""}>
+            <input
+              type="radio"
+              name={providerRadioName}
+              value="lmstudio"
+              checked={activeProvider === "lmstudio"}
+              onChange={() => updateProvider("lmstudio")}
             />
-          </div>
+            <span>LM Studio</span>
+          </label>
+        </div>
+      </fieldset>
 
-          <div className={`connection-card ${ollamaConnection.kind}`}>
-            <div>
-              <strong>{connectionTitle(ollamaConnection.kind)}</strong>
-              <p>{ollamaConnection.message}</p>
-              {ollamaModels.length > 0 ? (
-                <span>{ollamaModels.length} 件のローカルモデル</span>
-              ) : null}
+      <label className="field">
+        <span>{providerName} API URL</span>
+        <input
+          value={currentApiUrl}
+          disabled={!hasProvider}
+          onChange={(event) => updateCurrentApiUrl(event.currentTarget.value)}
+          placeholder={
+            activeProvider === "lmstudio"
+              ? "http://localhost:1234"
+              : activeProvider === "ollama"
+                ? "http://localhost:11434"
+                : "プロバイダーを選択してください"
+          }
+        />
+      </label>
+
+      <div className="field model-field">
+        <span>モデル</span>
+        <div className="model-combobox">
+          <input
+            ref={modelInputRef}
+            value={hasProvider ? settings.modelName : ""}
+            disabled={!hasProvider}
+            onChange={(event) => {
+              update({ modelName: event.currentTarget.value });
+              setModelListOpen(true);
+            }}
+            onFocus={() => setModelListOpen(true)}
+            onClick={() => setModelListOpen(true)}
+            onBlur={() => window.setTimeout(() => setModelListOpen(false), 120)}
+            placeholder={hasProvider ? "gemma3" : "プロバイダーを選択してください"}
+            role="combobox"
+            aria-expanded={modelListOpen}
+            aria-controls={modelOptionsId}
+            aria-autocomplete="list"
+          />
+          <button
+            className="model-list-toggle"
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            disabled={!hasProvider}
+            onClick={() => {
+              setModelListOpen((open) => !open);
+              modelInputRef.current?.focus();
+            }}
+            aria-label="ローカルモデルを表示"
+          >
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+          {modelListOpen ? (
+            <div className="model-options" id={modelOptionsId} role="listbox">
+              {sortedModelNames.length === 0 ? (
+                <p>
+                  {hasProvider
+                    ? `${providerName} のモデルを読み込んでいます。見つからない場合は接続チェックで再確認できます。`
+                    : "プロバイダーを選択するとモデル一覧を読み込みます。"}
+                </p>
+              ) : (
+                sortedModelNames.map((modelName) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={settings.modelName === modelName}
+                    className={settings.modelName === modelName ? "selected" : ""}
+                    key={modelName}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      update({ modelName });
+                      setModelListOpen(false);
+                      modelInputRef.current?.focus();
+                    }}
+                  >
+                    {modelName}
+                  </button>
+                ))
+              )}
             </div>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={onCheckOllama}
-              disabled={!hasProvider || ollamaConnection.kind === "checking"}
-            >
-              <RefreshCw
-                className={ollamaConnection.kind === "checking" ? "spin" : ""}
-                size={15}
-                aria-hidden="true"
-              />
-              接続チェック
-            </button>
-          </div>
-
-          {setupMode ? (
-            <p className="setup-settings-note">
-              変換結果の適用方法や自動変換は、あとから「変換」で変更できます。
-            </p>
           ) : null}
         </div>
+        <CheckRow
+          label={settings.think ? "Thinkingモード" : "Thinkingモード（OFF推奨）"}
+          checked={settings.think}
+          onChange={(checked) => update({ think: checked })}
+        />
+      </div>
+
+      <div className={`connection-card ${ollamaConnection.kind}`}>
+        <div>
+          <strong>{connectionTitle(ollamaConnection.kind)}</strong>
+          <p>{ollamaConnection.message}</p>
+          {ollamaModels.length > 0 ? (
+            <span>{ollamaModels.length} 件のローカルモデル</span>
+          ) : null}
+        </div>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={onCheckOllama}
+          disabled={!hasProvider || ollamaConnection.kind === "checking"}
+        >
+          <RefreshCw
+            className={ollamaConnection.kind === "checking" ? "spin" : ""}
+            size={15}
+            aria-hidden="true"
+          />
+          接続チェック
+        </button>
+      </div>
+
+      {setupMode ? (
+        <p className="setup-settings-note">
+          変換結果の適用方法や自動変換は、あとから「変換」で変更できます。
+        </p>
+      ) : null}
+    </div>
   );
 }
 

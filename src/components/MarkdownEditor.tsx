@@ -1,7 +1,3 @@
-import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
-import { candidatePresentation } from "../lib/candidatePresentation";
-import { requiresExplicitAcceptance } from "../lib/readingAssessment";
-import { isPendingNumericSeparator } from "../lib/conversionBoundaries";
 import {
   defaultKeymap,
   history,
@@ -13,21 +9,21 @@ import {
   undoDepth,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
   openSearchPanel,
   search,
   searchKeymap,
 } from "@codemirror/search";
+import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
-  WidgetType,
   keymap,
   lineNumbers,
   placeholder,
+  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -45,19 +41,22 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { candidatePresentation } from "../lib/candidatePresentation";
 import {
   extractSelectedConversionRange,
   isTriggerEnabled,
   punctuationSuffixForGhostCommit,
-  triggerFromCharacter,
   shouldTriggerAutoConversion,
+  triggerFromCharacter,
 } from "../lib/conversion";
+import { isPendingNumericSeparator } from "../lib/conversionBoundaries";
 import {
   inputPauseDurationMs,
   MAX_TYPING_INTERVAL_MS,
   MIN_TYPING_INTERVAL_MS,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
+import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import type {
   AppSettings,
   ConversionRange,
@@ -66,6 +65,7 @@ import type {
   OllamaConnectionStatus,
   PendingConversion,
 } from "../lib/types";
+import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
 
 interface MarkdownEditorProps {
   settings: AppSettings;
@@ -168,20 +168,19 @@ class GhostTextWidget extends WidgetType {
       hint.textContent += `  ${index + 1}/${session.candidates.length}`;
     }
 
-    if ((this.candidate.inputCompletionAdditions ?? []).length > 0) {
+    if ((this.candidate.changes?.additions ?? []).length > 0) {
       const diff = document.createElement("span");
       diff.className = "cm-ghost-text-diff";
-      const visibleAdditions = (this.candidate.inputCompletionAdditions ?? []).slice(0, 3);
+      const visibleAdditions = (this.candidate.changes?.additions ?? []).slice(0, 3);
       const additions = visibleAdditions
         .map((addition) => `「${addition}」`)
         .join("・");
-      const remainingCount = (this.candidate.inputCompletionAdditions ?? []).length - visibleAdditions.length;
-      const diffLabel = speculative ? "読みの追加" : this.candidate.changes?.readingAssessment?.status !== "verified" ? "補完候補（読み未確認）"
-        : this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified" ? "補完候補（区切り未確認）" : "補完";
+      const remainingCount = (this.candidate.changes?.additions ?? []).length - visibleAdditions.length;
+      const diffLabel = "読みの追加";
       diff.textContent = `${diffLabel} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
       diff.setAttribute(
         "aria-label",
-        `${explicitAcceptance ? "モデル申告の追加候補" : "入力補完で追加"}: ${(this.candidate.inputCompletionAdditions ?? []).join("、")}`,
+        `${explicitAcceptance ? "モデル申告の読みの追加" : "読みの追加"}: ${(this.candidate.changes?.additions ?? []).join("、")}`,
       );
       element.append(diff);
     }
@@ -192,9 +191,9 @@ class GhostTextWidget extends WidgetType {
     const before = document.createElement("span");
     before.textContent = `変換前: ${this.candidate.originalText}`;
     comparison.append(before);
-    if (this.candidate.inputCompletionSourceKana && !speculative) {
+    if (this.candidate.changes?.sourceReading && !speculative) {
       const reading = document.createElement("span");
-      reading.textContent = `補完前の読み: ${this.candidate.inputCompletionSourceKana}`;
+      reading.textContent = `元の読み: ${this.candidate.changes?.sourceReading}`;
       comparison.append(reading);
     }
     const after = document.createElement("span");
@@ -206,11 +205,7 @@ class GhostTextWidget extends WidgetType {
       reading.textContent = `読みの比較: ${this.candidate.changes.sourceReading} → ${this.candidate.changes.resultReading}`;
       comparison.append(reading);
     }
-    if (!speculative && (this.candidate.changes?.wordBoundary === "unverified" || this.candidate.changes?.additionKind === "unverified")) {
-      const note = document.createElement("span");
-      note.textContent = "単語の区切り未確認。語の補完として確定せず、Tabで採用する候補として表示しています。";
-      comparison.append(note);
-    }
+
     if (this.candidate.changes?.readingAssessment?.status !== "verified") {
       const note = document.createElement("span");
       const origin = this.candidate.changes?.readingAssessment?.origin;
@@ -219,11 +214,7 @@ class GhostTextWidget extends WidgetType {
         : "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
       comparison.append(note);
     }
-    if (!speculative && this.candidate.inputCompletionApplied && !(this.candidate.inputCompletionAdditions?.length)) {
-      const note = document.createElement("span");
-      note.textContent = "補足・言い換えあり。追加箇所は特定できません。";
-      comparison.append(note);
-    }
+
     element.prepend(comparison);
     element.append(hint);
     if (!this.candidate.previewOnly) {
@@ -276,7 +267,7 @@ export const ghostSuggestionField = StateField.define<GhostState>({
         // Late responses cannot reopen a closed session or target stale text.
         if (next.session && next.session.state !== "open") continue;
         if (next.from < 0 || next.from >= next.to || next.to > transaction.state.doc.length ||
-            transaction.state.doc.sliceString(next.from, next.to) !== next.originalText) continue;
+          transaction.state.doc.sliceString(next.from, next.to) !== next.originalText) continue;
         if (suggestion?.session !== next.session) dismiss();
         suggestion = next;
       }
@@ -735,7 +726,7 @@ export function MarkdownEditor({
         return;
       }
       if (composingRef.current || Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS ||
-          shouldSuppressAutoTriggerForUserEvent(userEvent) || !shouldTriggerAutoConversion(userEvent)) {
+        shouldSuppressAutoTriggerForUserEvent(userEvent) || !shouldTriggerAutoConversion(userEvent)) {
         resetPredictiveSuggestionCadence();
         return;
       }

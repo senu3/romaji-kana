@@ -1,4 +1,4 @@
-import { currentProviderApiBaseUrl, currentProviderBaseUrl, providerLabel } from "./ollama";
+import { currentProviderApiBaseUrl, currentProviderBaseUrl, providerLabel } from "./modelProvider";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings, OllamaModel } from "./types";
 

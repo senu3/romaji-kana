@@ -10,9 +10,8 @@ import {
   X,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { ThemeSelect } from "./ThemeSelect";
 import type { ActivePanel } from "../lib/appTypes";
-import { providerLabel } from "../lib/ollama";
+import { providerLabel } from "../lib/modelProvider";
 import type {
   AppSettings,
   ConversionStatus,
@@ -20,6 +19,7 @@ import type {
   PendingConversion,
 } from "../lib/types";
 import type { EditorDocumentStatus } from "./MarkdownEditor";
+import { ThemeSelect } from "./ThemeSelect";
 
 export function AppTitleBar() {
   return (

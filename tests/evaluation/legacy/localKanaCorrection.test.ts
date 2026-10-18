@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { isAllowedInputCompletion, parseStructuredSuggestion } from "./completionValidation";
-import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { isAllowedLocalKanaCorrection } from "../../../src/lib/localKanaCorrection";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
 // These tests exercise the legacy model-generation contract.

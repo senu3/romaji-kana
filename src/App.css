@@ -961,64 +961,6 @@ h3 {
   background: var(--surface);
 }
 
-.settings-panel {
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  width: 320px;
-  height: 100vh;
-  min-height: 0;
-  overflow: visible;
-  padding-bottom: 44px;
-  border-left: 1px solid var(--theme-border, #cbdedb);
-  background: var(--theme-accent-soft, #f8fffd);
-}
-
-.settings-panel.collapsed {
-  width: 58px;
-}
-
-.panel-toggle {
-  position: absolute;
-  top: 18px;
-  left: -16px;
-  z-index: 7;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--theme-border, #b5d7d1);
-  border-radius: 8px;
-  background: var(--theme-surface, #ffffff);
-  color: var(--theme-accent, #0f766e);
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease;
-}
-
-.panel-toggle:hover {
-  border-color: var(--theme-accent, #0d9488);
-  background: var(--theme-accent-soft, #ecfeff);
-}
-
-.collapsed-mark {
-  display: flex;
-  flex: 1 1 auto;
-  height: 100%;
-  min-height: 320px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: var(--theme-accent, #0f766e);
-  font-size: 12px;
-  font-weight: 700;
-  writing-mode: vertical-rl;
-}
-
 .settings-content {
   display: flex;
   flex: 1 1 auto;
@@ -1713,12 +1655,12 @@ h3 {
   box-shadow: 0 8px 18px var(--theme-shadow, rgba(19, 78, 74, 0.12));
 }
 
-.recent-retry-chip.completion {
+.recent-retry-chip.review {
   border-color: var(--theme-warning, #f6c453);
   background: var(--theme-warning-soft, #fffbeb);
 }
 
-.recent-retry-chip.completion .recent-retry-chip-main:hover {
+.recent-retry-chip.review .recent-retry-chip-main:hover {
   background: var(--theme-warning-soft, #fef3c7);
 }
 
@@ -2198,7 +2140,7 @@ h3 {
   white-space: nowrap;
 }
 
-.history-completion-level {
+.history-route {
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 2px 6px;
@@ -2209,7 +2151,7 @@ h3 {
   line-height: 1.4;
 }
 
-.history-completion-level.applied {
+.history-route.applied {
   background: var(--theme-accent-soft, #dff7f1);
   color: var(--theme-accent, #087068);
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { convertRomajiToJapaneseDetailed, convertRomajiToJapanese } from "./ollama";
 import type { JapaneseConversionResult } from "./japaneseConversionTypes";
-import { defaultSettings } from "./settings";
-import type { KanaEngine, EngineCandidate } from "./kanaEngine";
+import type { EngineCandidate, KanaEngine } from "./kanaEngine";
+import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { requiresExplicitAcceptance } from "./readingAssessment";
+import { defaultSettings } from "./settings";
 
 const json = (text: string, reading: string) => ({ response: JSON.stringify({ convertedText: text, completedKana: reading }) });
 function harness(candidates: EngineCandidate[] = []) {
@@ -36,13 +36,15 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     h.generate.mockResolvedValue(json("明日の予定。", "あしたのよてい。"));
     const result = await convertRomajiToJapaneseDetailed("ashitanoyottei.", defaultSettings, h.transport, { kanaEngine: h.engine });
     expect(result.text).toBe("明日の予定。");
-    expect(result.conversionStrategy).toBe("completion");
+    expect(result.conversionStrategy).toBe("correction");
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(result.attempts?.map(a => [a.stage, a.outcome])).toEqual([["normal", "rejected"], ["correction", "candidate"]]);
     expect(h.generate).toHaveBeenCalledTimes(1);
-    expect(h.generate.mock.calls[0][2].outputSchema).toEqual({ type: "object",
+    expect(h.generate.mock.calls[0][2].outputSchema).toEqual({
+      type: "object",
       properties: { convertedText: { type: "string" }, completedKana: { type: "string" } },
-      required: ["convertedText", "completedKana"], additionalProperties: false });
+      required: ["convertedText", "completedKana"], additionalProperties: false
+    });
   });
   it("discards an unchanged reading echo and tries speculation once", async () => {
     const h = harness();
@@ -72,11 +74,6 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(result.session).toBeUndefined();
     expect(result.attempts?.every(a => a.outcome === "rejected")).toBe(true);
     expect(h.generate).toHaveBeenCalledTimes(2);
-    // The string API also preserves the input on a rejected conversion.
-    const { defaultKanaEngine } = await import("./kanaEngine");
-    const spy = vi.spyOn(defaultKanaEngine, "search").mockImplementation(h.engine.search);
-    try { expect(await convertRomajiToJapanese("hon.", defaultSettings, h.transport)).toBe("hon."); }
-    finally { spy.mockRestore(); }
   });
   it("rejects invented numbers in both rescue stages", async () => {
     const h = harness();
@@ -99,7 +96,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     await run();
     expect(initial.session?.state).toBe("dismissed");
     expect(start).toHaveBeenCalledOnce();
-    expect(ranked.mock.calls[0][0]).toMatchObject({ text: "本", conversionStrategy: "completion" });
+    expect(ranked.mock.calls[0][0]).toMatchObject({ text: "本", conversionStrategy: "correction" });
     expect(h.generate).toHaveBeenCalledTimes(2);
   });
   it("does not treat transport failure as a request to run the next rescue", async () => {
@@ -118,7 +115,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("never starts speculation after correction is canceled", async () => {
     const h = harness();
     const controller = new AbortController();
-    h.generate.mockImplementation(() => { controller.abort(); return new Promise(() => {}); });
+    h.generate.mockImplementation(() => { controller.abort(); return new Promise(() => { }); });
     await expect(convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
