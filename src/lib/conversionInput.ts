@@ -17,7 +17,12 @@ interface LiteralNounPart {
 
 type DictionarySplitPart = DictionaryTextPart | DictionaryEntryPart;
 
-type ConversionSplitPart = DictionaryTextPart | DictionaryEntryPart | LiteralNounPart;
+interface FixedParticlePart {
+  type: "particle";
+  output: string;
+}
+
+type ConversionSplitPart = DictionaryTextPart | DictionaryEntryPart | LiteralNounPart | FixedParticlePart;
 
 interface DictionaryCandidate {
   normalizedReading: string;
@@ -236,7 +241,7 @@ function splitInputByProtectedSpacedRomajiParticles(input: string): ConversionSp
     if (leadingText.length > 0) {
       parts.push({ type: "text", value: leadingText });
     }
-    parts.push({ type: "literal", output: romajiParticleToKana(match[0]) });
+    parts.push({ type: "particle", output: romajiParticleToKana(match[0]) });
     lastCopiedIndex = end;
     while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
       lastCopiedIndex += 1;

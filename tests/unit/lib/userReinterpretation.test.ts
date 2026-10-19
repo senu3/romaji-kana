@@ -56,6 +56,38 @@ describe("whole-target user reinterpretation", () => {
     expect(result.changes?.readingAssessment?.status).toBe("verified");
   });
 
+  it("fixes separated particles without counting matching kana inside editable words", async () => {
+    const h = harness("", "");
+    h.generate.mockResolvedValue({ response: JSON.stringify({ segments: [
+      { id: "edit-4", convertedText: "変更しません。", completedKana: "へんこうしません。" },
+    ] }) });
+    const result = await convertRomajiToJapaneseDetailed("`A-1` kara `B-2` he henkoushimasen.", defaultSettings, h.transport, {
+      userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["A-1からB-2へ返答しません。"],
+    });
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).target.parts).toEqual([
+      { literal: "A-1" }, { literal: "から" }, { literal: "B-2" }, { literal: "へ" },
+      { id: "edit-4", originalInput: "henkoushimasen。" },
+    ]);
+    expect(result.text).toBe("A-1からB-2へ変更しません。");
+    expect(result.reviewKana).toBe("A-1からB-2へへんこうしません。");
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not split an ambiguous word prefix into a fixed particle", async () => {
+    const h = harness("", "");
+    h.generate.mockResolvedValue({ response: JSON.stringify({ segments: [
+      { id: "edit-1", convertedText: "変更しません。", completedKana: "へんこうしません。" },
+    ] }) });
+    const result = await convertRomajiToJapaneseDetailed("`A-1`henkoushimasen.", defaultSettings, h.transport, {
+      userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["A-1返答しません。"],
+    });
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).target.parts).toEqual([
+      { literal: "A-1" }, { id: "edit-1", originalInput: "henkoushimasen。" },
+    ]);
+    expect(result.text).toBe("A-1変更しません。");
+  });
+
   it.each([
     { segments: [{ id: "edit-0", convertedText: "更新", completedKana: "こうしん" }] },
     { segments: [{ id: "edit-1", convertedText: "更新", completedKana: "こうしん" }, { id: "edit-1", convertedText: "更新", completedKana: "こうしん" }] },

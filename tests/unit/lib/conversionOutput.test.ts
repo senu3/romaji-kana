@@ -26,6 +26,8 @@ describe("occurrence-local rejection surface comparison", () => {
     ["終わっていない。", "終わっていなかった。"],
     ["終わっていません。", "終わっている。"],
     ["変更はない。", "変更はないか。"],
+    ["B-2へ廃止しません。", "B-2廃止しません。"],
+    ["B-2へ発送しません。", "B-2から発送しません。"],
   ])("does not infer synonymy, a word ban or equivalence of tense/polarity: %s / %s", (before, after) => {
     expect(isRejectedSurfaceVariant(after, [before])).toBe(false);
   });

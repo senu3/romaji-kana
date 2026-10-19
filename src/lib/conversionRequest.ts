@@ -40,7 +40,9 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
     ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
   ]);
   const protection: ConversionProtection = {
-    literalTerms: parts.flatMap(part => part.type === "text" ? [] : [part.output]),
+    // Fixed particles are reinserted by position. Counting their characters in
+    // the whole output would also count kana inside editable words (へんこう).
+    literalTerms: parts.flatMap(part => part.type === "literal" || part.type === "dictionary" ? [part.output] : []),
     source: parts.map(part => part.type !== "text" ? part.output
       : romajiToKana(part.value).tokens.map(token =>
         token.kind === "unknown" && /^[A-Za-z]$/u.test(token.kana) ? " " : token.kana,
