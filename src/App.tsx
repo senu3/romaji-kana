@@ -65,7 +65,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
-    message: "準備完了。入力が止まると変換候補を生成します。Tab で確定できます。",
+    message: "準備完了。",
   });
 
   const [editorReady, setEditorReady] = useState(false);

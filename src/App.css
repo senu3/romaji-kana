@@ -3661,3 +3661,30 @@ button.model-chip:hover {
   height: auto;
   min-height: 46px;
 }
+
+/* Conversion settings follow the same reading order as the writing workflow. */
+.conversion-panel-content { gap: 22px; padding: 20px 16px 28px; }
+.conversion-panel .check-row,
+.conversion-panel .mode-field,
+.conversion-panel .shortcut-field {
+  border: 0;
+  border-radius: 0;
+  padding: 4px 0;
+  background: transparent;
+}
+.conversion-panel .check-row { font-weight: 500; }
+.conversion-panel .trigger-options { border: 0; padding-left: 0; gap: 8px; }
+.conversion-panel .input-pause-field { margin: 0; }
+.conversion-panel .panel-note { border: 0; padding: 0; font-size: 12px; }
+.conversion-panel .settings-accordion {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.conversion-panel .accordion-trigger { padding: 12px 0; }
+.conversion-panel .accordion-content { background: transparent; padding: 8px 0 0; }
+.conversion-panel .settings-accordion.open .accordion-trigger { border-bottom: 0; }
+.conversion-panel .advanced-prompt { border: 0; }
+.conversion-panel .advanced-prompt > summary { padding: 10px 0; }
+.conversion-detail-heading { margin: 0 0 8px; color: var(--ink); font-size: 13px; font-weight: 650; }

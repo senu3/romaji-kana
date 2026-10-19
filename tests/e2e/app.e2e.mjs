@@ -120,6 +120,25 @@ try {
   await preview.getByRole('button', { name: '確定 Tab', exact: true }).click();
   assert.equal(await editor.innerText(), '記者');
   await page.getByRole('button', { name: /変換を開く/ }).click();
+  const conversionSettings = page.getByRole('region', { name: '変換設定', exact: true });
+  await conversionSettings.getByRole('heading', { name: '変換の開始', exact: true }).waitFor();
+  assert.equal(await conversionSettings.getByRole('checkbox', { name: '入力が止まったら変換', exact: true }).isDisabled(), true);
+  await conversionSettings.getByRole('checkbox', { name: '自動変換', exact: true }).check();
+  await conversionSettings.getByText('長め', { exact: true }).click();
+  await conversionSettings.getByRole('button', { name: /^キー操作/ }).click();
+  await conversionSettings.getByRole('checkbox', { name: 'Spaceで変換', exact: true }).uncheck();
+  await conversionSettings.getByRole('button', { name: '直接置換', exact: true }).click();
+  await conversionSettings.getByRole('button', { name: /^詳細設定/ }).click();
+  await conversionSettings.getByRole('checkbox', { name: '. を 。に置き換える', exact: true }).uncheck();
+  const changed = await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-settings')));
+  assert.equal(changed.inputPauseTiming, 'deliberate');
+  assert.equal(changed.triggers.space, false);
+  assert.equal(changed.conversionMode, 'replace');
+  assert.equal(changed.punctuationConversion.periodToJapanese, false);
+  await conversionSettings.getByRole('button', { name: /^詳細設定/ }).click();
+  await conversionSettings.getByRole('button', { name: /^キー操作/ }).click();
+  await page.locator('.inspector-body').evaluate(el => { el.scrollTop = 0; });
+  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-settings-desktop.png') });
   assert.equal(await page.getByLabel('通常変換の方式').count(), 0);
   assert.equal(await page.getByRole('radiogroup', { name: '入力補完レベル' }).count(), 0);
   const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-settings')));
@@ -127,6 +146,8 @@ try {
   assert.equal('inputCompletionLevel' in settings, false);
   await page.setViewportSize({ width: 390, height: 520 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('dark');
+  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-settings-mobile-dark.png') });
   console.log('App E2E passed: themes, responsive layout, restored document, dictionary conversion and current settings contract.');
   await context.close();
 } finally { await browser?.close(); await server.close(); }

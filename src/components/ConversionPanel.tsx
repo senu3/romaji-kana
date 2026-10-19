@@ -44,9 +44,10 @@ export function ConversionPanel({
   const [shortcutError, setShortcutError] = useState("");
   const [openAccordions, setOpenAccordions] = useState({
     triggers: false,
-    punctuation: false,
+    details: false,
   });
   const resultHeadingId = useId();
+  const startHeadingId = useId();
 
   const update = (patch: Partial<AppSettings>) => {
     onChange({ ...settings, ...patch, });
@@ -101,65 +102,30 @@ export function ConversionPanel({
     setShortcutError("");
   };
 
-  const enabledTriggerCount = [
-    settings.triggers.typing ?? settings.triggers.space,
-    settings.triggers.space,
-    settings.triggers.period,
-    settings.triggers.comma,
-    settings.triggers.enter,
-  ].filter(Boolean).length;
-  const punctuationCount = [
-    settings.punctuationConversion.periodToJapanese,
-    settings.punctuationConversion.commaToJapanese,
-  ].filter(Boolean).length;
+  const enabledKeys = [
+    settings.triggers.space && "Space",
+    settings.triggers.period && ".",
+    settings.triggers.comma && ",",
+    settings.triggers.enter && "Enter",
+  ].filter(Boolean).join("・");
+  const punctuationSummary = [
+    settings.punctuationConversion.periodToJapanese && ". → 。",
+    settings.punctuationConversion.commaToJapanese && ", → 、",
+  ].filter(Boolean).join(" / ") || "句読点の置換なし";
 
   return (
     <section className="floating-panel prompt-panel conversion-panel" aria-label="変換設定">
       <div className="conversion-panel-content">
-        <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
-          <h3 id={resultHeadingId}>変換結果</h3>
-          <div className="mode-field">
-            <span>適用方法</span>
-            <div className="segmented-control" role="group" aria-label="変換結果の適用方法">
-              <button
-                className={settings.conversionMode === "replace" ? "selected" : ""}
-                type="button"
-                aria-pressed={settings.conversionMode === "replace"}
-                onClick={() => update({ conversionMode: "replace" })}
-              >
-                直接置換
-              </button>
-              <button
-                className={settings.conversionMode === "ghost" ? "selected" : ""}
-                type="button"
-                aria-pressed={settings.conversionMode === "ghost"}
-                onClick={() => update({ conversionMode: "ghost" })}
-              >
-                候補を表示
-              </button>
-            </div>
-            <small>
-              {settings.conversionMode === "ghost"
-                ? "候補をインライン表示し、Tabで確定します。"
-                : "変換後の日本語ですぐに置き換えます。"}
-            </small>
-          </div>
-        </section>
-
-        <AccordionSection
-          title="変換タイミング"
-          summary={settings.autoConvert ? `自動 · ${enabledTriggerCount}/5 条件` : "手動のみ"}
-          open={openAccordions.triggers}
-          onToggle={() => toggleAccordion("triggers")}
-        >
+        <section className="settings-group conversion-start-settings" aria-labelledby={startHeadingId}>
+          <h3 id={startHeadingId}>変換の開始</h3>
           <CheckRow
-            label="入力中に自動変換"
+            label="自動変換"
             checked={settings.autoConvert}
             onChange={(checked) => update({ autoConvert: checked })}
           />
           <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="入力停止後に候補を生成"
+              label="入力が止まったら変換"
               checked={settings.triggers.typing ?? settings.triggers.space}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ typing: checked })}
@@ -168,11 +134,11 @@ export function ConversionPanel({
               className={`mode-field compact-mode-field input-pause-field ${settings.autoConvert && (settings.triggers.typing ?? settings.triggers.space) ? "" : "disabled"
                 }`}
             >
-              <span>入力停止の判定</span>
+              <span>入力停止後の待ち時間</span>
               <div
                 className="segmented-control"
                 role="radiogroup"
-                aria-label="入力停止の判定"
+                aria-label="入力停止後の待ち時間"
               >
                 {INPUT_PAUSE_TIMING_OPTIONS.map((option) => (
                   <label
@@ -193,31 +159,73 @@ export function ConversionPanel({
               </div>
               <small>{inputPauseTimingDescription(settings.inputPauseTiming)}</small>
             </div>
+          </div>
+        </section>
+
+        <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
+          <h3 id={resultHeadingId}>結果の適用</h3>
+          <div className="mode-field">
+            <span>適用方法</span>
+            <div className="segmented-control" role="group" aria-label="変換結果の適用方法">
+              <button
+                className={settings.conversionMode === "replace" ? "selected" : ""}
+                type="button"
+                aria-pressed={settings.conversionMode === "replace"}
+                onClick={() => update({ conversionMode: "replace" })}
+              >
+                直接置換
+              </button>
+              <button
+                className={settings.conversionMode === "ghost" ? "selected" : ""}
+                type="button"
+                aria-pressed={settings.conversionMode === "ghost"}
+                onClick={() => update({ conversionMode: "ghost" })}
+              >
+                確認して確定
+              </button>
+            </div>
+            <small>
+              {settings.conversionMode === "ghost"
+                ? "候補パネルで確認し、Tabまたは確定ボタンで本文に反映します。"
+                : "変換後の日本語ですぐに置き換えます。"}
+            </small>
+          </div>
+          <p className="panel-note">誤字修正・推測・読み未確認の候補は、どちらの設定でも確認して確定します。</p>
+        </section>
+
+        <AccordionSection
+          title="キー操作"
+          summary={settings.autoConvert ? enabledKeys || "手動ショートカットのみ" : "自動変換はオフ"}
+          open={openAccordions.triggers}
+          onToggle={() => toggleAccordion("triggers")}
+        >
+          <div className={`trigger-options ${settings.autoConvert ? "" : "disabled"}`}>
             <CheckRow
-              label="Spaceで候補を生成"
+              label="Spaceで変換"
               checked={settings.triggers.space}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ space: checked })}
             />
             <CheckRow
-              label="ピリオドで変換"
+              label="ピリオド（.）で変換"
               checked={settings.triggers.period}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ period: checked })}
             />
             <CheckRow
-              label="カンマで変換"
+              label="カンマ（,）で変換"
               checked={settings.triggers.comma}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ comma: checked })}
             />
             <CheckRow
-              label="Enterで変換（IME 変換中は無視）"
+              label="Enterで変換"
               checked={settings.triggers.enter}
               disabled={!settings.autoConvert}
               onChange={(checked) => updateTriggers({ enter: checked })}
             />
           </div>
+          <p className="panel-note">日本語IMEで文字を変換している間は、Enterによる変換を行いません。</p>
           {!remoteMode ? (
             <div className="shortcut-field">
               <div>
@@ -261,44 +269,40 @@ export function ConversionPanel({
         </AccordionSection>
 
         <AccordionSection
-          title="句読点変換"
-          summary={`${punctuationCount}/2 有効`}
-          open={openAccordions.punctuation}
-          onToggle={() => toggleAccordion("punctuation")}
+          title="詳細設定"
+          summary={punctuationSummary}
+          open={openAccordions.details}
+          onToggle={() => toggleAccordion("details")}
         >
+          <h4 className="conversion-detail-heading">句読点の置換</h4>
           <CheckRow
-            label=". を 。に変換"
+            label=". を 。に置き換える"
             checked={settings.punctuationConversion.periodToJapanese}
             onChange={(checked) => updatePunctuation({ periodToJapanese: checked })}
           />
           <CheckRow
-            label=", を 、に変換"
+            label=", を 、に置き換える"
             checked={settings.punctuationConversion.commaToJapanese}
             onChange={(checked) => updatePunctuation({ commaToJapanese: checked })}
           />
+          <details className="advanced-prompt">
+            <summary>変換指示の編集</summary>
+            <label className="prompt-editor">
+              <span>日本語変換の指示</span>
+              <textarea
+                value={settings.conversionPrompt}
+                onChange={(event) => update({ conversionPrompt: event.currentTarget.value })}
+                spellCheck={false}
+              />
+            </label>
+            <div className="panel-actions">
+              <button className="secondary-button" type="button" onClick={onResetPrompt}>
+                デフォルトに戻す
+              </button>
+            </div>
+          </details>
         </AccordionSection>
-
-        <p className="panel-note">
-          通常変換は入力の読みを保ちます。誤字修正・推測の候補は、内容を確認してTabで採用します。
-        </p>
-
-        <details className="advanced-prompt">
-          <summary>詳細な変換指示</summary>
-          <label className="prompt-editor">
-            <span>日本語変換の指示</span>
-            <textarea
-              value={settings.conversionPrompt}
-              onChange={(event) => update({ conversionPrompt: event.currentTarget.value })}
-              spellCheck={false}
-            />
-          </label>
-          <div className="panel-actions">
-            <button className="secondary-button" type="button" onClick={onResetPrompt}>
-              デフォルトに戻す
-            </button>
-          </div>
-          <p className="panel-note">変更は自動保存されます。</p>
-        </details>
+        <p className="panel-note">設定は自動保存されます。</p>
       </div>
     </section>
   );

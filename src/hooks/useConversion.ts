@@ -375,10 +375,10 @@ export function useConversion({
           setStatus({
             kind: "success",
             message: conversion.conversionStrategy === "speculative"
-              ? "推測候補を生成しました。Tab で確定、Esc で破棄できます。"
+              ? "推測候補を表示しました。"
               : conversion.conversionStrategy === "correction"
-                ? "誤字修正候補を生成しました。Tab で確定、Ctrl/Cmd+/ で候補一覧を開けます。"
-                : "変換候補の準備ができました。Tab で確定、Ctrl/Cmd+/ で候補一覧を開けます。",
+                ? "誤字修正候補を表示しました。"
+                : "変換候補を表示しました。",
           });
           return;
         }
@@ -587,10 +587,10 @@ export function useConversion({
           setStatus({
             kind: "success",
             message: conversion.conversionStrategy === "speculative"
-              ? "履歴から推測候補を生成しました。Tab で適用、Esc で破棄できます。"
+              ? "履歴から推測候補を表示しました。"
               : conversion.conversionStrategy === "correction"
-                ? "履歴から誤字修正候補を生成しました。Tab で適用、Ctrl/Cmd+/ で候補一覧を開けます。"
-                : "履歴から変換候補を生成しました。Tab で適用、Ctrl/Cmd+/ で候補一覧を開けます。",
+                ? "履歴から誤字修正候補を表示しました。"
+                : "履歴から変換候補を表示しました。",
           });
           return;
         }
@@ -873,10 +873,10 @@ export function useConversion({
     setStatus({
       kind: "success",
       message: suggestion.conversionStrategy === "speculative"
-        ? "推測候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。"
+        ? "推測候補を確定しました。"
         : suggestion.conversionStrategy === "correction"
-          ? "誤字修正候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。"
-          : "変換候補を確定しました。Ctrl/Cmd+/ で候補一覧を開けます。",
+          ? "誤字修正候補を確定しました。"
+          : "変換候補を確定しました。",
     });
   }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
 
@@ -890,7 +890,7 @@ export function useConversion({
     invalidatePredictiveSuggestions(false);
     setStatus({
       kind: "idle",
-      message: "候補を破棄しました。入力を止めると新しい候補を生成します。",
+      message: "候補を閉じました。",
     });
   }, [invalidatePredictiveSuggestions]);
 
@@ -1072,7 +1072,7 @@ export function useConversion({
       })
     });
     editorViewRef.current!.focus();
-    setStatus({ kind: "success", message: "候補を選びました。Tabで採用、Escで破棄できます。" });
+    setStatus({ kind: "success", message: "選んだ候補を表示しました。" });
   }, [candidateList, candidateListIsCurrent]);
 
   const speculateFromCandidateList = useCallback(() => {
@@ -1185,12 +1185,12 @@ export function useConversion({
           setStatus({
             kind: predictiveSuggestionQueueRef.current ? "loading" : "success",
             message: conversion.conversionStrategy === "speculative"
-              ? "推測候補を表示しました。Tab で確定、Esc で破棄できます。"
+              ? "推測候補を表示しました。"
               : conversion.changes?.additions?.length
-                ? `読みの差分 ${conversion.changes?.additions.map((text) => `+「${text}」`).join(" ")}。Tab で確定できます。`
+                ? "読みを変更した候補を表示しました。"
                 : predictiveSuggestionQueueRef.current
                   ? "候補を表示しました。より新しい入力の候補を更新しています。"
-                  : "変換候補を表示しました。Tab で確定、Esc で破棄できます。",
+                  : "変換候補を表示しました。",
           });
         };
         const conversion = await convertRomajiToJapaneseDetailed(

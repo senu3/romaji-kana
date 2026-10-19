@@ -131,12 +131,6 @@ export function HistoryPanel({
                   <dt>変換前</dt>
                   <dd>{item.input}</dd>
                 </div>
-                {item.changes?.sourceReading ? (
-                  <div className="history-line">
-                    <dt>元の読み</dt>
-                    <dd>{item.changes?.sourceReading}</dd>
-                  </div>
-                ) : null}
                 <div className="history-line">
                   <dt>{item.status === "success" ? "出力" : "結果"}</dt>
                   <dd>{item.output ?? item.error ?? "出力はありません。"}</dd>
