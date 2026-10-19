@@ -1,9 +1,10 @@
 import { classifyConversionChanges } from "./conversionChanges";
-import { generateKanaConversion } from "./conversionGeneration";
+import { isRejectedSurfaceVariant } from "./conversionOutput";
+import { generateKanaConversion, generateReinterpretationSegments } from "./conversionGeneration";
 import { hasConvertibleRomaji, normalizeRomajiReadingCandidate } from "./conversionInput";
 import { isAllowedSpeculativeConversion } from "./conversionPolicy";
 import { preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
-import { prepareConversionRequest, type ConversionRequest } from "./conversionRequest";
+import { prepareConversionRequest, type ConversionRequest, type ReinterpretationPart } from "./conversionRequest";
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { convertLocally } from "./localConversion";
@@ -60,6 +61,9 @@ function finishGeneration(segments: GeneratedSegment[], protection: ConversionPr
   changes.readingAssessment.reportedReading = segments.map(s => s.reported ?? s.reading).join("");
   if (segments.some(s => s.numeric)) changes.readingAssessment.numericReadingNormalized = true;
   const result: JapaneseConversionResult = { text, reviewKana: reading, changes };
+  if (options.userRequestedSpeculation && isRejectedSurfaceVariant(text, options.avoidOutputs)) {
+    return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "speculative", rejectionDetail: "avoided-output" };
+  }
   if (changes.readingAssessment.status === "contradicted") return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "reading", rejectionDetail: "reading-contradiction" };
   if (!preservesProtectedContent(protection.source, text, protection.literalTerms) || !preservesProtectedContent(protection.source, reading, protection.literalTerms)) {
     return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "protected", rejectionDetail: "protected-content" };
@@ -70,51 +74,50 @@ function finishGeneration(segments: GeneratedSegment[], protection: ConversionPr
   return result;
 }
 
-function splitAroundLiterals(value: string, literals: readonly string[]): string[] | undefined {
-  const spans: string[] = [];
-  let cursor = 0;
-  for (const literal of literals) {
-    const index = value.indexOf(literal, cursor);
-    if (index < 0) return undefined;
-    spans.push(value.slice(cursor, index));
-    cursor = index + literal.length;
-  }
-  return [...spans, value.slice(cursor)];
-}
-
 async function reinterpretWholeTarget(settings: AppSettings, transport: OllamaTransport,
   options: JapaneseConversionOptions, preparedInput: ReturnType<typeof prepareConversionRequest>): Promise<JapaneseConversionResult> {
   const { parts, protection, documentVocabulary } = preparedInput;
-  const literals = parts.flatMap(part => part.type === "text" ? [] : [part.output]).filter(Boolean);
   const source = parts.map(part => part.type === "text" ? romajiToKana(part.value).kana : part.output).join("");
-  const prepared = parts.map(part => part.type === "text" ? romajiToKana(normalizeRomajiReadingCandidate(part.value)).kana : part.output).join("");
-  const rejected = (detail: "no-candidate" | "protected-content"): JapaneseConversionResult => ({
-    text: "", reviewKana: source, suggestionRejected: true, suggestionRejectedReason: detail === "protected-content" ? "protected" : "unconvertible", rejectionDetail: detail,
-  });
-  if (!parts.some(part => part.type === "text" && hasConvertibleRomaji(part.value))) return rejected("no-candidate");
-  const candidate = await generateKanaConversion({
-    target: { originalRomaji: parts.map(part => part.type === "text" ? part.value : part.output).join(""), mechanicalReading: prepared, preparedReading: prepared, protectedLiterals: literals },
+  const request: ConversionRequest = {
+    target: {
+      originalRomaji: parts.map(part => part.type === "text" ? part.value : part.output).join(""),
+      mechanicalReading: source,
+      preparedReading: parts.map(part => part.type === "text" ? romajiToKana(normalizeRomajiReadingCandidate(part.value)).kana : part.output).join(""),
+    },
     reference: { beforeTarget: options.contextBefore ?? "", afterTarget: options.contextAfter, documentVocabulary },
-  }, settings, transport, options);
-  if (!candidate.text) return rejected("no-candidate");
-  // Reject broken or duplicated anchors before splitting/verification. The model
-  // emits one full target; the application never guesses a rejected sub-fragment.
-  if (!preservesProtectedContent(protection.source, candidate.text, literals) || !preservesProtectedContent(protection.source, candidate.reading, literals)) return rejected("protected-content");
-  const textSpans = splitAroundLiterals(candidate.text, literals);
-  const readingSpans = splitAroundLiterals(candidate.reading, literals);
-  const reportedSpans = splitAroundLiterals(candidate.reportedReading, literals);
-  const sourceSpans = splitAroundLiterals(source, literals);
-  if (!textSpans || !readingSpans || !reportedSpans || !sourceSpans) return rejected("protected-content");
+  };
+  const rejected = (): JapaneseConversionResult => ({ text: "", reviewKana: source, suggestionRejected: true,
+    suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate" });
+  if (!parts.some(part => part.type === "text" && hasConvertibleRomaji(part.value))) return rejected();
+  const hasLiterals = parts.some(part => part.type !== "text");
+  const layout: ReinterpretationPart[] = parts.map((part, index) => part.type === "text" && hasConvertibleRomaji(part.value)
+    ? { id: "edit-" + index, originalInput: part.value }
+    : { literal: part.type === "text" ? part.value : part.output });
+  const editableReadings = parts.flatMap(part => part.type === "text" && hasConvertibleRomaji(part.value)
+    ? [romajiToKana(normalizeRomajiReadingCandidate(part.value)).kana] : []);
+  const generated = hasLiterals
+    ? await generateReinterpretationSegments(request, layout, editableReadings, settings, transport, options)
+    : [await generateKanaConversion(request, settings, transport, options)];
+  if (!generated.length || generated.some(segment => !segment.text)) return rejected();
   const segments: GeneratedSegment[] = [];
-  for (let i = 0; i < textSpans.length; i++) {
+  let index = 0;
+  // One model request sees the complete target and full rejections. Immutable
+  // spans are inserted by the app, never generated or pronounced by the model.
+  for (const part of hasLiterals ? layout : [{ id: "whole", originalInput: request.target.originalRomaji }]) {
     throwIfConversionAborted(options.signal);
-    if (textSpans[i] || readingSpans[i] || sourceSpans[i]) {
-      const assessment = await assessReadingWithEngine(textSpans[i], readingSpans[i], true, options.readingVerifier,
-        options.kanaEngine, settings.personalDictionary, options.signal);
-      segments.push({ text: textSpans[i], reading: readingSpans[i], source: sourceSpans[i], assessment,
-        reported: reportedSpans[i], numeric: candidate.numericReadingNormalized });
+    if ("literal" in part) {
+      segments.push({ text: part.literal, reading: part.literal, source: part.literal,
+        assessment: { status: "verified", origin: "literal", proof: "preserved" } });
+      continue;
     }
-    if (i < literals.length) segments.push({ text: literals[i], reading: literals[i], source: literals[i], assessment: { status: "verified", origin: "literal", proof: "preserved" } });
+    const candidate = generated[index];
+    const segmentSource = hasLiterals ? romajiToKana(part.originalInput).kana : source;
+    index++;
+    const assessment = await assessReadingWithEngine(candidate.text, candidate.reading, true, options.readingVerifier,
+      options.kanaEngine, settings.personalDictionary, options.signal);
+    throwIfConversionAborted(options.signal);
+    segments.push({ text: candidate.text, reading: candidate.reading, source: segmentSource, assessment,
+      reported: candidate.reportedReading, numeric: candidate.numericReadingNormalized });
   }
   return finishGeneration(segments, protection, options);
 }

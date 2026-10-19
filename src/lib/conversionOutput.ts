@@ -58,3 +58,17 @@ export function parseConversionOutput(text: string): ConversionOutput | null {
 export function isAvoidedConversionOutput(output: string, avoided: string[] | undefined): boolean {
   return Boolean(output.trim() && avoided?.some(value => value.trim() === output.trim()));
 }
+
+/** A deliberately narrow surface comparison, not a semantic/synonym detector.
+ * Keep polarity, tense, question endings and content words distinct. */
+export function isRejectedSurfaceVariant(output: string, avoided: readonly string[] | undefined): boolean {
+  const comparable = (text: string) => text.normalize("NFC").trim().replace(/[。．.]$/u, "")
+    .replace(/なかったです$/u, "なかった")
+    .replace(/ないです$/u, "ない")
+    .replace(/いませんでした$/u, "いなかった")
+    .replace(/いません$/u, "いない")
+    .replace(/ありませんでした$/u, "なかった")
+    .replace(/ありません$/u, "ない");
+  const value = comparable(output);
+  return Boolean(value && avoided?.some(text => comparable(text) === value));
+}

@@ -122,6 +122,45 @@ try {
       assert.equal(proposals, 1, 'Explicit reinterpretation must issue only one proposal');
     });
   }
+  await scenario({ autoConvert: false }, async (page, editor) => {
+    await page.route('**/api/kana-engine', route => {
+      const body = route.request().postDataJSON();
+      if (body.operation === 'verify') return route.fulfill({ json: { status: 'verified' } });
+      const text = '講師は終わらなかった';
+      return route.fulfill({ json: { candidates: [{ text, reading: body.reading, cost: 100,
+        tokens: [{ text, reading: body.reading, from: 0, to: [...body.reading].length,
+          source: 'mozc', entryId: 'fixture', lid: 0, rid: 0, wordCost: 100 }] }], truncated: false, dictionaryRevision: 'test' } });
+    });
+    let proposals = 0;
+    await page.route('**/api/generate', route => {
+      const body = route.request().postDataJSON();
+      if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+      const request = JSON.parse(body.prompt);
+      const editable = request.target.parts.filter(part => part.id);
+      assert.equal(editable.length, 1);
+      assert.ok(request.target.parts.some(part => part.literal === 'XR-34'));
+      assert.deepEqual(request.rejectedOutputs, ['XR-34の講師は終わらなかった。']);
+      proposals++;
+      return route.fulfill({ json: { response: JSON.stringify({ segments: [{ id: editable[0].id,
+        convertedText: '更新は終わらなかった。', completedKana: 'こうしんはおわらなかった。' }] }) } });
+    });
+    const source = '`XR-34` no koushihaowaranakatta.';
+    await editor.click(); await page.keyboard.insertText(source);
+    await page.keyboard.press('Control+Enter');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    await page.keyboard.press('Control+/');
+    await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: '読みも含めて見直す', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.cm-ghost-text-suggestion')?.textContent === 'XR-34の更新は終わらなかった。');
+    const documentText = await editor.evaluate(element => {
+      const clone = element.cloneNode(true);
+      clone.querySelectorAll('.cm-ghost-text').forEach(widget => widget.remove());
+      return clone.textContent;
+    });
+    assert.equal(documentText, source, 'Reconstructed protected output must remain a preview');
+    await editor.focus(); await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), 'XR-34の更新は終わらなかった。');
+    assert.equal(proposals, 1);
+  });
   await scenario({ triggers: { typing: true, space: true } }, async (page, editor, searches) => {
     await editor.evaluate(element => {
       const data = new DataTransfer();

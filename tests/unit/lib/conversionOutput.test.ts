@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConversionOutput } from "../../../src/lib/conversionOutput";
+import { parseConversionOutput, isRejectedSurfaceVariant } from "../../../src/lib/conversionOutput";
 
 describe("current structured output contract", () => {
   it("allows an explicit abstention as well as a text and reading pair", () => {
@@ -10,4 +10,23 @@ describe("current structured output contract", () => {
     ("rejects incomplete or retired response forms: %s", response => {
       expect(parseConversionOutput(response)).toBeNull();
     });
+});
+
+describe("occurrence-local rejection surface comparison", () => {
+  it.each([
+    ["廃止はまだしていない。", "廃止はまだしていません。"],
+    ["更新は終わっていなかった。", "更新は終わっていませんでした。"],
+    ["変更はなかった。", "変更はありませんでした。"],
+    ["確認。", "確認."],
+  ])("rejects only a known surface variant: %s / %s", (before, after) => {
+    expect(isRejectedSurfaceVariant(after, [before])).toBe(true);
+  });
+  it.each([
+    ["角煮", "確認"], ["陶器", "登記"], ["方向", "方角"],
+    ["終わっていない。", "終わっていなかった。"],
+    ["終わっていません。", "終わっている。"],
+    ["変更はない。", "変更はないか。"],
+  ])("does not infer synonymy, a word ban or equivalence of tense/polarity: %s / %s", (before, after) => {
+    expect(isRejectedSurfaceVariant(after, [before])).toBe(false);
+  });
 });
