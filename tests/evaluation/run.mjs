@@ -30,7 +30,8 @@ if (args.help) {
   --repeats 3  --seed 20260922  --case basic-01,basic-02
   --prompt FILE  --note TEXT  --out NEW_DIRECTORY  --dry-run
 Dry run validates cases and writes the schedule without contacting a model.
-Actual runs include one unscored warmup and stop on the first request error.`);
+Actual runs include one unscored warmup. Response validation errors are recorded;
+transport and unexpected errors stop the run.`);
 } else {
   await main().catch(error => { console.error(error.message); process.exitCode = 1; });
 }
@@ -61,7 +62,7 @@ async function main() {
   const selected = args.case ? args.case.split(",") : [...ids];
   if (new Set(selected).size !== selected.length || selected.some(id => !ids.has(id))) throw new Error("Unknown or duplicate case ID");
   const cases = dataset.cases.filter(c => selected.includes(c.id));
-  if (args.engine === "local" && cases.some(c => (c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel) !== "none" || c.options?.completionMode || c.options?.speculativeMode || c.options?.alternativeMode)) {
+  if (args.engine === "local" && cases.some(c => (c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel) !== "none" || c.options?.completionMode || c.options?.speculativeMode || c.options?.alternativeMode || c.options?.userRequestedSpeculation || (c.options?.purpose && c.options.purpose !== "normal"))) {
     throw new Error("--engine local requires faithful conversion cases without repair/completion/speculation");
   }
   const prompt = args.prompt ? await readFile(resolve(args.prompt), "utf8") : null;
@@ -74,6 +75,7 @@ async function main() {
     const { convertRomajiToJapaneseDetailed } = await vite.ssrLoadModule("/src/lib/ollama.ts");
     const { convertRomajiToJapaneseDetailed: compareLegacy } = await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts");
     const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
+    const { ConversionResponseError } = await vite.ssrLoadModule("/src/lib/conversionDiagnostics.ts");
     const { documentVocabulary, ...defaults } = dataset.defaults;
     const configured = cases.map(c => ({
       ...c,
@@ -96,7 +98,7 @@ async function main() {
       for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       schedule.push(...order.map(c => ({ caseId: c.id, repeat })));
     }
-    const out = resolve(args.out ?? resolve(root, "tests/evaluation/results", `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID().slice(0, 8)}`));
+    const out = resolve(args.out ?? resolve(root, "docs/evaluation/runs", `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID().slice(0, 8)}`));
     await mkdir(dirname(out), { recursive: true });
     await mkdir(out); // Never overwrite an earlier experiment.
     const git = (...argv) => { try { return execFileSync("git", argv, { cwd: root, encoding: "utf8" }).trim(); } catch { return "unknown"; } };
@@ -173,7 +175,10 @@ async function main() {
       } catch (error) {
         row.outcome = "error"; row.error = String(error);
         if (error?.diagnostic) row.errorDiagnostic = error.diagnostic;
-        stopped = true;
+        // A completed but invalid response is a quality failure, not evidence of
+        // an in-flight server generation. Keep it in the denominator and continue.
+        row.errorKind = error instanceof ConversionResponseError ? "response-validation" : "request-or-unexpected";
+        stopped = row.errorKind !== "response-validation";
       }
       row.elapsedMs = performance.now() - started;
       row.rankingCompletionMs = args.engine === "hybrid" && row.firstDictionaryCandidateMs !== null ? row.rescueStartedMs ?? row.elapsedMs : null;

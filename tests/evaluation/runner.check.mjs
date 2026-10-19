@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -75,6 +75,50 @@ test("records the experimental missing-letter switch and comparison set", async 
     }
     assert.equal((await run(["--dry-run", "--missing-letter", "invalid"])).code, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("production reinterpretation records validation failures and continues, without leaking reference answers", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "kana-intent-"));
+  const requests = [];
+  const server = createServer(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push(JSON.parse(body));
+    res.setHeader("Content-Type", "application/json");
+    // Invalid response contract: this must count as an error, not end the run.
+    res.end(JSON.stringify({ response: "{}" }));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const dataset = join(dir, "cases.json");
+    const source = JSON.parse(await readFile(new URL("./intent-quality.json", import.meta.url), "utf8"));
+    source.cases = [source.cases.find(c => c.id === "intent-10")];
+    source.cases[0].acceptableExamples = ["REFERENCE_ANSWER_DO_NOT_SEND"];
+    source.cases[0].criteria = ["EVALUATOR_CRITERION_DO_NOT_SEND"];
+    source.cases[0].notes = "EVALUATOR_NOTES_DO_NOT_SEND";
+    await writeFile(dataset, JSON.stringify(source));
+    const base = ["--dataset", dataset, "--repeats", "2", "--model", "mock", "--url", `http://127.0.0.1:${server.address().port}`];
+    const result = await run([...base, "--out", join(dir, "run")]);
+    assert.equal(result.code, 0, result.output);
+    const rows = (await readFile(join(dir, "run/trials.jsonl"), "utf8")).trim().split("\n").map(JSON.parse);
+    assert.equal(rows.length, 3);
+    assert.ok(rows.every(r => r.implementation === "production" && r.outcome === "error" && r.errorKind === "response-validation"));
+    const summary = JSON.parse(await readFile(join(dir, "run/summary.json"), "utf8"));
+    assert.equal(summary.completedTrials, 2);
+    assert.equal(summary.stoppedOnError, false);
+    assert.equal(summary.categories["user-reinterpretation"].errors, 2);
+    assert.equal(requests.length, 3);
+    assert.ok(requests.every(r => !JSON.stringify(r).includes("DO_NOT_SEND")));
+    assert.ok(requests.every(r => r.system.includes("記事を予約してください。")));
+    assert.equal((await run([...base, "--engine", "local", "--dry-run", "--out", join(dir, "invalid")])).code, 1);
+    source.cases[0].options = { purpose: "correction" };
+    await writeFile(dataset, JSON.stringify(source));
+    assert.equal((await run([...base, "--engine", "local", "--dry-run", "--out", join(dir, "invalid-purpose")])).code, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 for (const format of ["plain", "structured"]) {
