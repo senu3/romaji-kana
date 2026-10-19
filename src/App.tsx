@@ -9,7 +9,6 @@ import {
   StatusBar,
 } from "./components/AppChrome";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import { CandidateList } from "./components/CandidateList";
 import { CompanionPanel } from "./components/CompanionPanel";
 import { ConversionPanel } from "./components/ConversionPanel";
 import { DictionaryModal } from "./components/DictionaryModal";
@@ -291,6 +290,10 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     <main className="app-shell">
       <AppTitleBar />
       <MarkdownEditor
+        candidateList={candidateList}
+        onSelectCandidate={selectListedCandidate}
+        onSpeculate={speculateFromCandidateList}
+        onCloseCandidateList={closeCandidateList}
         settings={settings}
         pending={pending}
         initialDocument={initialDocument}
@@ -428,8 +431,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           onSkip={closeModelSettings}
         />
       ) : null}
-      {candidateList ? <CandidateList session={candidateList.session} onSelect={selectListedCandidate}
-        onSpeculate={speculateFromCandidateList} onClose={closeCandidateList} /> : null}
       <StatusBar
         status={status}
         pending={delayedPending}

@@ -1558,86 +1558,49 @@ h3 {
   color: var(--theme-warning, #9a3412);
 }
 
-.candidate-list-dialog {
-  width: min(480px, calc(100vw - 32px));
-  max-height: min(680px, calc(100dvh - 32px));
-  padding: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow: 0 16px 48px var(--theme-shadow, rgb(18 63 59 / 20%));
+/* One anchored surface for conversion previews and alternative selection. */
+.conversion-popover {
+  position: fixed;
+  z-index: 35;
+  width: min(440px, calc(100vw - 16px));
+  max-height: min(440px, calc(100dvh - 220px));
   overflow: auto;
-}
-
-.candidate-list-dialog::backdrop {
-  background: rgb(0 0 0 / 28%);
-}
-
-.candidate-list-content {
-  padding: 18px;
-}
-
-.candidate-list-content header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.candidate-list-content h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.candidate-list-content p {
-  margin: 12px 0;
-  color: var(--ink-muted);
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.candidate-list-options {
-  display: grid;
-  gap: 6px;
-  margin: 16px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.candidate-list-options button {
-  display: flex;
-  width: 100%;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   background: var(--surface);
   color: var(--ink);
-  text-align: left;
-  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.conversion-popover-heading { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.conversion-popover-heading > button { margin-left: auto; }
+.conversion-kind { color: var(--accent); font-size: 12px; }
+.conversion-popover .cm-ghost-text-suggestion { margin: 14px 0; font-size: 17px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-help { margin: 8px 0; color: var(--ink-muted); font-size: 12px; }
+.candidate-notice { margin: 8px 0 12px; color: var(--ink); font-size: 12px; }
+.candidate-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.candidate-action, .candidate-accept { min-height: 34px; padding: 5px 9px; border: 0; border-radius: 5px; font: inherit; cursor: pointer; }
+.candidate-action { background: transparent; color: var(--ink); }
+.candidate-action:hover { background: var(--chrome); }
+.candidate-accept { background: var(--accent); color: var(--surface); }
+.candidate-accept:hover { filter: brightness(0.9); }
+.conversion-popover kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: 0.85; }
+.candidate-details-toggle { margin-left: auto; color: var(--ink-muted); }
+.candidate-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line-strong); font-size: 12px; }
+.candidate-details dt { color: var(--ink-muted); }
+.candidate-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-list-options { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 2px; }
+.candidate-list-options button { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; min-height: 40px; border: 0; border-radius: 5px; padding: 8px 10px; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+.candidate-list-options button > span { overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
+.candidate-list-options button:hover, .candidate-list-options button[aria-pressed="true"] { background: var(--accent-soft); }
+.candidate-list-options small { flex-shrink: 0; font-size: 11px; color: var(--ink-muted); }
+.candidate-reconsider { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-strong); }
+.conversion-popover button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .conversion-popover button { min-height: 44px; }
 }
 
-.candidate-list-options button:hover,
-.candidate-list-options button[aria-pressed="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.candidate-list-options small {
-  flex-shrink: 0;
-  color: var(--ink-muted);
-  font-size: 11px;
-}
-
-.candidate-list-content footer {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
 
 .recent-retry-chip {
   position: fixed;

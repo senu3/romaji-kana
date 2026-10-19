@@ -16,14 +16,13 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
   keymap,
   lineNumbers,
   placeholder,
-  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -41,7 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { candidatePresentation } from "../lib/candidatePresentation";
+import { CandidateList, type CandidateListTarget } from "./CandidateList";
 import {
   extractSelectedConversionRange,
   isTriggerEnabled,
@@ -68,6 +67,10 @@ import type {
 import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } from "../lib/unconvertedRanges";
 
 interface MarkdownEditorProps {
+  candidateList?: CandidateListTarget | null;
+  onSelectCandidate?: (id: string) => void;
+  onSpeculate?: () => void;
+  onCloseCandidateList?: () => void;
   settings: AppSettings;
   pending: PendingConversion[];
   initialDocument: string;
@@ -141,100 +144,6 @@ interface GhostState {
   decorations: DecorationSet;
 }
 
-const openGhostCandidates = Facet.define<(suggestion: GhostConversionSuggestion) => void>();
-
-class GhostTextWidget extends WidgetType {
-  constructor(private readonly candidate: GhostConversionSuggestion) {
-    super();
-  }
-
-  toDOM(view: EditorView) {
-    const presentation = candidatePresentation(this.candidate);
-    const speculative = this.candidate.conversionStrategy === "speculative";
-    const explicitAcceptance = requiresExplicitAcceptance(this.candidate);
-    const element = document.createElement("span");
-    element.className = "cm-ghost-text";
-    element.title = presentation.description;
-    const suggestion = document.createElement("span");
-    suggestion.className = "cm-ghost-text-suggestion";
-    suggestion.textContent = this.candidate.convertedText;
-
-    const hint = document.createElement("span");
-    hint.className = "cm-ghost-text-hint";
-    hint.textContent = `${presentation.label}  ${explicitAcceptance ? "Tabで確定" : "Tab/句読点で確定"}  Ctrl/Cmd+/でほかの候補  Escで破棄`;
-    if (this.candidate.session && this.candidate.session.candidates.length > 1) {
-      const session = this.candidate.session;
-      const index = session.candidates.findIndex(c => c.id === session.selectedId);
-      hint.textContent += `  ${index + 1}/${session.candidates.length}`;
-    }
-
-    if ((this.candidate.changes?.additions ?? []).length > 0) {
-      const diff = document.createElement("span");
-      diff.className = "cm-ghost-text-diff";
-      const visibleAdditions = (this.candidate.changes?.additions ?? []).slice(0, 3);
-      const additions = visibleAdditions
-        .map((addition) => `「${addition}」`)
-        .join("・");
-      const remainingCount = (this.candidate.changes?.additions ?? []).length - visibleAdditions.length;
-      const diffLabel = "読みの追加";
-      diff.textContent = `${diffLabel} +${additions}${remainingCount > 0 ? ` ほか${remainingCount}件` : ""}`;
-      diff.setAttribute(
-        "aria-label",
-        `${explicitAcceptance ? "モデル申告の読みの追加" : "読みの追加"}: ${(this.candidate.changes?.additions ?? []).join("、")}`,
-      );
-      element.append(diff);
-    }
-    const comparison = document.createElement("span");
-    comparison.className = "cm-ghost-comparison";
-    comparison.setAttribute("role", "group");
-    comparison.setAttribute("aria-label", "候補の比較");
-    const before = document.createElement("span");
-    before.textContent = `変換前: ${this.candidate.originalText}`;
-    comparison.append(before);
-    if (this.candidate.changes?.sourceReading && !speculative) {
-      const reading = document.createElement("span");
-      reading.textContent = `元の読み: ${this.candidate.changes?.sourceReading}`;
-      comparison.append(reading);
-    }
-    const after = document.createElement("span");
-    after.textContent = "候補: ";
-    after.append(suggestion);
-    comparison.append(after);
-    if (this.candidate.conversionStrategy === "speculative" && this.candidate.changes?.resultReading) {
-      const reading = document.createElement("span");
-      reading.textContent = `読みの比較: ${this.candidate.changes.sourceReading} → ${this.candidate.changes.resultReading}`;
-      comparison.append(reading);
-    }
-
-    if (this.candidate.changes?.readingAssessment?.status !== "verified") {
-      const note = document.createElement("span");
-      const origin = this.candidate.changes?.readingAssessment?.origin;
-      note.textContent = origin === "dictionary" || origin === "literal"
-        ? "入力の読み未確認。候補を確認してTabで採用してください。"
-        : "読み未確認。差分はモデル申告に基づく候補です。Tabで確認して採用してください。";
-      comparison.append(note);
-    }
-
-    element.prepend(comparison);
-    element.append(hint);
-    if (!this.candidate.previewOnly) {
-      const retry = document.createElement("button");
-      retry.type = "button";
-      retry.className = "cm-ghost-candidates";
-      retry.textContent = "ほかの候補";
-      retry.title = "同じ読みの候補一覧を開きます。読みも含めた見直しも選べます。";
-      retry.onmousedown = event => event.preventDefault();
-      retry.onclick = () => view.state.facet(openGhostCandidates)[0]?.(this.candidate);
-      element.append(retry);
-    }
-    return element;
-  }
-
-  ignoreEvent() {
-    return true;
-  }
-}
-
 export const ghostSuggestionField = StateField.define<GhostState>({
   create() {
     return { suggestion: null, decorations: Decoration.none };
@@ -300,13 +209,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
     return Decoration.set([sourceDecoration]);
   }
 
-  return Decoration.set([
-    sourceDecoration,
-    Decoration.widget({
-      widget: new GhostTextWidget(suggestion),
-      side: 1,
-    }).range(suggestion.to),
-  ]);
+  return Decoration.set([sourceDecoration]);
 }
 
 const theme = EditorView.theme({
@@ -359,80 +262,7 @@ const theme = EditorView.theme({
     borderBottom: "1px dashed var(--theme-accent, #0d9488)",
     borderRadius: "3px",
   },
-  ".cm-ghost-text": {
-    color: "var(--theme-accent, #0f766e)",
-    fontStyle: "italic",
-    whiteSpace: "pre-wrap",
-  },
-  ".cm-ghost-text-suggestion": {
-    marginRight: "8px",
-  },
-  ".cm-ghost-candidates": {
-    display: "inline-block",
-    margin: "4px",
-    padding: "4px 8px",
-    maxWidth: "100%",
-    whiteSpace: "normal",
-    font: "inherit",
-    fontSize: "12px",
-    fontStyle: "normal",
-    color: "var(--theme-text, #123f3b)",
-    backgroundColor: "var(--theme-chrome, #f3f8f6)",
-    border: "1px solid var(--theme-border, #b5d7d1)",
-    borderRadius: "6px",
-    cursor: "pointer",
-  },
-  ".cm-ghost-comparison": {
-    display: "inline-flex",
-    flexDirection: "column",
-    maxWidth: "100%",
-    margin: "4px 8px",
-    padding: "4px 8px",
-    border: "1px solid var(--theme-border, #b5d7d1)",
-    borderRadius: "6px",
-    color: "var(--theme-text, #123f3b)",
-    backgroundColor: "var(--theme-accent-soft, #f8fffd)",
-    fontSize: "12px",
-    fontStyle: "normal",
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-    verticalAlign: "middle",
-  },
-  ".cm-ghost-text-diff": {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "20px",
-    marginRight: "6px",
-    border: "1px solid var(--theme-warning, #e2b45e)",
-    borderRadius: "6px",
-    padding: "1px 6px",
-    backgroundColor: "var(--theme-warning-soft, #fff8e8)",
-    color: "var(--theme-warning, #7a4d0b)",
-    fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
-    fontSize: "11px",
-    fontStyle: "normal",
-    fontWeight: "750",
-    verticalAlign: "middle",
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  },
-  ".cm-ghost-text-hint": {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "20px",
-    border: "1px solid var(--theme-border, #b5d7d1)",
-    borderRadius: "999px",
-    padding: "1px 7px",
-    backgroundColor: "var(--theme-accent-soft, #f8fffd)",
-    color: "var(--theme-accent, #0f766e)",
-    fontFamily: '"Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, sans-serif',
-    fontSize: "11px",
-    fontStyle: "normal",
-    fontWeight: "750",
-    opacity: "0.86",
-    verticalAlign: "middle",
-    whiteSpace: "nowrap",
-  },
+
   ".cm-history-preview": {
     backgroundColor: "var(--theme-accent-soft, #e8f5f2)",
     borderBottom: "1px solid var(--theme-accent, #5aa79d)",
@@ -551,6 +381,10 @@ function singleInsertedCharacter(update: ViewUpdate): string | null {
 }
 
 export function MarkdownEditor({
+  candidateList,
+  onSelectCandidate,
+  onSpeculate,
+  onCloseCandidateList,
   settings,
   pending,
   initialDocument,
@@ -592,6 +426,7 @@ export function MarkdownEditor({
   const typingIntervalsRef = useRef<number[]>([]);
   const lastTypingAtRef = useRef<number | null>(null);
   const lastPredictiveRequestRef = useRef<PredictiveRequestMarker | null>(null);
+  const [visibleSuggestion, setVisibleSuggestion] = useState<GhostConversionSuggestion | null>(null);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -707,6 +542,7 @@ export function MarkdownEditor({
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
+      setVisibleSuggestion(update.state.field(ghostSuggestionField).suggestion);
       if (update.docChanged || update.selectionSet) {
         onEditorStatusChangeRef.current(editorDocumentStatus(update.state));
         setCanUndo(undoDepth(update.state) > 0);
@@ -823,10 +659,6 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
-        openGhostCandidates.of(suggestion => {
-          clearPredictiveSuggestionTimer();
-          onRetryGhostRef.current(suggestion);
-        }),
         unconvertedRanges,
         theme,
         syntaxHighlighting(highlightStyle),
@@ -1311,6 +1143,20 @@ export function MarkdownEditor({
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />
+      {viewRef.current && (candidateList || (visibleSuggestion && !visibleSuggestion.previewOnly)) ? (
+        <CandidateList
+          key={candidateList?.ghost?.id ?? visibleSuggestion?.id ?? candidateList?.session.id}
+          view={viewRef.current}
+          suggestion={visibleSuggestion?.previewOnly ? null : visibleSuggestion}
+          target={candidateList ?? null}
+          onAccept={() => runEditorCommand(acceptGhostSuggestion)}
+          onDismiss={() => runEditorCommand(dismissGhostSuggestion)}
+          onOpen={() => runEditorCommand(retryGhostSuggestion)}
+          onSelect={onSelectCandidate ?? (() => {})}
+          onSpeculate={onSpeculate ?? (() => {})}
+          onClose={() => { onCloseCandidateList?.(); viewRef.current?.focus(); }}
+        />
+      ) : null}
     </section>
   );
 }

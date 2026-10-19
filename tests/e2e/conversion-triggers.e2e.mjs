@@ -85,7 +85,7 @@ try {
       else await page.getByRole('complementary', { name: '変換結果の見直し' }).waitFor();
       assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
       if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();
-      const action = entry === 'ghost' ? page.locator('.cm-ghost-candidates')
+      const action = entry === 'ghost' ? page.getByRole('dialog', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true })
         : entry === 'recent' ? page.locator('.recent-retry-chip-main')
         : page.locator('.history-item').getByRole('button', { name: 'ほかの候補' });
       await action.click();
@@ -109,7 +109,8 @@ try {
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       } else {
         await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '確認' }).waitFor();
-        assert.match(await page.locator('.cm-ghost-comparison').textContent(), /かくに → かくにん/);
+        await page.getByRole('button', { name: '変更の詳細', exact: true }).click();
+        assert.match(await page.locator('.candidate-details').textContent(), /かくに.*かくにん/s);
         const doc = await editor.evaluate(element => { const clone = element.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(e => e.remove()); return clone.textContent; });
         assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
         await page.setViewportSize({ width: 390, height: 520 });
@@ -244,7 +245,7 @@ try {
       if (succeeds) {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
         assert.equal(await editor.innerText().then(text => text.startsWith('hon')), true);
-        assert.match(await page.locator('.cm-ghost-text-hint').textContent(), /推測候補/);
+        assert.match(await page.locator('.conversion-kind').textContent(), /推測候補/);
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), '本');
       } else {
@@ -293,7 +294,7 @@ try {
         assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.');
       } else {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
-        assert.match(await page.locator('.cm-ghost-text-hint').textContent(), /誤字修正候補/);
+        assert.match(await page.locator('.conversion-kind').textContent(), /誤字修正候補/);
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), `${text}。`);
       }
