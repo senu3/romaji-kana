@@ -27,3 +27,6 @@ dist-ssr
 *.sw?
 docs/
 src-engine/target/
+
+# Generated test and evaluation artifacts
+/test-results/

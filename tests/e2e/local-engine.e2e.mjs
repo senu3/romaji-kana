@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import { artifactPath } from '../helpers/artifacts.mjs';
 
-const server = await createServer({ server: { host: '127.0.0.1', port: 0, strictPort: false } });
+const server = await createServer({ cacheDir: artifactPath('cache/e2e'), server: { host: '127.0.0.1', port: 0, strictPort: false } });
 let browser;
 try {
   await server.listen();

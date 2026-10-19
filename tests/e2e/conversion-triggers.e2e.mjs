@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
+import { artifactPath, screenshotPath } from '../helpers/artifacts.mjs';
 
-const server = await createServer({ server: { host: '127.0.0.1', port: 0, strictPort: false } });
+const server = await createServer({ cacheDir: artifactPath('cache/e2e'), server: { host: '127.0.0.1', port: 0, strictPort: false } });
 let browser;
 try {
   await server.listen();
@@ -99,7 +100,7 @@ try {
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         assert.notEqual(await list.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'The candidate list must have an opaque surface');
-        await page.screenshot({ path: 'node_modules/.conversion-tmp/candidate-list-mobile.png', fullPage: true });
+        await page.screenshot({ path: await screenshotPath('test-results/e2e/candidate-list-mobile.png'), fullPage: true });
       }
       await list.getByRole('button', { name: '読みも含めて見直す', exact: true }).click();
       if (entry === 'recent') {
@@ -113,7 +114,7 @@ try {
         assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        if (entry === 'ghost') await page.screenshot({ path: 'node_modules/.conversion-tmp/speculate-mobile.png', fullPage: true });
+        if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/e2e/speculate-mobile.png'), fullPage: true });
         await editor.focus();
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), '資料を確認してください。');

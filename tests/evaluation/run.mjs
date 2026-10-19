@@ -8,6 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import { createKanaEngineClient } from "../../tools/kana-engine-client.mjs";
 import { finalRoutes, observeRoute, summarizeRoutes } from "./routes.mjs";
+import { artifactPath, resolveArtifactPath } from "../helpers/artifacts.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { values: args } = parseArgs({ options: {
@@ -28,7 +29,7 @@ if (args.help) {
   --dataset tests/evaluation/holdout.json
   --missing-letter on|off
   --repeats 3  --seed 20260922  --case basic-01,basic-02
-  --prompt FILE  --note TEXT  --out NEW_DIRECTORY  --dry-run
+  --prompt FILE  --note TEXT  --out test-results/evaluation/NEW_DIRECTORY  --dry-run
 Dry run validates cases and writes the schedule without contacting a model.
 Actual runs include one unscored warmup. Response validation errors are recorded;
 transport and unexpected errors stop the run.`);
@@ -37,6 +38,9 @@ transport and unexpected errors stop the run.`);
 }
 
 async function main() {
+  const out = args.out ? resolveArtifactPath(args.out) : artifactPath(
+    `evaluation/runs/${new Date().toISOString().replaceAll(":", "-")}-${randomUUID().slice(0, 8)}`,
+  );
   if (!["ollama", "lmstudio"].includes(args.provider)) throw new Error("Invalid provider");
   if (!["hybrid", "local", "llm"].includes(args.engine)) throw new Error("Invalid engine");
   if (!["on", "off"].includes(args["missing-letter"])) throw new Error("Invalid missing-letter mode");
@@ -66,7 +70,7 @@ async function main() {
     throw new Error("--engine local requires faithful conversion cases without repair/completion/speculation");
   }
   const prompt = args.prompt ? await readFile(resolve(args.prompt), "utf8") : null;
-  const vite = await createServer({ root, configFile: false, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: "custom" });
+  const vite = await createServer({ root, configFile: false, cacheDir: artifactPath("cache/evaluation"), optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: "custom" });
   const nativeFetch = globalThis.fetch;
   const engineClient = createKanaEngineClient({ evaluation: true });
   try {
@@ -98,7 +102,6 @@ async function main() {
       for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       schedule.push(...order.map(c => ({ caseId: c.id, repeat })));
     }
-    const out = resolve(args.out ?? resolve(root, "docs/evaluation/runs", `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID().slice(0, 8)}`));
     await mkdir(dirname(out), { recursive: true });
     await mkdir(out); // Never overwrite an earlier experiment.
     const git = (...argv) => { try { return execFileSync("git", argv, { cwd: root, encoding: "utf8" }).trim(); } catch { return "unknown"; } };

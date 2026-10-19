@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { resolveArtifactPath, temporaryArtifactDirectory } from "../helpers/artifacts.mjs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ function run(args) {
 }
 
 test("dry run validates data, deterministic order, and refuses overwrite", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kana-eval-"));
+  const dir = await temporaryArtifactDirectory("kana-eval-");
   try {
     for (const name of ["a", "b"]) {
       const result = await run(["--dry-run", "--out", join(dir, name)]);
@@ -38,8 +38,25 @@ test("dry run validates data, deterministic order, and refuses overwrite", async
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("keeps default and custom evaluation output inside test-results", async () => {
+  for (const out of ["tests/evaluation/generated", "docs/evaluation/generated", "test-results/../escaped"]) {
+    const result = await run(["--dry-run", "--out", out]);
+    assert.equal(result.code, 1);
+    assert.match(result.output, /inside test-results/);
+  }
+  const result = await run(["--dry-run", "--case", "basic-02"]);
+  assert.equal(result.code, 0, result.output);
+  const out = result.output.match(/^Output: (.+)$/m)?.[1].trim();
+  assert.ok(out, result.output);
+  assert.equal(resolveArtifactPath(out), out);
+  try {
+    const manifest = JSON.parse(await readFile(join(out, "manifest.json"), "utf8"));
+    assert.equal(manifest.dryRun, true);
+  } finally { await rm(out, { recursive: true, force: true }); }
+});
+
 test("keeps the unused comparison set separate from the regression set", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kana-holdout-"));
+  const dir = await temporaryArtifactDirectory("kana-holdout-");
   try {
     const result = await run(["--dry-run", "--dataset", "tests/evaluation/holdout.json", "--out", join(dir, "run")]);
     assert.equal(result.code, 0, result.output);
@@ -51,7 +68,7 @@ test("keeps the unused comparison set separate from the regression set", async (
 });
 
 test("validates rescue cases with unspecified acceptable text and route expectations", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kana-rescue-"));
+  const dir = await temporaryArtifactDirectory("kana-rescue-");
   try {
     const result = await run(["--dry-run", "--dataset", "tests/evaluation/rescue-holdout.json", "--out", join(dir, "run")]);
     assert.equal(result.code, 0, result.output);
@@ -64,7 +81,7 @@ test("validates rescue cases with unspecified acceptable text and route expectat
 });
 
 test("records the experimental missing-letter switch and comparison set", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kana-missing-letter-"));
+  const dir = await temporaryArtifactDirectory("kana-missing-letter-");
   try {
     for (const mode of ["on", "off"]) {
       const result = await run(["--dry-run", "--dataset", "tests/evaluation/missing-letter.json", "--missing-letter", mode, "--out", join(dir, mode)]);
@@ -78,7 +95,7 @@ test("records the experimental missing-letter switch and comparison set", async 
 });
 
 test("production reinterpretation records validation failures and continues, without leaking reference answers", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "kana-intent-"));
+  const dir = await temporaryArtifactDirectory("kana-intent-");
   const requests = [];
   const server = createServer(async (req, res) => {
     let body = "";
@@ -124,7 +141,7 @@ test("production reinterpretation records validation failures and continues, wit
 for (const format of ["plain", "structured"]) {
   for (const provider of ["ollama", "lmstudio"]) {
     test(`${provider}/${format}: real pipeline records HTTP attempts and stops on 503`, async () => {
-      const dir = await mkdtemp(join(tmpdir(), "kana-eval-"));
+      const dir = await temporaryArtifactDirectory("kana-eval-");
       const requests = [];
       let fail = false;
       const server = createServer(async (req, res) => {

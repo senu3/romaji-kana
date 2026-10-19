@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { createServer } from "vite";
+import { artifactPath, screenshotPath } from "../helpers/artifacts.mjs";
 
 const TEST_MODELS = [
   { name: "gemma4:latest", modified_at: "2026-01-01T00:00:00Z", size: 1 },
@@ -8,6 +9,7 @@ const TEST_MODELS = [
 ];
 
 const server = await createServer({
+  cacheDir: artifactPath("cache/e2e"),
   server: {
     host: "127.0.0.1",
     port: 0,
@@ -62,7 +64,7 @@ try {
   const selectorBounds = await themeSelect.boundingBox();
   assert.ok(selectorBounds && selectorBounds.x >= 0 && selectorBounds.x + selectorBounds.width <= 390);
   if (process.env.E2E_CANDIDATE_SCREENSHOT) {
-    await firstRunPage.screenshot({ path: process.env.E2E_CANDIDATE_SCREENSHOT + ".mobile.png" });
+    await firstRunPage.screenshot({ path: await screenshotPath(process.env.E2E_CANDIDATE_SCREENSHOT + ".mobile.png") });
   }
   assert.equal(
     await firstRunPage.getByRole("dialog").count(),
