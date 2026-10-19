@@ -1,0 +1,33 @@
+{
+  "version": "2026-10-19-reinterpretation-quality-1",
+  "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "cases": [
+    { "id": "revisit-01", "category": "normal-control", "input": "bangouha35desu.", "acceptableExamples": ["番号は35です。"], "expectedRoutes": ["normal"], "criteria": ["番号と35を保持し、通常変換だけで返す"] },
+    { "id": "revisit-02", "category": "normal-control", "input": "kyounosagyouhamadaowatteinai.", "acceptableExamples": ["今日の作業はまだ終わっていない。", "きょうの作業はまだ終わっていない。"], "expectedRoutes": ["normal"], "criteria": ["今日の作業の未完了を保持する"], "criticalChecks": ["否定を保持する"] },
+    { "id": "revisit-03", "category": "user-reinterpretation", "input": "konokyouzainohaishihamadasiteinai.",
+      "options": { "contextBefore": "動画教材を受講者に送る作業について話しています。", "userRequestedSpeculation": true, "avoidOutputs": ["この教材の廃止はまだしていない。"] },
+      "acceptableExamples": ["この教材の配信はまだしていない。"], "expectedRoutes": ["speculative"], "criteria": ["退けた廃止から配信へ見直し、未実施を保持する"], "criticalChecks": ["否定を保持する"] },
+    { "id": "revisit-04", "category": "user-reinterpretation", "input": "shinkouwosumaseteinai.",
+      "options": { "contextBefore": "税務署に所得を届け出る手続きが残っています。", "userRequestedSpeculation": true, "avoidOutputs": ["進行を済ませていない。"] },
+      "acceptableExamples": ["申告を済ませていない。"], "expectedRoutes": ["speculative"], "criteria": ["税務の文脈から申告を推測し、未完了を保持する"], "criticalChecks": ["否定を保持する"] },
+    { "id": "revisit-05", "category": "user-reinterpretation", "input": "kingakuwotenjishitekudasai.",
+      "options": { "contextAfter": "別の帳票へ同じ数値を書き写します。", "userRequestedSpeculation": true, "avoidOutputs": ["金額を展示してください。"] },
+      "acceptableExamples": ["金額を転記してください。"], "expectedRoutes": ["speculative"], "criteria": ["後方文脈を使って転記を提案し、依頼を保持する"] },
+    { "id": "revisit-06", "category": "protected-reinterpretation", "input": "`CN-54`kara`UZ-19`hehaishishimasen.",
+      "options": { "contextBefore": "装置間で映像を送る処理について説明しています。", "userRequestedSpeculation": true, "avoidOutputs": ["CN-54からUZ-19へ廃止しません。"] },
+      "acceptableExamples": ["CN-54からUZ-19へ配信しません。"], "expectedRoutes": ["speculative"], "criteria": ["複数識別子の境界をまたいでも配信へ見直す"], "criticalChecks": ["両識別子の順序・回数、から・へ、否定を保持する"] },
+    { "id": "revisit-07", "category": "protected-reinterpretation", "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": { "userDictionary": [{ "id": "protected-person", "reading": "akari", "output": "灯里", "enabled": true, "note": "" }] },
+      "options": { "contextBefore": "会社の設立を法務局に登録する手続きについて話しています。", "userRequestedSpeculation": true, "avoidOutputs": ["灯里の陶器は終わらなかった。"] },
+      "acceptableExamples": ["灯里の登記は終わらなかった。"], "expectedRoutes": ["speculative"], "criteria": ["辞書による保護語を保持し、同音異義語の登記を選ぶ"], "criticalChecks": ["灯里、の、否定、過去形を保持する"] },
+    { "id": "revisit-08", "category": "numeric-reinterpretation", "input": "mada8kennoshinkouhaowatteinai.",
+      "options": { "contextBefore": "顧客の所得を税務署に届け出る手続きについて報告しています。", "userRequestedSpeculation": true, "avoidOutputs": ["まだ8件の進行は終わっていない。"] },
+      "acceptableExamples": ["まだ8件の申告は終わっていない。"], "expectedRoutes": ["speculative"], "criteria": ["申告への見直しで件数と未完了を保持する"], "criticalChecks": ["8件と否定を保持する"] },
+    { "id": "revisit-09", "category": "underdetermined", "input": "sagyou",
+      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["作業"] },
+      "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["文脈なしでは別の意味を特定できない。作業する等の続きを創作せず辞退する"] },
+    { "id": "revisit-10", "category": "underdetermined", "input": "zvxqpn",
+      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["ズブックス"] },
+      "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["復元根拠のない英字列から特定の語を創作しない"] }
+  ]
+}

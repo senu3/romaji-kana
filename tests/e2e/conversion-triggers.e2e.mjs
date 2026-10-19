@@ -66,9 +66,9 @@ try {
         const body = route.request().postDataJSON();
         if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
         assert.match(body.system, /user explicitly rejected/);
-        assert.match(body.system, /rejected only for this target occurrence/);
-        assert.match(body.system, /"角煮"/);
-        assert.match(body.prompt, /Original romaji input:\nkakuni/);
+        assert.match(body.system, /this complete target occurrence only, not a global word ban/);
+        assert.deepEqual(JSON.parse(body.prompt).rejectedOutputs, ['角煮']);
+        assert.equal(JSON.parse(body.prompt).target.originalInput, 'kakuni');
         assert.match(body.prompt, /資料を/);
         assert.match(body.prompt, /してください。/);
         proposals++;

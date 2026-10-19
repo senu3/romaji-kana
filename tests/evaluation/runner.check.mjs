@@ -102,7 +102,8 @@ test("production reinterpretation continues after validation errors, stops on 50
     assert.equal(summary.categories["user-reinterpretation"].errors, 2);
     assert.equal(requests.length, 3);
     assert.ok(requests.every(r => !JSON.stringify(r).includes("DO_NOT_SEND")));
-    assert.ok(requests.every(r => r.system.includes("記事を予約してください。")));
+    assert.ok(requests.every(r => JSON.parse(r.prompt).rejectedOutputs.includes("記事を予約してください。")));
+    assert.ok(requests.every(r => !r.system.includes("記事を予約してください。")));
     fail = true;
     requests.length = 0;
     const failed = await run([...base, "--out", join(dir, "failed")]);

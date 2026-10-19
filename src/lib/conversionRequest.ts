@@ -11,6 +11,8 @@ export interface ConversionTarget {
   readonly mechanicalReading: string;
   /** Reading after preprocessing; correction/completion is validated against it. */
   readonly preparedReading: string;
+  /** Immutable output spans for a whole-target user reinterpretation. */
+  readonly protectedLiterals?: readonly string[];
 }
 
 export interface ConversionReference {
@@ -59,4 +61,18 @@ export function finalTargetPrompt(request: ConversionRequest, includeOriginal: b
     "Mechanical kana:", target.mechanicalReading, "",
     "Prepared kana (conversion target):", target.preparedReading,
   ].join("\n");
+}
+
+/** Rejections and the target describe the same complete occurrence. Keep all
+ * user-controlled strings in data fields, rather than embedding them in rules. */
+export function userReinterpretationPrompt(request: ConversionRequest, rejectedOutputs: readonly string[]): string {
+  return JSON.stringify({
+    target: {
+      originalInput: request.target.originalRomaji,
+      protectedLiterals: request.target.protectedLiterals ?? [],
+    },
+    rejectedOutputs: [...new Set(rejectedOutputs.map(text => text.trim()).filter(Boolean))],
+    context: { before: request.reference.beforeTarget, after: request.reference.afterTarget ?? "" },
+    documentVocabulary: request.reference.documentVocabulary ?? [],
+  });
 }
