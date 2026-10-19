@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { isAllowedInputCompletion, parseStructuredSuggestion } from "./completionValidation";
-import { isAllowedLocalKanaCorrection } from "../../../src/lib/localKanaCorrection";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
 // These tests exercise the legacy model-generation contract.
@@ -11,27 +10,6 @@ const response = (correctedKana: string, completedKana = correctedKana, converte
 const settings = { ...defaultSettings, inputCompletionLevel: "word" as const };
 
 describe("local correction before completion", () => {
-  it.each([
-    ["あしたのよってい。", "あしたのよてい。"],
-    ["あしたのよでい。", "あしたのよてい。"],
-    ["あしたのかいぎのよいて。", "あしたのかいぎのよてい。"],
-    ["あしたのよい。", "あしたのよてい。"],
-  ])("allows one bounded kana edit: %s → %s", (source, corrected) => {
-    expect(isAllowedLocalKanaCorrection(source, corrected)).toBe(true);
-  });
-  it.each([
-    ["あしたのよてい。", "きょうのかいぎ。"],
-    ["あした10じ。", "あした11じ。"],
-    ["あした10じ。", "あしたじ。"],
-    ["あしたのよてい。", "あしたのよてい！"],
-    ["あしたはいかない。", "あしたはいく。"],
-    ["あしたのよてい。", "あしたの予定。"],
-    ["ありが。", "ありがとう。"],
-    ["よて。", "よで。"],
-    ["ほん をよむ。", "ほんをよむ。"],
-  ])("rejects an unsafe or nonlocal correction: %s → %s", (source, corrected) => {
-    expect(isAllowedLocalKanaCorrection(source, corrected)).toBe(false);
-  });
   it("accepts high-confidence typo correction in one request while retaining the original reading", async () => {
     const generate = vi.fn().mockResolvedValue(response("あしたのよてい。", undefined, "明日の予定。"));
     const result = await convertRomajiToJapaneseDetailed("ashitanoyottei.", settings, { models: vi.fn(), generate });

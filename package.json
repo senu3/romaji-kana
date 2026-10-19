@@ -8,12 +8,15 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node tests/run.mjs unit",
+    "test:legacy": "node tests/run.mjs legacy",
     "test:e2e": "node tests/run.mjs e2e",
     "test:e2e:local": "node tests/run.mjs e2e:local",
     "test:e2e:triggers": "node tests/run.mjs e2e:triggers",
     "test:engine": "node tests/run.mjs engine",
+    "test:companion": "node tests/run.mjs companion",
     "eval:run": "node tests/run.mjs eval",
     "eval:test": "node tests/run.mjs evaluation",
+    "eval:test:legacy": "node tests/run.mjs evaluation:legacy",
     "tauri": "tauri"
   },
   "dependencies": {

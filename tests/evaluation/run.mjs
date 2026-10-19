@@ -1,4 +1,3 @@
-import { createServer } from "vite";
 import { readFile, mkdir, writeFile, appendFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,22 +69,21 @@ async function main() {
     throw new Error("--engine local requires faithful conversion cases without repair/completion/speculation");
   }
   const prompt = args.prompt ? await readFile(resolve(args.prompt), "utf8") : null;
+  const { createServer } = await import("vite");
   const vite = await createServer({ root, configFile: false, cacheDir: artifactPath("cache/evaluation"), optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: "custom" });
   const nativeFetch = globalThis.fetch;
-  const engineClient = createKanaEngineClient({ evaluation: true });
+  const usesLegacy = c => args.engine === "llm" || (c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel) !== "none" || Boolean(c.options?.alternativeMode);
+  const needCurrent = cases.some(c => !usesLegacy(c));
+  const needLegacy = cases.some(usesLegacy);
+  let engineClient;
   try {
-    const { defaultSettings } = await vite.ssrLoadModule("/src/lib/settings.ts");
-    const { defaultSettings: comparisonSettings } = await vite.ssrLoadModule("/tests/evaluation/legacy/settings.ts");
-    const { convertRomajiToJapaneseDetailed } = await vite.ssrLoadModule("/src/lib/ollama.ts");
-    const { convertRomajiToJapaneseDetailed: compareLegacy } = await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts");
-    const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
-    const { ConversionResponseError } = await vite.ssrLoadModule("/src/lib/conversionDiagnostics.ts");
+    const defaultSettings = needCurrent ? (await vite.ssrLoadModule("/src/lib/settings.ts")).defaultSettings : null;
+    const comparisonSettings = needLegacy ? (await vite.ssrLoadModule("/tests/evaluation/legacy/settings.ts")).defaultSettings : null;
     const { documentVocabulary, ...defaults } = dataset.defaults;
     const configured = cases.map(c => ({
       ...c,
       settings: {
-        ...structuredClone(args.engine === "llm" || (c.settingsOverrides?.inputCompletionLevel ?? defaults.inputCompletionLevel) !== "none" || c.options?.alternativeMode
-          ? comparisonSettings : defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
+        ...structuredClone(usesLegacy(c) ? comparisonSettings : defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
         modelProvider: args.provider, modelName: args.model ?? "DRY_RUN",
         conversionEngine: args.engine === "llm" ? "llm" : "local",
         [args.provider === "ollama" ? "ollamaApiUrl" : "lmStudioApiUrl"]: endpoint.href,
@@ -123,6 +121,13 @@ async function main() {
     console.log(`Output: ${out}`);
     if (args["dry-run"]) { console.log(`Validated ${cases.length} cases / ${schedule.length} scheduled trials; no API calls.`); return; }
 
+    // Data checks need settings only. Load converters and build a dictionary
+    // process only when an actual trial requires them.
+    const convertRomajiToJapaneseDetailed = needCurrent ? (await vite.ssrLoadModule("/src/lib/ollama.ts")).convertRomajiToJapaneseDetailed : null;
+    const compareLegacy = needLegacy ? (await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts")).convertRomajiToJapaneseDetailed : null;
+    const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
+    const { ConversionResponseError } = await vite.ssrLoadModule("/src/lib/conversionDiagnostics.ts");
+    engineClient = createKanaEngineClient({ evaluation: needLegacy });
     let calls = [];
     let engineCalls = [];
     const engineRequest = async body => {
@@ -216,7 +221,7 @@ async function main() {
         pool: measured.filter(r => r.exactReferenceMatch.pool === true).length, poolEvaluated: measured.filter(r => r.exactReferenceMatch.pool !== null).length },
       qualityStatus: "unreviewed; candidate or exact example match does not mean correct", categories: groups }, null, 2));
     if (stopped) process.exitCode = 1;
-  } finally { globalThis.fetch = nativeFetch; engineClient.close(); await vite.close(); }
+  } finally { globalThis.fetch = nativeFetch; engineClient?.close(); await vite.close(); }
 }
 
 function hash(value) { return createHash("sha256").update(value).digest("hex"); }

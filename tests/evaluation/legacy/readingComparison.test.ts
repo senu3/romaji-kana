@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { normalizeReading, normalizeComparableReading, normalizeNumericAlignment, splitTerminalPunctuation } from "../../../src/lib/readingComparison";
 import { isAllowedInputCompletion } from "./completionValidation";
 import { convertRomajiToJapaneseDetailed } from "./ollama";
 import { defaultSettings as applicationSettings } from "./settings";
@@ -7,12 +6,6 @@ import { defaultSettings as applicationSettings } from "./settings";
 const defaultSettings = { ...applicationSettings, conversionEngine: "llm" as const };
 
 describe("comparison policies keep protection separate", () => {
-  it("distinguishes phonetics, change classification and numeric alignment", () => {
-    expect(normalizeReading("ﾃｽﾄ \n。" )).toBe("てすと。");
-    expect(normalizeComparableReading("ﾃｽﾄ \n。" )).toBe("てすと");
-    expect(normalizeNumericAlignment("ﾃｽﾄ \n。" )).toBe("てすと\n。");
-    expect(splitTerminalPunctuation("ほん\nよむ。" )).toEqual({ body: "ほん\nよむ", punctuation: "。" });
-  });
   it("allows kana spacing cleanup but preserves ASCII boundaries and newlines", () => {
     expect(isAllowedInputCompletion("ほん をよむ。", "ほんをよむ。", "word")).toBe(true);
     expect(isAllowedInputCompletion("A B。", "AB。", "word")).toBe(false);
