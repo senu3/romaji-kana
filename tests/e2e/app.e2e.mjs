@@ -106,6 +106,9 @@ try {
   assert.equal((await editor.locator('.cm-line').boundingBox()).height, lineBefore.height, 'Preview must not change line height');
   assert.notEqual(await preview.evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
   await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-preview-desktop.png') });
+  await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('dark');
+  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-preview-dark.png') });
+  await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('light');
   await page.keyboard.press('Control+/');
   const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
   await list.waitFor();
@@ -116,6 +119,11 @@ try {
   await page.keyboard.press('ArrowDown');
   assert.equal(await list.locator('.candidate-list-options button').evaluate(el => el === document.activeElement), true);
   await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-alternatives-desktop.png') });
+  await editor.focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await list.count(), 0, 'Moving the editor selection must close the list');
+  await page.keyboard.press('Control+/');
+  await list.waitFor();
   await page.keyboard.press('Escape');
   await preview.getByRole('button', { name: '確定 Tab', exact: true }).click();
   assert.equal(await editor.innerText(), '記者');

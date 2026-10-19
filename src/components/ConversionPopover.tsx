@@ -1,4 +1,4 @@
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { candidatePresentation } from "../lib/candidatePresentation";
@@ -12,7 +12,7 @@ export interface CandidateListTarget {
   ghost?: GhostConversionSuggestion;
 }
 
-export function CandidateList({ view, suggestion, target, onAccept, onDismiss, onOpen, onSelect, onSpeculate, onClose }: {
+export function ConversionPopover({ view, suggestion, target, onAccept, onDismiss, onOpen, onSelect, onSpeculate, onClose }: {
   view: EditorView;
   suggestion: GhostConversionSuggestion | null;
   target: CandidateListTarget | null;
@@ -44,8 +44,13 @@ export function CandidateList({ view, suggestion, target, onAccept, onDismiss, o
         const coords = view.coordsAtPos(Math.min(anchor.to, view.state.doc.length));
         if (!panel || !coords) { setPosition(p => ({ ...p, visible: false })); return; }
         const bounds = view.scrollDOM.getBoundingClientRect();
-        const topEdge = Math.max(8, bounds.top);
-        const bottomEdge = Math.min(window.innerHeight - 8, bounds.bottom);
+        const viewport = window.visualViewport;
+        const viewportTop = viewport?.offsetTop ?? 0;
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+        const topEdge = Math.max(viewportTop + 8, bounds.top);
+        // On narrow screens the panel may cover the status strip, while keeping the document target and navigation visible.
+        const bottomLimit = window.innerWidth <= 960 ? viewportBottom - 72 : bounds.bottom;
+        const bottomEdge = Math.min(viewportBottom - 8, bottomLimit);
         const spaceBelow = Math.max(0, bottomEdge - coords.bottom - 8);
         const spaceAbove = Math.max(0, coords.top - topEdge - 8);
         const below = spaceBelow >= Math.min(440, panel.scrollHeight) || spaceBelow >= spaceAbove;
@@ -59,13 +64,26 @@ export function CandidateList({ view, suggestion, target, onAccept, onDismiss, o
     const observer = new ResizeObserver(place);
     if (panelRef.current) observer.observe(panelRef.current);
     window.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("resize", place);
+    window.visualViewport?.addEventListener("scroll", place);
     document.addEventListener("scroll", place, true);
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("resize", place); document.removeEventListener("scroll", place, true); };
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("resize", place);
+      window.visualViewport?.removeEventListener("scroll", place);
+      document.removeEventListener("scroll", place, true);
+    };
   }, [view, anchor.from, anchor.to, text, target, detailsOpen]);
 
   useEffect(() => {
-    if (target) panelRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
-  }, [target]);
+    if (target) view.dispatch({ effects: EditorView.scrollIntoView(target.anchor.to, { y: "nearest" }) });
+  }, [view, target]);
+
+  useEffect(() => {
+    if (target && position.visible) panelRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
+  }, [target, position.visible]);
 
   // Escape collapses alternatives before dismissing the preview, including when focus is in the editor.
   useEffect(() => {
@@ -96,7 +114,7 @@ export function CandidateList({ view, suggestion, target, onAccept, onDismiss, o
         <button type="button" className="candidate-action" onClick={target ? onClose : onDismiss} aria-label={target ? "候補一覧を閉じる" : "候補を閉じる"}>閉じる <kbd>Esc</kbd></button>
       </header>
       {target ? (
-        <>
+        <div className="candidate-alternatives">
           <p className="candidate-help">同じ読みの候補です。選んだあとに確定できます。</p>
           <ul className="candidate-list-options" aria-label="同じ読みの候補">
             {target.session.candidates.map(c => (
@@ -107,27 +125,52 @@ export function CandidateList({ view, suggestion, target, onAccept, onDismiss, o
           </ul>
           {target.session.candidates.length < 2 ? <p className="candidate-help">ほかの表記はありません。</p> : null}
           <footer className="candidate-reconsider">
-            <button type="button" className="candidate-action" onClick={onSpeculate}>読みも含めて見直す</button>
+            <button type="button" className="candidate-action" onClick={() => { onSpeculate(); view.focus(); }}>読みも含めて見直す</button>
             <p className="candidate-help">入力と前後の文脈から新しい候補を推測します。確定するまで本文は変わりません。</p>
           </footer>
-        </>
+        </div>
       ) : (
         <>
           <p className="cm-ghost-text-suggestion" aria-live="polite">{text}</p>
+          <div className="candidate-review">
+          {changes?.sourceReading && changes.resultReading && changes.sourceReading !== changes.resultReading ? (
+            <ReadingChange before={changes.sourceReading} after={changes.resultReading} />
+          ) : null}
           {explicit ? <p className="candidate-notice">{changes?.readingAssessment?.status !== "verified" ? "読み未確認の候補です。内容を確認して確定してください。" : "入力の読みを変更しています。内容を確認して確定してください。"}</p> : null}
-          <div className="candidate-toolbar">
-            <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Tab</kbd></button>
-            <button type="button" className="candidate-action" onClick={onOpen} title="Ctrl/Cmd + /">ほかの候補</button>
-            <button type="button" className="candidate-action candidate-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>変更の詳細</button>
-          </div>
           {detailsOpen ? <dl className="candidate-details">
             <dt>変換前</dt><dd>{suggestion?.originalText}</dd>
             {changes?.sourceReading ? <><dt>元の読み</dt><dd>{changes.sourceReading}</dd></> : null}
             {changes?.resultReading ? <><dt>候補の読み</dt><dd>{changes.resultReading}</dd></> : null}
             {!!changes?.additions?.length ? <><dt>読みの追加</dt><dd>{changes.additions.join("、")}</dd></> : null}
           </dl> : null}
+          </div>
+          <div className="candidate-toolbar">
+            <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Tab</kbd></button>
+            <button type="button" className="candidate-action" onClick={onOpen} title="Ctrl/Cmd + /">ほかの候補</button>
+            <button type="button" className="candidate-action candidate-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>変更の詳細</button>
+          </div>
+
         </>
       )}
     </section>, document.body,
   );
+}
+
+function ReadingChange({ before, after }: { before: string; after: string }) {
+  const source = Array.from(before);
+  const result = Array.from(after);
+  let start = 0;
+  while (start < source.length && start < result.length && source[start] === result[start]) start++;
+  let sourceEnd = source.length;
+  let resultEnd = result.length;
+  while (sourceEnd > start && resultEnd > start && source[sourceEnd - 1] === result[resultEnd - 1]) {
+    sourceEnd--;
+    resultEnd--;
+  }
+  return <p className="candidate-reading-change">
+    <span>読みの変更</span>
+    <span>{source.slice(0, start).join("")}<del>{source.slice(start, sourceEnd).join("")}</del>{source.slice(sourceEnd).join("")}</span>
+    <span aria-label="から">→</span>
+    <span>{result.slice(0, start).join("")}<ins>{result.slice(start, resultEnd).join("")}</ins>{result.slice(resultEnd).join("")}</span>
+  </p>;
 }

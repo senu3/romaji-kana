@@ -109,6 +109,7 @@ try {
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       } else {
         await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '確認' }).waitFor();
+        assert.equal(await page.locator('.candidate-reading-change ins').textContent(), 'ん');
         await page.getByRole('button', { name: '変更の詳細', exact: true }).click();
         assert.match(await page.locator('.candidate-details').textContent(), /かくに.*かくにん/s);
         const doc = await editor.evaluate(element => { const clone = element.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(e => e.remove()); return clone.textContent; });

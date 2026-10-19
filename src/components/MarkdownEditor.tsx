@@ -40,7 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CandidateList, type CandidateListTarget } from "./CandidateList";
+import { ConversionPopover, type CandidateListTarget } from "./ConversionPopover";
 import {
   extractSelectedConversionRange,
   isTriggerEnabled,
@@ -204,10 +204,6 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
   const sourceDecoration = Decoration.mark({
     class: suggestion.previewOnly ? "cm-history-preview" : "cm-ghost-source",
   }).range(suggestion.from, suggestion.to);
-
-  if (suggestion.previewOnly) {
-    return Decoration.set([sourceDecoration]);
-  }
 
   return Decoration.set([sourceDecoration]);
 }
@@ -418,6 +414,8 @@ export function MarkdownEditor({
   const onDismissGhostRef = useRef(onDismissGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
+  const onCloseCandidateListRef = useRef(onCloseCandidateList);
+  onCloseCandidateListRef.current = onCloseCandidateList;
   const initialDocumentRef = useRef(initialDocument);
   const settingsRef = useRef(settings);
   const composingRef = useRef(false);
@@ -543,6 +541,7 @@ export function MarkdownEditor({
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
       setVisibleSuggestion(update.state.field(ghostSuggestionField).suggestion);
+      if (update.selectionSet) onCloseCandidateListRef.current?.();
       if (update.docChanged || update.selectionSet) {
         onEditorStatusChangeRef.current(editorDocumentStatus(update.state));
         setCanUndo(undoDepth(update.state) > 0);
@@ -1144,7 +1143,7 @@ export function MarkdownEditor({
       </div>
       <div className="editor-host" ref={hostRef} />
       {viewRef.current && (candidateList || (visibleSuggestion && !visibleSuggestion.previewOnly)) ? (
-        <CandidateList
+        <ConversionPopover
           key={candidateList?.ghost?.id ?? visibleSuggestion?.id ?? candidateList?.session.id}
           view={viewRef.current}
           suggestion={visibleSuggestion?.previewOnly ? null : visibleSuggestion}

@@ -104,8 +104,8 @@ export function ConversionPanel({
 
   const enabledKeys = [
     settings.triggers.space && "Space",
-    settings.triggers.period && ".",
-    settings.triggers.comma && ",",
+    settings.triggers.period && "ピリオド",
+    settings.triggers.comma && "カンマ",
     settings.triggers.enter && "Enter",
   ].filter(Boolean).join("・");
   const punctuationSummary = [

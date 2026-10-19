@@ -50,7 +50,10 @@ try {
   release();
   await page.waitForTimeout(200);
   assert.equal(await candidateButtons.nth(1).locator('span').textContent(), selected, 'Late ranking must not reorder an open list');
-  await candidateButtons.nth(1).click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await candidateButtons.nth(1).evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('Enter');
   assert.equal(await ghost.textContent(), selected, 'Late ranking must not move the selected candidate');
   assert.equal(modelCalls, 1, 'Stored candidate navigation must not call the model');
   await page.keyboard.press('Tab');
@@ -63,6 +66,10 @@ try {
   assert.equal(modelCalls, 1, 'History alternatives also use the retained candidate set');
   await page.keyboard.press('Escape');
 
+  await editor.focus();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.insertText('\n'.repeat(80) + 'end');
+  await page.locator('.cm-scroller').evaluate(el => { el.scrollTop = el.scrollHeight; });
   await page.getByRole('button', { name: /履歴を開く/ }).click();
   await page.locator('.history-item').first().getByRole('button', { name: 'ほかの候補', exact: true }).click();
   await list.waitFor();
@@ -70,7 +77,7 @@ try {
   const historyText = await historyButton.locator('span').textContent();
   await historyButton.click();
   await page.keyboard.press('Tab');
-  assert.equal(await documentText(page), historyText, 'Selecting from history must return focus to the editor for Tab acceptance');
+  assert.equal(await documentText(page), historyText + '\n'.repeat(80) + 'end', 'Offscreen history must scroll into view and return focus for Tab acceptance');
   assert.equal(modelCalls, 1, 'History list selection must not generate');
 
   await typeInput('kisha');
