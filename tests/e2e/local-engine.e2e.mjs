@@ -34,7 +34,7 @@ try {
     await editor.click(); await page.keyboard.press('Control+A'); await page.keyboard.type(text);
     await page.keyboard.press('Control+Enter');
     await ghost.waitFor();
-    await page.getByRole('dialog', { name: '変換候補', exact: true }).waitFor();
+    await page.getByRole('group', { name: '変換候補', exact: true }).waitFor();
   }
   await typeInput('honwoyomu');
   assert.equal(await ghost.textContent(), '本を読む');

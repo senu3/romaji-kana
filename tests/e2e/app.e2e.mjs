@@ -100,14 +100,15 @@ try {
   const lineBefore = await editor.locator('.cm-line').boundingBox();
   await page.keyboard.press('Control+Enter');
   await page.locator('.cm-ghost-text-suggestion').waitFor();
-  const preview = page.getByRole('dialog', { name: '変換候補', exact: true });
+  const preview = page.getByRole('group', { name: '変換候補', exact: true });
   await preview.waitFor();
-  assert.equal(await editor.innerText(), 'kisha', 'Preview controls must remain outside document text');
-  assert.equal((await editor.locator('.cm-line').boundingBox()).height, lineBefore.height, 'Preview must not change line height');
-  assert.notEqual(await preview.evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
-  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-preview-desktop.png') });
+  assert.ok((await preview.boundingBox()).height <= 48, 'Collapsed candidate bar must remain one compact row');
+  assert.equal(await editor.evaluate(el => { const clone = el.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(node => node.remove()); return clone.textContent; }), 'kisha', 'Inline decorations must not alter document text');
+  assert.ok((await editor.locator('.cm-line').boundingBox()).height <= lineBefore.height + 1, 'Short inline preview must stay within the original line');
+  assert.equal(await page.getByRole('dialog', { name: '変換候補', exact: true }).count(), 0, 'No floating panel should appear until details are requested');
+  await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/conversion-preview-desktop.png') });
   await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('dark');
-  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-preview-dark.png') });
+  await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/conversion-preview-dark.png') });
   await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('light');
   await page.keyboard.press('Control+/');
   const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
@@ -118,7 +119,7 @@ try {
   assert.equal(await list.getAttribute('aria-modal'), 'false');
   await page.keyboard.press('ArrowDown');
   assert.equal(await list.locator('.candidate-list-options button').evaluate(el => el === document.activeElement), true);
-  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-alternatives-desktop.png') });
+  await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/conversion-alternatives-desktop.png') });
   await editor.focus();
   await page.keyboard.press('ArrowLeft');
   assert.equal(await list.count(), 0, 'Moving the editor selection must close the list');
@@ -146,7 +147,7 @@ try {
   await conversionSettings.getByRole('button', { name: /^詳細設定/ }).click();
   await conversionSettings.getByRole('button', { name: /^キー操作/ }).click();
   await page.locator('.inspector-body').evaluate(el => { el.scrollTop = 0; });
-  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-settings-desktop.png') });
+  await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/conversion-settings-desktop.png') });
   assert.equal(await page.getByLabel('通常変換の方式').count(), 0);
   assert.equal(await page.getByRole('radiogroup', { name: '入力補完レベル' }).count(), 0);
   const settings = await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-settings')));
@@ -155,7 +156,7 @@ try {
   await page.setViewportSize({ width: 390, height: 520 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.getByRole('combobox', { name: '表示テーマ' }).selectOption('dark');
-  await page.screenshot({ path: await screenshotPath('test-results/e2e/conversion-settings-mobile-dark.png') });
+  await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/conversion-settings-mobile-dark.png') });
   console.log('App E2E passed: themes, responsive layout, restored document, dictionary conversion and current settings contract.');
   await context.close();
 } finally { await browser?.close(); await server.close(); }

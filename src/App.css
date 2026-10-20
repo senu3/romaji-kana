@@ -3825,3 +3825,75 @@ button.model-chip:hover {
   overscroll-behavior: contain;
 }
 .candidate-review { flex: 1 1 auto; }
+
+/* Prototype 2: a single quiet row beside the current conversion target. */
+.conversion-bar {
+  width: 560px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.candidate-bar-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; min-width: 0; }
+.candidate-preview-toggle { flex: 1 1 auto; min-width: 32px; border: 0; padding: 4px 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.conversion-bar .cm-ghost-text-suggestion { display: block; min-height: 0; max-height: none; overflow: hidden; margin: 0; font-size: 14px; line-height: 24px; white-space: nowrap; text-overflow: ellipsis; }
+.candidate-bar-row .candidate-action, .candidate-bar-row .candidate-accept { flex-shrink: 0; min-height: 32px; padding: 3px 7px; white-space: nowrap; }
+.candidate-bar-row .candidate-accept { background: var(--accent-soft); color: var(--ink); }
+.candidate-bar-row .candidate-details-toggle { margin-left: 0; font-size: 18px; }
+.candidate-bar-row .candidate-close { font-size: 18px; color: var(--ink-muted); }
+.candidate-bar-row .conversion-kind { flex-shrink: 0; font-size: 11px; }
+.conversion-bar .candidate-review, .conversion-bar .candidate-alternatives { padding: 4px 6px 8px; border-top: 1px solid var(--line); }
+.candidate-full-text { max-height: 150px; flex-shrink: 1; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 6px; font-size: 14px; }
+@media (pointer: coarse) {
+  .candidate-bar-row button { min-height: 40px; }
+}
+@media (max-width: 480px) {
+  .candidate-bar-row { gap: 2px; }
+  .candidate-bar-row .candidate-action, .candidate-bar-row .candidate-accept { padding-inline: 4px; }
+  .candidate-bar-row .conversion-kind { font-size: 10px; }
+  .candidate-bar-row kbd { display: none; }
+}
+
+/* A faint green surface distinguishes the candidate bar from the document. */
+.conversion-bar {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+.candidate-bar-row .candidate-accept { background: var(--surface); color: var(--accent); }
+
+/* Prototype 1: append a short candidate without adding a panel below the line. */
+.cm-inline-candidate {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: min(440px, 80vw);
+  margin-inline: 6px;
+  color: var(--accent);
+  font-family: "MPLUS2", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 22px;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+.cm-inline-candidate button {
+  min-width: 20px;
+  max-width: 26ch;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 4px;
+  overflow: hidden;
+  background: var(--accent-soft);
+  color: var(--ink);
+  text-overflow: ellipsis;
+  font: inherit;
+  line-height: 22px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cm-inline-candidate .cm-ghost-text-suggestion { background: transparent; color: var(--accent); }
+.cm-inline-candidate .conversion-kind { font-size: 10px; }
+.cm-inline-candidate button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.conversion-bar .candidate-popover-text { display: block; overflow: hidden; font-size: 14px; line-height: 24px; white-space: nowrap; text-overflow: ellipsis; }
+@media (max-width: 480px) {
+  .cm-inline-candidate { gap: 3px; margin-inline: 4px; }
+  .cm-inline-candidate button { max-width: 16ch; }
+}

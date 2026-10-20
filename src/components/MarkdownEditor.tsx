@@ -16,13 +16,14 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
   keymap,
   lineNumbers,
   placeholder,
+  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -55,6 +56,7 @@ import {
   MIN_TYPING_INTERVAL_MS,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
+import { candidatePresentation } from "../lib/candidatePresentation";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import type {
   AppSettings,
@@ -144,6 +146,56 @@ interface GhostState {
   decorations: DecorationSet;
 }
 
+const inlineGhostActions = Facet.define<{
+  accept: (view: EditorView) => boolean;
+  open: (suggestion: GhostConversionSuggestion) => void;
+  details: (suggestion: GhostConversionSuggestion) => void;
+}>();
+
+class InlineGhostWidget extends WidgetType {
+  constructor(private readonly suggestion: GhostConversionSuggestion) { super(); }
+
+  eq(other: InlineGhostWidget) { return this.suggestion === other.suggestion; }
+
+  toDOM(view: EditorView) {
+    const element = document.createElement("span");
+    element.className = "cm-ghost-text cm-inline-candidate";
+    element.contentEditable = "false";
+    element.setAttribute("role", "group");
+    element.setAttribute("aria-label", "変換候補");
+    // Keep pointer interaction out of CodeMirror's selection handling.
+    element.onmousedown = event => event.preventDefault();
+    const arrow = document.createElement("span");
+    arrow.textContent = "→";
+    arrow.setAttribute("aria-hidden", "true");
+    element.append(arrow);
+    const button = (label: string, name: string, action: () => void) => {
+      const control = document.createElement("button");
+      control.type = "button";
+      control.textContent = label;
+      control.setAttribute("aria-label", name);
+      control.title = name;
+      control.onclick = action;
+      element.append(control);
+      return control;
+    };
+    const text = button(this.suggestion.convertedText, "変更の詳細", () => view.state.facet(inlineGhostActions)[0]?.details(this.suggestion));
+    text.className = "cm-ghost-text-suggestion";
+    if (requiresExplicitAcceptance(this.suggestion)) {
+      const kind = document.createElement("span");
+      kind.className = "conversion-kind";
+      kind.textContent = this.suggestion.conversionStrategy ? candidatePresentation(this.suggestion).label : "読み未確認";
+      kind.title = "内容を確認してTabで確定してください。";
+      element.append(kind);
+    }
+    button("Tab", "確定 Tab", () => view.state.facet(inlineGhostActions)[0]?.accept(view));
+    button("▾", "ほかの候補", () => view.state.facet(inlineGhostActions)[0]?.open(this.suggestion));
+    return element;
+  }
+
+  ignoreEvent() { return true; }
+}
+
 export const ghostSuggestionField = StateField.define<GhostState>({
   create() {
     return { suggestion: null, decorations: Decoration.none };
@@ -205,7 +257,10 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
     class: suggestion.previewOnly ? "cm-history-preview" : "cm-ghost-source",
   }).range(suggestion.from, suggestion.to);
 
-  return Decoration.set([sourceDecoration]);
+  return suggestion.previewOnly ? Decoration.set([sourceDecoration]) : Decoration.set([
+    sourceDecoration,
+    Decoration.widget({ widget: new InlineGhostWidget(suggestion), side: 1 }).range(suggestion.to),
+  ]);
 }
 
 const theme = EditorView.theme({
@@ -424,6 +479,7 @@ export function MarkdownEditor({
   const typingIntervalsRef = useRef<number[]>([]);
   const lastTypingAtRef = useRef<number | null>(null);
   const lastPredictiveRequestRef = useRef<PredictiveRequestMarker | null>(null);
+  const [inlineDetailsId, setInlineDetailsId] = useState<string | null>(null);
   const [visibleSuggestion, setVisibleSuggestion] = useState<GhostConversionSuggestion | null>(null);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
@@ -658,6 +714,15 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        inlineGhostActions.of({
+          accept: acceptGhostSuggestion,
+          open: suggestion => {
+            clearPredictiveSuggestionTimer();
+            setInlineDetailsId(null);
+            onRetryGhostRef.current(suggestion);
+          },
+          details: suggestion => { clearPredictiveSuggestionTimer(); setInlineDetailsId(suggestion.id); },
+        }),
         unconvertedRanges,
         theme,
         syntaxHighlighting(highlightStyle),
@@ -1142,15 +1207,15 @@ export function MarkdownEditor({
         </div>
       </div>
       <div className="editor-host" ref={hostRef} />
-      {viewRef.current && (candidateList || (visibleSuggestion && !visibleSuggestion.previewOnly)) ? (
+      {viewRef.current && (candidateList || (visibleSuggestion && !visibleSuggestion.previewOnly && inlineDetailsId === visibleSuggestion.id)) ? (
         <ConversionPopover
           key={candidateList?.ghost?.id ?? visibleSuggestion?.id ?? candidateList?.session.id}
           view={viewRef.current}
           suggestion={visibleSuggestion?.previewOnly ? null : visibleSuggestion}
           target={candidateList ?? null}
           onAccept={() => runEditorCommand(acceptGhostSuggestion)}
-          onDismiss={() => runEditorCommand(dismissGhostSuggestion)}
-          onOpen={() => runEditorCommand(retryGhostSuggestion)}
+          onDismiss={() => { setInlineDetailsId(null); viewRef.current?.focus(); }}
+          onOpen={() => { setInlineDetailsId(null); runEditorCommand(retryGhostSuggestion); }}
           onSelect={onSelectCandidate ?? (() => {})}
           onSpeculate={onSpeculate ?? (() => {})}
           onClose={() => { onCloseCandidateList?.(); viewRef.current?.focus(); }}

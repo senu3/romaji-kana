@@ -26,7 +26,8 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
   const panelRef = useRef<HTMLElement>(null);
   const titleId = useId();
   const [position, setPosition] = useState({ left: 0, top: 0, visible: false, maxHeight: 440 });
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(!target);
+  const [textExpanded, setTextExpanded] = useState(!target);
   const candidate = target ? target.session.candidates.find(c => c.id === target.session.selectedId)?.result : null;
   const text = candidate?.text ?? suggestion?.convertedText ?? "";
   const changes = candidate?.changes ?? suggestion?.changes;
@@ -75,7 +76,7 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
       window.visualViewport?.removeEventListener("scroll", place);
       document.removeEventListener("scroll", place, true);
     };
-  }, [view, anchor.from, anchor.to, text, target, detailsOpen]);
+  }, [view, anchor.from, anchor.to, text, target, detailsOpen, textExpanded]);
 
   useEffect(() => {
     if (target) view.dispatch({ effects: EditorView.scrollIntoView(target.anchor.to, { y: "nearest" }) });
@@ -97,7 +98,7 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
   }, [view, target, onClose, onDismiss]);
 
   return createPortal(
-    <section ref={panelRef} className="conversion-popover" role="dialog" aria-modal="false"
+    <section ref={panelRef} className={`conversion-popover conversion-bar ${target || detailsOpen || textExpanded ? "is-expanded" : ""}`} role="dialog" aria-modal="false"
       aria-labelledby={titleId} style={{ left: position.left, top: position.top, maxHeight: position.maxHeight, visibility: position.visible ? "visible" : "hidden" }}
       onKeyDown={event => {
         if (!target || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -108,11 +109,23 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
         const index = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
         buttons[index].focus();
       }}>
-      <header className="conversion-popover-heading">
-        <span id={titleId}>{target ? "ほかの候補" : "変換候補"}</span>
-        {strategy ? <span className="conversion-kind">{presentation.label}</span> : null}
-        <button type="button" className="candidate-action" onClick={target ? onClose : onDismiss} aria-label={target ? "候補一覧を閉じる" : "候補を閉じる"}>閉じる <kbd>Esc</kbd></button>
-      </header>
+      <span id={titleId} className="sr-only">{target ? "ほかの候補" : "変換候補"}</span>
+      <div className="candidate-bar-row">
+        <button type="button" className="candidate-preview-toggle" aria-label="候補の全文" aria-expanded={textExpanded}
+          onClick={() => setTextExpanded(!textExpanded)} title="押すと候補の全文を表示します">
+          <span className="candidate-popover-text" aria-live="polite">{text}</span>
+        </button>
+        {explicit ? <span className="conversion-kind" title={presentation.description}>{strategy ? presentation.label : "読み未確認"}</span> : null}
+        {!target ? <>
+          <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Tab</kbd></button>
+          <button type="button" className="candidate-action" aria-label="ほかの候補" onClick={onOpen} title="ほかの候補 · Ctrl/Cmd + /">候補 ▾</button>
+          <button type="button" className="candidate-action candidate-details-toggle" aria-label="変更の詳細" title="変更の詳細"
+            aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>⋯</button>
+        </> : null}
+        <button type="button" className="candidate-action candidate-close" onClick={target ? onClose : onDismiss}
+          aria-label={target ? "候補一覧を閉じる" : "候補を閉じる"} title="閉じる · Esc">×</button>
+      </div>
+      {textExpanded ? <p className="candidate-full-text">{text}</p> : null}
       {target ? (
         <div className="candidate-alternatives">
           <p className="candidate-help">同じ読みの候補です。選んだあとに確定できます。</p>
@@ -130,27 +143,18 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
           </footer>
         </div>
       ) : (
-        <>
-          <p className="cm-ghost-text-suggestion" aria-live="polite">{text}</p>
-          <div className="candidate-review">
+        detailsOpen ? <div className="candidate-review">
           {changes?.sourceReading && changes.resultReading && changes.sourceReading !== changes.resultReading ? (
             <ReadingChange before={changes.sourceReading} after={changes.resultReading} />
           ) : null}
           {explicit ? <p className="candidate-notice">{changes?.readingAssessment?.status !== "verified" ? "読み未確認の候補です。内容を確認して確定してください。" : "入力の読みを変更しています。内容を確認して確定してください。"}</p> : null}
-          {detailsOpen ? <dl className="candidate-details">
+          <dl className="candidate-details">
             <dt>変換前</dt><dd>{suggestion?.originalText}</dd>
             {changes?.sourceReading ? <><dt>元の読み</dt><dd>{changes.sourceReading}</dd></> : null}
             {changes?.resultReading ? <><dt>候補の読み</dt><dd>{changes.resultReading}</dd></> : null}
             {!!changes?.additions?.length ? <><dt>読みの追加</dt><dd>{changes.additions.join("、")}</dd></> : null}
-          </dl> : null}
-          </div>
-          <div className="candidate-toolbar">
-            <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Tab</kbd></button>
-            <button type="button" className="candidate-action" onClick={onOpen} title="Ctrl/Cmd + /">ほかの候補</button>
-            <button type="button" className="candidate-action candidate-details-toggle" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>変更の詳細</button>
-          </div>
-
-        </>
+          </dl>
+        </div> : null
       )}
     </section>, document.body,
   );

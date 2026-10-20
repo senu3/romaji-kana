@@ -85,7 +85,7 @@ try {
       else await page.getByRole('complementary', { name: '変換結果の見直し' }).waitFor();
       assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
       if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();
-      const action = entry === 'ghost' ? page.getByRole('dialog', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true })
+      const action = entry === 'ghost' ? page.getByRole('group', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true })
         : entry === 'recent' ? page.locator('.recent-retry-chip-main')
         : page.locator('.history-item').getByRole('button', { name: 'ほかの候補' });
       await action.click();
@@ -100,7 +100,7 @@ try {
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         assert.notEqual(await list.evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'The candidate list must have an opaque surface');
-        await page.screenshot({ path: await screenshotPath('test-results/e2e/candidate-list-mobile.png'), fullPage: true });
+        await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/candidate-list-mobile.png'), fullPage: true });
       }
       await list.getByRole('button', { name: '読みも含めて見直す', exact: true }).click();
       if (entry === 'recent') {
@@ -109,14 +109,14 @@ try {
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       } else {
         await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '確認' }).waitFor();
-        assert.equal(await page.locator('.candidate-reading-change ins').textContent(), 'ん');
         await page.getByRole('button', { name: '変更の詳細', exact: true }).click();
+        assert.equal(await page.locator('.candidate-reading-change ins').textContent(), 'ん');
         assert.match(await page.locator('.candidate-details').textContent(), /かくに.*かくにん/s);
         const doc = await editor.evaluate(element => { const clone = element.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(e => e.remove()); return clone.textContent; });
         assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/e2e/speculate-mobile.png'), fullPage: true });
+        if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/speculate-mobile.png'), fullPage: true });
         await editor.focus();
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), '資料を確認してください。');
