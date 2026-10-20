@@ -1,13 +1,6 @@
-@font-face {
-  font-family: 'MPLUS2';
-  src: url('./assets/fonts/MPLUS2-VariableFont_wght.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-}
-
 :root {
   font-family:
-    "MPLUS2", "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   color: var(--theme-text, #123f3b);
   background: var(--theme-chrome, #f5f8f7);
@@ -3216,7 +3209,7 @@ button.model-chip:hover {
   min-width: 0;
   max-width: 100%;
   overflow-x: hidden;
-  font-size: 16px;
+  font-size: var(--editor-font-size, 16px);
   line-height: 1.78;
 }
 
@@ -3868,9 +3861,9 @@ button.model-chip:hover {
   max-width: min(440px, 80vw);
   margin-inline: 6px;
   color: var(--accent);
-  font-family: "MPLUS2", system-ui, sans-serif;
-  font-size: 13px;
-  line-height: 22px;
+  font-family: var(--editor-font-family, ui-monospace, Consolas, monospace);
+  font-size: calc(var(--editor-font-size, 16px) * 0.85);
+  line-height: 1.5;
   vertical-align: baseline;
   white-space: nowrap;
 }
@@ -3885,7 +3878,7 @@ button.model-chip:hover {
   color: var(--ink);
   text-overflow: ellipsis;
   font: inherit;
-  line-height: 22px;
+  line-height: 1.5;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -3897,3 +3890,20 @@ button.model-chip:hover {
   .cm-inline-candidate { gap: 3px; margin-inline: 4px; }
   .cm-inline-candidate button { max-width: 16ch; }
 }
+
+.editor-appearance-control { position: relative; margin-left: 12px; }
+.editor-appearance-trigger { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.editor-appearance-trigger:hover, .editor-appearance-trigger[aria-expanded="true"] { background: var(--accent-soft); }
+.editor-appearance-panel { position: absolute; z-index: 45; top: calc(100% + 10px); right: 0; width: min(330px, calc(100vw - 24px)); padding: 16px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.editor-appearance-panel header, .editor-appearance-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-appearance-panel h2 { font-size: 15px; margin: 0; }
+.editor-appearance-panel header { margin-bottom: 16px; }
+.editor-appearance-field { display: grid; gap: 8px; }
+.editor-appearance-field input { width: 100%; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 5px; padding: 6px 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.editor-appearance-help { color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+.editor-font-size-field { grid-template-columns: 1fr auto; align-items: center; margin-top: 16px; }
+.editor-font-size-field input { width: 76px; }
+.editor-font-preview { margin: 16px 0; padding-block: 12px; border-block: 1px solid var(--line); overflow-wrap: anywhere; font-family: var(--editor-font-family); font-size: var(--editor-font-size); line-height: 1.6; }
+.editor-appearance-panel footer { margin-top: 16px; }
+@media (max-width: 480px) { .editor-appearance-control { margin-left: 8px; } }
+@media (pointer: coarse) { .editor-appearance-trigger, .editor-appearance-field input { min-height: 44px; min-width: 44px; } }

@@ -10,6 +10,7 @@
     "test": "node tests/run.mjs unit",
     "test:legacy": "node tests/run.mjs legacy",
     "test:e2e": "node tests/run.mjs e2e",
+    "test:e2e:appearance": "node tests/run.mjs e2e:appearance",
     "test:e2e:local": "node tests/run.mjs e2e:local",
     "test:e2e:triggers": "node tests/run.mjs e2e:triggers",
     "test:engine": "node tests/run.mjs engine",

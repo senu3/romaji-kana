@@ -56,6 +56,7 @@ import {
   MIN_TYPING_INTERVAL_MS,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
+import { EDITOR_APPEARANCE_EVENT } from "../lib/editorAppearance";
 import { candidatePresentation } from "../lib/candidatePresentation";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import type {
@@ -271,8 +272,8 @@ const theme = EditorView.theme({
   },
   ".cm-scroller": {
     fontFamily:
-      'ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
-    fontSize: "15.5px",
+      'var(--editor-font-family, ui-monospace, Consolas, monospace)',
+    fontSize: "var(--editor-font-size, 16px)",
     lineHeight: "1.82",
   },
   ".cm-content": {
@@ -322,7 +323,7 @@ const theme = EditorView.theme({
   ".cm-panels": {
     backgroundColor: "var(--theme-raised, #fbfdfc)",
     color: "var(--theme-text, #123f3b)",
-    fontFamily: '"MPLUS2", Inter, ui-sans-serif, system-ui, sans-serif',
+    fontFamily: 'system-ui, sans-serif',
     fontSize: "13px",
   },
   ".cm-panels.cm-panels-top": {
@@ -774,6 +775,8 @@ export function MarkdownEditor({
       parent: hostRef.current,
     });
 
+    const refreshTypography = () => view.requestMeasure();
+    window.addEventListener(EDITOR_APPEARANCE_EVENT, refreshTypography);
     viewRef.current = view;
     registerView(view);
     onEditorStatusChangeRef.current(editorDocumentStatus(view.state));
@@ -783,6 +786,7 @@ export function MarkdownEditor({
     return () => {
       resetPredictiveSuggestionCadence();
       registerView(null);
+      window.removeEventListener(EDITOR_APPEARANCE_EVENT, refreshTypography);
       view.destroy();
       viewRef.current = null;
     };

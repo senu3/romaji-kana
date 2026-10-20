@@ -10,6 +10,7 @@ const commands = {
   "evaluation:legacy": [process.execPath, "--test", "tests/evaluation/legacy-runner.check.mjs"],
   eval: [process.execPath, "tests/evaluation/run.mjs"],
   e2e: [process.execPath, "tests/e2e/app.e2e.mjs"],
+  "e2e:appearance": [process.execPath, "tests/e2e/editor-appearance.e2e.mjs"],
   "e2e:local": [process.execPath, "tests/e2e/local-engine.e2e.mjs"],
   "e2e:triggers": [process.execPath, "tests/e2e/conversion-triggers.e2e.mjs"],
   engine: ["cargo", "test", "--manifest-path", "src-engine/Cargo.toml", "--lib"],

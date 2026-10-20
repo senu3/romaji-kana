@@ -19,6 +19,7 @@ import type {
   PendingConversion,
 } from "../lib/types";
 import type { EditorDocumentStatus } from "./MarkdownEditor";
+import { EditorAppearanceControl } from "./EditorAppearanceControl";
 import { ThemeSelect } from "./ThemeSelect";
 
 export function AppTitleBar() {
@@ -29,6 +30,7 @@ export function AppTitleBar() {
         <span>Romaji Kana</span>
       </div>
       <ThemeSelect />
+      <EditorAppearanceControl />
     </header>
   );
 }
