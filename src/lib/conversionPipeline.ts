@@ -10,6 +10,7 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import { convertLocally } from "./localConversion";
 import { acceptsRomajiRepair } from "./romajiRepairPlans";
 import { faithfulConversionRule } from "./conversionRules";
+import { hasSemanticConflict } from "./semanticGuard";
 import type { OllamaTransport } from "./ollamaProxy";
 import { assessReadingWithEngine, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
 import { romajiToKana } from "./romajiKana";
@@ -64,6 +65,9 @@ function finishGeneration(segments: GeneratedSegment[], protection: ConversionPr
   changes.readingAssessment.reportedReading = segments.map(s => s.reported ?? s.reading).join("");
   if (segments.some(s => s.numeric)) changes.readingAssessment.numericReadingNormalized = true;
   const result: JapaneseConversionResult = { text, reviewKana: reading, changes };
+  if (hasSemanticConflict(source, reading)) {
+    return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "diverged", rejectionDetail: "semantic-conflict" };
+  }
   if (options.purpose === "speculative" && isRejectedSurfaceVariant(text, options.avoidOutputs)) {
     return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "speculative", rejectionDetail: "avoided-output" };
   }

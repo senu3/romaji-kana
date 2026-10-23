@@ -225,7 +225,7 @@ describe("conversion lifecycle", () => {
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
     expect(view.state.doc.toString()).toBe("hon");
     await act(async () => { correction.resolve(echo); });
-    expect(generate).toHaveBeenCalledTimes(3);
+    expect(generate).toHaveBeenCalledTimes(2);
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
     expect(view.state.doc.toString()).toBe("hon");
     expect(hook.current.history[0].status).toBe("skipped");

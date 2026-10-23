@@ -12,10 +12,10 @@ function setup(repairNeeded: boolean, chooseRepair: boolean) {
     })),
   })) };
   const generate = vi.fn(async (_p, _u, body) => {
-    const request = JSON.parse(body.prompt);
+    const request = JSON.parse(body.prompt) as { candidates: Array<{ id: string; text: string }> };
     const baseline = request.candidates.find(c => c.id === "unchanged");
     const selected = baseline ? (chooseRepair ? request.candidates.find(c => c.text === "予定") : baseline) : request.candidates[0];
-    return { response: JSON.stringify({ order: [selected.id], repairNeeded: baseline ? false : repairNeeded }) };
+    return { response: JSON.stringify({ order: [selected!.id], repairNeeded: baseline ? false : repairNeeded }) };
   });
   return { engine, transport: { models: vi.fn(), generate } };
 }

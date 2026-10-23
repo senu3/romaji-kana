@@ -36,7 +36,7 @@ async function convertWithinBudget(input: string, settings: AppSettings,
   const runRescue = async (first: JapaneseConversionResult): Promise<JapaneseConversionResult> => {
     options.onRescueStart?.();
     const attempts: NonNullable<JapaneseConversionResult["attempts"]> = [{ stage: "normal", outcome: "rejected", detail: first.rejectionDetail }];
-    const stages = options.autoSpeculation === false ? ["correction"] as const : ["correction", "speculative"] as const;
+    const stages = options.autoSpeculation === true ? ["correction", "speculative"] as const : ["correction"] as const;
     for (const stage of stages) {
       throwIfConversionAborted(options.signal);
       let candidate: JapaneseConversionResult;

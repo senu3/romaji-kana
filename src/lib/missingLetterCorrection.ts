@@ -7,14 +7,11 @@ import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { convertLocally, rankConversionSession } from "./localConversion";
 import type { OllamaTransport } from "./ollamaProxy";
-import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
 
 // Missing n and vowels are common one-key omissions. Visit every edit position
 // before exploring its less likely alternatives, rather than spending the
 // entire search budget near the beginning of a sentence.
-const ALPHABET = "naeioubcdfghjklmpqrstvwxyz";
-const MAX_ROMAJI = 96;
 const MAX_PLANS = 128;
 const MAX_ENGINE_CALLS = 128;
 const MAX_CANDIDATES = 24;

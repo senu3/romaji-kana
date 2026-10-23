@@ -37,8 +37,7 @@ export interface JapaneseConversionOptions {
   onRankedCandidates?: (result: JapaneseConversionResult) => void | Promise<void>;
   /** Disable correction/speculation for dictionary-only measurements. */
   autoRescue?: boolean;
-  /** Isolate normal conversion and correction in evaluations; default preserves
-   * the application's existing speculative rescue behavior. */
+  /** Explicit opt-in for automatic reinterpretation; normal requests stop after repair by default. */
   autoSpeculation?: boolean;
   /** Search one romaji insertion, deletion, adjacent transposition or keyboard-neighbor replacement before model repair. */
   missingLetterCorrection?: boolean;

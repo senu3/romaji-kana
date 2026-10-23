@@ -16,11 +16,25 @@ function candidate(text: string, source = "mozc", reading = "ほん"): EngineCan
 }
 
 describe("normal → correction → speculation → unchanged romaji", () => {
+  it("stops automatic rescue after correction unless reinterpretation was opted into", async () => {
+    const h = harness();
+    h.generate.mockResolvedValue(json("", ""));
+    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.attempts?.map(a => a.stage)).toEqual(["normal", "correction"]);
+    expect(h.generate).toHaveBeenCalledOnce();
+  });
+  it("rejects an explicit speculative proposal that reverses attendance", async () => {
+    const h = harness();
+    h.generate.mockResolvedValue(json("明日は欠席します。", "あしたはけっせきします。"));
+    const result = await convertRomajiToJapaneseDetailed("ashitahaiku.", defaultSettings, h.transport, { kanaEngine: h.engine, purpose: "speculative" });
+    expect(result).toMatchObject({ text: "", suggestionRejected: true, rejectionDetail: "semantic-conflict" });
+    expect(h.generate).toHaveBeenCalledOnce();
+  });
   it("reports a repaired misspelling as a correction with the original reading retained", async () => {
     const h = harness();
     h.generate.mockResolvedValue(json("分かったふりをする", "わかったふりをする"));
     const result = await convertRomajiToJapaneseDetailed("wakatahuriwosuru", defaultSettings, h.transport, {
-      kanaEngine: h.engine, missingLetterCorrection: false,
+      autoSpeculation: true, kanaEngine: h.engine, missingLetterCorrection: false,
     });
     expect(result).toMatchObject({ text: "分かったふりをする", conversionStrategy: "correction",
       changes: { sourceReading: "わかたふりをする", resultReading: "わかったふりをする" } });
@@ -31,7 +45,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     h.generate.mockResolvedValueOnce(json("", ""))
       .mockResolvedValueOnce(json("同じ手順で進めてください。", "おなじてじゅんですすめてください。"));
     const result = await convertRomajiToJapaneseDetailed("houkouwokaenaidekudasai.", defaultSettings, h.transport, {
-      kanaEngine: h.engine, contextBefore: "全員が同じ作業手順で進めます。",
+      autoSpeculation: true, kanaEngine: h.engine, contextBefore: "全員が同じ作業手順で進めます。",
     });
     expect(result.text).toBe("同じ手順で進めてください。");
     expect(result.attempts?.map(a => a.stage)).toEqual(["normal", "correction", "speculative"]);
@@ -52,7 +66,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("removes synthetic passthrough from candidates and sends dictionary ranking evidence", async () => {
     const h = harness([candidate("本"), candidate("ほん", "literal"), candidate("奔")]);
     h.generate.mockResolvedValue({ response: '{"order":["candidate-0"]}' });
-    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.session?.candidates.map(c => c.result.text)).toEqual(["本", "奔"]);
     const prompt = JSON.parse(h.generate.mock.calls[0][2].prompt);
     expect(prompt).not.toHaveProperty("styleGuidance");
@@ -60,14 +74,14 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   });
   it("keeps natural dictionary-backed hiragana without correction or speculation", async () => {
     const h = harness([candidate("ありがとう", "mozc", "ありがとう")]);
-    const result = await convertRomajiToJapaneseDetailed("arigatou", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("arigatou", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("ありがとう");
     expect(h.generate).not.toHaveBeenCalled();
   });
   it("tries a bounded typo correction after normal conversion has no candidate", async () => {
     const h = harness();
     h.generate.mockResolvedValue(json("明日の予定。", "あしたのよてい。"));
-    const result = await convertRomajiToJapaneseDetailed("ashitanoyottei.", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("ashitanoyottei.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("明日の予定。");
     expect(result.conversionStrategy).toBe("correction");
     expect(requiresExplicitAcceptance(result)).toBe(true);
@@ -82,7 +96,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("discards an unchanged reading echo and tries speculation once", async () => {
     const h = harness();
     h.generate.mockResolvedValueOnce(json("ほん。", "ほん。")).mockResolvedValueOnce(json("本。", "ほん。"));
-    const result = await convertRomajiToJapaneseDetailed("hon.", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("hon.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("本。");
     expect(result.conversionStrategy).toBe("speculative");
     expect(result.attempts?.map(a => a.stage)).toEqual(["normal", "correction", "speculative"]);
@@ -94,7 +108,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("allows an inferred natural hiragana word without inventing a kanji paraphrase", async () => {
     const h = harness();
     h.generate.mockResolvedValueOnce(json("ありが。", "ありが。")).mockResolvedValueOnce(json("ありがとう。", "ありがとう。"));
-    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("ありがとう。");
     expect(result.conversionStrategy).toBe("speculative");
     expect(h.generate.mock.calls[1][2].system).not.toContain("Candidate: 感謝します");
@@ -102,7 +116,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("leaves the original romaji when both rescues fail instead of returning kana", async () => {
     const h = harness();
     h.generate.mockResolvedValue(json("ほん。", "ほん。"));
-    const result = await convertRomajiToJapaneseDetailed("hon.", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("hon.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result).toMatchObject({ text: "", suggestionRejected: true, suggestionRejectedReason: "unconvertible" });
     expect(result.session).toBeUndefined();
     expect(result.attempts?.every(a => a.outcome === "rejected")).toBe(true);
@@ -111,7 +125,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("rejects invented numbers in both rescue stages", async () => {
     const h = harness();
     h.generate.mockResolvedValue(json("11時。", "11じ。"));
-    const result = await convertRomajiToJapaneseDetailed("10ji.", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("10ji.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("");
     expect(result.attempts).toHaveLength(3);
   });
@@ -122,7 +136,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     const start = vi.fn();
     const ranked = vi.fn<(result: JapaneseConversionResult) => void>();
     const initial = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, {
-      kanaEngine: h.engine, deferRanking: task => { run = task; }, onRescueStart: start, onRankedCandidates: ranked,
+      autoSpeculation: true, kanaEngine: h.engine, deferRanking: task => { run = task; }, onRescueStart: start, onRankedCandidates: ranked,
     });
     expect(initial.session?.rerankStatus).toBe("pending");
     expect(ranked).not.toHaveBeenCalled();
@@ -135,13 +149,13 @@ describe("normal → correction → speculation → unchanged romaji", () => {
   it("does not treat transport failure as a request to run the next rescue", async () => {
     const h = harness();
     h.generate.mockRejectedValue(new Error("offline"));
-    await expect(convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine })).rejects.toThrow("offline");
+    await expect(convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine })).rejects.toThrow("offline");
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
   it("does not accept legacy unvalidated plain text as an automatic rescue candidate", async () => {
     const h = harness();
     h.generate.mockResolvedValue({ response: "変換できません" });
-    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine });
+    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result).toMatchObject({ text: "", suggestionRejected: true, suggestionRejectedReason: "unconvertible" });
     expect(result.attempts?.slice(1).map(attempt => attempt.detail)).toEqual(["response-format", "response-format"]);
   });
@@ -149,7 +163,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     const h = harness();
     const controller = new AbortController();
     h.generate.mockImplementation(() => { controller.abort(); return new Promise(() => { }); });
-    await expect(convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { kanaEngine: h.engine, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    await expect(convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
 });

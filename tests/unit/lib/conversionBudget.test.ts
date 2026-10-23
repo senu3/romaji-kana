@@ -36,7 +36,7 @@ describe("whole conversion budget", () => {
       setTimeout(() => resolve({ response: '{"convertedText":"","completedKana":""}' }), 60);
     })).mockImplementation(() => new Promise(() => {}));
     const result = convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, {
-      kanaEngine: h.engine, missingLetterCorrection: false, timeoutMs: 100,
+      kanaEngine: h.engine, autoSpeculation: true, missingLetterCorrection: false, timeoutMs: 100,
     });
     const assertion = expect(result).rejects.toMatchObject({ name: "TimeoutError" });
     await vi.advanceTimersByTimeAsync(60);
