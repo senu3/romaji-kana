@@ -5,6 +5,7 @@ import { createId } from "../lib/id";
 import type { UserDictionaryEntry } from "../lib/types";
 import type { PersonalWord } from "../lib/kanaEngine";
 import { PersonalDictionary } from "./PersonalDictionary";
+import { normalizePersonalDictionary } from "../lib/settings";
 
 const MAX_USER_DICTIONARY_ENTRIES = 50;
 
@@ -30,13 +31,13 @@ export function DictionaryModal({
   const [detectedDraft, setDetectedDraft] = useState<{
     reading: string;
     output: string;
-    note: string;
+    pos: PersonalWord["pos"];
   } | null>(null);
   const [detectedStatus, setDetectedStatus] = useState("");
   const detectedReadingInputRef = useRef<HTMLInputElement | null>(null);
   const detectedTerms = documentVocabularyProfile.terms.slice(0, 30);
   const registeredOutputs = new Set(
-    entries.map((entry) => entry.output.trim()).filter(Boolean),
+    personalWords.filter(word => word.enabled).map(word => word.text),
   );
   const canAdd =
     draft.reading.trim().length > 0 &&
@@ -45,7 +46,7 @@ export function DictionaryModal({
   const canAddDetected =
     Boolean(detectedDraft?.reading.trim()) &&
     Boolean(detectedDraft?.output.trim()) &&
-    entries.length < MAX_USER_DICTIONARY_ENTRIES;
+    personalWords.length < 500 && Boolean(onPersonalWordsChange);
   const detectedDraftOpen = detectedDraft !== null;
 
   useEffect(() => {
@@ -78,14 +79,21 @@ export function DictionaryModal({
   };
 
   const selectDetectedTerm = (term: string) => {
-    if (registeredOutputs.has(term) || entries.length >= MAX_USER_DICTIONARY_ENTRIES) {
+    if (registeredOutputs.has(term) || !onPersonalWordsChange) {
       return;
     }
+    const disabled = personalWords.find(word => word.text === term && !word.enabled);
+    if (disabled) {
+      onPersonalWordsChange(personalWords.map(word => word.id === disabled.id ? { ...word, enabled: true } : word));
+      setDetectedStatus(`${term} の個人語彙を有効にしました。`);
+      return;
+    }
+    if (personalWords.length >= 500) return;
     setDetectedStatus("");
     setDetectedDraft({
-      reading: suggestedRomajiReading(term),
+      reading: "",
       output: term,
-      note: "文書から追加",
+      pos: "noun",
     });
   };
 
@@ -95,10 +103,12 @@ export function DictionaryModal({
       return;
     }
 
-    const output = detectedDraft.output.trim();
-    appendEntry(detectedDraft);
+    const word = normalizePersonalDictionary([{ id: createId("word"), reading: detectedDraft.reading,
+      text: detectedDraft.output, pos: detectedDraft.pos, enabled: true }])[0];
+    if (!word) { setDetectedStatus("読みはかな、表記は80文字以内で入力してください。"); return; }
+    onPersonalWordsChange?.([...personalWords, word]);
     setDetectedDraft(null);
-    setDetectedStatus(`${output} を辞書に追加しました。`);
+    setDetectedStatus(`${word.text} を個人語彙に追加しました。`);
   };
 
   const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
@@ -293,7 +303,7 @@ export function DictionaryModal({
           <div className="document-vocabulary-copy">
             <strong>{detectedTerms.length} 語を検出</strong>
             <p>
-              文書語彙はこの文書だけで参照します。よく使う表記は辞書へ追加できます。
+              文書語彙はこの文書だけで参照します。かな読みを登録すると、ほかの文書でも個人語彙として使えます。
             </p>
           </div>
 
@@ -301,18 +311,19 @@ export function DictionaryModal({
             <div className="document-vocabulary-candidates" aria-label="検出した文書語彙">
               {detectedTerms.map((term) => {
                 const registered = registeredOutputs.has(term);
+                const disabled = personalWords.some(word => word.text === term && !word.enabled);
                 const selected = detectedDraft?.output === term;
                 return (
                   <button
                     className={`${registered ? "registered" : ""} ${selected ? "selected" : ""}`}
                     type="button"
                     key={term}
-                    disabled={registered || entries.length >= MAX_USER_DICTIONARY_ENTRIES}
+                    disabled={registered || !onPersonalWordsChange || (!disabled && personalWords.length >= 500)}
                     onClick={() => selectDetectedTerm(term)}
-                    aria-label={registered ? `${term} は登録済み` : `${term} を辞書に追加`}
+                    aria-label={registered ? `${term} は個人語彙に登録済み` : disabled ? `${term} の個人語彙を有効にする` : `${term} を個人語彙に追加`}
                   >
                     <span>{term}</span>
-                    <small>{registered ? "登録済み" : selected ? "編集中" : "追加"}</small>
+                    <small>{registered ? "登録済み" : disabled ? "有効にする" : selected ? "編集中" : "追加"}</small>
                   </button>
                 );
               })}
@@ -326,7 +337,7 @@ export function DictionaryModal({
           {detectedDraft ? (
             <form className="detected-vocabulary-form" onSubmit={addDetectedEntry}>
               <div className="detected-vocabulary-form-heading">
-                <strong>辞書へ追加</strong>
+                <strong>個人語彙へ追加</strong>
                 <button
                   className="text-button"
                   type="button"
@@ -336,13 +347,13 @@ export function DictionaryModal({
                 </button>
               </div>
               <label className="field">
-                <span>Romaji reading</span>
+                <span>かな読み</span>
                 <input
                   ref={detectedReadingInputRef}
-                  aria-label="検出語彙の Romaji reading"
+                  aria-label="検出語彙のかな読み"
                   value={detectedDraft.reading}
                   maxLength={80}
-                  placeholder="youkenteigi"
+                  placeholder="ようけんていぎ"
                   onChange={(event) => {
                     const reading = event.currentTarget.value;
                     setDetectedDraft((value) =>
@@ -366,18 +377,12 @@ export function DictionaryModal({
                 />
               </label>
               <label className="field">
-                <span>メモ</span>
-                <input
-                  aria-label="検出語彙のメモ"
-                  value={detectedDraft.note}
-                  maxLength={120}
-                  onChange={(event) => {
-                    const note = event.currentTarget.value;
-                    setDetectedDraft((value) =>
-                      value ? { ...value, note } : value,
-                    );
-                  }}
-                />
+                <span>種類</span>
+                <select aria-label="検出語彙の種類" value={detectedDraft.pos}
+                  onChange={event => { const pos = event.currentTarget.value as PersonalWord["pos"]; setDetectedDraft(value => value ? { ...value, pos } : value); }}>
+                  <option value="noun">一般名詞</option><option value="proper">固有名詞</option>
+                  <option value="person">人名</option><option value="organization">組織名</option>
+                </select>
               </label>
               <button
                 className="primary-button detected-vocabulary-add"
@@ -385,14 +390,14 @@ export function DictionaryModal({
                 disabled={!canAddDetected}
               >
                 <Plus size={16} aria-hidden="true" />
-                辞書に追加
+                個人語彙に追加
               </button>
             </form>
           ) : null}
 
-          {entries.length >= MAX_USER_DICTIONARY_ENTRIES ? (
+          {personalWords.length >= 500 ? (
             <p className="dictionary-limit-note">
-              辞書が上限の {MAX_USER_DICTIONARY_ENTRIES} 件に達しています。
+              個人語彙が上限の500件に達しています。
             </p>
           ) : null}
           <p className="detected-vocabulary-status" role="status" aria-live="polite">
@@ -402,10 +407,6 @@ export function DictionaryModal({
       ) : null}
     </section>
   );
-}
-
-function suggestedRomajiReading(term: string): string {
-  return /^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(term) ? term.toLowerCase() : "";
 }
 
 function createDictionaryEntryId(prefix = "dictionary"): string {
