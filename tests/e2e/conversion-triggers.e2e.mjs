@@ -36,6 +36,56 @@ try {
     } finally { await context.close(); }
   }
 
+  const selectedCandidateFailures = [];
+  for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {
+    await scenario({ conversionMode: entry === 'ghost' ? 'ghost' : 'replace', triggers: { typing: true, space: true, enter: true } }, async (page, editor, searches) => {
+      await page.route('**/api/kana-engine', route => {
+        const { reading } = route.request().postDataJSON();
+        searches.push(reading);
+        const candidates = ['公開のときだ', '航海のときだ'].map((text, index) => ({
+          text, reading, cost: index * 100, tokens: [{ text, reading, from: 0, to: [...reading].length,
+            source: 'mozc', entryId: text, lid: 0, rid: 0, wordCost: index * 100 }],
+        }));
+        return route.fulfill({ json: { candidates, dictionaryRevision: 'test', truncated: false } });
+      });
+      await page.keyboard.insertText('さあ船出のときだ、');
+      await page.keyboard.type('koukainotokida');
+      if (entry === 'ghost') {
+        await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '公開のときだ' }).waitFor();
+        await page.getByRole('group', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true }).click();
+      } else {
+        await page.keyboard.press('Control+Enter');
+        if (entry === 'recent') await page.locator('.recent-retry-chip-main').click();
+        else {
+          await page.getByRole('button', { name: /履歴を開く/ }).click();
+          await page.locator('.history-item').getByRole('button', { name: 'ほかの候補' }).click();
+        }
+      }
+      await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: '航海のときだ', exact: true }).click();
+      await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '航海のときだ' }).waitFor();
+      const previousSearches = searches.length;
+      if (trigger === 'Enter') await page.keyboard.press('Enter');
+      else if (trigger !== 'pause') await page.keyboard.type(trigger);
+      await page.waitForTimeout(700);
+      try {
+        if (trigger === 'pause' || trigger === ' ') {
+          assert.equal(await page.locator('.cm-ghost-text-suggestion').textContent(), '航海のときだ');
+        } else {
+          const suffix = trigger === ',' ? '、' : trigger === '.' ? '。' : trigger === 'Enter' ? '\n' : ' ';
+          const text = await editor.locator('.cm-line').evaluateAll(lines => lines.map(line => {
+            const copy = line.cloneNode(true);
+            copy.querySelectorAll('.cm-ghost-text').forEach(widget => widget.remove());
+            return copy.textContent;
+          }).join('\n'));
+          assert.equal(text, `さあ船出のときだ、航海のときだ${suffix}`);
+          assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+        }
+        assert.equal(searches.length, previousSearches, 'A selected candidate must not start another conversion');
+      } catch (error) { selectedCandidateFailures.push(`${entry}/${JSON.stringify(trigger)}: ${error.message}`); }
+    });
+  }
+  assert.deepEqual(selectedCandidateFailures, []);
+
   await scenario({ triggers: { typing: true, space: false } }, async (page, _editor, searches) => {
     await page.keyboard.type('hon ');
     await page.waitForTimeout(100);
@@ -301,5 +351,5 @@ try {
       }
     });
   }
-  console.log('Conversion trigger E2E passed: pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges, ordered rescue and user-requested speculation.');
+  console.log('Conversion trigger E2E passed: selected candidate punctuation commits, pause/Space, paste, IME, ghost dismissal, history previews, fences, numeric ranges, ordered rescue and user-requested speculation.');
 } finally { await browser?.close(); await server.close(); }

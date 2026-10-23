@@ -874,6 +874,15 @@ export function MarkdownEditor({
     }
 
     const cursor = view.state.selection.main.head;
+    const suggestion = view.state.field(ghostSuggestionField).suggestion;
+    // An explicit candidate choice takes precedence over generating again.
+    if (suggestion?.session?.locked && !suggestion.previewOnly &&
+      view.state.selection.main.empty && cursor === suggestion.to &&
+      !requiresExplicitAcceptance(suggestion) &&
+      view.state.doc.sliceString(suggestion.from, suggestion.to) === suggestion.originalText) {
+      acceptGhostSuggestion(view);
+      return false;
+    }
     const range = retainedConversionRange(view.state, cursor, "enter");
     if (!range) {
       return false;
@@ -972,7 +981,6 @@ export function MarkdownEditor({
     const selection = view.state.selection.main;
     if (
       !suggestion ||
-      suggestion.source !== "editor" ||
       suggestion.previewOnly ||
       !selection.empty ||
       selection.head !== suggestion.to
