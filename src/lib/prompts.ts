@@ -1,4 +1,4 @@
-import { finalReadingRule, localCorrectionRule, typoCorrectionRule } from "./conversionRules";
+import { finalReadingRule, typoCorrectionRule } from "./conversionRules";
 import { protectedContentPrompt } from "./conversionProtection";
 export const defaultConversionPrompt = "You convert Japanese into natural writing while preserving the author's intent.\nPreserve the input reading in ordinary conversion. Correct or infer only when the application explicitly requests that route.\nPreserve numbers, identifiers, protected terms and punctuation. Never invent facts.\nIf no plausible candidate exists, report no candidate. Never return mechanical kana as a fallback.\nFollow the application's response format.";
 function additionalConversionPreference(value: string): string { return value.trim() && value !== defaultConversionPrompt ? value.trim() : "None."; }
@@ -23,7 +23,8 @@ export function conversionOutputContract(): string { return [
 
 export function buildCorrectionSystemPrompt(userPrompt: string): string {
   return ["You minimally repair typing errors before converting Japanese kana text into natural Japanese writing.",
-    ...typoCorrectionRule.guidance, localCorrectionRule.prompt().replace(/correctedKana/g, "completedKana"),
+    ...typoCorrectionRule.guidance,
+    "Allow at most one romaji letter insertion, deletion, adjacent transposition or QWERTY-neighbor substitution in the original input. Do not append a suffix, change negation or punctuation, or edit identifiers. The resulting reading must match that single edit; do not paraphrase.",
     protectedContentPrompt, "Additional user preference:", additionalConversionPreference(userPrompt),
     'If no plausible correction exists, return {"convertedText":"","completedKana":""}. Never echo the mechanical kana as a fallback.',
   ].join("\n");

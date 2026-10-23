@@ -8,7 +8,8 @@ import { prepareConversionRequest, type PreparedConversionInput, type Conversion
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { convertLocally } from "./localConversion";
-import { isAllowedLocalKanaCorrection } from "./localKanaCorrection";
+import { acceptsRomajiRepair } from "./romajiRepairPlans";
+import { faithfulConversionRule } from "./conversionRules";
 import type { OllamaTransport } from "./ollamaProxy";
 import { assessReadingWithEngine, combineReadingAssessments, type ReadingAssessment } from "./readingAssessment";
 import { romajiToKana } from "./romajiKana";
@@ -23,6 +24,7 @@ export async function convertInputOnce(input: string, settings: AppSettings, tra
   const { parts, protection, documentVocabulary } = preparedInput;
   if (options.purpose === "speculative") return speculateWholeTarget(settings, transport, options, preparedInput);
   const segments: GeneratedSegment[] = [];
+  let repairedParts = 0;
   for (const [partIndex, part] of parts.entries()) {
     throwIfConversionAborted(options.signal);
     if (part.type !== "text" || !hasConvertibleRomaji(part.value)) {
@@ -42,7 +44,8 @@ export async function convertInputOnce(input: string, settings: AppSettings, tra
     };
     const candidate = await generateKanaConversion(request, settings, transport, options);
     if (!candidate.text) return { text: "", reviewKana: source, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate" };
-    if (options.purpose === "correction" && !isAllowedLocalKanaCorrection(prepared, candidate.reading)) {
+    if (!faithfulConversionRule.sameReading(source, candidate.reading)) repairedParts++;
+    if (options.purpose === "correction" && (repairedParts > 1 || !acceptsRomajiRepair(part.value, candidate.reading))) {
       return { text: "", reviewKana: source, suggestionRejected: true, suggestionRejectedReason: "diverged", rejectionDetail: "local-correction" };
     }
     const assessment = await assessReadingWithEngine(candidate.text, candidate.reading, true, options.readingVerifier,
