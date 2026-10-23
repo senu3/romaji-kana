@@ -39,6 +39,39 @@ export function missingLetterReadings(value: string) {
       plans.push({ value: repaired, reading: kana.kana, offset, inserted, distance });
     }
   }
+
+  // Reserve exploration for deletion, adjacent transposition and keyboard-neighbor
+  // replacement. Keep the same total 128-plan / engine-call budget as production.
+  const neighbors: Record<string, string> = {
+    q: "wa", w: "qesa", e: "wrsd", r: "etdf", t: "ryfg", y: "tugh", u: "yihj", i: "uojk", o: "ipkl", p: "ol",
+    a: "qwsz", s: "awedxz", d: "serfcx", f: "drtgvc", g: "ftyhbv", h: "gyujnb", j: "huikmn", k: "jiolm", l: "kop",
+    z: "asx", x: "zsdc", c: "xdfv", v: "cfgb", b: "vghn", n: "bhjm", m: "njk"
+  };
+  const extra: typeof plans = [];
+  for (const run of value.matchAll(/[a-z]+/g)) {
+    const start = run.index, end = start + run[0].length;
+    if (/[A-Za-z_:/.-]/.test(value[start - 1] ?? "") || /[A-Za-z_:/-]/.test(value[end] ?? "")) continue;
+    for (let offset = start; offset < end; offset++) {
+      const edits = [
+        { value: value.slice(0, offset) + value.slice(offset + 1), inserted: "" },
+        ...(offset + 1 < end && value[offset] !== value[offset + 1] ? [{ value: value.slice(0, offset) + value[offset + 1] + value[offset] + value.slice(offset + 2), inserted: value[offset + 1] + value[offset] }] : []),
+        ...[...(neighbors[value[offset]] ?? "")].map(inserted => ({ value: value.slice(0, offset) + inserted + value.slice(offset + 1), inserted }))
+      ];
+      for (const edit of edits) {
+        const kana = romajiToKana(edit.value);
+        if (!kana.kana || kana.lowConfidenceSpans.length || kana.kana === original.kana || markers(original.kana) !== markers(kana.kana)) continue;
+        const distance = original.lowConfidenceSpans.length ? Math.min(...original.lowConfidenceSpans.map(span => Math.min(Math.abs(offset - span.inputFrom), Math.abs(offset - span.inputTo)))) : 0;
+        extra.push({ ...edit, reading: kana.kana, offset, distance });
+      }
+    }
+  }
+  // Alternate original insertion plans and new edits at each position.
+  const insertionPlans = plans.splice(0);
+  const offsets = new Set([...insertionPlans, ...extra].map(plan => plan.offset));
+  for (const offset of offsets) {
+    const a = insertionPlans.filter(plan => plan.offset === offset), b = extra.filter(plan => plan.offset === offset);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) { if (a[i]) plans.push(a[i]); if (b[i]) plans.push(b[i]); }
+  }
   const positions = new Map<number, typeof plans>();
   for (const plan of plans) {
     const queue = positions.get(plan.offset) ?? [];

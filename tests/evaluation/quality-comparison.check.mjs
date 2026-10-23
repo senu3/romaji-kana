@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { projectRoot } from '../helpers/artifacts.mjs';
 import { variantSource, augmentSpeculation, replaceOnce } from './quality-comparison-variants.mjs';
 import { summarize } from './quality-comparison-summary.mjs';
 
@@ -37,7 +39,7 @@ test('each prompt arm adds only its declared reference; never rubric or expected
 });
 test('experiments leave baseline and unrelated source intact, retain repair budgets', async () => {
   for (const file of ['localConversion.ts', 'missingLetterCorrection.ts']) {
-    const source = await readFile(new URL('../../src/lib/' + file, import.meta.url), 'utf8');
+    const source = execFileSync('git', ['show', '2bbae00:src/lib/' + file], { cwd: projectRoot, encoding: 'utf8' });
     assert.equal(variantSource(file, source, 'baseline'), source);
     assert.equal(variantSource(file, source, 'plus-romaji'), source);
     const modified = variantSource(file, source, 'edit-all');

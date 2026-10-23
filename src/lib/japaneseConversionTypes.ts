@@ -9,6 +9,7 @@ export interface JapaneseConversionResult {
   reviewKana: string;
   changes?: ConversionChanges;
   conversionStrategy?: "correction" | "speculative";
+  /** inserted is the replacement text (empty for deletion); before/after describe the full edit. */
   romajiCorrection?: { partIndex: number; offset: number; inserted: string; before: string; after: string };
 
   suggestionRejected?: boolean;
@@ -35,7 +36,7 @@ export interface JapaneseConversionOptions {
   /** Isolate normal conversion and correction in evaluations; default preserves
    * the application's existing speculative rescue behavior. */
   autoSpeculation?: boolean;
-  /** Experimental branch: search one internal missing romaji letter before model repair. */
+  /** Search one romaji insertion, deletion, adjacent transposition or keyboard-neighbor replacement before model repair. */
   missingLetterCorrection?: boolean;
   onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;
   onRescueStart?: () => void;

@@ -22,14 +22,34 @@ function harness() {
   return { engine, transport };
 }
 
-describe("single missing romaji letter", () => {
+describe("single romaji edit correction", () => {
   it("automatically generates internal insertions and coalesces equal readings", () => {
     const { plans } = missingLetterReadings("jkan");
     expect(plans.map(p => p.reading)).toContain("じかん");
     expect(plans.map(p => p.reading)).toContain("じゃかん");
     expect(new Set(plans.map(p => p.reading)).size).toBe(plans.length);
-    expect(plans.every(p => p.value.length === 5 && p.offset < 4)).toBe(true);
+    expect(plans.every(p => Math.abs(p.value.length - 4) <= 1 && p.offset < 4)).toBe(true);
     expect(plans.find(p => p.reading === "じかん")).toMatchObject({ offset: 1, inserted: "i", value: "jikan" });
+  });
+  it.each([
+    ["yottei", "yotei", ""],
+    ["yotie", "yotei", "ei"],
+    ["yorei", "yotei", "t"],
+  ])("offers a dictionary-backed repair for %s", async (input, corrected, inserted) => {
+    const reading = romajiToKana(corrected).kana;
+    const plans = missingLetterReadings(input).plans;
+    expect(plans.findIndex(p => p.value === corrected)).toBeGreaterThanOrEqual(0);
+    expect(plans.findIndex(p => p.value === corrected)).toBeLessThan(128);
+    const { engine, transport } = harness();
+    vi.mocked(engine.search).mockImplementation(async value => ({ dictionaryRevision: "test", truncated: false,
+      candidates: value === reading ? [{ text: "予定", reading, cost: 100, tokens: [{ text: "予定", reading,
+        from: 0, to: reading.length, source: "mozc", entryId: "schedule", lid: 0, rid: 0, wordCost: 100 }] }] : [] }));
+    const result = await searchMissingLetter(input, defaultSettings, transport, { kanaEngine: engine });
+    expect(result?.text).toBe("予定");
+    expect(result?.romajiCorrection).toMatchObject({ before: input, after: corrected, inserted });
+    expect(requiresExplicitAcceptance(result!)).toBe(true);
+    expect(vi.mocked(engine.search).mock.calls.length).toBeLessThanOrEqual(128);
+    expect(transport.generate).toHaveBeenCalledOnce();
   });
   it("can explore already interpretable kana but excludes suffix completion and negation changes", () => {
     expect(missingLetterReadings("kakuniwoshite").plans.some(p => p.reading === "かくにんをして")).toBe(true);
