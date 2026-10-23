@@ -1,0 +1,16 @@
+{
+  "description": "One internal missing key; candidate recall only, not model selection accuracy. Includes readable omissions, late edits, protected text and negation.",
+  "cases": [
+    { "input": "jkan", "repaired": "jikan" },
+    { "input": "kaiginojkanwokaenaidekudasai.", "repaired": "kaiginojikanwokaenaidekudasai." },
+    { "input": "kyouhaamgafuru.", "repaired": "kyouhaamegafuru." },
+    { "input": "shoruiwokakninshitekudasai.", "repaired": "shoruiwokakuninshitekudasai." },
+    { "input": "kakuniwoshite", "repaired": "kakuninwoshite" },
+    { "input": "kakunishitekudasai", "repaired": "kakuninshitekudasai" },
+    { "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.", "repaired": "ashitanokaiginoshiryouwosakuseishitekakuninshitekudasai." },
+    { "input": "raishuunouchiawasemadenishiryouwoyomikakunishitekudasai.", "repaired": "raishuunouchiawasemadenishiryouwoyomikakuninshitekudasai." },
+    { "input": "mada7kennokakuniwosumaseteinai.", "repaired": "mada7kennokakuninwosumaseteinai." },
+    { "input": "`QX-73`nojkanwokaenaidekudasai.", "repaired": "`QX-73`nojikanwokaenaidekudasai." },
+    { "input": "ashitanokaiginoshiryouwosakuseishitekudasai\n`QX-73`\nkakunishitekudasai", "repaired": "ashitanokaiginoshiryouwosakuseishitekudasai\n`QX-73`\nkakuninshitekudasai" }
+  ]
+}

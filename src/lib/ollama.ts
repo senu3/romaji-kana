@@ -30,7 +30,8 @@ export async function convertRomajiToJapaneseDetailed(input: string, settings: A
       let candidate: JapaneseConversionResult;
       try {
         const searched = stage === "correction" && options.missingLetterCorrection !== false ? await searchMissingLetter(input, settings, transport, options) : undefined;
-        candidate = searched ?? await runAttempt({ ...options, purpose: stage, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined });
+        candidate = searched && isUsableConversionResult(searched, options) ? searched
+          : await runAttempt({ ...options, purpose: stage, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined });
       } catch (error) {
         if (!(error instanceof ConversionResponseError)) throw error;
         candidate = { text: "", reviewKana: first.reviewKana, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: error.diagnostic };

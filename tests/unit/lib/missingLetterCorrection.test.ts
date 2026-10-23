@@ -4,6 +4,7 @@ import { missingLetterReadings, searchMissingLetter } from "../../../src/lib/mis
 import { convertRomajiToJapaneseDetailed } from "../../../src/lib/ollama";
 import { requiresExplicitAcceptance } from "../../../src/lib/readingAssessment";
 import { defaultSettings } from "../../../src/lib/settings";
+import { romajiToKana } from "../../../src/lib/romajiKana";
 
 function harness() {
   const engine: KanaEngine = {
@@ -36,6 +37,82 @@ describe("single missing romaji letter", () => {
     expect(missingLetterReadings("ikanai").plans.every(p => p.reading.includes("ない"))).toBe(true);
     expect(missingLetterReadings("a".repeat(97)).truncated).toBe(true);
     expect(missingLetterReadings("https://QX-73").plans).toEqual([]);
+  });
+  it("reaches a missing n near the end of a sentence within the search budget", async () => {
+    const input = "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.";
+    const repaired = "ashitanokaiginoshiryouwosakuseishitekakuninshitekudasai.";
+    const reading = romajiToKana(repaired).kana;
+    expect(missingLetterReadings(input).plans.findIndex(plan => plan.reading === reading)).toBeLessThan(128);
+    const { engine, transport } = harness();
+    const target = reading.replace(/\.$/, "");
+    vi.mocked(engine.search).mockImplementation(async value => ({
+      dictionaryRevision: "test", truncated: false, candidates: value === target ? [{
+        text: "明日の会議の資料を作成して確認してください", reading: value, cost: 100,
+        tokens: [{ text: "明日の会議の資料を作成して確認してください", reading: value, from: 0,
+          to: [...value].length, source: "mozc", entryId: "late-n", lid: 0, rid: 0, wordCost: 100 }],
+      }] : [],
+    }));
+    const result = await searchMissingLetter(input, defaultSettings, transport, { kanaEngine: engine });
+    expect(result?.text).toBe("明日の会議の資料を作成して確認してください。");
+    expect(result?.romajiCorrection?.after).toBe(repaired.replace(/\.$/, "。"));
+    expect(vi.mocked(engine.search).mock.calls.length).toBeLessThanOrEqual(128);
+  });
+  it("shares exploration across editable parts separated by a protected literal", async () => {
+    const { engine, transport } = harness();
+    const prefix = "ashitanokaiginoshiryouwosakuseishitekudasai";
+    const prefixReading = romajiToKana(prefix).kana;
+    const repaired = "かくにんしてください";
+    vi.mocked(engine.search).mockImplementation(async reading => ({
+      dictionaryRevision: "test", truncated: false, candidates: [prefixReading, repaired].includes(reading) ? [{
+        text: reading === repaired ? "確認してください" : "明日の会議の資料を作成してください", reading, cost: 100,
+        tokens: [{ text: reading === repaired ? "確認してください" : "明日の会議の資料を作成してください", reading,
+          from: 0, to: [...reading].length, source: "mozc", entryId: reading, lid: 0, rid: 0, wordCost: 100 }],
+      }] : [],
+    }));
+    const result = await searchMissingLetter(`${prefix}\n\x60QX-73\x60\nkakunishitekudasai`, defaultSettings, transport, { kanaEngine: engine });
+    expect(result?.text).toBe("明日の会議の資料を作成してください\nQX-73\n確認してください");
+    expect(result?.romajiCorrection?.inserted).toBe("n");
+    expect(vi.mocked(engine.search).mock.calls.length).toBeLessThanOrEqual(128);
+  });
+  it("keeps different repaired readings instead of filling the pool with cheap homophones", async () => {
+    const { engine, transport } = harness();
+    const readings = missingLetterReadings("kakuniwoshite").plans.slice(0, 9).map(plan => plan.reading);
+    const desired = readings[8];
+    vi.mocked(engine.search).mockImplementation(async reading => {
+      const index = readings.indexOf(reading);
+      return { dictionaryRevision: "test", truncated: false, candidates: index < 0 ? [] : ["甲", "乙", "丙"].map(text => ({
+        text: text + reading, reading, cost: index * 100,
+        tokens: [{ text: text + reading, reading, from: 0, to: [...reading].length, source: "mozc" as const,
+          entryId: text, lid: 0, rid: 0, wordCost: index * 100 }],
+      })) };
+    });
+    transport.generate.mockImplementation(async (_provider, _url, request) => {
+      const prompt = JSON.parse(request.prompt);
+      const selected = prompt.candidates.find((candidate: { reading: string }) => candidate.reading === desired);
+      expect(selected).toBeDefined();
+      return { response: JSON.stringify({ order: [selected.id] }) };
+    });
+    const result = await searchMissingLetter("kakuniwoshite", defaultSettings, transport, { kanaEngine: engine });
+    expect(result?.reviewKana).toBe(desired);
+    expect(result?.session?.candidates).toHaveLength(24);
+  });
+  it("tries model correction when all dictionary repairs are rejected", async () => {
+    const { engine, transport } = harness();
+    // Select a generated internal insertion rather than suffix completion.
+    const plan = missingLetterReadings("ashitanoyottei").plans[0];
+    vi.mocked(engine.search).mockImplementation(async reading => ({
+      dictionaryRevision: "test", truncated: false, candidates: reading === plan.reading ? [{
+        text: "仮候補", reading, cost: 100, tokens: [{ text: "仮候補", reading, from: 0,
+          to: [...reading].length, source: "mozc", entryId: "repair", lid: 0, rid: 0, wordCost: 100 }],
+      }] : [],
+    }));
+    transport.generate.mockResolvedValueOnce({ response: '{"order":[]}' })
+      .mockResolvedValueOnce({ response: '{"convertedText":"明日の予定","completedKana":"あしたのよてい"}' });
+    const result = await convertRomajiToJapaneseDetailed("ashitanoyottei", defaultSettings, transport, { kanaEngine: engine });
+    expect(result.text).toBe("明日の予定");
+    expect(result.conversionStrategy).toBe("correction");
+    expect(result.attempts?.map(attempt => attempt.stage)).toEqual(["normal", "correction"]);
+    expect(transport.generate).toHaveBeenCalledTimes(2);
   });
   it("ranks dictionary-backed repairs, including a single candidate, without changing original input", async () => {
     const { engine, transport } = harness();
@@ -105,5 +182,17 @@ describe("single missing romaji letter", () => {
     transport.generate.mockResolvedValue({ response: '{"convertedText":"","completedKana":""}' });
     await convertRomajiToJapaneseDetailed("jkan", defaultSettings, transport, { kanaEngine: engine, missingLetterCorrection: false });
     expect(engine.search).not.toHaveBeenCalled();
+  });
+  it("leaves a valid normal conversion alone without starting missing-letter exploration", async () => {
+    const { engine, transport } = harness();
+    const metrics = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed("jikan", defaultSettings, transport, {
+      kanaEngine: engine, onMissingLetterSearch: metrics,
+    });
+    expect(result.text).toBe("時間");
+    expect(result.conversionStrategy).toBeUndefined();
+    expect(metrics).not.toHaveBeenCalled();
+    expect(transport.generate).not.toHaveBeenCalled();
+    expect(engine.search).toHaveBeenCalledOnce();
   });
 });
