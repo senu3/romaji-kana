@@ -18,6 +18,8 @@ export interface JapaneseConversionResult {
 }
 
 export interface JapaneseConversionOptions {
+  /** Whole-request budget including deferred ranking and rescue; default 60s. */
+  timeoutMs?: number;
   purpose?: "normal" | "correction" | "speculative";
   kanaEngine?: import("./kanaEngine").KanaEngine;
   anchor?: import("./types").ConversionAnchor;

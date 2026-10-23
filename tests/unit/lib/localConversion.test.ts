@@ -75,7 +75,7 @@ describe("local faithful conversion", () => {
     try {
       const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport);
       expect(result.session?.dictionaryRevision).toBe("test");
-      expect(spy).toHaveBeenCalledWith("きしゃ", [], undefined);
+      expect(spy).toHaveBeenCalledWith("きしゃ", [], expect.any(AbortSignal));
     } finally { spy.mockRestore(); }
   });
   it("selects only retained candidates by ID and preserves their dictionary paths", async () => {

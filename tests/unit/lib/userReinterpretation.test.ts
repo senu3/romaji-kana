@@ -45,7 +45,7 @@ describe("whole-target user reinterpretation", () => {
     expect(request.prompt).toContain("明日再開する。");
     expect(request.prompt).not.toContain(options.avoidOutputs[0]);
     expect(request.system).not.toContain(options.avoidOutputs[0]);
-    expect(h.kanaEngine.verify).toHaveBeenCalledWith("の更新は終わらなかった。", "のこうしんはおわらなかった。", [], undefined);
+    expect(h.kanaEngine.verify).toHaveBeenCalledWith("の更新は終わらなかった。", "のこうしんはおわらなかった。", [], expect.any(AbortSignal));
     expect(h.kanaEngine.search).not.toHaveBeenCalled();
   });
 
@@ -69,7 +69,7 @@ describe("whole-target user reinterpretation", () => {
       userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["灯里の陶器は終わらなかった。"],
     });
     expect(result.text).toBe("灯里の登記は終わらなかった。");
-    expect(h.kanaEngine.verify).toHaveBeenCalledWith("の登記は終わらなかった。", "のとうきはおわらなかった。", [], undefined);
+    expect(h.kanaEngine.verify).toHaveBeenCalledWith("の登記は終わらなかった。", "のとうきはおわらなかった。", [], expect.any(AbortSignal));
     expect(result.changes?.readingAssessment?.status).toBe("verified");
   });
 

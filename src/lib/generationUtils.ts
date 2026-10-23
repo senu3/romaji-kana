@@ -2,6 +2,7 @@ import type { LocalGenerateResponse } from "./ollamaProxy";
 
 export function throwIfConversionAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) {
+    if (signal.reason instanceof DOMException && signal.reason.name === "TimeoutError") throw signal.reason;
     throw new DOMException("変換候補の生成を中止しました。", "AbortError");
   }
 }
@@ -17,7 +18,10 @@ export function generateWithAbort<T>(
   const promise = createPromise();
 
   return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(new DOMException("変換候補の生成を中止しました。", "AbortError"));
+    const abort = () => {
+      signal.removeEventListener("abort", abort);
+      try { throwIfConversionAborted(signal); } catch (error) { reject(error); }
+    };
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();
     promise.then(

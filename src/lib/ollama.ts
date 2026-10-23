@@ -1,4 +1,5 @@
 import { ConversionResponseError } from "./conversionDiagnostics";
+import { withConversionBudget } from "./conversionBudget";
 import { correctInput } from "./conversionCorrection";
 import { convertInputOnce } from "./conversionPipeline";
 import { prepareConversionRequest } from "./conversionRequest";
@@ -13,6 +14,12 @@ import type { AppSettings } from "./types";
 
 export async function convertRomajiToJapaneseDetailed(input: string, settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport, options: JapaneseConversionOptions = {}): Promise<JapaneseConversionResult> {
+  return withConversionBudget(transport, options, (boundedTransport, boundedOptions) =>
+    convertWithinBudget(input, settings, boundedTransport, boundedOptions));
+}
+
+async function convertWithinBudget(input: string, settings: AppSettings,
+  transport: OllamaTransport, options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
   options = { ...options, purpose: options.userRequestedSpeculation ? "speculative" : options.purpose ?? "normal", kanaEngine: options.kanaEngine ?? defaultKanaEngine };
   const preparedInput = prepareConversionRequest(input, settings, options);
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {

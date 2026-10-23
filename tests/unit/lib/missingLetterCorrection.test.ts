@@ -8,7 +8,7 @@ import { romajiToKana } from "../../../src/lib/romajiKana";
 
 function harness() {
   const engine: KanaEngine = {
-    verify: vi.fn(), search: vi.fn(async reading => ({
+    verify: vi.fn().mockResolvedValue("unverified"), search: vi.fn(async reading => ({
       dictionaryRevision: "test", truncated: false,
       candidates: reading === "じかん" ? [{
         text: "時間", reading, cost: 100, tokens: [{
