@@ -12,7 +12,8 @@ interface VocabularyCandidate {
   kind: "japanese" | "latin";
 }
 
-const JAPANESE_TERM_PATTERN = /[一-龯々〆ヵヶァ-ヴー]{2,24}/gu;
+const wordSegmenter = new Intl.Segmenter("ja", { granularity: "word" });
+const JAPANESE_ONLY = /^[一-龯々〆ヵヶァ-ヴー]+$/u;
 const LATIN_PHRASE_PATTERN =
   /\b[A-Z][A-Za-z0-9+.#_-]{1,31}(?:[ \t]+[A-Z][A-Za-z0-9+.#_-]{1,31}){1,2}\b/g;
 const LATIN_TERM_PATTERN = /\b[A-Za-z][A-Za-z0-9+.#_-]{1,31}\b/g;
@@ -24,7 +25,7 @@ export function buildDocumentVocabularyProfile(
   const source = stripNonProseContent(documentText);
   const candidates = new Map<string, VocabularyCandidate>();
 
-  collectMatches(source, JAPANESE_TERM_PATTERN, "japanese", candidates);
+  collectJapanese(source, candidates);
   collectMatches(source, LATIN_PHRASE_PATTERN, "latin", candidates);
   collectMatches(source, LATIN_TERM_PATTERN, "latin", candidates);
 
@@ -44,11 +45,47 @@ export function buildDocumentVocabularyProfile(
 }
 
 function stripNonProseContent(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/~~~[\s\S]*?~~~/g, " ")
+  let fence: { marker: string; length: number } | undefined;
+  return text.split(/\r?\n/).map(line => {
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence.marker && marker[1].length >= fence.length && !marker[2].trim()) fence = undefined;
+      return "";
+    }
+    if (marker) { fence = { marker: marker[1][0], length: marker[1].length }; return ""; }
+    return line;
+  }).join("\n")
     .replace(/`[^`\r\n]*`/g, " ")
     .replace(/https?:\/\/[^\s)>]+/gi, " ");
+}
+
+function collectJapanese(source: string, candidates: Map<string, VocabularyCandidate>): void {
+  let pending = "", start = 0;
+  const flush = () => {
+    if (pending.length >= 2 && pending.length <= 24) addCandidate(pending, "japanese", start, candidates);
+    pending = "";
+  };
+  for (const part of wordSegmenter.segment(source)) {
+    if (part.isWordLike && JAPANESE_ONLY.test(part.segment)) {
+      if (!pending) start = part.index;
+      pending += part.segment;
+    } else {
+      flush();
+      // Keep whole mixed-script words, rather than clipping their kanji stems.
+      if (part.isWordLike && /[一-龯]/u.test(part.segment) && /^[一-龯々ぁ-ゖー]{2,24}$/u.test(part.segment)) {
+        addCandidate(part.segment, "japanese", part.index, candidates);
+      }
+    }
+  }
+  flush();
+}
+
+function addCandidate(term: string, kind: VocabularyCandidate["kind"], firstIndex: number,
+  candidates: Map<string, VocabularyCandidate>): void {
+  const key = kind === "latin" ? term.toLocaleLowerCase("en-US") : term;
+  const current = candidates.get(key);
+  if (current) current.count += 1;
+  else candidates.set(key, { term, kind, firstIndex, count: 1 });
 }
 
 function collectMatches(
@@ -65,26 +102,13 @@ function collectMatches(
       continue;
     }
 
-    const key = kind === "latin" ? term.toLocaleLowerCase("en-US") : term;
-    const current = candidates.get(key);
-    if (current) {
-      current.count += 1;
-      continue;
-    }
-
-    candidates.set(key, {
-      term,
-      count: 1,
-      firstIndex: match.index ?? 0,
-      kind,
-    });
+    addCandidate(term, kind, match.index ?? 0, candidates);
   }
 }
 
 function isLikelyNamedLatinTerm(candidate: VocabularyCandidate): boolean {
   const term = candidate.term;
   return (
-    candidate.count > 1 ||
     /\s/.test(term) ||
     /^[A-Z0-9._+#-]+$/.test(term) ||
     /^[A-Z][a-z]{2,}$/.test(term) ||

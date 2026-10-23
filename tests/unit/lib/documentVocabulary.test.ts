@@ -5,6 +5,18 @@ import {
 } from "../../../src/lib/documentVocabulary";
 
 describe("buildDocumentVocabularyProfile", () => {
+  it("keeps whole mixed-script words and excludes repeated unfinished romaji", () => {
+    const terms = buildDocumentVocabularyProfile("取り扱いを見直す。申し込み。東京都千代田区丸の内。koukainotokida koukainotokida").terms;
+    expect(terms).toContain("取り扱い");
+    expect(terms).toContain("丸の内");
+    expect(terms).not.toContain("見直");
+    expect(terms).not.toContain("東京都千代田区丸");
+    expect(terms).not.toContain("koukainotokida");
+  });
+  it.each(["```ts", "~~~~", "````markdown\n```"])("ignores unfinished and nested fenced code: %s", fence => {
+    expect(buildDocumentVocabularyProfile(`本文の航海。\n${fence}\nSecretProduct 秘密用語`).terms).not.toContain("SecretProduct");
+    expect(buildDocumentVocabularyProfile(`本文の航海。\n${fence}\nSecretProduct 秘密用語`).terms).not.toContain("秘密用語");
+  });
   it("extracts and ranks repeated Japanese and named Latin terms", () => {
     const profile = buildDocumentVocabularyProfile([
       "要件定義を確認します。OpenAI とローカルモデルを使います。",
