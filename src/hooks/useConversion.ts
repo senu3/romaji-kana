@@ -13,7 +13,7 @@ import { formatConversionError } from "../lib/appErrors";
 import type { ActivePanel } from "../lib/appTypes";
 import { recordConversionChoice } from "../lib/conversionLearning";
 import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
-import { createConversionSession, type ConversionSession } from "../lib/conversionSession";
+import { acceptConversionSession, dismissConversionSession, lockConversionSession, createConversionSession, type ConversionSession } from "../lib/conversionSession";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { resolveConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
@@ -56,6 +56,13 @@ interface PredictiveSuggestionRequest {
   settings: AppSettings;
   documentVocabulary?: string[];
   documentVocabularyRevision?: string;
+}
+
+function conversionContext(view: EditorView | null, range: { from: number; to: number } | null) {
+  return {
+    contextBefore: view && range ? view.state.doc.sliceString(Math.max(0, range.from - 1200), range.from) : "",
+    contextAfter: view && range ? view.state.doc.sliceString(range.to, Math.min(view.state.doc.length, range.to + 600)) : "",
+  };
 }
 
 function isPredictiveSuggestionTrigger(trigger: ConversionRange["trigger"] | undefined): boolean {
@@ -204,7 +211,7 @@ export function useConversion({
       const view = editorViewRef.current;
       if (view) {
         const session = view.state.field(ghostSuggestionField).suggestion?.session;
-        if (session?.state === "open") session.state = "dismissed";
+        dismissConversionSession(session);
         view.dispatch({ effects: clearGhostSuggestion.of(null) });
       }
     }
@@ -286,400 +293,114 @@ export function useConversion({
     setStatus({ kind: "warning", message });
   }, []);
 
-  const processEditorConversion = useCallback(
-    async (request: PendingConversion) => {
-      const view = editorViewRef.current;
-      const anchor = request.anchor;
-      if (!view || !anchor) {
-        skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
+  // All producers use the same guard and ghost projection. Each producer only
+  // decides whether its anchor/revision is current before reaching this point.
+  const showConversionPreview = useCallback((conversion: JapaneseConversionResult,
+    target: Omit<GhostConversionSuggestion, keyof ReturnType<typeof candidateDetails>>) => {
+    const view = editorViewRef.current;
+    if (!view || !isOpenConversionResult(conversion) || !requestsRef.current.valid(target.id) ||
+        !requestsRef.current.display(target.id)) return false;
+    view.dispatch({ effects: [removeLoadingDecoration.of(target.id),
+      showGhostSuggestion.of({ ...target, ...candidateDetails(conversion) })] });
+    return true;
+  }, []);
+
+  const processQueuedConversion = useCallback(async (request: PendingConversion) => {
+    const view = editorViewRef.current;
+    const anchor = request.anchor;
+    const historical = request.source === "history";
+    const resolved = view && anchor ? resolveConversionAnchor(view.state.doc.toString(), anchor) : null;
+    if ((!historical && (!view || !anchor)) || (view && anchor && !resolved)) {
+      skipQueuedConversion(request, "元の箇所を確認できないため、変換をスキップしました。");
+      return;
+    }
+    const settings = { ...settingsRef.current };
+    const historyItem = (conversion: JapaneseConversionResult, nextAnchor = anchor): ConversionHistoryItem => ({
+      id: request.id, status: "success", input: request.originalText, output: conversion.text,
+      reviewKana: conversion.reviewKana, modelName: settings.modelName, createdAt: Date.now(),
+      source: request.source, anchor: nextAnchor, conversionStrategy: conversion.conversionStrategy,
+      changes: conversion.changes, session: conversion.session,
+      documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+      retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
+    });
+    const applyConversion = (conversion: JapaneseConversionResult) => {
+      if (!requestsRef.current.valid(request.id) || !isOpenConversionResult(conversion)) return;
+      const current = editorViewRef.current;
+      if (conversion.suggestionRejected) {
+        current?.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
+        skipQueuedConversion(request, request.userRequestedSpeculation
+          ? "意図に合う推測候補を作れませんでした。本文は変更していません。"
+          : conversion.suggestionRejectedReason === "unconvertible"
+            ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
+            : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。");
         return;
       }
-
-      const resolved = resolveConversionAnchor(view.state.doc.toString(), anchor);
-      if (!resolved) {
-        skipQueuedConversion(
-          request,
-          "キュー内の変換を開始する前に元のテキストが変わったため、スキップしました。",
-        );
+      if (!current || !anchor || !resolved) {
+        if (historical) {
+          setHistory(items => upsertConversionHistory(items, historyItem(conversion)));
+          setStatus({ kind: "success", message: "履歴から再変換しました。適用先がないため結果のみ保存しました。" });
+        } else skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
         return;
       }
-
-      const applyConversion = (conversion: JapaneseConversionResult) => {
-        if (!requestsRef.current.valid(request.id)) {
-          return;
-        }
-        if (!isOpenConversionResult(conversion)) return;
-
-        if (conversion.suggestionRejected) {
-          view.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
-          skipQueuedConversion(
-            request,
-            conversion.suggestionRejectedReason === "unconvertible"
-              ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
-              : conversion.suggestionRejectedReason === "speculative"
-                ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
-                : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。",
-          );
-          return;
-        }
-
-        const currentView = editorViewRef.current;
-        if (!currentView) {
-          skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
-          return;
-        }
-
-        const latestAnchor: ConversionAnchor = {
-          ...anchor,
-          from: resolved.from,
-          to: resolved.to,
-          originalText: resolved.matchedText,
-        };
-        const latestResolved = resolveConversionAnchor(currentView.state.doc.toString(), latestAnchor);
-        if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
-          skipQueuedConversion(
-            request,
-            "キュー内の変換を適用する前に元のテキストが変わったため、スキップしました。",
-          );
-          return;
-        }
-
-        const converted = conversion.text;
-        if (
-          conversion.session?.rerankStatus === "pending" ||
-          settingsRef.current.conversionMode === "ghost" ||
-          requiresExplicitAcceptance(conversion) ||
-          conversion.conversionStrategy === "speculative" ||
-          isPredictiveSuggestionTrigger(request.range?.trigger)
-        ) {
-          if (!requestsRef.current.display(request.id)) return;
-          currentView.dispatch({
-            effects: [
-              removeLoadingDecoration.of(request.id),
-              showGhostSuggestion.of({
-                ...candidateDetails(conversion),
-                id: request.id,
-                from: latestResolved.from,
-                to: latestResolved.to,
-                originalText: latestResolved.matchedText,
-                inputText: request.originalText,
-                trigger: request.range?.trigger,
-                documentVocabulary: request.documentVocabulary,
-                documentVocabularyRevision: request.documentVocabularyRevision,
-                source: "editor",
-                retryOf: request.retryOf,
-                avoidOutputs: request.avoidOutputs
-              }),
-            ],
-          });
-          setStatus({
-            kind: "success",
-            message: conversion.conversionStrategy === "speculative"
-              ? "推測候補を表示しました。"
-              : conversion.conversionStrategy === "correction"
-                ? "誤字修正候補を表示しました。"
-                : "変換候補を表示しました。",
-          });
-          return;
-        }
-
-        currentView.dispatch({
-          changes: {
-            from: latestResolved.from,
-            to: latestResolved.to,
-            insert: converted,
-          },
-          effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)],
-          userEvent: "input.convert",
-        });
-        if (conversion.session) conversion.session.state = "accepted";
-        saveCurrentDocumentSession(currentView.state.doc.toString());
-
-        const nextAnchor: ConversionAnchor = {
-          from: latestResolved.from,
-          to: latestResolved.from + converted.length,
-          originalText: latestResolved.matchedText,
-          appliedText: converted,
-          docVersion: docVersionRef.current,
-        };
-        const historyItem: ConversionHistoryItem = {
-          id: request.id,
-          status: "success",
-          input: request.originalText,
-          output: converted,
-          reviewKana: conversion.reviewKana,
-          modelName: settingsRef.current.modelName,
-          createdAt: Date.now(),
-          source: "editor",
-          anchor: nextAnchor,
-          conversionStrategy: conversion.conversionStrategy,
-          changes: conversion.changes,
-          session: conversion.session,
-
-          documentVocabulary: request.documentVocabulary,
-          documentVocabularyRevision: request.documentVocabularyRevision,
-          retryOf: request.retryOf,
-          avoidOutputs: request.avoidOutputs,
-        };
-        setHistory((items) => prependConversionHistory(items, historyItem));
-        setRecentRetryItem(historyItem);
-        setStatus({
-          kind: "success",
-          message: conversion.conversionStrategy === "correction"
-            ? "誤字修正で変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。"
-            : "変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。",
-        });
-      };
-      const conversion = await convertRomajiToJapaneseDetailed(
-        resolved.matchedText,
-        { ...settingsRef.current, },
-        undefined,
-        {
-          kanaEngine: defaultKanaEngine,
-          signal: requestsRef.current.get(request.id)?.controller.signal,
-          deferRanking: deferRanking(request.id, request),
-          onRankedCandidates: applyConversion,
-          onRescueStart: () => {
-            if (!requestsRef.current.valid(request.id)) return;
-            editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
-            setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正・推測を試しています。" });
-          },
-          anchor,
-          contextBefore: view.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from),
-          contextAfter: view.state.doc.sliceString(resolved.to, Math.min(view.state.doc.length, resolved.to + 600)),
-          onLocalCandidates: (result) => {
-            const current = editorViewRef.current;
-            const position = current && resolveConversionAnchor(current.state.doc.toString(), anchor);
-            if (!current || !position || !requestsRef.current.display(request.id)) return;
-            current.dispatch({
-              effects: showGhostSuggestion.of({
-                ...candidateDetails(result),
-                id: request.id,
-                from: position.from,
-                to: position.to,
-                originalText: position.matchedText,
-                inputText: request.originalText,
-                trigger: request.range?.trigger,
-                source: request.source,
-                documentVocabulary: request.documentVocabulary
-              })
-            });
-          },
-          avoidOutputs: request.avoidOutputs,
-
-          userRequestedSpeculation: request.userRequestedSpeculation,
-
-          documentVocabulary: request.documentVocabulary,
+      const latest = resolveConversionAnchor(current.state.doc.toString(), {
+        ...anchor, from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
+      });
+      if (!latest || latest.matchedText !== resolved.matchedText) {
+        skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
+        return;
+      }
+      if (conversion.session?.rerankStatus === "pending" || settingsRef.current.conversionMode === "ghost" ||
+          requiresExplicitAcceptance(conversion) || isPredictiveSuggestionTrigger(request.range?.trigger)) {
+        if (!showConversionPreview(conversion, {
+          id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,
+          inputText: request.originalText, trigger: request.range?.trigger, source: request.source,
+          retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
+          documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+        })) return;
+        if (historical) current.focus();
+        setStatus({ kind: "success", message: conversion.conversionStrategy === "speculative"
+          ? "推測候補を表示しました。" : conversion.conversionStrategy === "correction"
+            ? "誤字修正候補を表示しました。" : "変換候補を表示しました。" });
+        return;
+      }
+      // Clearing the ghost dismisses an open session in the editor state field.
+      // Mark acceptance first so the same session cannot be classified as closed by dismissal.
+      acceptConversionSession(conversion.session);
+      current.dispatch({
+        changes: { from: latest.from, to: latest.to, insert: conversion.text },
+        effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)],
+        userEvent: historical ? "input.historyApply" : "input.convert",
+      });
+      saveCurrentDocumentSession(current.state.doc.toString());
+      const item = historyItem(conversion, {
+        from: latest.from, to: latest.from + conversion.text.length,
+        originalText: historical ? request.originalText : latest.matchedText,
+        appliedText: conversion.text, docVersion: docVersionRef.current,
+      });
+      setHistory(items => upsertConversionHistory(items, item));
+      setRecentRetryItem(item);
+      setStatus({ kind: "success", message: historical
+        ? "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
+        : "変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。" });
+    };
+    const conversion = await convertRomajiToJapaneseDetailed(
+      historical ? request.originalText : resolved!.matchedText, settings, undefined, {
+        kanaEngine: defaultKanaEngine, signal: requestsRef.current.get(request.id)?.controller.signal,
+        anchor, deferRanking: deferRanking(request.id, request),
+        onLocalCandidates: applyConversion, onRankedCandidates: applyConversion,
+        onRescueStart: () => {
+          if (!requestsRef.current.valid(request.id)) return;
+          editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
+          setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正・推測を試しています。" });
         },
-      );
-      applyConversion(conversion);
-    },
-    [saveCurrentDocumentSession, skipQueuedConversion],
-  );
-
-  const processHistoryConversion = useCallback(
-    async (request: PendingConversion) => {
-      const currentView = editorViewRef.current;
-      const resolved = request.anchor && currentView
-        ? resolveConversionAnchor(currentView.state.doc.toString(), request.anchor)
-        : null;
-
-      if (request.anchor && currentView && !resolved) {
-        skipQueuedConversion(
-          request,
-          "適用位置を解決できなかったため、履歴からの変換を適用しませんでした。",
-        );
-        return;
-      }
-
-      const applyConversion = (conversion: JapaneseConversionResult) => {
-        if (!requestsRef.current.valid(request.id)) {
-          return;
-        }
-
-        if (!isOpenConversionResult(conversion)) return;
-
-        if (conversion.suggestionRejected) {
-          currentView?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
-          skipQueuedConversion(
-            request,
-            request.userRequestedSpeculation
-              ? "意図に合う推測候補を作れませんでした。本文は変更していません。"
-              : conversion.suggestionRejectedReason === "speculative"
-                ? "適切な推測候補を作れなかったため、ローマ字を残しました。"
-                : "候補を安全に適用できなかったため、履歴からのサジェストを表示しませんでした。",
-          );
-          return;
-        }
-
-        const converted = conversion.text;
-        const latestView = editorViewRef.current;
-        if (!latestView || !request.anchor || !resolved) {
-          setHistory((items) =>
-            prependConversionHistory(items, {
-              id: request.id,
-              status: "success",
-              input: request.originalText,
-              output: converted,
-              reviewKana: conversion.reviewKana,
-              modelName: settingsRef.current.modelName,
-              createdAt: Date.now(),
-              source: "history",
-              anchor: request.anchor,
-              conversionStrategy: conversion.conversionStrategy,
-              changes: conversion.changes,
-              session: conversion.session,
-
-              documentVocabulary: request.documentVocabulary,
-              documentVocabularyRevision: request.documentVocabularyRevision,
-              retryOf: request.retryOf,
-              avoidOutputs: request.avoidOutputs,
-            }),
-          );
-          setStatus({
-            kind: "success",
-            message: conversion.conversionStrategy === "correction"
-              ? "誤字修正で履歴から再変換しました。適用先がないため結果のみ保存しました。"
-              : "履歴から再変換しました。適用先がないため結果のみ保存しました。",
-          });
-          return;
-        }
-
-        const latestResolved = resolveConversionAnchor(latestView.state.doc.toString(), {
-          ...request.anchor,
-          from: resolved.from,
-          to: resolved.to,
-          originalText: resolved.matchedText,
-        });
-        if (!latestResolved || latestResolved.matchedText !== resolved.matchedText) {
-          skipQueuedConversion(
-            request,
-            "適用前に位置が変わったため、履歴からの変換を適用しませんでした。",
-          );
-          return;
-        }
-
-        if (
-          conversion.session?.rerankStatus === "pending" ||
-          settingsRef.current.conversionMode === "ghost" ||
-          requiresExplicitAcceptance(conversion) ||
-          conversion.conversionStrategy === "speculative" ||
-          isPredictiveSuggestionTrigger(request.range?.trigger)
-        ) {
-          if (!requestsRef.current.display(request.id)) return;
-          latestView.dispatch({
-            effects: showGhostSuggestion.of({
-              ...candidateDetails(conversion),
-              id: request.id,
-              from: latestResolved.from,
-              to: latestResolved.to,
-              originalText: latestResolved.matchedText,
-              inputText: request.originalText,
-              trigger: request.range?.trigger,
-              documentVocabulary: request.documentVocabulary,
-              documentVocabularyRevision: request.documentVocabularyRevision,
-              source: "history",
-              retryOf: request.retryOf,
-              avoidOutputs: request.avoidOutputs
-            }),
-          });
-          latestView.focus();
-          setStatus({
-            kind: "success",
-            message: conversion.conversionStrategy === "speculative"
-              ? "履歴から推測候補を表示しました。"
-              : conversion.conversionStrategy === "correction"
-                ? "履歴から誤字修正候補を表示しました。"
-                : "履歴から変換候補を表示しました。",
-          });
-          return;
-        }
-
-        latestView.dispatch({
-          changes: {
-            from: latestResolved.from,
-            to: latestResolved.to,
-            insert: converted,
-          },
-          effects: clearGhostSuggestion.of(request.id),
-          userEvent: "input.historyApply",
-        });
-        if (conversion.session) conversion.session.state = "accepted";
-        saveCurrentDocumentSession(latestView.state.doc.toString());
-
-        const nextAnchor: ConversionAnchor = {
-          from: latestResolved.from,
-          to: latestResolved.from + converted.length,
-          originalText: request.originalText,
-          appliedText: converted,
-          docVersion: docVersionRef.current,
-        };
-
-        const historyItem: ConversionHistoryItem = {
-          id: request.id,
-          status: "success",
-          input: request.originalText,
-          output: converted,
-          reviewKana: conversion.reviewKana,
-          modelName: settingsRef.current.modelName,
-          createdAt: Date.now(),
-          source: "history",
-          anchor: nextAnchor,
-          conversionStrategy: conversion.conversionStrategy,
-          changes: conversion.changes,
-          session: conversion.session,
-
-          documentVocabulary: request.documentVocabulary,
-          documentVocabularyRevision: request.documentVocabularyRevision,
-          retryOf: request.retryOf,
-          avoidOutputs: request.avoidOutputs,
-        };
-
-        setHistory((items) => prependConversionHistory(items, historyItem));
-        setRecentRetryItem(historyItem);
-        setStatus({
-          kind: "success",
-          message: conversion.conversionStrategy === "correction"
-            ? "誤字修正で履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
-            : latestResolved.matchedBy === "nearby"
-              ? "近くの一致位置に履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
-              : "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。",
-        });
-      };
-      const conversion = await convertRomajiToJapaneseDetailed(
-        request.originalText,
-        { ...settingsRef.current, },
-        undefined,
-        {
-          kanaEngine: defaultKanaEngine,
-          signal: requestsRef.current.get(request.id)?.controller.signal,
-          anchor: request.anchor,
-          deferRanking: deferRanking(request.id, request),
-          onRankedCandidates: applyConversion,
-          onRescueStart: () => {
-            if (requestsRef.current.valid(request.id)) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
-          },
-          contextBefore: resolved && currentView ? currentView.state.doc.sliceString(Math.max(0, resolved.from - 1200), resolved.from) : "",
-          contextAfter: resolved && currentView ? currentView.state.doc.sliceString(resolved.to, Math.min(currentView.state.doc.length, resolved.to + 600)) : "",
-          avoidOutputs: request.avoidOutputs,
-
-          userRequestedSpeculation: request.userRequestedSpeculation,
-
-          documentVocabulary: request.documentVocabulary,
-          // Unconverted romaji is the target, not a protected ASCII spelling.
-          protectedDictionaryEntries: resolved && resolved.matchedText !== request.originalText
-            ? buildProtectedDictionaryEntries(
-              request.originalText,
-              resolved.matchedText,
-              settingsRef.current.userDictionary,
-            )
-            : [],
-        },
-      );
-      applyConversion(conversion);
-    },
-    [saveCurrentDocumentSession, skipQueuedConversion],
-  );
+        ...conversionContext(view, resolved),
+        avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,
+        documentVocabulary: request.documentVocabulary,
+        protectedDictionaryEntries: historical && resolved && resolved.matchedText !== request.originalText
+          ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText, settings.userDictionary) : [],
+      });
+    applyConversion(conversion);
+  }, [saveCurrentDocumentSession, skipQueuedConversion, showConversionPreview, deferRanking]);
 
   const processConversionQueue = useCallback(async () => {
     if (processingQueueRef.current) {
@@ -715,11 +436,7 @@ export function useConversion({
         });
 
         try {
-          if (request.source === "history") {
-            await processHistoryConversion(request);
-          } else {
-            await processEditorConversion(request);
-          }
+          await processQueuedConversion(request);
         } catch (error: unknown) {
           if (requestsRef.current.valid(request.id)) {
             const message = formatConversionError(error);
@@ -761,7 +478,7 @@ export function useConversion({
       processingQueueRef.current = false;
       runningRequestIdRef.current = null;
     }
-  }, [processEditorConversion, processHistoryConversion]);
+  }, [processQueuedConversion]);
 
   const enqueueConversion = useCallback(
     (request: PendingConversion) => {
@@ -779,7 +496,7 @@ export function useConversion({
       const current = editorViewRef.current;
       const visible = current?.state.field(ghostSuggestionField).suggestion;
       if (visible && request.anchor && rangesOverlap(visible, request.anchor)) {
-        if (visible.session) visible.session.state = "dismissed";
+        dismissConversionSession(visible.session);
         current?.dispatch({ effects: clearGhostSuggestion.of(visible.id) });
       }
       conversionQueueRef.current = [...conversionQueueRef.current, request];
@@ -813,7 +530,7 @@ export function useConversion({
       if (view) {
         const suggestion = view.state.field(ghostSuggestionField).suggestion;
         if (suggestion?.id === request.id && suggestion.session) {
-          suggestion.session.state = "dismissed";
+          dismissConversionSession(suggestion.session);
         }
         view.dispatch({ effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)] });
       }
@@ -825,8 +542,7 @@ export function useConversion({
     requestsRef.current.cancel(suggestion.id);
     syncPending();
     if (suggestion.session) {
-      suggestion.session.state = "accepted";
-      suggestion.session.locked = true;
+      acceptConversionSession(suggestion.session);
       const selected = suggestion.session.candidates.find(c => c.id === suggestion.session!.selectedId);
       if (selected?.kind === "conversion" && selected.result.changes?.readingAssessment?.status === "verified") {
         recordConversionChoice(selected.result.reviewKana, selected.result.text);
@@ -885,7 +601,7 @@ export function useConversion({
     if (suggestion) requestsRef.current.cancel(suggestion.id);
     syncPending();
     const session = suggestion?.session ?? editorViewRef.current?.state.field(ghostSuggestionField).suggestion?.session;
-    if (session) session.state = "dismissed";
+    dismissConversionSession(session);
     if (suggestion) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(suggestion.id) });
     invalidatePredictiveSuggestions(false);
     setStatus({
@@ -974,7 +690,7 @@ export function useConversion({
     const reading = item.changes?.resultReading ?? item.reviewKana;
     const stored = item.session;
     // A visible list keeps its order even if an older ranking request finishes.
-    if (stored) stored.locked = true;
+    lockConversionSession(stored);
     const seen = new Set<string>();
     const candidates = reading ? (stored?.candidates ?? []).filter(candidate => {
       const result = candidate.result;
@@ -992,7 +708,7 @@ export function useConversion({
     });
     const session = createConversionSession(item.input, candidates);
     session.selectedId = candidates.find(candidate => candidate.result.text === item.output)!.id;
-    session.locked = true;
+    lockConversionSession(session);
     setCandidateList({
       item, ghost, session, documentText: view.state.doc.toString(), docVersion: docVersionRef.current,
       anchor: { from: resolved.from, to: resolved.to, originalText: resolved.matchedText, docVersion: docVersionRef.current }
@@ -1168,20 +884,12 @@ export function useConversion({
           }
 
           displayedSuggestionRevisionRef.current = request.revision;
-          currentView.dispatch({
-            effects: showGhostSuggestion.of({
-              ...candidateDetails(conversion),
-              id: request.id,
-              from: request.range.from,
-              to: request.range.to,
-              originalText: request.range.text,
-              inputText: request.range.text,
-              trigger: request.range.trigger,
-              documentVocabulary: request.documentVocabulary,
-              documentVocabularyRevision: request.documentVocabularyRevision,
-              source: "editor"
-            }),
-          });
+          if (!showConversionPreview(conversion, {
+            id: request.id, from: request.range.from, to: request.range.to,
+            originalText: request.range.text, inputText: request.range.text, trigger: request.range.trigger,
+            documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+            source: "editor",
+          })) return;
           setStatus({
             kind: predictiveSuggestionQueueRef.current ? "loading" : "success",
             message: conversion.conversionStrategy === "speculative"
@@ -1206,8 +914,7 @@ export function useConversion({
             onRescueStart: () => {
               if (requestsRef.current.valid(request.id)) editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
             },
-            contextBefore: editorViewRef.current?.state.doc.sliceString(Math.max(0, request.range.from - 1200), request.range.from),
-            contextAfter: editorViewRef.current?.state.doc.sliceString(request.range.to, Math.min(editorViewRef.current.state.doc.length, request.range.to + 600)),
+            ...conversionContext(editorViewRef.current, request.range),
           },
         );
         applyConversion(conversion);
@@ -1219,7 +926,7 @@ export function useConversion({
         if (!rankingRequestsRef.current.has(request.id)) requestsRef.current.finish(request.id);
       }
     },
-    [],
+    [showConversionPreview],
   );
 
   const processPredictiveSuggestionQueue = useCallback(async () => {

@@ -28,6 +28,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { acceptConversionSession, dismissConversionSession } from "../lib/conversionSession";
 import {
   ChevronDown,
   FilePlus2,
@@ -204,7 +205,7 @@ export const ghostSuggestionField = StateField.define<GhostState>({
   update(value, transaction) {
     let suggestion = value.suggestion;
     const dismiss = () => {
-      if (suggestion?.session?.state === "open") suggestion.session.state = "dismissed";
+      dismissConversionSession(suggestion?.session);
       suggestion = null;
     };
 
@@ -944,6 +945,7 @@ export function MarkdownEditor({
       return true;
     }
 
+    acceptConversionSession(suggestion.session);
     view.dispatch({
       changes: {
         from: suggestion.from,
@@ -1019,6 +1021,7 @@ export function MarkdownEditor({
       settingsRef.current,
     );
     const replacement = `${suggestion.convertedText}${suffix}`;
+    acceptConversionSession(suggestion.session);
     view.dispatch({
       changes: {
         from: suggestion.from,

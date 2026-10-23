@@ -171,6 +171,29 @@ describe("conversion lifecycle", () => {
     expect(hook.current.history[0].status).toBe("success");
   });
 
+  it.each(["editor", "history"] as const)("applies %s results once when both callback and return publish the same session", async source => {
+    const result = { text: "本", reviewKana: "ほん", changes: {
+      ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+      readingAssessment: { status: "verified" as const, origin: "dictionary" as const, proof: "independent" as const },
+    } };
+    const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(async (_input, _settings, _transport, options) => {
+      options?.onLocalCandidates?.(sessionResult(session));
+      return sessionResult(session);
+    });
+    const { hook, view, options } = harness("hon");
+    await act(async () => {
+      if (source === "editor") hook.current.handleConvert(range("hon"));
+      else hook.current.handleRerunHistory({ id: "old", input: "hon", output: "本", status: "success",
+        source: "editor", modelName: "test", createdAt: 0,
+        anchor: { from: 0, to: 3, originalText: "hon", docVersion: 0 } });
+    });
+    expect(view.state.doc.toString()).toBe("本");
+    expect(session.state).toBe("accepted");
+    expect(hook.current.history).toHaveLength(1);
+    expect(options.saveCurrentDocumentSession).toHaveBeenCalledOnce();
+  });
+
   it("clears the visible candidate when dismiss is called without a supplied suggestion", async () => {
     const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result: { text: "本", reviewKana: "ほん" } }]);
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));

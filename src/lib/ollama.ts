@@ -1,6 +1,7 @@
 import { ConversionResponseError } from "./conversionDiagnostics";
 import { correctInput } from "./conversionCorrection";
 import { convertInputOnce } from "./conversionPipeline";
+import { prepareConversionRequest } from "./conversionRequest";
 import { isUsableConversionResult } from "./conversionPolicy";
 import { faithfulConversionRule } from "./conversionRules";
 import { createConversionSession, sessionResult } from "./conversionSession";
@@ -13,11 +14,12 @@ import type { AppSettings } from "./types";
 export async function convertRomajiToJapaneseDetailed(input: string, settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport, options: JapaneseConversionOptions = {}): Promise<JapaneseConversionResult> {
   options = { ...options, purpose: options.userRequestedSpeculation ? "speculative" : options.purpose ?? "normal", kanaEngine: options.kanaEngine ?? defaultKanaEngine };
+  const preparedInput = prepareConversionRequest(input, settings, options);
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = attemptOptions.purpose === "correction"
-      ? await correctInput(input, settings, transport, attemptOptions)
-      : await convertInputOnce(input, settings, transport, attemptOptions);
+      ? await correctInput(input, settings, transport, attemptOptions, preparedInput)
+      : await convertInputOnce(input, settings, transport, attemptOptions, preparedInput);
     const result = attemptOptions.purpose === "speculative" ? { ...candidate, conversionStrategy: "speculative" as const }
       : attemptOptions.purpose === "correction" ? { ...candidate, conversionStrategy: "correction" as const } : candidate;
     if (result.session || result.suggestionRejected) return result;

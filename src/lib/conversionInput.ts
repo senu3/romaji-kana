@@ -196,32 +196,10 @@ function splitInputByInlineKanjiTerms(input: string): Array<DictionaryTextPart |
 }
 
 function normalizeSpacedRomajiParticles(input: string): string {
-  const matches = Array.from(
-    input.matchAll(/(?<!\S)(no|ni|wo|o|ha|wa|ga|to|de|e|he|mo|kara|made|yori)(?!\S)/gi),
-  );
-  if (matches.length === 0) {
-    return input;
-  }
-
-  let normalized = "";
-  let lastCopiedIndex = 0;
-  for (const match of matches) {
-    const start = match.index ?? 0;
-    const end = start + match[0].length;
-    const leadingText = input.slice(lastCopiedIndex, start).replace(/[^\S\r\n]+$/u, "");
-    normalized += leadingText;
-    normalized += romajiParticleToKana(match[0]);
-    lastCopiedIndex = end;
-    while (lastCopiedIndex < input.length && /[^\S\r\n]/u.test(input[lastCopiedIndex] ?? "")) {
-      lastCopiedIndex += 1;
-    }
-  }
-
-  if (lastCopiedIndex < input.length) {
-    normalized += input.slice(lastCopiedIndex);
-  }
-
-  return normalized;
+  // Share tokenization and whitespace preservation with protected inputs. Only
+  // the rendering differs: ordinary particles remain in the dictionary phrase.
+  return splitInputByProtectedSpacedRomajiParticles(input)
+    .map(part => part.type === "text" ? part.value : part.output).join("");
 }
 
 function splitInputByProtectedSpacedRomajiParticles(input: string): ConversionSplitPart[] {

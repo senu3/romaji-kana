@@ -1,4 +1,5 @@
 import { normalizeInputForPrompt } from "./conversion";
+import { conversionLearningSnapshot } from "./conversionLearning";
 import { splitInputForConversion } from "./conversionInput";
 import type { ConversionProtection } from "./conversionProtection";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
@@ -39,17 +40,23 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
   const parts = splitInputForConversion(normalizeInputForPrompt(input, settings), [
     ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
   ]);
+  const readings = parts.map(part => romajiToKana(part.type === "text" ? part.value : part.output));
   const protection: ConversionProtection = {
+    lineBreaks: input.match(/\r\n|\r|\n/g) ?? [],
     // Fixed particles are reinserted by position. Counting their characters in
     // the whole output would also count kana inside editable words (へんこう).
     literalTerms: parts.flatMap(part => part.type === "literal" || part.type === "dictionary" ? [part.output] : []),
-    source: parts.map(part => part.type !== "text" ? part.output
-      : romajiToKana(part.value).tokens.map(token =>
+    source: parts.map((part, index) => part.type !== "text" ? part.output
+      : readings[index].tokens.map(token =>
         token.kind === "unknown" && /^[A-Za-z]$/u.test(token.kana) ? " " : token.kana,
       ).join("")).join(""),
   };
-  return { originalInput: input, parts, protection, documentVocabulary: options.documentVocabulary?.slice() };
+  const sourceReading = parts.map((part, index) => part.type === "text" ? readings[index].kana : part.output).join("");
+  return { originalInput: input, parts, readings, sourceReading, protection,
+    learnedBonus: conversionLearningSnapshot(), documentVocabulary: options.documentVocabulary?.slice() };
 }
+
+export type PreparedConversionInput = ReturnType<typeof prepareConversionRequest>;
 
 export function finalTargetPrompt(request: ConversionRequest, includeOriginal: boolean): string {
   const { target, reference } = request;

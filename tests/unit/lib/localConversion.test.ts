@@ -23,7 +23,7 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
-  it.each(["hon\nwo\nyomu", "hon\n wo \nyomu", "本\nwo\nyomu"])("preserves line breaks around particles: %s", async input => {
+  it.each(["hon\nwo\nyomu", "hon\n wo \nyomu", "本\nwo\nyomu", "hon\r\nwo\r\nyomu", "hon\rwo\ryomu"])("preserves line breaks around particles: %s", async input => {
     const h = harness();
     const spellings: Record<string, string> = { "ほん": "本", "を": "を", "よむ": "読む" };
     h.search.mockImplementation(async (reading: string) => ({
@@ -32,7 +32,8 @@ describe("local faithful conversion", () => {
     const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
       kanaEngine: h.engine, rerank: false, autoRescue: false,
     });
-    expect(result.text).toBe("本\nを\n読む");
+    const newline = input.match(/\r\n|\r|\n/)![0];
+    expect(result.text).toBe(`本${newline}を${newline}読む`);
     expect(h.generate).not.toHaveBeenCalled();
   });
 

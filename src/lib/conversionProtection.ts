@@ -12,6 +12,13 @@ export const protectedContentPrompt = [
 export interface ConversionProtection {
   source: string;
   literalTerms: readonly string[];
+  /** Capture before whitespace normalization, including CRLF vs LF. */
+  lineBreaks?: readonly string[];
+}
+
+export function preservesInputLineBreaks(protection: ConversionProtection, candidate: string): boolean {
+  const expected = protection.lineBreaks ?? protection.source.match(/\r\n|\r|\n/g) ?? [];
+  return JSON.stringify(expected) === JSON.stringify(candidate.match(/\r\n|\r|\n/g) ?? []);
 }
 
 export function preservesProtectedAsciiTokens(source: string, candidate: string): boolean {

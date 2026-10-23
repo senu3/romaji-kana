@@ -3,8 +3,8 @@ import { isRejectedSurfaceVariant } from "./conversionOutput";
 import { generateKanaConversion, generateSpeculationSegments } from "./conversionGeneration";
 import { hasConvertibleRomaji, normalizeRomajiReadingCandidate } from "./conversionInput";
 import { isAllowedSpeculativeConversion } from "./conversionPolicy";
-import { preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
-import { prepareConversionRequest, type ConversionRequest, type SpeculationPart } from "./conversionRequest";
+import { preservesInputLineBreaks, preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
+import { prepareConversionRequest, type PreparedConversionInput, type ConversionRequest, type SpeculationPart } from "./conversionRequest";
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { convertLocally } from "./localConversion";
@@ -17,27 +17,27 @@ import type { AppSettings } from "./types";
 type GeneratedSegment = { text: string; source: string; reading: string; assessment: ReadingAssessment; reported?: string; numeric?: boolean };
 
 export async function convertInputOnce(input: string, settings: AppSettings, transport: OllamaTransport,
-  options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
+  options: JapaneseConversionOptions, preparedInput: PreparedConversionInput = prepareConversionRequest(input, settings, options)): Promise<JapaneseConversionResult> {
   throwIfConversionAborted(options.signal);
-  if (!options.purpose || options.purpose === "normal") return convertLocally(input, settings, transport, options);
-  const preparedInput = prepareConversionRequest(input, settings, options);
+  if (!options.purpose || options.purpose === "normal") return convertLocally(input, settings, transport, options, undefined, preparedInput);
   const { parts, protection, documentVocabulary } = preparedInput;
   if (options.purpose === "speculative") return speculateWholeTarget(settings, transport, options, preparedInput);
   const segments: GeneratedSegment[] = [];
-  for (const part of parts) {
+  for (const [partIndex, part] of parts.entries()) {
     throwIfConversionAborted(options.signal);
     if (part.type !== "text" || !hasConvertibleRomaji(part.value)) {
       const text = part.type === "text" ? part.value : part.output;
       segments.push({ text, source: text, reading: text, assessment: { status: "verified", origin: "literal", proof: "preserved" } });
       continue;
     }
-    const source = romajiToKana(part.value).kana;
+    const source = preparedInput.readings[partIndex].kana;
     const prepared = romajiToKana(normalizeRomajiReadingCandidate(part.value)).kana;
     const request: ConversionRequest = {
       target: { originalRomaji: part.value, mechanicalReading: prepared, preparedReading: prepared },
       reference: {
         beforeTarget: (options.contextBefore ?? "") + segments.map(s => s.text).join(""),
-        afterTarget: options.contextAfter, beforeTargetReading: segments.map(s => s.source).join(""), documentVocabulary
+        afterTarget: parts.slice(partIndex + 1).map(part => part.type === "text" ? part.value : part.output).join("") + (options.contextAfter ?? ""),
+        beforeTargetReading: segments.map(s => s.source).join(""), documentVocabulary
       }
     };
     const candidate = await generateKanaConversion(request, settings, transport, options);
@@ -65,7 +65,8 @@ function finishGeneration(segments: GeneratedSegment[], protection: ConversionPr
     return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "speculative", rejectionDetail: "avoided-output" };
   }
   if (changes.readingAssessment.status === "contradicted") return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "reading", rejectionDetail: "reading-contradiction" };
-  if (!preservesProtectedContent(protection.source, text, protection.literalTerms) || !preservesProtectedContent(protection.source, reading, protection.literalTerms)) {
+  if (!preservesInputLineBreaks(protection, text) || !preservesInputLineBreaks(protection, reading) ||
+      !preservesProtectedContent(protection.source, text, protection.literalTerms) || !preservesProtectedContent(protection.source, reading, protection.literalTerms)) {
     return { ...result, text: "", suggestionRejected: true, suggestionRejectedReason: "protected", rejectionDetail: "protected-content" };
   }
   if (text.trim() === protection.source.trim() || (options.purpose === "speculative" && !isAllowedSpeculativeConversion(protection.source, text))) {
@@ -77,7 +78,7 @@ function finishGeneration(segments: GeneratedSegment[], protection: ConversionPr
 async function speculateWholeTarget(settings: AppSettings, transport: OllamaTransport,
   options: JapaneseConversionOptions, preparedInput: ReturnType<typeof prepareConversionRequest>): Promise<JapaneseConversionResult> {
   const { parts, protection, documentVocabulary } = preparedInput;
-  const source = parts.map(part => part.type === "text" ? romajiToKana(part.value).kana : part.output).join("");
+  const source = preparedInput.sourceReading;
   const request: ConversionRequest = {
     target: {
       originalRomaji: parts.map(part => part.type === "text" ? part.value : part.output).join(""),

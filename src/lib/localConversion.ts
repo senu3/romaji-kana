@@ -1,14 +1,14 @@
 import { classifyConversionChanges } from "./conversionChanges";
 import { hasConvertibleRomaji } from "./conversionInput";
-import { learnedBonus } from "./conversionLearning";
+import { conversionLearningSnapshot } from "./conversionLearning";
 import { isAvoidedConversionOutput } from "./conversionOutput";
-import { preservesProtectedContent } from "./conversionProtection";
-import { prepareConversionRequest } from "./conversionRequest";
+import { preservesInputLineBreaks, preservesProtectedContent } from "./conversionProtection";
+import { prepareConversionRequest, type PreparedConversionInput } from "./conversionRequest";
 import { finalReadingRule } from "./conversionRules";
-import { applySessionRanking, createConversionSession, sessionResult, type ConversionSession, type SessionCandidate } from "./conversionSession";
+import { applySessionRanking, createConversionSession, dismissConversionSession, sessionResult, type ConversionSession, type SessionCandidate } from "./conversionSession";
 import { generatedText, stripThinkBlock, throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
-import type { EngineCandidate, EngineToken } from "./kanaEngine";
+import type { EngineCandidate, EngineSearchResult, EngineToken } from "./kanaEngine";
 import { currentProviderBaseUrl } from "./modelProvider";
 import type { OllamaTransport } from "./ollamaProxy";
 import { romajiToKana } from "./romajiKana";
@@ -28,10 +28,11 @@ function appendLiteral(candidate: Combined, literal: string): Combined {
 }
 
 export async function convertLocally(input: string, settings: AppSettings, transport: OllamaTransport,
-  options: JapaneseConversionOptions, plan?: { correction: { partIndex: number; value: string } }): Promise<JapaneseConversionResult> {
+  options: JapaneseConversionOptions, plan?: { correction: { partIndex: number; value: string } },
+  preparedInput: PreparedConversionInput = prepareConversionRequest(input, settings, options),
+  searchCache = new Map<string, EngineSearchResult>()): Promise<JapaneseConversionResult> {
   const engine = options.kanaEngine!;
-  const { parts, protection } = prepareConversionRequest(input, settings, options);
-  const sourceReading = parts.map(part => part.type !== "text" ? part.output : hasConvertibleRomaji(part.value) ? romajiToKana(part.value).kana : part.value).join("");
+  const { parts, protection, sourceReading, learnedBonus } = preparedInput;
   const unavailable = (detail: "no-candidate" | "unresolved-reading"): JapaneseConversionResult => ({
     text: "", reviewKana: sourceReading, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: detail,
   });
@@ -48,27 +49,33 @@ export async function convertLocally(input: string, settings: AppSettings, trans
       combined = combined.map(c => appendLiteral(c, literal));
       continue;
     }
-    const kana = romajiToKana(part.value);
+    const kana = part === originalPart ? preparedInput.readings[partIndex] : romajiToKana(part.value);
     if (kana.lowConfidenceSpans.length) return unavailable("unresolved-reading");
     reliable &&= kana.lowConfidenceSpans.length === 0;
     // Sentence boundaries keep search bounded; punctuation remains an exact literal.
-    const chunks = kana.kana.split(/([A-Za-z0-9][A-Za-z0-9._:/-]*|[。、!?！？\n])/gu).filter(Boolean);
+    const chunks = kana.kana.split(/([A-Za-z0-9][A-Za-z0-9._:/-]*|\r\n|[。、!?！？\r\n])/gu).filter(Boolean);
     for (const chunk of chunks) {
       if (Array.from(chunk).length > 160) throw new Error("変換範囲が長すぎます。160文字以内に分けて変換してください。");
-      if (/^[。、!?！？\n]$/u.test(chunk) || /^[A-Za-z0-9]/u.test(chunk)) {
+      if (/^(?:\r\n|[。、!?！？\r\n])$/u.test(chunk) || /^[A-Za-z0-9]/u.test(chunk)) {
         combined = combined.map(c => appendLiteral(c, chunk));
         continue;
       }
-      const found = await engine.search(chunk, settings.personalDictionary ?? [], options.signal);
+      let found = searchCache.get(chunk);
+      if (!found) {
+        const response = await engine.search(chunk, settings.personalDictionary ?? [], options.signal);
+        // Cache validated dictionary segments as well as abstentions. Unchanged
+        // chunks in repair plans need neither another IPC call nor revalidation.
+        const valid = response.candidates.filter(c => validEngineCandidate(c, chunk));
+        if (response.candidates.length && !valid.length) throw new Error("かな漢字エンジンから有効な候補が返りませんでした。");
+        found = { ...response, candidates: valid.filter(c => c.tokens.some(t => t.source !== "literal") &&
+          c.tokens.every(t => t.source !== "literal" || !/[ぁ-ヿー]/u.test(t.reading))) };
+        searchCache.set(chunk, found);
+      }
       revision = found.dictionaryRevision;
       truncated ||= found.truncated;
-      // Validate wire alignment before trusting dictionary-path evidence.
-      const valid = found.candidates.filter(c => validEngineCandidate(c, chunk));
-      if (found.candidates.length && !valid.length) throw new Error("かな漢字エンジンから有効な候補が返りませんでした。");
       // Reject synthetic kana passthrough, including partial unknown fragments.
       // Kana spellings backed by dictionary entries (e.g. ありがとう) remain valid.
-      const dictionaryCandidates = valid.filter(c => c.tokens.some(t => t.source !== "literal") &&
-        c.tokens.every(t => t.source !== "literal" || !/[ぁ-ヿー]/u.test(t.reading)));
+      const dictionaryCandidates = found.candidates;
       if (!dictionaryCandidates.length) return unavailable("no-candidate");
       const next: Combined[] = [];
       for (const left of combined) for (const right of dictionaryCandidates) {
@@ -85,7 +92,7 @@ export async function convertLocally(input: string, settings: AppSettings, trans
     }
   }
   const reading = combined[0]?.reading ?? sourceReading;
-  const candidates: SessionCandidate[] = combined.filter(c => finalReadingRule.acceptsControls({ completedKana: c.reading, convertedText: c.text }) && preservesProtectedContent(plan?.correction ? protection.source : sourceReading, c.text, protection.literalTerms) &&
+  const candidates: SessionCandidate[] = combined.filter(c => preservesInputLineBreaks(protection, c.text) && finalReadingRule.acceptsControls({ completedKana: c.reading, convertedText: c.text }) && preservesProtectedContent(plan?.correction ? protection.source : sourceReading, c.text, protection.literalTerms) &&
     !isAvoidedConversionOutput(c.text, options.avoidOutputs)).map((c, i) => {
       const dictionaryPath = c.tokens.some(t => t.source !== "literal");
       const changes = classifyConversionChanges(sourceReading, c.reading, dictionaryPath ? "dictionary-path" : "literal",
@@ -107,11 +114,11 @@ export async function convertLocally(input: string, settings: AppSettings, trans
   const session = createConversionSession(input, candidates, options);
   session.dictionaryRevision = revision;
   session.truncated = truncated;
-  return rankConversionSession(session, settings, transport, options);
+  return rankConversionSession(session, settings, transport, options, learnedBonus);
 }
 
 export async function rankConversionSession(session: ConversionSession, settings: AppSettings, transport: OllamaTransport,
-  options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
+  options: JapaneseConversionOptions, learnedBonus = conversionLearningSnapshot()): Promise<JapaneseConversionResult> {
   if (options.deferRanking && options.rerank !== false && session.candidates.length > 1) {
     session.rerankStatus = "pending";
     options.onLocalCandidates?.(sessionResult(session));
@@ -121,9 +128,9 @@ export async function rankConversionSession(session: ConversionSession, settings
         return;
       }
       const result = await rankConversionSession(session, settings, transport,
-        { ...options, deferRanking: undefined, onLocalCandidates: undefined });
+        { ...options, deferRanking: undefined, onLocalCandidates: undefined }, learnedBonus);
       if (session.state === "open" && !session.locked) {
-        if (result.suggestionRejected) session.state = "dismissed";
+        if (result.suggestionRejected) dismissConversionSession(session);
         await options.onRankedCandidates?.(result);
       }
     }, () => {
@@ -138,7 +145,7 @@ export async function rankConversionSession(session: ConversionSession, settings
   const reading = candidates[0].result.changes?.sourceReading ?? candidates[0].result.reviewKana;
   const invalidCorrectionRanking = (): JapaneseConversionResult => {
     session.rerankStatus = "invalid";
-    session.state = "dismissed";
+    dismissConversionSession(session);
     return { text: "", reviewKana: reading, suggestionRejected: true,
       suggestionRejectedReason: "unconvertible", rejectionDetail: "ranking-invalid" };
   };

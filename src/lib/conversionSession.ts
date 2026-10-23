@@ -62,6 +62,21 @@ export function sessionResult(session: ConversionSession): JapaneseConversionRes
   return { ...candidate.result, session };
 }
 
+export function lockConversionSession(session?: ConversionSession): void {
+  if (session) session.locked = true;
+}
+
+export function acceptConversionSession(session?: ConversionSession): void {
+  if (session?.state === "open") {
+    session.state = "accepted";
+    session.locked = true;
+  }
+}
+
+export function dismissConversionSession(session?: ConversionSession): void {
+  if (session?.state === "open") session.state = "dismissed";
+}
+
 export function applySessionRanking(session: ConversionSession, ids: unknown): boolean {
   if (session.locked || session.state !== "open") return false;
   if (!Array.isArray(ids) || !ids.length || ids.length > session.candidates.length || new Set(ids).size !== ids.length) return false;

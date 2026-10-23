@@ -7,9 +7,9 @@ function load(): Choice[] {
       Number.isInteger(c.count) && c.count > 0 && Number.isFinite(c.updated)).slice(0, 500) : [];
   } catch { return []; }
 }
-export function learnedBonus(reading: string, text: string): number {
-  const choice = load().find(c => c.reading === reading && c.text === text);
-  return choice ? Math.min(choice.count, 4) * 1500 : 0;
+export function conversionLearningSnapshot(): (reading: string, text: string) => number {
+  const bonuses = new Map(load().map(choice => [JSON.stringify([choice.reading, choice.text]), Math.min(choice.count, 4) * 1500]));
+  return (reading, text) => bonuses.get(JSON.stringify([reading, text])) ?? 0;
 }
 /** Called only on an explicit user acceptance, never on generation or automatic replacement. */
 export function recordConversionChoice(reading: string, text: string): void {

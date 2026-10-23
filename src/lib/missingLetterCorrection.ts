@@ -1,5 +1,5 @@
 import { preservesProtectedContent } from "./conversionProtection";
-import { prepareConversionRequest } from "./conversionRequest";
+import { prepareConversionRequest, type PreparedConversionInput } from "./conversionRequest";
 import { localCorrectionRule } from "./conversionRules";
 import { createConversionSession, type SessionCandidate } from "./conversionSession";
 import { throwIfConversionAborted } from "./generationUtils";
@@ -57,23 +57,21 @@ export function missingLetterReadings(value: string) {
 }
 
 export async function searchMissingLetter(input: string, settings: AppSettings, transport: OllamaTransport,
-  options: JapaneseConversionOptions): Promise<JapaneseConversionResult | undefined> {
+  options: JapaneseConversionOptions, preparedInput: PreparedConversionInput = prepareConversionRequest(input, settings, options)): Promise<JapaneseConversionResult | undefined> {
   if (!options.kanaEngine) return undefined;
   throwIfConversionAborted(options.signal);
   const started = performance.now();
-  const { parts, protection } = prepareConversionRequest(input, settings, options);
+  const { parts, protection } = preparedInput;
   const metrics = { generated: 0, searched: 0, engineCalls: 0, candidates: 0, truncated: false, searchMs: 0, elapsedMs: 0 };
   const pool: SessionCandidate[] = [];
   const cache = new Map<string, Awaited<ReturnType<typeof options.kanaEngine.search>>>();
   const engine = {
     ...options.kanaEngine, search: async (reading: string) => {
       throwIfConversionAborted(options.signal);
-      if (cache.has(reading)) return cache.get(reading)!;
       if (metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; return { candidates: [], truncated: true, dictionaryRevision: "" }; }
       metrics.engineCalls++;
       const result = await options.kanaEngine!.search(reading, settings.personalDictionary ?? [], options.signal);
       metrics.truncated ||= result.truncated;
-      cache.set(reading, result);
       return result;
     }
   };
@@ -97,7 +95,7 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
       const result = await convertLocally(input, settings, transport, {
         ...options, kanaEngine: engine, rerank: false,
         onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined
-      }, { correction: { partIndex, value: plan.value } });
+      }, { correction: { partIndex, value: plan.value } }, preparedInput, cache);
       revision = result.session?.dictionaryRevision ?? revision;
       for (const candidate of result.session?.candidates.slice(0, 3) ?? []) {
         if (!preservesProtectedContent(protection.source, candidate.result.text, protection.literalTerms)) continue;
@@ -135,7 +133,7 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     return await rankConversionSession(session, settings, transport, {
       ...options,
       onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined
-    });
+    }, preparedInput.learnedBonus);
   } finally {
     metrics.elapsedMs = performance.now() - started;
     options.onMissingLetterSearch?.(metrics);
