@@ -1,0 +1,881 @@
+{
+  "version": "2026-10-22-quality-comparison-1",
+  "baselineRef": "2bbae00",
+  "repeats": 2,
+  "seed": 20261022,
+  "scope": "Exploratory paired comparison; existing cases plus predeclared edit and vocabulary probes, not an unseen holdout.",
+  "arms": {
+    "normal": [
+      "baseline",
+      "check-single",
+      "pool32"
+    ],
+    "repair": [
+      "baseline",
+      "edit-all"
+    ],
+    "speculation": [
+      "baseline",
+      "plus-romaji",
+      "plus-rejection",
+      "plus-vocabulary"
+    ]
+  },
+  "cases": [
+    {
+      "id": "intent-01",
+      "category": "normal-context",
+      "input": "seisanwotsuzukeru.",
+      "options": {
+        "contextBefore": "工場の製造ラインは稼働中です。"
+      },
+      "acceptableExamples": [
+        "生産を続ける。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "製造の文脈に合う生産を選び、継続の意味を保持する"
+      ],
+      "group": "normal",
+      "origin": "intent-quality.json"
+    },
+    {
+      "id": "intent-02",
+      "category": "normal-context",
+      "input": "shiyouwokaenai.",
+      "options": {
+        "contextAfter": "設計書に記載した要件は、そのまま維持する。"
+      },
+      "acceptableExamples": [
+        "仕様を変えない。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "後方文脈に合う仕様を選ぶ"
+      ],
+      "criticalChecks": [
+        "変更しないという否定を維持する"
+      ],
+      "group": "normal",
+      "origin": "intent-quality.json"
+    },
+    {
+      "id": "intent-03",
+      "category": "normal-preservation",
+      "input": "mada6dainosouchihadousashiteinai.",
+      "acceptableExamples": [
+        "まだ6台の装置は動作していない。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "未動作の状態を保ち、台数と対象を保持する"
+      ],
+      "criticalChecks": [
+        "6台と否定を維持し、故障などの原因を創作しない"
+      ],
+      "group": "normal",
+      "origin": "intent-quality.json"
+    },
+    {
+      "id": "intent-04",
+      "category": "normal-hiragana",
+      "input": "otsukaresamadesu.",
+      "acceptableExamples": [
+        "お疲れ様です。",
+        "お疲れさまです。",
+        "おつかれさまです。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "自然な挨拶を不要に棄却せず、語句を追加しない"
+      ],
+      "group": "normal",
+      "origin": "intent-quality.json"
+    },
+    {
+      "id": "control-greeting",
+      "category": "correct-input",
+      "input": "arigatou.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "ありがとう。",
+        "有難う。",
+        "有り難う。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい入力を修正しない"
+      ],
+      "group": "normal",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-schedule",
+      "category": "correct-input",
+      "input": "ashitanoyoteiwokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の予定を確認します。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい予定の文を修正しない"
+      ],
+      "group": "normal",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-negative",
+      "category": "correct-input",
+      "input": "kaiginojikanwokaenaidekudasai.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "会議の時間を変えないでください。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい否定文を修正しない"
+      ],
+      "group": "normal",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-protected",
+      "category": "correct-input",
+      "input": "`QX-73`no15jinojikanwokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "QX-73の15時の時間を確認します。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "数字と識別子を保持し読みを修正しない"
+      ],
+      "group": "normal",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "single-book",
+      "group": "normal",
+      "category": "correct-input",
+      "input": "hon",
+      "options": {},
+      "acceptableExamples": [
+        "本"
+      ],
+      "criteria": [
+        "単独の本を自然に表記する"
+      ]
+    },
+    {
+      "id": "single-typo",
+      "group": "normal",
+      "category": "typo-correction",
+      "input": "wakkata",
+      "options": {
+        "contextBefore": "説明を理解したことを短く伝えます。"
+      },
+      "acceptableExamples": [
+        "分かった",
+        "わかった"
+      ],
+      "criteria": [
+        "理解したという意味を保つ。辞書にある不自然な断片を選ばない"
+      ]
+    },
+    {
+      "id": "repair-time",
+      "category": "typo-correction",
+      "input": "jkan",
+      "options": {
+        "autoSpeculation": false,
+        "contextBefore": "会議が始まる時刻を確認しています。"
+      },
+      "acceptableExamples": [
+        "時間"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "欠けたiを補って時間とする"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-negative",
+      "category": "typo-correction",
+      "input": "kaiginojkanwokaenaidekudasai.",
+      "options": {
+        "autoSpeculation": false,
+        "contextBefore": "会議の開始時刻は確定しているので、そのままにする依頼です。"
+      },
+      "acceptableExamples": [
+        "会議の時間を変えないでください。"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "時間を修復し否定の依頼を維持する"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-confirm",
+      "category": "typo-correction",
+      "input": "shoruiwokakninshitekudasai.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "書類を確認してください。"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "確認のuを補い依頼を保つ"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-duplicate",
+      "category": "typo-correction",
+      "input": "ashitanoyottei.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の予定。"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "余分なtを削除して予定とする"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-late-n",
+      "category": "typo-correction",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の会議の資料を作成して確認してください。"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "文末近くの確認を修復する"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-protected",
+      "category": "typo-correction",
+      "input": "`QX-73`nojkanwokaenaidekudasai.",
+      "options": {
+        "autoSpeculation": false,
+        "contextBefore": "装置の待機時間は決まっているので、変更しない依頼です。"
+      },
+      "acceptableExamples": [
+        "QX-73の時間を変えないでください。"
+      ],
+      "expectedRoutes": [
+        "correction"
+      ],
+      "criteria": [
+        "識別子と否定を保持して時間を修復する"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-greeting",
+      "category": "correct-input",
+      "input": "arigatou.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "ありがとう。",
+        "有難う。",
+        "有り難う。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい入力を修正しない"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-schedule",
+      "category": "correct-input",
+      "input": "ashitanoyoteiwokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の予定を確認します。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい予定の文を修正しない"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-negative",
+      "category": "correct-input",
+      "input": "kaiginojikanwokaenaidekudasai.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "会議の時間を変えないでください。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "正しい否定文を修正しない"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "control-protected",
+      "category": "correct-input",
+      "input": "`QX-73`no15jinojikanwokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "QX-73の15時の時間を確認します。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "数字と識別子を保持し読みを修正しない"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "unknown-letters",
+      "category": "unknown-input",
+      "input": "qxzvplm",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "特定できない入力には辞退する"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "unknown-protected",
+      "category": "unknown-input",
+      "input": "`QX-73`noqzxvwokaenai.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "未知語を創作しない"
+      ],
+      "group": "repair",
+      "origin": "correction-quality.json"
+    },
+    {
+      "id": "repair-transpose",
+      "group": "repair",
+      "category": "typo-correction",
+      "input": "ashitanoyotiewokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の予定を確認します。"
+      ],
+      "criteria": [
+        "ieの転置を直し、予定を確認するという意味を保つ"
+      ]
+    },
+    {
+      "id": "repair-neighbor",
+      "group": "repair",
+      "category": "typo-correction",
+      "input": "ashitanoyoreiwokakuninshimasu.",
+      "options": {
+        "autoSpeculation": false
+      },
+      "acceptableExamples": [
+        "明日の予定を確認します。"
+      ],
+      "criteria": [
+        "rから隣接キーtへの置換を直す"
+      ]
+    },
+    {
+      "id": "context-01",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-02",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-04",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-05",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-06",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-08",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-10",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-11",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "context-12",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "noise-1",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "noise-2",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "window-03",
+      "category": "new-adjacent-context",
+      "input": "mada3kennoshinkouhaowatteinai.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "午前中は工事の進行状況を確認しました。ここからは税務署へ届け出る書類の手続きについて報告します。",
+        "contextAfter": "未提出のものが残っています。次の話題では来週の予定を相談します。"
+      },
+      "acceptableExamples": [
+        "まだ3件の申告は終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "3件の申告手続きの未完了を保つ"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-03",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。",
+      "group": "speculation",
+      "origin": "speculation-adopted.json"
+    },
+    {
+      "id": "vocab-relevant",
+      "group": "speculation",
+      "category": "vocabulary",
+      "input": "shiyouwokaenaidekudasai.",
+      "options": {
+        "purpose": "speculative",
+        "documentVocabulary": [
+          "設計書",
+          "要件定義",
+          "仕様書"
+        ],
+        "contextBefore": "この文書の内容について指示しています。"
+      },
+      "acceptableExamples": [
+        "仕様を変えないでください。"
+      ],
+      "criteria": [
+        "設計関連の文書語彙に合う仕様を選び、変更しない依頼を保つ"
+      ]
+    }
+  ]
+}
