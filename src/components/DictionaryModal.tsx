@@ -267,7 +267,7 @@ export function DictionaryModal({
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === "detected" ? (
         <div
           className="document-vocabulary-panel"
           id="dictionary-detected-panel"
@@ -399,7 +399,7 @@ export function DictionaryModal({
             {detectedStatus}
           </p>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
