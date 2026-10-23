@@ -4,6 +4,8 @@ import type { ProtectedDictionaryEntry } from "./conversionInput";
 import type { ReadingVerifier } from "./readingAssessment";
 
 export interface JapaneseConversionResult {
+  /** Ranking suspects a typo; retain this candidate while comparing bounded repairs. */
+  repairRequested?: boolean;
   session?: import("./conversionSession").ConversionSession;
   text: string;
   reviewKana: string;
@@ -19,6 +21,8 @@ export interface JapaneseConversionResult {
 }
 
 export interface JapaneseConversionOptions {
+  /** Internal: unchanged alternative retained during a bounded repair comparison. */
+  repairBaseline?: JapaneseConversionResult;
   /** Whole-request budget including deferred ranking and rescue; default 60s. */
   timeoutMs?: number;
   purpose?: "normal" | "correction" | "speculative";

@@ -155,7 +155,9 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
       if (readings.has(reading)) alternatives.push(candidate);
       else { readings.add(reading); first.push(candidate); }
     }
-    const retained = [...first, ...alternatives].slice(0, MAX_CANDIDATES);
+    const baseline = options.repairBaseline;
+    const unchanged: SessionCandidate[] = baseline ? [{ id: "unchanged", kind: "conversion", result: { ...baseline, session: undefined, repairRequested: undefined } }] : [];
+    const retained = [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
     metrics.candidates = retained.length;
     metrics.searchMs = performance.now() - started;
     metrics.truncated ||= seen.size > MAX_CANDIDATES;

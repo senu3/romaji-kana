@@ -19,6 +19,9 @@ export async function correctInput(input: string, settings: AppSettings, transpo
   };
   const searched = options.missingLetterCorrection !== false
     ? await searchMissingLetter(input, settings, transport, correctionOptions, preparedInput) : undefined;
+  // A suspicion is not permission to replace a usable normal result with free generation.
+  if (options.repairBaseline) return searched && isUsableConversionResult(searched, options)
+    ? searched : { ...options.repairBaseline, repairRequested: undefined };
   if (searched && (isUsableConversionResult(searched, options) || searched.rejectionDetail === "ranking-invalid")) return searched;
   return convertInputOnce(input, settings, transport, correctionOptions, preparedInput);
 }

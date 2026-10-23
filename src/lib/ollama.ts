@@ -56,6 +56,10 @@ async function convertWithinBudget(input: string, settings: AppSettings,
   };
   let rescue: Promise<JapaneseConversionResult> | undefined;
   const resolveNormal = async (candidate: JapaneseConversionResult): Promise<JapaneseConversionResult> => {
+    if (automatic && candidate.repairRequested && candidate.session?.state === "open" && !candidate.session.locked) {
+      const compared = await correctInput(input, settings, transport, { ...options, repairBaseline: candidate }, preparedInput);
+      return candidate.session.locked || candidate.session.state !== "open" ? sessionResult(candidate.session) : compared;
+    }
     if (!automatic || candidate.session?.rerankStatus === "pending" || isUsableConversionResult(candidate, options) || candidate.suggestionRejectedReason === "protected") return candidate;
     return rescue ??= runRescue(candidate);
   };
