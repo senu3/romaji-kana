@@ -115,10 +115,11 @@ try {
       await page.route('**/api/generate', route => {
         const body = route.request().postDataJSON();
         if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
-        assert.match(body.system, /user explicitly rejected/);
-        assert.match(body.system, /this complete target occurrence only, not a global word ban/);
-        assert.deepEqual(JSON.parse(body.prompt).rejectedOutputs, ['角煮']);
-        assert.equal(JSON.parse(body.prompt).target.originalInput, 'kakuni');
+        // The current request sends the reading and nearby context. Rejected
+        // surfaces are enforced locally; the scenarios below check behavior.
+        assert.deepEqual(body.format.required, ['convertedText', 'completedKana']);
+        assert.match(body.prompt, /かくに/);
+        assert.ok(!body.prompt.includes('角煮'));
         assert.match(body.prompt, /資料を/);
         assert.match(body.prompt, /してください。/);
         proposals++;
@@ -187,13 +188,12 @@ try {
     await page.route('**/api/generate', route => {
       const body = route.request().postDataJSON();
       if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
-      const request = JSON.parse(body.prompt);
-      const editable = request.target.parts.filter(part => part.id);
-      assert.equal(editable.length, 1);
-      assert.ok(request.target.parts.some(part => part.literal === 'XR-34'));
-      assert.deepEqual(request.rejectedOutputs, ['XR-34の講師は終わらなかった。']);
+      const editableIds = body.format.properties.segments.items.properties.id.enum;
+      assert.equal(editableIds.length, 1);
+      assert.match(body.prompt, /XR-34/);
+      assert.ok(!body.prompt.includes('講師'));
       proposals++;
-      return route.fulfill({ json: { response: JSON.stringify({ segments: [{ id: editable[0].id,
+      return route.fulfill({ json: { response: JSON.stringify({ segments: [{ id: editableIds[0],
         convertedText: '更新は終わらなかった。', completedKana: 'こうしんはおわらなかった。' }] }) } });
     });
     const source = '`XR-34` no koushihaowaranakatta.';
@@ -287,7 +287,9 @@ try {
       await page.route('**/api/generate', route => {
         const body = route.request().postDataJSON();
         if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
-        const speculative = body.system.includes('speculative Japanese');
+        // First return an unchanged reading, then a usable rescue (or another
+        // abstention). Assert the visible result instead of prompt wording.
+        const speculative = stages.length === 1;
         stages.push(speculative ? 'speculative' : 'correction');
         return route.fulfill({ json: { response: JSON.stringify({ convertedText: speculative && succeeds ? '本' : 'ほん', completedKana: 'ほん' }) } });
       });

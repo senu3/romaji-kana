@@ -3,14 +3,15 @@ import { romajiToKana } from "../../../src/lib/romajiKana";
 
 describe("romajiToKana", () => {
   it("mechanically converts high-confidence romaji to kana", () => {
-    const result = romajiToKana("wakkatahuriwosurunowoyametekudasai");
+    const result = romajiToKana("wakattahuriwosurunowoyametekudasai");
 
     expect(result.kana).toBe("わかったふりをするのをやめてください");
     expect(result.lowConfidenceSpans).toEqual([]);
     expect(result.tokens.every((token) => token.confidence === 1)).toBe(true);
     expect(result.tokens.map((token) => token.romaji)).toEqual([
       "wa",
-      "kkata",
+      "ka",
+      "tta",
       "hu",
       "ri",
       "wo",
@@ -26,6 +27,26 @@ describe("romajiToKana", () => {
       "sa",
       "i",
     ]);
+  });
+
+  it.each([
+    ["fairu", "ふぁいる"], ["firumu", "ふぃるむ"], ["kafe", "かふぇ"], ["fooku", "ふぉおく"],
+    ["thi", "てぃ"], ["dhi", "でぃ"], ["twu", "とぅ"], ["dwu", "どぅ"],
+    ["va", "ゔぁ"], ["vu", "ゔ"], ["she", "しぇ"], ["che", "ちぇ"], ["je", "じぇ"],
+    ["xa", "ぁ"], ["la", "ぁ"], ["xya", "ゃ"], ["lyu", "ゅ"], ["xwa", "ゎ"],
+    ["ltsu", "っ"], ["xtsu", "っ"], ["ltu", "っ"], ["xtu", "っ"],
+    ["n'a", "んあ"], ["nn", "ん"], ["nna", "んな"], ["FAIRU", "ふぁいる"],
+  ])("converts supported spelling %s without repair", (input, kana) => {
+    const result = romajiToKana(input);
+    expect(result.kana).toBe(kana);
+    expect(result.lowConfidenceSpans).toEqual([]);
+    expect(result.tokens.map(token => token.romaji).join("")).toBe(input);
+  });
+
+  it("keeps misspellings in the mechanical reading for the correction route", () => {
+    expect(romajiToKana("wakkata").kana).toBe("わっかた");
+    expect(romajiToKana("kakkata").kana).toBe("かっかた");
+    expect(romajiToKana("wakatta").kana).toBe("わかった");
   });
 
   it("marks unrecognized fragments as low confidence", () => {

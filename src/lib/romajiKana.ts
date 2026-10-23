@@ -1,7 +1,24 @@
 import type { RomajiKanaResult, RomajiKanaSpan, RomajiKanaToken } from "./types";
 
 const kanaMap: Record<string, string> = {
-  kkata: "かった",
+  // Spelling aliases only. Typo repair belongs to the correction route so the
+  // original mechanical reading remains available for comparison.
+  fa: "ふぁ", fi: "ふぃ", fe: "ふぇ", fo: "ふぉ", fya: "ふゃ", fyu: "ふゅ", fyo: "ふょ",
+  va: "ゔぁ", vi: "ゔぃ", vu: "ゔ", ve: "ゔぇ", vo: "ゔぉ", vya: "ゔゃ", vyu: "ゔゅ", vyo: "ゔょ",
+  she: "しぇ", sye: "しぇ", je: "じぇ", jye: "じぇ", zye: "じぇ", che: "ちぇ", tye: "ちぇ",
+  thi: "てぃ", thu: "てゅ", tha: "てゃ", the: "てぇ", tho: "てょ",
+  dhi: "でぃ", dhu: "でゅ", dha: "でゃ", dhe: "でぇ", dho: "でょ",
+  twa: "とぁ", twi: "とぃ", twu: "とぅ", twe: "とぇ", two: "とぉ",
+  dwa: "どぁ", dwi: "どぃ", dwu: "どぅ", dwe: "どぇ", dwo: "どぉ",
+  tsa: "つぁ", tsi: "つぃ", tse: "つぇ", tso: "つぉ",
+  wi: "うぃ", we: "うぇ", wha: "うぁ", whi: "うぃ", whu: "う", whe: "うぇ", who: "うぉ",
+  kwa: "くぁ", kwi: "くぃ", kwu: "くぅ", kwe: "くぇ", kwo: "くぉ",
+  gwa: "ぐぁ", gwi: "ぐぃ", gwu: "ぐぅ", gwe: "ぐぇ", gwo: "ぐぉ",
+  xa: "ぁ", xi: "ぃ", xu: "ぅ", xe: "ぇ", xo: "ぉ",
+  la: "ぁ", li: "ぃ", lu: "ぅ", le: "ぇ", lo: "ぉ",
+  xya: "ゃ", xyu: "ゅ", xyo: "ょ", lya: "ゃ", lyu: "ゅ", lyo: "ょ",
+  xwa: "ゎ", lwa: "ゎ", xka: "ヵ", lka: "ヵ", xke: "ヶ", lke: "ヶ",
+  xtsu: "っ", ltsu: "っ",
   kya: "きゃ",
   kyu: "きゅ",
   kyo: "きょ",

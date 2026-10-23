@@ -16,6 +16,16 @@ function candidate(text: string, source = "mozc", reading = "ほん"): EngineCan
 }
 
 describe("normal → correction → speculation → unchanged romaji", () => {
+  it("reports a repaired misspelling as a correction with the original reading retained", async () => {
+    const h = harness();
+    h.generate.mockResolvedValue(json("分かったふりをする", "わかったふりをする"));
+    const result = await convertRomajiToJapaneseDetailed("wakkatahuriwosuru", defaultSettings, h.transport, {
+      kanaEngine: h.engine, missingLetterCorrection: false,
+    });
+    expect(result).toMatchObject({ text: "分かったふりをする", conversionStrategy: "correction",
+      changes: { sourceReading: "わっかたふりをする", resultReading: "わかったふりをする" } });
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+  });
   it("uses a contextual paraphrase only after both earlier routes fail, with one speculative generation", async () => {
     const h = harness();
     h.generate.mockResolvedValueOnce(json("", ""))

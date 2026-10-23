@@ -23,6 +23,27 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
+  it.each(["hon\nwo\nyomu", "hon\n wo \nyomu", "本\nwo\nyomu"])("preserves line breaks around particles: %s", async input => {
+    const h = harness();
+    const spellings: Record<string, string> = { "ほん": "本", "を": "を", "よむ": "読む" };
+    h.search.mockImplementation(async (reading: string) => ({
+      candidates: [candidate(spellings[reading] ?? reading, reading)], truncated: false, dictionaryRevision: "test",
+    }));
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
+      kanaEngine: h.engine, rerank: false, autoRescue: false,
+    });
+    expect(result.text).toBe("本\nを\n読む");
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+
+  it("converts foreign sounds locally without invoking typo rescue", async () => {
+    const h = harness();
+    h.search.mockResolvedValue({ candidates: [candidate("ファイル", "ふぁいる")], truncated: false, dictionaryRevision: "test" });
+    const result = await convertRomajiToJapaneseDetailed("fairu", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.text).toBe("ファイル");
+    expect(result.conversionStrategy).toBeUndefined();
+    expect(h.generate).not.toHaveBeenCalled();
+  });
   it("returns dictionary candidates before ranking and publishes the ranked result separately", async () => {
     const h = harness();
     let run!: () => Promise<void>;

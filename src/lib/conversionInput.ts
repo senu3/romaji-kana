@@ -208,11 +208,11 @@ function normalizeSpacedRomajiParticles(input: string): string {
   for (const match of matches) {
     const start = match.index ?? 0;
     const end = start + match[0].length;
-    const leadingText = input.slice(lastCopiedIndex, start).trimEnd();
+    const leadingText = input.slice(lastCopiedIndex, start).replace(/[^\S\r\n]+$/u, "");
     normalized += leadingText;
     normalized += romajiParticleToKana(match[0]);
     lastCopiedIndex = end;
-    while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
+    while (lastCopiedIndex < input.length && /[^\S\r\n]/u.test(input[lastCopiedIndex] ?? "")) {
       lastCopiedIndex += 1;
     }
   }
@@ -237,13 +237,13 @@ function splitInputByProtectedSpacedRomajiParticles(input: string): ConversionSp
   for (const match of matches) {
     const start = match.index ?? 0;
     const end = start + match[0].length;
-    const leadingText = input.slice(lastCopiedIndex, start).trimEnd();
+    const leadingText = input.slice(lastCopiedIndex, start).replace(/[^\S\r\n]+$/u, "");
     if (leadingText.length > 0) {
       parts.push({ type: "text", value: leadingText });
     }
     parts.push({ type: "particle", output: romajiParticleToKana(match[0]) });
     lastCopiedIndex = end;
-    while (lastCopiedIndex < input.length && /\s/.test(input[lastCopiedIndex] ?? "")) {
+    while (lastCopiedIndex < input.length && /[^\S\r\n]/u.test(input[lastCopiedIndex] ?? "")) {
       lastCopiedIndex += 1;
     }
   }
