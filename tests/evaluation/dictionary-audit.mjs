@@ -23,8 +23,8 @@ try {
   }
   const { DictionaryModal } = await load('src/components/DictionaryModal.tsx');
   const markup = renderToStaticMarkup(createElement(DictionaryModal, {
-    entries: [], documentVocabularyProfile: profile('航海'), useDocumentVocabulary: true,
-    onUseDocumentVocabularyChange() {}, onChange() {}, personalWords: [], onPersonalWordsChange() {},
+    documentVocabularyProfile: profile('航海'), useDocumentVocabulary: true,
+    onUseDocumentVocabularyChange() {}, personalWords: [], onPersonalWordsChange() {},
   }));
   report.initialPanels = [...markup.matchAll(/id="(dictionary-[^"]+-panel)"/g)].map(m => m[1]);
   const { convertRomajiToJapaneseDetailed: convert } = await load('src/lib/ollama.ts');

@@ -282,9 +282,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const modelAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
 
-  const enabledDictionaryCount = settings.userDictionary.filter(
-    (entry) => entry.enabled && entry.reading.trim() && entry.output.trim(),
-  ).length + (settings.personalDictionary ?? []).filter(entry => entry.enabled).length;
+  const enabledDictionaryCount = (settings.personalDictionary ?? []).filter(entry => entry.enabled).length;
 
   return (
     <main className="app-shell">
@@ -372,7 +370,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           ) : null}
           {activePanel === "dictionary" ? (
             <DictionaryModal
-              entries={settings.userDictionary}
               personalWords={settings.personalDictionary ?? []}
               onPersonalWordsChange={(personalDictionary) => setSettings(value => ({ ...value, personalDictionary }))}
               documentVocabularyProfile={documentVocabularyProfile}
@@ -380,7 +377,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
               onUseDocumentVocabularyChange={(useDocumentVocabulary) =>
                 setSettings((value) => ({ ...value, useDocumentVocabulary }))
               }
-              onChange={(userDictionary) => setSettings((value) => ({ ...value, userDictionary }))}
             />
           ) : null}
           {activePanel === "conversion" ? (

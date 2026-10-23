@@ -1,4 +1,3 @@
-import type { UserDictionaryEntry } from "./types";
 
 interface DictionaryTextPart {
   type: "text";
@@ -29,15 +28,11 @@ interface DictionaryCandidate {
   output: string;
 }
 
-export type ProtectedDictionaryEntry = Pick<
-  UserDictionaryEntry,
-  "reading" | "output" | "enabled"
->;
+export interface ProtectedDictionaryEntry { reading: string; output: string; enabled: boolean }
 
 export function buildProtectedDictionaryEntries(
   input: string,
   currentText: string,
-  entries: UserDictionaryEntry[],
 ): ProtectedDictionaryEntry[] {
   const protectedEntries: ProtectedDictionaryEntry[] = [];
   const seen = new Set<string>();
@@ -63,13 +58,6 @@ export function buildProtectedDictionaryEntries(
       enabled: true,
     });
   };
-
-  for (const entry of entries) {
-    if (!entry.enabled || !entry.output.trim() || !currentText.includes(entry.output.trim())) {
-      continue;
-    }
-    addEntry(entry.reading, entry.output);
-  }
 
   for (const term of extractAsciiProtectedTerms(currentText)) {
     addEntry(term, term);

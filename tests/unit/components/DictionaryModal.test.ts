@@ -10,15 +10,16 @@ function mount(overrides: Partial<ComponentProps<typeof DictionaryModal>> = {}) 
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const host = document.createElement("div"); document.body.append(host);
   const root = createRoot(host);
-  const props = { entries: [], personalWords: [], documentVocabularyProfile: { terms: ["航海"], revision: "1" },
-    useDocumentVocabulary: false, onUseDocumentVocabularyChange: vi.fn(), onChange: vi.fn(), onPersonalWordsChange: vi.fn(), ...overrides };
+  const props = { personalWords: [], documentVocabularyProfile: { terms: ["航海"], revision: "1" },
+    useDocumentVocabulary: false, onUseDocumentVocabularyChange: vi.fn(), onPersonalWordsChange: vi.fn(), ...overrides };
   act(() => root.render(createElement(DictionaryModal, props)));
   dispose = () => { act(() => root.unmount()); host.remove(); };
   return { host, props };
 }
 it("shows only the selected dictionary panel", () => {
   const { host } = mount();
-  for (const tab of ["personal", "detected", "registered", "personal"]) {
+  expect(host.querySelector('#dictionary-registered-tab')).toBeNull();
+  for (const tab of ["personal", "detected", "personal"]) {
     act(() => host.querySelector<HTMLButtonElement>(`#dictionary-${tab}-tab`)!.click());
     expect([...host.querySelectorAll('[role="tabpanel"]')].map(p => p.id)).toEqual([`dictionary-${tab}-panel`]);
     expect(host.querySelector('[aria-selected="true"]')?.id).toBe(`dictionary-${tab}-tab`);
@@ -38,7 +39,6 @@ it("registers a detected term as a kana dictionary word, not a snippet", () => {
   input(host, "検出語彙のかな読み", "コウカイ");
   act(() => host.querySelector('form')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(props.onPersonalWordsChange).toHaveBeenCalledWith([expect.objectContaining({ reading: "こうかい", text: "航海", enabled: true })]);
-  expect(props.onChange).not.toHaveBeenCalled();
 });
 it("reactivates a disabled personal word without duplicating it", () => {
   const word = { id: "word", reading: "こうかい", text: "航海", enabled: false, pos: "noun" as const };

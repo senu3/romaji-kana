@@ -62,10 +62,9 @@ describe("whole-target user reinterpretation", () => {
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
 
-  it("restores protected dictionary kanji without requiring a model-supplied reading", async () => {
+  it("restores explicitly protected kanji without requiring a model-supplied reading", async () => {
     const h = harness("灯里の登記は終わらなかった。", "灯里のとうきはおわらなかった。");
-    const settings = { ...defaultSettings, userDictionary: [{ id: "person", reading: "akari", output: "灯里", enabled: true, note: "" }] };
-    const result = await convertRomajiToJapaneseDetailed("akarinotoukihaowaranakatta.", settings, h.transport, {
+    const result = await convertRomajiToJapaneseDetailed("`灯里`notoukihaowaranakatta.", defaultSettings, h.transport, {
       userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["灯里の陶器は終わらなかった。"],
     });
     expect(result.text).toBe("灯里の登記は終わらなかった。");

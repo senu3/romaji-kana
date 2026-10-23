@@ -10,13 +10,7 @@ export type ModelProvider = "ollama" | "lmstudio";
 
 export type InputPauseTiming = "early" | "auto" | "deliberate";
 
-export interface UserDictionaryEntry {
-  id: string;
-  reading: string;
-  output: string;
-  note: string;
-  enabled: boolean;
-}
+
 
 export interface AppSettings {
   modelProvider: ModelProvider;
@@ -42,7 +36,6 @@ export interface AppSettings {
 
   inputPauseTiming: InputPauseTiming;
   useDocumentVocabulary: boolean;
-  userDictionary: UserDictionaryEntry[];
   personalDictionary?: import("./kanaEngine").PersonalWord[];
   think: boolean;
 }
@@ -56,7 +49,6 @@ export type SharedConversionSettings = Pick<
   | "conversionPrompt"
   | "inputPauseTiming"
   | "useDocumentVocabulary"
-  | "userDictionary"
   | "personalDictionary"
 >;
 

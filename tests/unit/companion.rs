@@ -72,7 +72,6 @@ fn mobile_settings_update_only_shared_conversion_fields() {
         "personalDictionary": [],
         "inputPauseTiming": "auto",
         "useDocumentVocabulary": false,
-        "userDictionary": [],
         "think": false
     });
     update_shared_settings(&manager.shared, desktop_settings, "desktop")
@@ -89,8 +88,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
                 "conversionPrompt": "mobile prompt",
                 "personalDictionary": [],
                 "inputPauseTiming": "deliberate",
-                "useDocumentVocabulary": true,
-                "userDictionary": []
+                "useDocumentVocabulary": true
             }),
             client_id: "mobile-test".to_string(),
         },

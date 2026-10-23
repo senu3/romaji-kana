@@ -401,7 +401,7 @@ export function useConversion({
         avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,
         documentVocabulary: request.documentVocabulary,
         protectedDictionaryEntries: historical && resolved && resolved.matchedText !== request.originalText
-          ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText, settings.userDictionary) : [],
+          ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText) : [],
       });
     applyConversion(conversion);
   }, [saveCurrentDocumentSession, skipQueuedConversion, showConversionPreview, deferRanking]);
@@ -978,7 +978,6 @@ export function useConversion({
 
         triggers: { ...settingsRef.current.triggers },
         punctuationConversion: { ...settingsRef.current.punctuationConversion },
-        userDictionary: [...settingsRef.current.userDictionary],
       };
       const vocabularyProfile = settingsSnapshot.useDocumentVocabulary
         ? buildDocumentVocabularyProfile(view.state.doc.toString())

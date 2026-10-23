@@ -38,7 +38,7 @@ function referenceSections(reference: ConversionReference): string[] {
  * support interpretation, but cannot introduce mandatory protected content. */
 export function prepareConversionRequest(input: string, settings: AppSettings, options: JapaneseConversionOptions) {
   const parts = splitInputForConversion(normalizeInputForPrompt(input, settings), [
-    ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
+    ...(options.protectedDictionaryEntries ?? []),
   ]);
   const readings = parts.map(part => romajiToKana(part.type === "text" ? part.value : part.output));
   const protection: ConversionProtection = {

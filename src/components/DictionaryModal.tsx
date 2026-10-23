@@ -1,33 +1,26 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import type { DocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { createId } from "../lib/id";
-import type { UserDictionaryEntry } from "../lib/types";
 import type { PersonalWord } from "../lib/kanaEngine";
 import { PersonalDictionary } from "./PersonalDictionary";
 import { normalizePersonalDictionary } from "../lib/settings";
 
-const MAX_USER_DICTIONARY_ENTRIES = 50;
 
 export function DictionaryModal({
-  entries,
   documentVocabularyProfile,
   useDocumentVocabulary,
   onUseDocumentVocabularyChange,
-  onChange,
   personalWords = [],
   onPersonalWordsChange,
 }: {
-  entries: UserDictionaryEntry[];
   documentVocabularyProfile: DocumentVocabularyProfile;
   useDocumentVocabulary: boolean;
   onUseDocumentVocabularyChange: (enabled: boolean) => void;
-  onChange: (entries: UserDictionaryEntry[]) => void;
   personalWords?: PersonalWord[];
   onPersonalWordsChange?: (words: PersonalWord[]) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"registered" | "detected" | "personal">("personal");
-  const [draft, setDraft] = useState({ reading: "", output: "", note: "" });
+  const [activeTab, setActiveTab] = useState<"detected" | "personal">("personal");
   const [detectedDraft, setDetectedDraft] = useState<{
     reading: string;
     output: string;
@@ -39,10 +32,6 @@ export function DictionaryModal({
   const registeredOutputs = new Set(
     personalWords.filter(word => word.enabled).map(word => word.text),
   );
-  const canAdd =
-    draft.reading.trim().length > 0 &&
-    draft.output.trim().length > 0 &&
-    entries.length < MAX_USER_DICTIONARY_ENTRIES;
   const canAddDetected =
     Boolean(detectedDraft?.reading.trim()) &&
     Boolean(detectedDraft?.output.trim()) &&
@@ -54,29 +43,6 @@ export function DictionaryModal({
       detectedReadingInputRef.current?.focus();
     }
   }, [detectedDraftOpen]);
-
-  const appendEntry = (nextDraft: { reading: string; output: string; note: string }) => {
-    onChange([
-      ...entries,
-      {
-        id: createDictionaryEntryId(),
-        reading: nextDraft.reading.trim(),
-        output: nextDraft.output.trim(),
-        note: nextDraft.note.trim(),
-        enabled: true,
-      },
-    ]);
-  };
-
-  const addEntry = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canAdd) {
-      return;
-    }
-
-    appendEntry(draft);
-    setDraft({ reading: "", output: "", note: "" });
-  };
 
   const selectDetectedTerm = (term: string) => {
     if (registeredOutputs.has(term) || !onPersonalWordsChange) {
@@ -111,40 +77,12 @@ export function DictionaryModal({
     setDetectedStatus(`${word.text} を個人語彙に追加しました。`);
   };
 
-  const updateEntry = (id: string, patch: Partial<UserDictionaryEntry>) => {
-    onChange(
-      entries.map((entry) =>
-        entry.id === id
-          ? {
-            ...entry,
-            ...patch,
-          }
-          : entry,
-      ),
-    );
-  };
-
-  const deleteEntry = (id: string) => {
-    onChange(entries.filter((entry) => entry.id !== id));
-  };
-
   return (
     <section className="dictionary-modal inspector-panel" aria-label="辞書項目">
       <div className="dictionary-tabs" role="tablist" aria-label="辞書の表示">
         <button type="button" role="tab" id="dictionary-personal-tab" aria-controls="dictionary-personal-panel"
           aria-selected={activeTab === "personal"} className={activeTab === "personal" ? "selected" : ""}
           onClick={() => setActiveTab("personal")}>個人語彙 {personalWords.length}</button>
-        <button
-          id="dictionary-registered-tab"
-          className={activeTab === "registered" ? "selected" : ""}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "registered"}
-          aria-controls="dictionary-registered-panel"
-          onClick={() => setActiveTab("registered")}
-        >
-          登録済みスニペット {entries.length}
-        </button>
         <button
           id="dictionary-detected-tab"
           className={activeTab === "detected" ? "selected" : ""}
@@ -162,122 +100,7 @@ export function DictionaryModal({
         <PersonalDictionary words={personalWords} onChange={onPersonalWordsChange ?? (() => undefined)} />
       </div>}
 
-      {activeTab === "registered" ? (
-        <div
-          id="dictionary-registered-panel"
-          role="tabpanel"
-          aria-labelledby="dictionary-registered-tab"
-        >
-          <form className="dictionary-add-form" onSubmit={addEntry}>
-            <label className="field">
-              <span>Romaji reading</span>
-              <input
-                aria-label="Romaji reading"
-                value={draft.reading}
-                maxLength={80}
-                placeholder="openai"
-                onChange={(event) => {
-                  const reading = event.currentTarget.value;
-                  setDraft((value) => ({ ...value, reading }));
-                }}
-              />
-            </label>
-            <label className="field">
-              <span>出力</span>
-              <input
-                aria-label="出力"
-                value={draft.output}
-                maxLength={80}
-                placeholder="OpenAI"
-                onChange={(event) => {
-                  const output = event.currentTarget.value;
-                  setDraft((value) => ({ ...value, output }));
-                }}
-              />
-            </label>
-            <label className="field dictionary-note-field">
-              <span>メモ</span>
-              <input
-                aria-label="メモ"
-                value={draft.note}
-                maxLength={120}
-                placeholder="会社名など"
-                onChange={(event) => {
-                  const note = event.currentTarget.value;
-                  setDraft((value) => ({ ...value, note }));
-                }}
-              />
-            </label>
-            <button
-              className="primary-button dictionary-add-button"
-              type="submit"
-              disabled={!canAdd}
-            >
-              <Plus size={16} aria-hidden="true" />
-              追加
-            </button>
-          </form>
-
-          <div className="dictionary-list-header">
-            <strong>{entries.length} / {MAX_USER_DICTIONARY_ENTRIES}</strong>
-          </div>
-          {entries.length === 0 ? (
-            <p className="empty-state">辞書の登録はまだありません。</p>
-          ) : (
-            <div className="dictionary-list">
-              {entries.map((entry, index) => (
-                <article className={`dictionary-entry ${entry.enabled ? "" : "disabled"}`} key={entry.id}>
-                  <label className="dictionary-enable">
-                    <input
-                      type="checkbox"
-                      checked={entry.enabled}
-                      onChange={(event) =>
-                        updateEntry(entry.id, { enabled: event.currentTarget.checked })
-                      }
-                    />
-                    有効
-                  </label>
-                  <div className="dictionary-entry-fields">
-                    <input
-                      aria-label={`辞書の読み ${index + 1}`}
-                      value={entry.reading}
-                      maxLength={80}
-                      onChange={(event) =>
-                        updateEntry(entry.id, { reading: event.currentTarget.value })
-                      }
-                    />
-                    <input
-                      aria-label={`辞書の出力 ${index + 1}`}
-                      value={entry.output}
-                      maxLength={80}
-                      onChange={(event) =>
-                        updateEntry(entry.id, { output: event.currentTarget.value })
-                      }
-                    />
-                    <input
-                      aria-label={`辞書のメモ ${index + 1}`}
-                      value={entry.note}
-                      maxLength={120}
-                      placeholder="メモ"
-                      onChange={(event) =>
-                        updateEntry(entry.id, { note: event.currentTarget.value })
-                      }
-                    />
-                  </div>
-                  <button
-                    className="icon-button dictionary-delete"
-                    type="button"
-                    onClick={() => deleteEntry(entry.id)}
-                    aria-label={`${entry.output || entry.reading} を削除`}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : activeTab === "detected" ? (
+      {activeTab === "detected" ? (
         <div
           className="document-vocabulary-panel"
           id="dictionary-detected-panel"
@@ -409,6 +232,3 @@ export function DictionaryModal({
   );
 }
 
-function createDictionaryEntryId(prefix = "dictionary"): string {
-  return createId(prefix);
-}

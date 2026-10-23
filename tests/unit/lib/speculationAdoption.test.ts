@@ -3,11 +3,12 @@ import { expect, it, vi } from "vitest";
 import { convertRomajiToJapaneseDetailed } from "../../../src/lib/ollama";
 import { defaultSettings } from "../../../src/lib/settings";
 
-it.each(baseline.cases)("matches the evaluated adopted request without an evaluation adapter: $id", async c => {
+// The historical snippet-protection case no longer belongs to the current contract.
+it.each(baseline.cases.filter(c => !c.userDictionary.length))("matches the evaluated adopted request without an evaluation adapter: $id", async c => {
   const generate = vi.fn().mockImplementation(async (_provider, _url, request) => ({
     response: JSON.stringify(request.outputSchema.properties.segments ? { segments: [] } : { convertedText: "", completedKana: "" }),
   }));
-  await convertRomajiToJapaneseDetailed(c.input, { ...defaultSettings, userDictionary: c.userDictionary }, { models: vi.fn(), generate }, {
+  await convertRomajiToJapaneseDetailed(c.input, defaultSettings, { models: vi.fn(), generate }, {
     ...c.options, purpose: "speculative", kanaEngine: { search: vi.fn(), verify: vi.fn() },
   });
   expect(generate).toHaveBeenCalledOnce();

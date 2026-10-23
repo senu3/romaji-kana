@@ -19,7 +19,7 @@ describe("current settings contract", () => {
     expect(mergeSharedConversionSettings(defaultSettings, shared).inputPauseTiming).toBe("deliberate");
   });
   it("does not restore unknown settings or obsolete policy migrations", () => {
-    localStorage.setItem("romaji-kana-settings", JSON.stringify({ inputCompletionLevel: "word", conversionEngine: "llm", thinkingMode: "on" }));
+    localStorage.setItem("romaji-kana-settings", JSON.stringify({ userDictionary: [{ reading: "hon", output: "obsolete" }], inputCompletionLevel: "word", conversionEngine: "llm", thinkingMode: "on" }));
     expect(loadSettings()).toEqual(defaultSettings);
   });
 });

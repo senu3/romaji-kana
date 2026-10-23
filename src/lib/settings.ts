@@ -5,11 +5,9 @@ import type {
   AppSettings,
   InputPauseTiming,
   SharedConversionSettings,
-  UserDictionaryEntry,
 } from "./types";
 
 const STORAGE_KEY = "romaji-kana-settings";
-const MAX_USER_DICTIONARY_ENTRIES = 50;
 
 export const defaultSettings: AppSettings = {
   modelProvider: "ollama",
@@ -35,7 +33,6 @@ export const defaultSettings: AppSettings = {
 
   inputPauseTiming: "auto",
   useDocumentVocabulary: false,
-  userDictionary: [],
   personalDictionary: [],
   think: false,
 };
@@ -68,7 +65,6 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
 
     inputPauseTiming: settings.inputPauseTiming,
     useDocumentVocabulary: settings.useDocumentVocabulary,
-    userDictionary: settings.userDictionary,
     personalDictionary: settings.personalDictionary ?? [],
   };
 }
@@ -84,7 +80,6 @@ export function mergeSharedConversionSettings(
     conversionPrompt: shared.conversionPrompt,
     triggers: { ...shared.triggers },
     punctuationConversion: { ...shared.punctuationConversion },
-    userDictionary: [...shared.userDictionary],
     personalDictionary: normalizePersonalDictionary(shared.personalDictionary),
   };
 }
@@ -99,43 +94,12 @@ function mergeSettings(settings: Partial<AppSettings>): AppSettings {
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: { ...defaultSettings.triggers, ...settings.triggers },
     punctuationConversion: { ...defaultSettings.punctuationConversion, ...settings.punctuationConversion },
-    userDictionary: normalizeUserDictionary(settings.userDictionary), personalDictionary: normalizePersonalDictionary(settings.personalDictionary)
+    personalDictionary: normalizePersonalDictionary(settings.personalDictionary)
   };
 }
 
 function normalizeInputPauseTiming(value: unknown): InputPauseTiming {
   return value === "early" || value === "deliberate" ? value : "auto";
-}
-
-function normalizeUserDictionary(entries: unknown): UserDictionaryEntry[] {
-  if (!Array.isArray(entries)) {
-    return [];
-  }
-
-  return entries
-    .flatMap((entry, index): UserDictionaryEntry[] => {
-      if (!entry || typeof entry !== "object") {
-        return [];
-      }
-
-      const record = entry as Record<string, unknown>;
-      const reading = readString(record.reading).trim();
-      const output = readString(record.output).trim();
-      if (!reading || !output) {
-        return [];
-      }
-
-      return [
-        {
-          id: readString(record.id).trim() || `dictionary-${index}`,
-          reading,
-          output,
-          note: readString(record.note).trim(),
-          enabled: typeof record.enabled === "boolean" ? record.enabled : true,
-        },
-      ];
-    })
-    .slice(0, MAX_USER_DICTIONARY_ENTRIES);
 }
 
 function readString(value: unknown): string {
