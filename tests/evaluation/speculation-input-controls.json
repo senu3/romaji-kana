@@ -1,0 +1,467 @@
+{
+  "version": "2026-10-22-speculation-input-controls-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    {
+      "id": "context-01--current--explicit-input",
+      "category": "contextual-paraphrase",
+      "input": "tejunwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-01--minimal-en--explicit-input",
+      "category": "contextual-paraphrase",
+      "input": "tejunwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--current--explicit-input",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakuninshitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--minimal-en--explicit-input",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakuninshitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--current--explicit-input",
+      "category": "negative-paraphrase",
+      "input": "ashitanokaiginihashussekishimasen.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--minimal-en--explicit-input",
+      "category": "negative-paraphrase",
+      "input": "ashitanokaiginihashussekishimasen.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--current--explicit-input",
+      "category": "positive-control",
+      "input": "ashitanokaiginihashussekishimasu.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--minimal-en--explicit-input",
+      "category": "positive-control",
+      "input": "ashitanokaiginihashussekishimasu.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--current--explicit-input",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushinhaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--minimal-en--explicit-input",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushinhaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--current--explicit-input",
+      "category": "numeric-control",
+      "input": "mada4kennoyouyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "current",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--minimal-en--explicit-input",
+      "category": "numeric-control",
+      "input": "mada4kennoyouyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "minimal-en",
+        "presentation": "text",
+        "inputControl": "typo-repaired-or-explicit-wording"
+      },
+      "notes": "原因切り分け用。元入力の欠字を直すか意味を明示する別入力。元入力そのままの品質得点には合算しない。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    }
+  ]
+}

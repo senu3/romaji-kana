@@ -1,6 +1,7 @@
 {
-  "version": "2026-10-19-intent-quality-1",
+  "version": "2026-10-21-intent-quality-contextual-2",
   "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "speculativeRubric": "推測経路では参考語句への完全一致を要求しない。入力と文脈に根拠がある言い換え・構文変更・省略語の補いを合格に含める。否定・未完了・依頼・数字・識別子を保持し、根拠のない事実を追加しない。通常変換・誤字修正の制約は緩めない。過去の評価得点とは直接比較しない。",
   "cases": [
     { "id": "intent-01", "category": "normal-context", "input": "seisanwotsuzukeru.",
       "options": { "contextBefore": "工場の製造ラインは稼働中です。" },
@@ -48,7 +49,7 @@
     { "id": "intent-12", "category": "user-reinterpretation", "input": "houkouwokaenaidekudasai.",
       "options": { "contextBefore": "作業の手順について話しています。", "userRequestedSpeculation": true, "avoidOutputs": ["方向を変えないでください。"] },
       "acceptableExamples": ["方法を変えないでください。"], "expectedRoutes": ["speculative"],
-      "criteria": ["退けた方向を繰り返さず、方法を提案する。手順などの妥当な別解は参考一致と分けて評価する"],
+      "criteria": ["退けた方向の再提示を避け、手順を変えない依頼を提案する。方法・手順など同等の表現を品質合格に含める。"],
       "criticalChecks": ["否定を維持する"] },
     { "id": "intent-13", "category": "user-preservation", "input": "mada4kennoyoyakuhaowatteinai.",
       "options": { "contextBefore": "議事録を短くまとめる仕事が残っています。", "userRequestedSpeculation": true, "avoidOutputs": ["まだ4件の予約は終わっていない。"] },

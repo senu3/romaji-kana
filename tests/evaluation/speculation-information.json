@@ -1,0 +1,2753 @@
+{
+  "version": "2026-10-21-speculation-information-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    {
+      "id": "context-01--full--fallback",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-01--full--revisit",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-01--reduced--fallback",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-01--reduced--revisit",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-01--reduced-with-rejections--fallback",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-01--reduced-with-rejections--revisit",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--full--fallback",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--full--revisit",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--reduced--fallback",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--reduced--revisit",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--reduced-with-rejections--fallback",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-02--reduced-with-rejections--revisit",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--full--fallback",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--full--revisit",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--reduced--fallback",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--reduced--revisit",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--reduced-with-rejections--fallback",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-03--reduced-with-rejections--revisit",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--full--fallback",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--full--revisit",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--reduced--fallback",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--reduced--revisit",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--reduced-with-rejections--fallback",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-04--reduced-with-rejections--revisit",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--full--fallback",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--full--revisit",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--reduced--fallback",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--reduced--revisit",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--reduced-with-rejections--fallback",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-05--reduced-with-rejections--revisit",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--full--fallback",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--full--revisit",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--reduced--fallback",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--reduced--revisit",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--reduced-with-rejections--fallback",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-06--reduced-with-rejections--revisit",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--full--fallback",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--full--revisit",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--reduced--fallback",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--reduced--revisit",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--reduced-with-rejections--fallback",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-07--reduced-with-rejections--revisit",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--full--fallback",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--full--revisit",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--reduced--fallback",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--reduced--revisit",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--reduced-with-rejections--fallback",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-08--reduced-with-rejections--revisit",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--full--fallback",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--full--revisit",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--reduced--fallback",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--reduced--revisit",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--reduced-with-rejections--fallback",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-09--reduced-with-rejections--revisit",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--full--fallback",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--full--revisit",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--reduced--fallback",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--reduced--revisit",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--reduced-with-rejections--fallback",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-10--reduced-with-rejections--revisit",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--full--fallback",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--full--revisit",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--reduced--fallback",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--reduced--revisit",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--reduced-with-rejections--fallback",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-11--reduced-with-rejections--revisit",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--full--fallback",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--full--revisit",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--reduced--fallback",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--reduced--revisit",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--reduced-with-rejections--fallback",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "context-12--reduced-with-rejections--revisit",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--full--fallback",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--full--revisit",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--reduced--fallback",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--reduced--revisit",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--reduced-with-rejections--fallback",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-1--reduced-with-rejections--revisit",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--full--fallback",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "full",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--full--revisit",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "full",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "full",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--reduced--fallback",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "reduced",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--reduced--revisit",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "reduced",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--reduced-with-rejections--fallback",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "reduced-with-rejections",
+        "format": "fallback"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    },
+    {
+      "id": "noise-2--reduced-with-rejections--revisit",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced-with-rejections",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "information": "reduced-with-rejections",
+        "format": "revisit"
+      },
+      "notes": "通常変換からの到達差を除くため推測を直接実行。実経路の生成形式と採用条件を比較し、JSONだけの効果とは解釈しない。"
+    }
+  ]
+}

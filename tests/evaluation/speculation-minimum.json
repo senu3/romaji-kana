@@ -1,0 +1,5065 @@
+{
+  "version": "2026-10-22-speculation-minimum-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    {
+      "id": "context-01--current--text",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-01--current--json",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-01--minimal-en--text",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-01--minimal-en--json",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-01--minimal-ja--text",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-01--minimal-ja--json",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-01--contract--text",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-01--contract--json",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-02--current--text",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-02--current--json",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-02--minimal-en--text",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-02--minimal-en--json",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-02--minimal-ja--text",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-02--minimal-ja--json",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-02--contract--text",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-02--contract--json",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-03--current--text",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--current--json",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-03--minimal-en--text",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--minimal-en--json",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-03--minimal-ja--text",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--minimal-ja--json",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-03--contract--text",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-03--contract--json",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-04--current--text",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--current--json",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-04--minimal-en--text",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--minimal-en--json",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-04--minimal-ja--text",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--minimal-ja--json",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-04--contract--text",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-04--contract--json",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-05--current--text",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--current--json",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-05--minimal-en--text",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--minimal-en--json",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-05--minimal-ja--text",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--minimal-ja--json",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-05--contract--text",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-05--contract--json",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-06--current--text",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-06--current--json",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-06--minimal-en--text",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-06--minimal-en--json",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-06--minimal-ja--text",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-06--minimal-ja--json",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-06--contract--text",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-06--contract--json",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-07--current--text",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-07--current--json",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-07--minimal-en--text",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-07--minimal-en--json",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-07--minimal-ja--text",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-07--minimal-ja--json",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-07--contract--text",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-07--contract--json",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-08--current--text",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-08--current--json",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-08--minimal-en--text",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-08--minimal-en--json",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-08--minimal-ja--text",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-08--minimal-ja--json",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-08--contract--text",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-08--contract--json",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-09--current--text",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-09--current--json",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-09--minimal-en--text",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-09--minimal-en--json",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-09--minimal-ja--text",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-09--minimal-ja--json",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-09--contract--text",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-09--contract--json",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-10--current--text",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--current--json",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-10--minimal-en--text",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--minimal-en--json",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-10--minimal-ja--text",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--minimal-ja--json",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-10--contract--text",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-10--contract--json",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-11--current--text",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--current--json",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-11--minimal-en--text",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--minimal-en--json",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-11--minimal-ja--text",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--minimal-ja--json",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-11--contract--text",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-11--contract--json",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-12--current--text",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-12--current--json",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-12--minimal-en--text",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-12--minimal-en--json",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-12--minimal-ja--text",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-12--minimal-ja--json",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "context-12--contract--text",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "context-12--contract--json",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-1--current--text",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-1--current--json",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-1--minimal-en--text",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-1--minimal-en--json",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-1--minimal-ja--text",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-1--minimal-ja--json",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-1--contract--text",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-1--contract--json",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-2--current--text",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-2--current--json",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-2--minimal-en--text",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-2--minimal-en--json",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-2--minimal-ja--text",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-2--minimal-ja--json",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "noise-2--contract--text",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      }
+    },
+    {
+      "id": "noise-2--contract--json",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。",
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      }
+    },
+    {
+      "id": "protected-multi--current--text",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--current--json",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--minimal-en--text",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--minimal-en--json",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--minimal-ja--text",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--minimal-ja--json",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--contract--text",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-multi--contract--json",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--current--text",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--current--json",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--minimal-en--text",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--minimal-en--json",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--minimal-ja--text",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--minimal-ja--json",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--contract--text",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-person--contract--json",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--current--text",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--current--json",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--minimal-en--text",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--minimal-en--json",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-en",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--minimal-ja--text",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--minimal-ja--json",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "minimal-ja",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--contract--text",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "text"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    },
+    {
+      "id": "protected-order--contract--json",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "speculationAblation": {
+        "instruction": "contract",
+        "presentation": "json"
+      },
+      "notes": "評価用アダプターで指示文と提示形式のみ変更。元入力・近傍文脈・固定区間・応答スキーマ・検証器・モデル設定は同じ。"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import { createKanaEngineClient } from "../../tools/kana-engine-client.mjs";
 import { finalRoutes, observeRoute, summarizeRoutes } from "./routes.mjs";
 import { summarizeCorrectionQuality } from "./correction-quality.mjs";
 import { artifactPath, resolveArtifactPath } from "../helpers/artifacts.mjs";
+import { ablateSpeculationRequest, historicalSpeculationRequest, validateSpeculationAblation } from "./speculation-ablation.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { values: args } = parseArgs({ options: {
@@ -56,11 +57,18 @@ async function main() {
   const dataset = JSON.parse(source);
   const ids = new Set();
   for (const c of dataset.cases) {
+    validateSpeculationAblation(c.speculationAblation);
+    if (c.speculationAblation && (c.options?.purpose !== "speculative" || c.options?.speculationInformation !== "reduced")) {
+      throw new Error("Speculation ablation requires direct reduced speculation");
+    }
     if (!c.id || ids.has(c.id) || !c.input || !c.category || !c.criteria?.length || !Array.isArray(c.acceptableExamples)) throw new Error(`Invalid case: ${c.id}`);
     if (c.expectedRoutes !== undefined && (!Array.isArray(c.expectedRoutes) || !c.expectedRoutes.length ||
         c.expectedRoutes.some(route => !finalRoutes.includes(route)))) throw new Error(`Invalid expectedRoutes: ${c.id}`);
     if (!c.acceptableExamples.length && !c.expectedRoutes) throw new Error(`Empty examples require expectedRoutes: ${c.id}`);
     if (!["none", "word", "sentence"].includes(c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel)) throw new Error(`Invalid mode: ${c.id}`);
+    if (c.options?.speculationInformation !== undefined && c.options.speculationInformation !== "reduced") {
+      throw new Error(`Unsupported historical speculation information mode: ${c.options.speculationInformation}`);
+    }
     ids.add(c.id);
   }
   const selected = args.case ? args.case.split(",") : [...ids];
@@ -127,6 +135,9 @@ async function main() {
     const convertRomajiToJapaneseDetailed = needCurrent ? (await vite.ssrLoadModule("/src/lib/ollama.ts")).convertRomajiToJapaneseDetailed : null;
     const compareLegacy = needLegacy ? (await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts")).convertRomajiToJapaneseDetailed : null;
     const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
+    const { romajiToKana } = await vite.ssrLoadModule("/src/lib/romajiKana.ts");
+    const { prepareConversionRequest } = await vite.ssrLoadModule("/src/lib/conversionRequest.ts");
+    const { hasConvertibleRomaji } = await vite.ssrLoadModule("/src/lib/conversionInput.ts");
     const { ConversionResponseError } = await vite.ssrLoadModule("/src/lib/conversionDiagnostics.ts");
     engineClient = createKanaEngineClient({ evaluation: needLegacy });
     let calls = [];
@@ -171,7 +182,19 @@ async function main() {
         const comparison = args.engine === "llm" || c.settings.inputCompletionLevel !== "none" || c.options.alternativeMode;
         row.implementation = comparison ? "legacy-evaluation" : "production";
         const convert = comparison ? compareLegacy : convertRomajiToJapaneseDetailed;
-        row.result = await convert(c.input, c.settings, defaultOllamaTransport, {
+        const transport = c.speculationAblation ? { ...defaultOllamaTransport,
+          generate: (provider, url, request, ...rest) => {
+            const { parts } = prepareConversionRequest(c.input, c.settings, c.options);
+            const target = request.outputSchema?.properties?.segments
+              ? parts.map((part, index) => part.type === "text" && hasConvertibleRomaji(part.value)
+                ? { id: "edit-" + index, originalInput: part.value } : { literal: part.type === "text" ? part.value : part.output })
+              : parts.map(part => part.type === "text" ? part.value : part.output).join("");
+            return defaultOllamaTransport.generate(provider, url,
+              ablateSpeculationRequest(historicalSpeculationRequest(request, target), c.speculationAblation, text => romajiToKana(text).kana), ...rest);
+          },
+        } : defaultOllamaTransport;
+        if (c.speculationAblation) row.speculationAblation = c.speculationAblation;
+        row.result = await convert(c.input, c.settings, transport, {
           ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
           ...(!comparison && c.options.completionMode ? { purpose: "correction" } : {}),
           ...(!comparison && c.options.speculativeMode ? { purpose: "speculative" } : {}),

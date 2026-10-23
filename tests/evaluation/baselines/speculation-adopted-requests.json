@@ -1,0 +1,166 @@
+{
+  "source": "Reviewed repair-ja + mechanical kana + nearby-two requests, 2026-10-22",
+  "cases": [
+    {
+      "id": "context-03",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "contextAfter": "提出前に内容の確認もお願いします。"
+      },
+      "userDictionary": [],
+      "expected": {
+        "system": "以下の文章には、変換ミス・誤字・脱字が含まれている可能性があります。\n前後の文脈から本来入力したかった内容を推測し、その意図を変えない範囲で自然な日本語に修正してください。\n- 誤変換、誤字、脱字、余分な文字を修正する\n- 助詞や活用の不自然さも修正する\n- 情報を勝手に追加しない\nReturn only {\"convertedText\":\"Japanese target\",\"completedKana\":\"its hiragana reading\"}. For no candidate return {\"convertedText\":\"\",\"completedKana\":\"\"}.\ncompletedKana must read the generated text exactly, not the input. No kanji in completedKana; retain digits, punctuation and line breaks. No explanations or control characters except tabs and line breaks.",
+        "prompt": "Context before:\n\nOriginal input:\nあしたのかいぎのしりょうをさくせいしてかくにしてください。\nContext after:\n提出前に内容の確認もお願いします。",
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "convertedText": {
+              "type": "string"
+            },
+            "completedKana": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "convertedText",
+            "completedKana"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。"
+      },
+      "userDictionary": [
+        {
+          "id": "person",
+          "reading": "akari",
+          "output": "灯里",
+          "enabled": true,
+          "note": ""
+        }
+      ],
+      "expected": {
+        "system": "以下の文章には、変換ミス・誤字・脱字が含まれている可能性があります。\n前後の文脈から本来入力したかった内容を推測し、その意図を変えない範囲で自然な日本語に修正してください。\n- 誤変換、誤字、脱字、余分な文字を修正する\n- 助詞や活用の不自然さも修正する\n- 情報を勝手に追加しない\nThe target is an ordered list of editable parts and immutable literals. Interpret them together. Return only {\"segments\":[{\"id\":\"supplied editable ID\",\"convertedText\":\"Japanese for this editable part\",\"completedKana\":\"its hiragana reading\"}]}, with every editable ID once in order. Never include or pronounce literal parts; the app restores them. For no candidate return {\"segments\":[]}.\ncompletedKana must read the generated text exactly, not the input. No kanji in completedKana; retain digits, punctuation and line breaks. No explanations or control characters except tabs and line breaks.",
+        "prompt": "Context before:\n会社設立を法務局に登録する手続きについての報告です。\nOriginal input (ordered parts):\n[{\"literal\":\"灯里\"},{\"id\":\"edit-1\",\"originalInput\":\"のとうきはおわらなかった。\"}]\nContext after:\n",
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "segments": {
+              "type": "array",
+              "maxItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "enum": [
+                      "edit-1"
+                    ]
+                  },
+                  "convertedText": {
+                    "type": "string"
+                  },
+                  "completedKana": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "convertedText",
+                  "completedKana"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "segments"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "protected-multi",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。"
+      },
+      "userDictionary": [],
+      "expected": {
+        "system": "以下の文章には、変換ミス・誤字・脱字が含まれている可能性があります。\n前後の文脈から本来入力したかった内容を推測し、その意図を変えない範囲で自然な日本語に修正してください。\n- 誤変換、誤字、脱字、余分な文字を修正する\n- 助詞や活用の不自然さも修正する\n- 情報を勝手に追加しない\nThe target is an ordered list of editable parts and immutable literals. Interpret them together. Return only {\"segments\":[{\"id\":\"supplied editable ID\",\"convertedText\":\"Japanese for this editable part\",\"completedKana\":\"its hiragana reading\"}]}, with every editable ID once in order. Never include or pronounce literal parts; the app restores them. For no candidate return {\"segments\":[]}.\ncompletedKana must read the generated text exactly, not the input. No kanji in completedKana; retain digits, punctuation and line breaks. No explanations or control characters except tabs and line breaks.",
+        "prompt": "Context before:\n装置の更新作業の報告です。\nOriginal input (ordered parts):\n[{\"literal\":\"MR-62\"},{\"id\":\"edit-1\",\"originalInput\":\"のこうしはおわらなかった。\"},{\"literal\":\"TZ-14\"},{\"id\":\"edit-3\",\"originalInput\":\"のこうしはおわらなかった。\"}]\nContext after:\n",
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "segments": {
+              "type": "array",
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "enum": [
+                      "edit-1",
+                      "edit-3"
+                    ]
+                  },
+                  "convertedText": {
+                    "type": "string"
+                  },
+                  "completedKana": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "convertedText",
+                  "completedKana"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "segments"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "context-11",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "contextBefore": "議事録を短くまとめる作業が残っています。"
+      },
+      "userDictionary": [],
+      "expected": {
+        "system": "以下の文章には、変換ミス・誤字・脱字が含まれている可能性があります。\n前後の文脈から本来入力したかった内容を推測し、その意図を変えない範囲で自然な日本語に修正してください。\n- 誤変換、誤字、脱字、余分な文字を修正する\n- 助詞や活用の不自然さも修正する\n- 情報を勝手に追加しない\nReturn only {\"convertedText\":\"Japanese target\",\"completedKana\":\"its hiragana reading\"}. For no candidate return {\"convertedText\":\"\",\"completedKana\":\"\"}.\ncompletedKana must read the generated text exactly, not the input. No kanji in completedKana; retain digits, punctuation and line breaks. No explanations or control characters except tabs and line breaks.",
+        "prompt": "Context before:\n議事録を短くまとめる作業が残っています。\nOriginal input:\nまだ4けんのよやくはおわっていない。\nContext after:\n",
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "convertedText": {
+              "type": "string"
+            },
+            "completedKana": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "convertedText",
+            "completedKana"
+          ],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

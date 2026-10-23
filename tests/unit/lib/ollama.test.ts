@@ -5,7 +5,7 @@ import { requiresExplicitAcceptance } from "../../../src/lib/readingAssessment";
 
 const engine = () => ({ search: vi.fn(), verify: vi.fn().mockResolvedValue("verified") });
 describe("current conversion purposes", () => {
-  it("uses context and a user rejection for explicit speculation, without normal conversion", async () => {
+  it("uses context without sending the rejected text for reduced explicit speculation", async () => {
     const kanaEngine = engine();
     const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: "確認", completedKana: "かくにん" }) });
     const result = await convertRomajiToJapaneseDetailed("kakuni", defaultSettings, { models: vi.fn(), generate }, {
@@ -15,9 +15,9 @@ describe("current conversion purposes", () => {
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(kanaEngine.search).not.toHaveBeenCalled();
     expect(generate).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(generate.mock.calls)).toContain("user explicitly rejected");
+    expect(JSON.stringify(generate.mock.calls)).toContain("本来入力したかった内容");
     expect(JSON.stringify(generate.mock.calls)).toContain("資料を");
-    expect(JSON.stringify(generate.mock.calls)).toContain("角煮");
+    expect(JSON.stringify(generate.mock.calls)).not.toContain("角煮");
     expect(result).not.toHaveProperty("inputCompletionApplied");
   });
   it.each([

@@ -1,6 +1,7 @@
 {
-  "version": "2026-10-19-reinterpretation-quality-1",
+  "version": "2026-10-21-reinterpretation-quality-contextual-2",
   "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "speculativeRubric": "推測経路では参考語句への完全一致を要求しない。入力と文脈に根拠がある言い換え・構文変更・省略語の補いを合格に含める。否定・未完了・依頼・数字・識別子を保持し、根拠のない事実を追加しない。通常変換・誤字修正の制約は緩めない。過去の評価得点とは直接比較しない。",
   "cases": [
     { "id": "revisit-01", "category": "normal-control", "input": "bangouha35desu.", "acceptableExamples": ["番号は35です。"], "expectedRoutes": ["normal"], "criteria": ["番号と35を保持し、通常変換だけで返す"] },
     { "id": "revisit-02", "category": "normal-control", "input": "kyounosagyouhamadaowatteinai.", "acceptableExamples": ["今日の作業はまだ終わっていない。", "きょうの作業はまだ終わっていない。"], "expectedRoutes": ["normal"], "criteria": ["今日の作業の未完了を保持する"], "criticalChecks": ["否定を保持する"] },

@@ -1,6 +1,7 @@
 {
-  "version": "2026-10-19-reinterpretation-output-1",
+  "version": "2026-10-21-reinterpretation-output-quality-contextual-2",
   "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "speculativeRubric": "推測経路では参考語句への完全一致を要求しない。入力と文脈に根拠がある言い換え・構文変更・省略語の補いを合格に含める。否定・未完了・依頼・数字・識別子を保持し、根拠のない事実を追加しない。通常変換・誤字修正の制約は緩めない。過去の評価得点とは直接比較しない。",
   "cases": [
     { "id": "output-01", "category": "normal-control", "input": "atodekaerimasu.", "acceptableExamples": ["後で帰ります。", "あとで帰ります。"], "expectedRoutes": ["normal"], "criteria": ["帰る時点を後とし、通常経路で返す"] },
     { "id": "output-02", "category": "normal-control", "input": "nokoriha23kendesu.", "acceptableExamples": ["残りは23件です。"], "expectedRoutes": ["normal"], "criteria": ["残件数23を保持する"] },
@@ -28,6 +29,6 @@
       "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["意味の根拠がない英字列を無理に日本語へ変えない"] },
     { "id": "output-10", "category": "surface-rejection", "input": "renrakuhamadashiteinai.",
       "options": { "contextBefore": "まだ相手に連絡していない状態です。", "userRequestedSpeculation": true, "avoidOutputs": ["連絡はまだしていない。"] },
-      "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["何を見直すべきか特定できない。丁寧な否定語尾に変えただけの再提示は棄却し、別の事実を創作しない"] }
+      "acceptableExamples": ["相手への連絡は未実施です。"], "expectedRoutes": ["speculative", "rejected"], "criteria": ["未連絡の状態を保つ実質的な言い換えを許す。丁寧語尾だけの再提示は棄却する。根拠のない理由や完了事実を追加しない。"] }
   ]
 }

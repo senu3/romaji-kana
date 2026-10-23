@@ -1,0 +1,2609 @@
+{
+  "version": "2026-10-22-speculation-kana-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    {
+      "id": "context-01--current--romaji",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-01--current--kana",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-01--repair-ja--romaji",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-01--repair-ja--kana",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-02--current--romaji",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-02--current--kana",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-02--repair-ja--romaji",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-02--repair-ja--kana",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-03--current--romaji",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-03--current--kana",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-03--repair-ja--romaji",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-03--repair-ja--kana",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-04--current--romaji",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-04--current--kana",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-04--repair-ja--romaji",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-04--repair-ja--kana",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-05--current--romaji",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-05--current--kana",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-05--repair-ja--romaji",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-05--repair-ja--kana",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-06--current--romaji",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-06--current--kana",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-06--repair-ja--romaji",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-06--repair-ja--kana",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-07--current--romaji",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-07--current--kana",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-07--repair-ja--romaji",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-07--repair-ja--kana",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-08--current--romaji",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-08--current--kana",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-08--repair-ja--romaji",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-08--repair-ja--kana",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-09--current--romaji",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-09--current--kana",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-09--repair-ja--romaji",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-09--repair-ja--kana",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-10--current--romaji",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-10--current--kana",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-10--repair-ja--romaji",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-10--repair-ja--kana",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-11--current--romaji",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-11--current--kana",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-11--repair-ja--romaji",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-11--repair-ja--kana",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-12--current--romaji",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-12--current--kana",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "context-12--repair-ja--romaji",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "context-12--repair-ja--kana",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "noise-1--current--romaji",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "noise-1--current--kana",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "noise-1--repair-ja--romaji",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "noise-1--repair-ja--kana",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "noise-2--current--romaji",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "noise-2--current--kana",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "noise-2--repair-ja--romaji",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      }
+    },
+    {
+      "id": "noise-2--repair-ja--kana",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "speculationInformation": "reduced",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。",
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      }
+    },
+    {
+      "id": "protected-multi--current--romaji",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-multi--current--kana",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-multi--repair-ja--romaji",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-multi--repair-ja--kana",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-person--current--romaji",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-person--current--kana",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-person--repair-ja--romaji",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-person--repair-ja--kana",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-order--current--romaji",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "current",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-order--current--kana",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "current",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "current",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-order--repair-ja--romaji",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "repair-ja",
+        "inputRepresentation": "romaji"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "romaji"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    },
+    {
+      "id": "protected-order--repair-ja--kana",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "speculationInformation": "reduced"
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "instruction": "repair-ja",
+        "inputRepresentation": "kana"
+      },
+      "speculationAblation": {
+        "instruction": "repair-ja",
+        "presentation": "text",
+        "inputRepresentation": "kana"
+      },
+      "notes": "機械かな条件は本番のromajiToKanaを編集区間だけに適用。ローマ字併記なし。前後文脈・固定区間・応答契約・検証器は同一。"
+    }
+  ]
+}

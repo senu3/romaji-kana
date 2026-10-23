@@ -1,0 +1,30 @@
+{
+  "version": "2026-10-21-contextual-speculation-1",
+  "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    { "id": "context-01", "category": "contextual-paraphrase", "input": "houkouwokaenaidekudasai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["方向を変えないでください。"], "contextBefore": "作業手順を統一しています。", "contextAfter": "全員が同じ手順で進めます。" }, "acceptableExamples": ["手順を変えないでください。", "同じ方法で進めてください。"], "expectedRoutes": ["speculative"], "criteria": ["手順を維持する依頼。肯定形の言い換えも可"], "criticalChecks": ["手順の変更を勧めない"] },
+    { "id": "context-02", "category": "contextual-paraphrase", "input": "kijiwoyoyakushitekudasai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["記事を予約してください。"], "contextBefore": "長い記事を短くまとめる作業です。" }, "acceptableExamples": ["記事を要約してください。", "記事の要点をまとめてください。"], "expectedRoutes": ["speculative"], "criteria": ["記事を短くまとめる依頼なら表現を限定しない"], "criticalChecks": ["要約済みという事実にしない"] },
+    { "id": "context-03", "category": "contextual-paraphrase", "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["明日の会議の資料を作成して書くにしてください。"], "contextAfter": "提出前に内容の確認もお願いします。" }, "acceptableExamples": ["明日の会議資料を作成し、内容を確認してください。"], "expectedRoutes": ["speculative"], "criteria": ["資料の作成と確認を求める自然な文を提案する"], "criticalChecks": ["提出済み・承認済みなどを創作しない"] },
+    { "id": "context-04", "category": "negative-paraphrase", "input": "ashitahaikanai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["明日は鋳かない。"], "contextBefore": "明日の会議への出席について返答します。" }, "acceptableExamples": ["明日の会議への参加は見送ります。", "明日は出席しません。"], "expectedRoutes": ["speculative"], "criteria": ["会議への不参加を自然に表す。ないの文字列自体は必須にしない"], "criticalChecks": ["参加すると反転しない。欠席理由を創作しない"] },
+    { "id": "context-05", "category": "positive-control", "input": "ashitahaiku.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["明日は射く。"], "contextBefore": "明日の会議への出席について返答します。" }, "acceptableExamples": ["明日は出席します。"], "expectedRoutes": ["speculative"], "criteria": ["context-04と対照に参加の意向を保持する"], "criticalChecks": ["不参加に反転しない。会議開催済みとしない"] },
+    { "id": "context-06", "category": "incomplete-control", "input": "madakakunishiteinai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["まだ書くにしていない。"], "contextBefore": "資料の内容を確認したか質問されています。" }, "acceptableExamples": ["資料の内容は未確認です。"], "expectedRoutes": ["speculative"], "criteria": ["未確認の状態を保つ"], "criticalChecks": ["確認済みとしない。確認できない理由を追加しない"] },
+    { "id": "context-07", "category": "request-control", "input": "kakunishitekudasai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["書くにしてください。"], "contextBefore": "提出前の資料について担当者にお願いします。" }, "acceptableExamples": ["資料の内容を確認してください。"], "expectedRoutes": ["speculative"], "criteria": ["確認の依頼を自然に提案する"], "criticalChecks": ["確認済みという報告にしない。締切を創作しない"] },
+    { "id": "context-08", "category": "unsupported-fact-control", "input": "ashitaha",
+      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["明日は"] }, "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["予定を示す根拠がない。会議や出張を創作しない"] },
+    { "id": "context-09", "category": "context-supported-fragment", "input": "ashitaha",
+      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["明日は"], "contextBefore": "明日の会議には出席しないと返答する文を作っています。" }, "acceptableExamples": ["明日は会議に出席しません。"], "expectedRoutes": ["speculative"], "criteria": ["context-08と同じ断片だが文脈にある不参加は補える"], "criticalChecks": ["不参加を保持し、理由を追加しない"] },
+    { "id": "context-10", "category": "protected-control", "input": "`MR-62`nokoushihaowaranakatta.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["MR-62の講師は終わらなかった。"], "contextBefore": "装置の更新作業について報告しています。" }, "acceptableExamples": ["MR-62の更新は完了しなかった。"], "expectedRoutes": ["speculative"], "criteria": ["更新の過去の未完了を表す"], "criticalChecks": ["MR-62を保持。故障や担当者を創作しない"] },
+    { "id": "context-11", "category": "numeric-control", "input": "mada4kennoyoyakuhaowatteinai.", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["まだ4件の予約は終わっていない。"], "contextBefore": "議事録を短くまとめる作業が残っています。" }, "acceptableExamples": ["4件の議事録の要約はまだ終わっていない。"], "expectedRoutes": ["speculative"], "criteria": ["要約の未完了を表す"], "criticalChecks": ["4件と未完了を保持。納期を創作しない"] },
+    { "id": "context-12", "category": "ungrounded-control", "input": "vqxznb", "options": { "userRequestedSpeculation": true, "avoidOutputs": ["ブイクス"] }, "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["意味の根拠がなく辞退する"] },
+    { "id": "context-13", "category": "speculative-pass", "input": "kijiwoyoyakushitekudasai.", "options": { "purpose": "speculative", "contextBefore": "長い記事を短くまとめる作業です。" }, "acceptableExamples": ["記事の要点をまとめてください。", "記事を要約してください。"], "expectedRoutes": ["speculative"], "criteria": ["救済で使う部分文の生成指示でも文脈に合う候補を提案する"], "criticalChecks": ["依頼を保持し事実を創作しない"], "notes": "直接指定で指示を分離する。通常変換からの自動到達成功とは数えない。" },
+    { "id": "context-14", "category": "speculative-pass", "input": "ashitahaikanai.", "options": { "purpose": "speculative", "contextBefore": "明日の会議への出席について返答します。" }, "acceptableExamples": ["明日の会議への参加は見送ります。", "明日は出席しません。"], "expectedRoutes": ["speculative"], "criteria": ["部分文の生成指示でも不参加を表す"], "criticalChecks": ["否定を反転せず欠席理由を創作しない"] },
+    { "id": "context-15", "category": "normal-control", "input": "bangouha35desu.", "acceptableExamples": ["番号は35です。"], "expectedRoutes": ["normal"], "criteria": ["通常変換を維持し推測要求を追加しない"] },
+    { "id": "context-16", "category": "normal-control", "input": "madaowatteinai.", "acceptableExamples": ["まだ終わっていない。"], "expectedRoutes": ["normal"], "criteria": ["未完了を保持し通常変換を維持する"] }
+  ]
+}

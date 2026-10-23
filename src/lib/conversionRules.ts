@@ -77,13 +77,3 @@ export const typoCorrectionRule = {
     "If the intended repair is still unclear, report no candidate rather than returning the mechanical kana or inventing meaning.",
   ],
 } as const;
-
-export const speculativeRule = {
-  guidance: [
-    "Infer the user's most plausible intended Japanese from both the original romaji and the mechanical kana.",
-    "This is not another strict kana-to-kanji pass. It is a suggestion, so you may resolve an ambiguous reading, minimally repair a likely typing error, or use a nearby natural expression with the same intent.",
-    "Keep the central intent and tone close to the input. Never invent an unrelated sentence or new facts.",
-    "Use conventional natural Japanese spelling. A genuinely inferred word may be written in hiragana; never paraphrase solely to force kanji.",
-    "Never return the unchanged mechanical kana as a substitute for an unavailable candidate. Report no candidate when the intent cannot be inferred.",
-  ],
-} as const;

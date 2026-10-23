@@ -34,7 +34,7 @@ function referenceSections(reference: ConversionReference): string[] {
 }
 
 /** Only the original target supplies mandatory protection. Reference data can
- * affect spelling preferences, never the target or its protected content. */
+ * support interpretation, but cannot introduce mandatory protected content. */
 export function prepareConversionRequest(input: string, settings: AppSettings, options: JapaneseConversionOptions) {
   const parts = splitInputForConversion(normalizeInputForPrompt(input, settings), [
     ...(options.protectedDictionaryEntries ?? []), ...settings.userDictionary,
@@ -63,18 +63,21 @@ export function finalTargetPrompt(request: ConversionRequest, includeOriginal: b
   ].join("\n");
 }
 
-/** Rejections and the target describe the same complete occurrence. Keep all
- * user-controlled strings in data fields, rather than embedding them in rules. */
-export type ReinterpretationPart = { id: string; originalInput: string } | { literal: string };
+/** Immutable spans and editable parts describe the same complete target. */
+export type SpeculationPart = { id: string; originalInput: string } | { literal: string };
 
-export function userReinterpretationPrompt(request: ConversionRequest, rejectedOutputs: readonly string[], parts?: readonly ReinterpretationPart[]): string {
-  return JSON.stringify({
-    target: {
-      originalInput: request.target.originalRomaji,
-      ...(parts ? { parts } : {}),
-    },
-    rejectedOutputs: [...new Set(rejectedOutputs.map(text => text.trim()).filter(Boolean))],
-    context: { before: request.reference.beforeTarget, after: request.reference.afterTarget ?? "" },
-    documentVocabulary: request.reference.documentVocabulary ?? [],
-  });
+/** Keep two adjacent sentences/fragments, bounded even without punctuation. */
+export function nearbySpeculationContext(value: string, side: "before" | "after"): string {
+  const sentences = value.match(/[^。！？!?\n]+[。！？!?\n]*|[。！？!?\n]+/gu) ?? [];
+  const nearby = (side === "before" ? sentences.slice(-2) : sentences.slice(0, 2)).join("");
+  return side === "before" ? nearby.slice(-400) : nearby.slice(0, 400);
+}
+
+export function speculationPrompt(request: ConversionRequest, parts?: readonly SpeculationPart[]): string {
+  const before = nearbySpeculationContext(request.reference.beforeTarget, "before");
+  const after = nearbySpeculationContext(request.reference.afterTarget ?? "", "after");
+  const target = parts ? JSON.stringify(parts.map(part => "literal" in part ? part
+    : { ...part, originalInput: romajiToKana(part.originalInput).kana })) : romajiToKana(request.target.originalRomaji).kana;
+  return ["Context before:", before, parts ? "Original input (ordered parts):" : "Original input:", target,
+    "Context after:", after].join("\n");
 }

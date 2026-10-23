@@ -11,7 +11,24 @@ function harness(text: string, reading: string) {
 const options = { userRequestedSpeculation: true, avoidOutputs: ["MR-62の講師は終わらなかった。"] };
 
 describe("whole-target user reinterpretation", () => {
-  it("aligns original input, context, literals and full rejections in one request, without leaking reference into the target", async () => {
+  it.each([
+    ["ashitahaikanai.", "明日の会議には出席しないと返答します。", "明日の会議への参加は見送ります。", "あしたのかいぎへのさんかはみおくります。"],
+    ["houkouwokaenaidekudasai.", "全員が同じ作業手順で進めます。", "同じ手順で進めてください。", "おなじてじゅんですすめてください。"],
+    ["ashitaha", "明日の会議には出席しないと返答します。", "明日は欠席します。", "あしたはけっせきします。"],
+  ])("accepts a context-supported paraphrase through the contract, without extra generation: %s", async (input, contextBefore, text, reading) => {
+    // Stubbed verification tests the contract, not the model's semantic accuracy.
+    const generate = vi.fn().mockResolvedValue({ response: JSON.stringify({ convertedText: text, completedKana: reading }) });
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, { models: vi.fn(), generate }, {
+      userRequestedSpeculation: true, contextBefore, avoidOutputs: ["退けた候補。"],
+      kanaEngine: { search: vi.fn(), verify: vi.fn().mockResolvedValue("verified") },
+    });
+    expect(result.text).toBe(text);
+    expect(result.conversionStrategy).toBe("speculative");
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+    expect(generate).toHaveBeenCalledOnce();
+  });
+
+  it("aligns context and immutable parts in the shared reduced request", async () => {
     const h = harness("MR-62の更新は終わらなかった。", "MR-62のこうしんはおわらなかった。");
     const input = "`MR-62`nokoushihaowaranakatta.";
     const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
@@ -21,12 +38,12 @@ describe("whole-target user reinterpretation", () => {
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(h.generate).toHaveBeenCalledTimes(1);
     const request = h.generate.mock.calls[0][2];
-    expect(JSON.parse(request.prompt)).toMatchObject({
-      target: { originalInput: "MR-62nokoushihaowaranakatta。", parts: [{ literal: "MR-62" }, { id: "edit-1", originalInput: "nokoushihaowaranakatta。" }] },
-      rejectedOutputs: options.avoidOutputs,
-      context: { before: "更新の報告です。別装置ZZ-99は完了。", after: "明日再開する。" },
-    });
-    expect(JSON.parse(request.prompt).target).not.toHaveProperty("mechanicalReading");
+    expect(JSON.parse(request.prompt.split("Original input (ordered parts):\n")[1].split("\nContext after:")[0])).toEqual([
+      { literal: "MR-62" }, { id: "edit-1", originalInput: "のこうしはおわらなかった。" },
+    ]);
+    expect(request.prompt).toContain("更新の報告です。別装置ZZ-99は完了。");
+    expect(request.prompt).toContain("明日再開する。");
+    expect(request.prompt).not.toContain(options.avoidOutputs[0]);
     expect(request.system).not.toContain(options.avoidOutputs[0]);
     expect(h.kanaEngine.verify).toHaveBeenCalledWith("の更新は終わらなかった。", "のこうしんはおわらなかった。", [], undefined);
     expect(h.kanaEngine.search).not.toHaveBeenCalled();
@@ -64,9 +81,9 @@ describe("whole-target user reinterpretation", () => {
     const result = await convertRomajiToJapaneseDetailed("`A-1` kara `B-2` he henkoushimasen.", defaultSettings, h.transport, {
       userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["A-1からB-2へ返答しません。"],
     });
-    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).target.parts).toEqual([
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt.split("Original input (ordered parts):\n")[1].split("\nContext after:")[0])).toEqual([
       { literal: "A-1" }, { literal: "から" }, { literal: "B-2" }, { literal: "へ" },
-      { id: "edit-4", originalInput: "henkoushimasen。" },
+      { id: "edit-4", originalInput: "へんこうしません。" },
     ]);
     expect(result.text).toBe("A-1からB-2へ変更しません。");
     expect(result.reviewKana).toBe("A-1からB-2へへんこうしません。");
@@ -82,8 +99,8 @@ describe("whole-target user reinterpretation", () => {
     const result = await convertRomajiToJapaneseDetailed("`A-1`henkoushimasen.", defaultSettings, h.transport, {
       userRequestedSpeculation: true, kanaEngine: h.kanaEngine, avoidOutputs: ["A-1返答しません。"],
     });
-    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).target.parts).toEqual([
-      { literal: "A-1" }, { id: "edit-1", originalInput: "henkoushimasen。" },
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt.split("Original input (ordered parts):\n")[1].split("\nContext after:")[0])).toEqual([
+      { literal: "A-1" }, { id: "edit-1", originalInput: "へんこうしません。" },
     ]);
     expect(result.text).toBe("A-1変更しません。");
   });

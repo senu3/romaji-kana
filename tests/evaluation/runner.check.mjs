@@ -41,6 +41,20 @@ test("keeps default and custom evaluation output inside test-results", async () 
   } finally { await rm(out, { recursive: true, force: true }); }
 });
 
+test("validates the unified speculation set and refuses to relabel historical full requests", async () => {
+  const dir = await temporaryArtifactDirectory("kana-unified-");
+  try {
+    const valid = await run(["--dry-run", "--dataset", "tests/evaluation/speculation-unification.json", "--repeats", "2", "--out", join(dir, "unified")]);
+    assert.equal(valid.code, 0, valid.output);
+    const manifest = JSON.parse(await readFile(join(dir, "unified/manifest.json"), "utf8"));
+    assert.equal(manifest.cases.length, 34);
+    assert.equal(manifest.schedule.length, 68);
+    const historical = await run(["--dry-run", "--dataset", "tests/evaluation/speculation-information.json", "--out", join(dir, "historical")]);
+    assert.equal(historical.code, 1);
+    assert.match(historical.output, /Unsupported historical speculation information mode/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test("validates rescue cases with unspecified acceptable text and route expectations", async () => {
   const dir = await temporaryArtifactDirectory("kana-rescue-");
   try {
@@ -102,8 +116,17 @@ test("production reinterpretation continues after validation errors, stops on 50
     assert.equal(summary.categories["user-reinterpretation"].errors, 2);
     assert.equal(requests.length, 3);
     assert.ok(requests.every(r => !JSON.stringify(r).includes("DO_NOT_SEND")));
-    assert.ok(requests.every(r => JSON.parse(r.prompt).rejectedOutputs.includes("記事を予約してください。")));
+    assert.ok(requests.every(r => !r.prompt.includes("記事を予約してください。")));
     assert.ok(requests.every(r => !r.system.includes("記事を予約してください。")));
+    source.cases[0].options.speculationInformation = "reduced-with-rejections";
+    await writeFile(dataset, JSON.stringify(source));
+    requests.length = 0;
+    const full = await run([...base, "--dry-run", "--out", join(dir, "full")]);
+    assert.equal(full.code, 1, full.output);
+    assert.equal(requests.length, 0);
+    assert.match(full.output, /Unsupported historical speculation information mode/);
+    delete source.cases[0].options.speculationInformation;
+    await writeFile(dataset, JSON.stringify(source));
     fail = true;
     requests.length = 0;
     const failed = await run([...base, "--out", join(dir, "failed")]);

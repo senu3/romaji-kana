@@ -16,6 +16,19 @@ function candidate(text: string, source = "mozc", reading = "ほん"): EngineCan
 }
 
 describe("normal → correction → speculation → unchanged romaji", () => {
+  it("uses a contextual paraphrase only after both earlier routes fail, with one speculative generation", async () => {
+    const h = harness();
+    h.generate.mockResolvedValueOnce(json("", ""))
+      .mockResolvedValueOnce(json("同じ手順で進めてください。", "おなじてじゅんですすめてください。"));
+    const result = await convertRomajiToJapaneseDetailed("houkouwokaenaidekudasai.", defaultSettings, h.transport, {
+      kanaEngine: h.engine, contextBefore: "全員が同じ作業手順で進めます。",
+    });
+    expect(result.text).toBe("同じ手順で進めてください。");
+    expect(result.attempts?.map(a => a.stage)).toEqual(["normal", "correction", "speculative"]);
+    expect(result.conversionStrategy).toBe("speculative");
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+    expect(h.generate).toHaveBeenCalledTimes(2);
+  });
   it("can evaluate normal conversion and correction without launching speculative rescue", async () => {
     const h = harness();
     h.generate.mockResolvedValue(json("", ""));
@@ -65,7 +78,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(result.attempts?.map(a => a.stage)).toEqual(["normal", "correction", "speculative"]);
     expect(requiresExplicitAcceptance(result)).toBe(true);
     expect(h.generate.mock.calls[0][2].system).toContain("minimally repair");
-    expect(h.generate.mock.calls[1][2].system).toContain("speculative Japanese");
+    expect(h.generate.mock.calls[1][2].system).toContain("本来入力したかった内容");
     expect(h.generate.mock.calls[1][2].outputSchema.required).toEqual(["convertedText", "completedKana"]);
   });
   it("allows an inferred natural hiragana word without inventing a kanji paraphrase", async () => {

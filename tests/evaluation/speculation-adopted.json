@@ -1,0 +1,714 @@
+{
+  "version": "2026-10-22-speculation-adopted-1",
+  "defaults": {
+    "inputCompletionLevel": "none",
+    "think": false,
+    "userDictionary": [],
+    "documentVocabulary": []
+  },
+  "rubric": {
+    "useful": "入力と前後文脈に根拠があり、用途に合う候補なら語句・語順・読みの距離で減点しない。参考例との完全一致は品質得点ではない。",
+    "critical": "否定・未完了・依頼を反転しない。根拠のない人物・日時・理由・達成事実を追加しない。数字・識別子・固定区間を保持する。",
+    "abstention": "一意の原文復元は求めない。入力と文脈を合わせても候補の根拠がない場合は辞退する。",
+    "scoring": "有用・意味違反・根拠不足・形式棄却・辞退を別記する。実行時の読み検証や模擬応答テストは意味の保証に数えない。"
+  },
+  "cases": [
+    {
+      "id": "context-01",
+      "category": "contextual-paraphrase",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "作業手順を統一しています。",
+        "contextAfter": "全員が同じ手順で進めます。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "context-01",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-02",
+      "category": "contextual-paraphrase",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "長い記事を短くまとめる作業です。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "context-02",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-03",
+      "category": "contextual-paraphrase",
+      "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日の会議の資料を作成して書くにしてください。"
+        ],
+        "contextAfter": "提出前に内容の確認もお願いします。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議資料を作成し、内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "資料の作成と確認を求める自然な文を提案する"
+      ],
+      "criticalChecks": [
+        "提出済み・承認済みなどを創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-03",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-04",
+      "category": "negative-paraphrase",
+      "input": "ashitahaikanai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は鋳かない。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日の会議への参加は見送ります。",
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "会議への不参加を自然に表す。ないの文字列自体は必須にしない"
+      ],
+      "criticalChecks": [
+        "参加すると反転しない。欠席理由を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-04",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-05",
+      "category": "positive-control",
+      "input": "ashitahaiku.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は射く。"
+        ],
+        "contextBefore": "明日の会議への出席について返答します。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-04と対照に参加の意向を保持する"
+      ],
+      "criticalChecks": [
+        "不参加に反転しない。会議開催済みとしない"
+      ],
+      "comparison": {
+        "caseId": "context-05",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-06",
+      "category": "incomplete-control",
+      "input": "madakakunishiteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ書くにしていない。"
+        ],
+        "contextBefore": "資料の内容を確認したか質問されています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容は未確認です。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "未確認の状態を保つ"
+      ],
+      "criticalChecks": [
+        "確認済みとしない。確認できない理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-06",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-07",
+      "category": "request-control",
+      "input": "kakunishitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "書くにしてください。"
+        ],
+        "contextBefore": "提出前の資料について担当者にお願いします。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "資料の内容を確認してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "確認の依頼を自然に提案する"
+      ],
+      "criticalChecks": [
+        "確認済みという報告にしない。締切を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-07",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-08",
+      "category": "unsupported-fact-control",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "予定を示す根拠がない。会議や出張を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-08",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-09",
+      "category": "context-supported-fragment",
+      "input": "ashitaha",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "明日は"
+        ],
+        "contextBefore": "明日の会議には出席しないと返答する文を作っています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "明日は会議に出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "context-08と同じ断片だが文脈にある不参加は補える"
+      ],
+      "criticalChecks": [
+        "不参加を保持し、理由を追加しない"
+      ],
+      "comparison": {
+        "caseId": "context-09",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-10",
+      "category": "protected-control",
+      "input": "`MR-62`nokoushihaowaranakatta.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。"
+        ],
+        "contextBefore": "装置の更新作業について報告しています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "MR-62の更新は完了しなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "更新の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "MR-62を保持。故障や担当者を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-10",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-11",
+      "category": "numeric-control",
+      "input": "mada4kennoyoyakuhaowatteinai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "まだ4件の予約は終わっていない。"
+        ],
+        "contextBefore": "議事録を短くまとめる作業が残っています。",
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "4件の議事録の要約はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "要約の未完了を表す"
+      ],
+      "criticalChecks": [
+        "4件と未完了を保持。納期を創作しない"
+      ],
+      "comparison": {
+        "caseId": "context-11",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "context-12",
+      "category": "ungrounded-control",
+      "input": "vqxznb",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "ブイクス"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がなく辞退する"
+      ],
+      "comparison": {
+        "caseId": "context-12",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "noise-1",
+      "category": "long-context-control",
+      "input": "houkouwokaenaidekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "方向を変えないでください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。作業手順を統一しています。現在はこの作業を説明しています。",
+        "contextAfter": "全員が同じ手順で進めます。この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "手順を変えないでください。",
+        "同じ方法で進めてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "手順を維持する依頼。肯定形の言い換えも可"
+      ],
+      "criticalChecks": [
+        "手順の変更を勧めない"
+      ],
+      "comparison": {
+        "caseId": "noise-1",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "noise-2",
+      "category": "long-context-control",
+      "input": "kijiwoyoyakushitekudasai.",
+      "options": {
+        "userRequestedSpeculation": false,
+        "avoidOutputs": [
+          "記事を予約してください。"
+        ],
+        "contextBefore": "以前は俳句の講師を予約する方法について話していました。旧件は終了しています。長い記事を短くまとめる作業です。現在はこの作業を説明しています。",
+        "contextAfter": "この対象についての補足は以上です。その後は旅行の予約の話題に移ります。",
+        "documentVocabulary": [
+          "俳句",
+          "講師",
+          "予約",
+          "旅行"
+        ],
+        "purpose": "speculative"
+      },
+      "acceptableExamples": [
+        "記事を要約してください。",
+        "記事の要点をまとめてください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "記事を短くまとめる依頼なら表現を限定しない"
+      ],
+      "criticalChecks": [
+        "要約済みという事実にしない"
+      ],
+      "comparison": {
+        "caseId": "noise-2",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "protected-multi",
+      "category": "protected-multiple-edits",
+      "input": "`MR-62`nokoushihaowaranakatta.`TZ-14`nokoushihaowaranakatta.",
+      "options": {
+        "contextBefore": "装置の更新作業の報告です。",
+        "avoidOutputs": [
+          "MR-62の講師は終わらなかった。TZ-14の講師は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false
+      },
+      "acceptableExamples": [
+        "MR-62の更新は終わらなかった。TZ-14の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "2台の更新が過去に完了しなかった意味を保持する"
+      ],
+      "criticalChecks": [
+        "両識別子の順序と各未完了を保持し、故障の原因を作らない"
+      ],
+      "comparison": {
+        "caseId": "protected-multi",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "protected-person",
+      "category": "protected-person",
+      "input": "akarinotoukihaowaranakatta.",
+      "settingsOverrides": {
+        "userDictionary": [
+          {
+            "id": "person",
+            "reading": "akari",
+            "output": "灯里",
+            "enabled": true,
+            "note": ""
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "会社設立を法務局に登録する手続きについての報告です。",
+        "avoidOutputs": [
+          "灯里の陶器は終わらなかった。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false
+      },
+      "acceptableExamples": [
+        "灯里の登記は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "登記の過去の未完了を表す"
+      ],
+      "criticalChecks": [
+        "灯里と過去の未完了を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-person",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "protected-order",
+      "category": "protected-order",
+      "input": "`A-1`nokakunihamadaowatteinai.`B-2`nokakunihamadaowatteinai.",
+      "options": {
+        "contextBefore": "2台の装置の確認作業の進捗です。",
+        "avoidOutputs": [
+          "A-1の書くにはまだ終わっていない。B-2の書くにはまだ終わっていない。"
+        ],
+        "purpose": "speculative",
+        "userRequestedSpeculation": false
+      },
+      "acceptableExamples": [
+        "A-1の確認はまだ終わっていない。B-2の確認はまだ終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "各装置の確認が未完了という意味を保持する"
+      ],
+      "criticalChecks": [
+        "識別子の順序・回数と否定を保持する"
+      ],
+      "comparison": {
+        "caseId": "protected-order",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-01",
+      "category": "new-adjacent-context",
+      "input": "shiyouwokaenaidekudasai.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "画面の使い方を説明していました。ここからは設計書に定めた機能の要件について話します。",
+        "contextAfter": "この要件を維持して実装します。別の担当者が文書を整理します。"
+      },
+      "acceptableExamples": [
+        "仕様を変えないでください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "仕様・要件を維持する依頼を保持する"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-01",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-02",
+      "category": "new-adjacent-context",
+      "input": "housouwoshitekudasai.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "朝は放送設備の話でした。今は発送前の荷物を包む作業を依頼しています。",
+        "contextAfter": "箱と緩衝材を使います。伝票の点検は別の担当です。"
+      },
+      "acceptableExamples": [
+        "包装してください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "放送ではなく荷物を包む依頼。包装・梱包などを許す"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-02",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-03",
+      "category": "new-adjacent-context",
+      "input": "mada3kennoshinkouhaowatteinai.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "午前中は工事の進行状況を確認しました。ここからは税務署へ届け出る書類の手続きについて報告します。",
+        "contextAfter": "未提出のものが残っています。次の話題では来週の予定を相談します。"
+      },
+      "acceptableExamples": [
+        "まだ3件の申告は終わっていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "3件の申告手続きの未完了を保つ"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-03",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-04",
+      "category": "new-adjacent-context",
+      "input": "`NX-41`nokoushihaowaranakatta.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "昼は建物の工事について話しました。今の対象は装置のソフトウェアを新しい版に置き換える作業です。",
+        "contextAfter": "装置名は管理番号で示しています。次に別の設備の相談をします。"
+      },
+      "acceptableExamples": [
+        "NX-41の更新は終わらなかった。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "ソフトウェア更新の過去未完了。建物工事や故障にしない"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-04",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-05",
+      "category": "new-adjacent-context",
+      "input": "ashitahaiku.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "以前は会議を欠席した日のことを話しました。ここからは明日の会議への出席について返答します。",
+        "contextAfter": "出席するかどうかを相手に伝えてください。天気の話はその後にします。"
+      },
+      "acceptableExamples": [
+        "明日は出席します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "参加の意向を保持し、欠席に反転しない"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-05",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    },
+    {
+      "id": "window-06",
+      "category": "new-adjacent-context",
+      "input": "ashitahaikanai.",
+      "options": {
+        "purpose": "speculative",
+        "userRequestedSpeculation": false,
+        "contextBefore": "以前は会議を欠席した日のことを話しました。ここからは明日の会議への出席について返答します。",
+        "contextAfter": "出席するかどうかを相手に伝えてください。天気の話はその後にします。"
+      },
+      "acceptableExamples": [
+        "明日は出席しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "不参加の意向を保持し、理由や不可能を根拠なく追加しない"
+      ],
+      "criticalChecks": [
+        "数字・識別子と否定・依頼・未完了を保持し、根拠のない事実を作らない"
+      ],
+      "comparison": {
+        "caseId": "window-06",
+        "profile": "adopted-production"
+      },
+      "notes": "採用した本番経路を直接実行する回帰評価。評価アダプターで指示・入力を書き換えない。"
+    }
+  ]
+}

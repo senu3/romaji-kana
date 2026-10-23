@@ -1,24 +1,23 @@
 import { ConversionResponseError } from "./conversionDiagnostics";
 import { parseConversionOutput, type ConversionOutput } from "./conversionOutput";
-import { finalTargetPrompt, referenceContextInstruction, userReinterpretationPrompt, type ConversionRequest, type ReinterpretationPart } from "./conversionRequest";
+import { finalTargetPrompt, speculationPrompt, referenceContextInstruction, type ConversionRequest, type SpeculationPart } from "./conversionRequest";
 import { finalReadingRule } from "./conversionRules";
 import { generateWithAbort, generatedText, stripThinkBlock, throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import { currentProviderBaseUrl } from "./modelProvider";
 import { normalizeNumericReading } from "./numericReading";
 import type { OllamaTransport } from "./ollamaProxy";
-import { buildCorrectionSystemPrompt, buildSpeculativeConversionSystemPrompt, buildUserReinterpretationSystemPrompt, conversionOutputContract } from "./prompts";
+import { buildCorrectionSystemPrompt, buildSpeculationSystemPrompt, conversionOutputContract } from "./prompts";
 import type { AppSettings } from "./types";
 
 export async function generateKanaConversion(request: ConversionRequest, settings: AppSettings, transport: OllamaTransport,
   options: JapaneseConversionOptions): Promise<{ text: string; reading: string; reportedReading: string; numericReadingNormalized: boolean }> {
   const speculative = options.purpose === "speculative";
-  const system = options.userRequestedSpeculation ? buildUserReinterpretationSystemPrompt(settings.conversionPrompt)
-    : speculative ? buildSpeculativeConversionSystemPrompt(settings.conversionPrompt, options.avoidOutputs,
-    request.reference.documentVocabulary?.slice()) : buildCorrectionSystemPrompt(settings.conversionPrompt);
   const response = await generateStructuredConversion(settings, transport, options, {
-    system: [referenceContextInstruction, system, conversionOutputContract()].join("\n\n"),
-    prompt: options.userRequestedSpeculation ? userReinterpretationPrompt(request, options.avoidOutputs ?? []) : finalTargetPrompt(request, true),
+    system: speculative ? buildSpeculationSystemPrompt(settings.conversionPrompt, false)
+      : [referenceContextInstruction, buildCorrectionSystemPrompt(settings.conversionPrompt), conversionOutputContract()].join("\n\n"),
+    prompt: speculative ? speculationPrompt(request)
+      : finalTargetPrompt(request, true),
     outputSchema: {
       type: "object", properties: { convertedText: { type: "string" }, completedKana: { type: "string" } },
       required: ["convertedText", "completedKana"], additionalProperties: false
@@ -47,14 +46,12 @@ async function generateStructuredConversion(settings: AppSettings, transport: Ol
   return stripThinkBlock(generatedText(response)).trim();
 }
 
-export async function generateReinterpretationSegments(request: ConversionRequest, parts: readonly ReinterpretationPart[],
+export async function generateSpeculationSegments(request: ConversionRequest, parts: readonly SpeculationPart[],
   sourceReadings: readonly string[], settings: AppSettings, transport: OllamaTransport, options: JapaneseConversionOptions) {
-  const editable = parts.filter((part): part is Extract<ReinterpretationPart, { id: string }> => "id" in part);
+  const editable = parts.filter((part): part is Extract<SpeculationPart, { id: string }> => "id" in part);
   const raw = await generateStructuredConversion(settings, transport, options, {
-    system: [referenceContextInstruction, buildUserReinterpretationSystemPrompt(settings.conversionPrompt, true),
-      "For each editable segment, convertedText and completedKana must describe that segment only. completedKana must not contain kanji. Preserve its digits, punctuation and line breaks.",
-      finalReadingRule.controlPrompt("final")].join("\n\n"),
-    prompt: userReinterpretationPrompt(request, options.avoidOutputs ?? [], parts),
+    system: buildSpeculationSystemPrompt(settings.conversionPrompt, true),
+    prompt: speculationPrompt(request, parts),
     outputSchema: { type: "object", properties: { segments: { type: "array", maxItems: editable.length,
       items: { type: "object", properties: { id: { type: "string", enum: editable.map(part => part.id) }, convertedText: { type: "string" }, completedKana: { type: "string" } },
         required: ["id", "convertedText", "completedKana"], additionalProperties: false } } }, required: ["segments"], additionalProperties: false },
