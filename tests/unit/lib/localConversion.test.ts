@@ -116,6 +116,21 @@ describe("local faithful conversion", () => {
     expect(result.text).toBe("記者");
     expect(result.session?.rerankStatus).toBe("failed");
   });
+  it("does not request small-tsu repair after a failed ranking", async () => {
+    const h = harness();
+    const first = candidate("有った", "あった");
+    first.tokens = ["有", "っ", "た"].map((text, i) => ({
+      ...first.tokens[0], text, reading: ["あ", "っ", "た"][i], from: i, to: i + 1,
+    }));
+    h.search.mockResolvedValue({ candidates: [first, candidate("あった", "あった", 200)], truncated: false, dictionaryRevision: "test" });
+    h.generate.mockRejectedValue(new Error("offline"));
+    const result = await convertRomajiToJapaneseDetailed("atta", defaultSettings, h.transport, { kanaEngine: h.engine, autoRescue: false });
+    expect(result.text).toBe("有った");
+    expect(result.session?.rerankStatus).toBe("failed");
+    expect(result.repairRequested).not.toBe(true);
+    expect(h.search).toHaveBeenCalledTimes(1);
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
   it("freezes order once the user starts navigating", async () => {
     const h = harness();
     const result = await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {

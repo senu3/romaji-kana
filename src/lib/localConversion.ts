@@ -212,6 +212,8 @@ export async function rankConversionSession(session: ConversionSession, settings
       throwIfConversionAborted(options.signal);
       session.rerankStatus = "failed";
       if (correcting) throw error;
+      // Keep the provisional selection; a failed ranker must not start repair.
+      return sessionResult(session);
     }
   } else session.rerankStatus = "skipped";
   throwIfConversionAborted(options.signal);

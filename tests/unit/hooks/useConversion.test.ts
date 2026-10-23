@@ -52,6 +52,25 @@ describe("conversion lifecycle", () => {
     { id: "typo", kind: "correction", result: { text: "会社", reviewKana: "かいしゃ" } },
   ]);
 
+  it.each(["typing", "shortcut"] as const)("keeps a failed ranking provisional and reports it for %s", async trigger => {
+    const session = candidateSession();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(async (_input, _settings, _transport, callbacks) => {
+      session.rerankStatus = "pending";
+      callbacks?.onLocalCandidates?.(sessionResult(session));
+      session.rerankStatus = "failed";
+      return sessionResult(session);
+    });
+    const { hook, view, options } = harness("kisha");
+    options.settingsRef.current.conversionMode = "replace";
+    await act(async () => { hook.current.handleConvert(range("kisha", trigger)); });
+    expect(view.state.doc.toString()).toBe("kisha");
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("記者");
+    expect(session.selectedId).toBe("one");
+    expect(session.state).toBe("open");
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
+    expect(options.setStatus).toHaveBeenLastCalledWith({ kind: "warning", message: "文脈による順位付けなし（暫定候補を表示しています）。" });
+  });
+
   it("lists only the same reading, freezes late ranking and previews a selected stored candidate", () => {
     const { hook, view } = harness("kisha");
     const session = candidateSession();

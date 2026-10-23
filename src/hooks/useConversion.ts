@@ -349,7 +349,7 @@ export function useConversion({
         skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
         return;
       }
-      if (conversion.session?.rerankStatus === "pending" || settingsRef.current.conversionMode === "ghost" ||
+      if (conversion.session?.rerankStatus === "pending" || conversion.session?.rerankStatus === "failed" || settingsRef.current.conversionMode === "ghost" ||
           requiresExplicitAcceptance(conversion) || isPredictiveSuggestionTrigger(request.range?.trigger)) {
         if (!showConversionPreview(conversion, {
           id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,
@@ -358,6 +358,10 @@ export function useConversion({
           documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
         })) return;
         if (historical) current.focus();
+        if (conversion.session?.rerankStatus === "failed") {
+          setStatus({ kind: "warning", message: "文脈による順位付けなし（暫定候補を表示しています）。" });
+          return;
+        }
         setStatus({ kind: "success", message: conversion.conversionStrategy === "speculative"
           ? "推測候補を表示しました。" : conversion.conversionStrategy === "correction"
             ? "誤字修正候補を表示しました。" : "変換候補を表示しました。" });
@@ -890,6 +894,10 @@ export function useConversion({
             documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
             source: "editor",
           })) return;
+          if (conversion.session?.rerankStatus === "failed") {
+            setStatus({ kind: "warning", message: "文脈による順位付けなし（暫定候補を表示しています）。" });
+            return;
+          }
           setStatus({
             kind: predictiveSuggestionQueueRef.current ? "loading" : "success",
             message: conversion.conversionStrategy === "speculative"
