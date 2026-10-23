@@ -287,26 +287,25 @@ try {
       await page.route('**/api/generate', route => {
         const body = route.request().postDataJSON();
         if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
-        // First return an unchanged reading, then a usable rescue (or another
-        // abstention). Assert the visible result instead of prompt wording.
-        const speculative = stages.length === 1;
-        stages.push(speculative ? 'speculative' : 'correction');
-        return route.fulfill({ json: { response: JSON.stringify({ convertedText: speculative && succeeds ? '本' : 'ほん', completedKana: 'ほん' }) } });
+        // Automatic rescue stops at correction; explicit reinterpretation is
+        // exercised separately above through the user-facing actions.
+        stages.push('correction');
+        return route.fulfill({ json: { response: JSON.stringify({ convertedText: succeeds ? '本' : 'ほん', completedKana: 'ほん' }) } });
       });
       await page.keyboard.type('hon');
       await page.keyboard.press('Control+Enter');
       if (succeeds) {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
         assert.equal(await editor.innerText().then(text => text.startsWith('hon')), true);
-        assert.match(await page.locator('.conversion-kind').textContent(), /推測候補/);
+        assert.match(await page.locator('.conversion-kind').textContent(), /修正候補/);
         await page.keyboard.press('Tab');
         assert.equal(await editor.innerText(), '本');
       } else {
-        await page.getByText('通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。', { exact: true }).first().waitFor();
+        await page.getByText('通常変換・誤字修正で候補が得られなかったため、ローマ字を残しました。', { exact: true }).first().waitFor();
         assert.equal(await editor.innerText(), 'hon');
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       }
-      assert.deepEqual(stages, ['correction', 'speculative']);
+      assert.deepEqual(stages, ['correction']);
     });
   }
   for (const cancel of [false, true]) {

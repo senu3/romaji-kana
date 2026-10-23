@@ -24,8 +24,24 @@ it("compares a suspected typo against an unchanged alternative and requires acce
   const result = await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, { kanaEngine: h.engine });
   expect(result.text).toBe("予定");
   expect(result.session?.candidates.some(c => c.id === "unchanged")).toBe(true);
+  const comparison = JSON.parse(h.transport.generate.mock.calls[1][2].prompt);
+  expect(comparison.candidates.find((c: { id: string }) => c.id === "unchanged").cost).toBe(100);
   expect(requiresExplicitAcceptance(result)).toBe(true);
   expect(h.transport.generate).toHaveBeenCalledTimes(2);
+});
+it("does not replace an option the user selected while comparison was running", async () => {
+  const h = setup(true, true);
+  let original: Awaited<ReturnType<typeof convertRomajiToJapaneseDetailed>> | undefined;
+  const generate = h.transport.generate.getMockImplementation()!;
+  h.transport.generate.mockImplementation(async (...args) => {
+    if (JSON.parse(args[2].prompt).candidates.some((c: { id: string }) => c.id === "unchanged")) original!.session!.locked = true;
+    return generate(...args);
+  });
+  const result = await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, {
+    kanaEngine: h.engine, onLocalCandidates: result => { original = result; },
+  });
+  expect(result.text).toBe("よってい");
+  expect(result.session).toBe(original?.session);
 });
 it("keeps the unchanged option when repair evidence is insufficient", async () => {
   const h = setup(true, false);
@@ -39,4 +55,17 @@ it("does not search repairs for a normal ranking decision", async () => {
   await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, { kanaEngine: h.engine });
   expect(h.engine.search).toHaveBeenCalledOnce();
   expect(h.transport.generate).toHaveBeenCalledOnce();
+});
+it("compares a stranded small-tsu dictionary fragment even when the model misses the typo", async () => {
+  const h = setup(false, true);
+  const engine: KanaEngine = { ...h.engine, search: async (...args) => {
+    const result = await h.engine.search(...args);
+    if (args[0] === "よってい") for (const c of result.candidates) {
+      c.tokens = [...c.reading].map((reading, from) => ({ ...c.tokens[0], text: [...c.text][from], reading, from, to: from + 1 }));
+    }
+    return result;
+  } };
+  const result = await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, { kanaEngine: engine });
+  expect(result.text).toBe("予定");
+  expect(h.transport.generate).toHaveBeenCalledTimes(2);
 });

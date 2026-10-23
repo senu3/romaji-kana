@@ -331,7 +331,7 @@ export function useConversion({
         skipQueuedConversion(request, request.userRequestedSpeculation
           ? "意図に合う推測候補を作れませんでした。本文は変更していません。"
           : conversion.suggestionRejectedReason === "unconvertible"
-            ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
+            ? "通常変換・誤字修正で候補が得られなかったため、ローマ字を残しました。"
             : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。");
         return;
       }
@@ -391,7 +391,7 @@ export function useConversion({
         onRescueStart: () => {
           if (!requestsRef.current.valid(request.id)) return;
           editorViewRef.current?.dispatch({ effects: clearGhostSuggestion.of(request.id) });
-          setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正・推測を試しています。" });
+          setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正を試しています。" });
         },
         ...conversionContext(view, resolved),
         avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,

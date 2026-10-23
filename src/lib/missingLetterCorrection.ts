@@ -84,8 +84,12 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
       else { readings.add(reading); first.push(candidate); }
     }
     const baseline = options.repairBaseline;
-    const unchanged: SessionCandidate[] = baseline ? [{ id: "unchanged", kind: "conversion", result: { ...baseline, session: undefined, repairRequested: undefined } }] : [];
+    const baselineCandidate = baseline?.session?.candidates.find(c => c.id === baseline.session?.selectedId);
+    const unchanged: SessionCandidate[] = baseline ? [{ id: "unchanged", kind: "conversion", cost: baselineCandidate?.cost,
+      tokens: baselineCandidate?.tokens, result: { ...baseline, session: undefined, repairRequested: undefined } }] : [];
     const retained = [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
+    // Reserve the unchanged option without falsely labeling it the best local path.
+    if (baseline) retained.sort((a, b) => (a.cost ?? Number.MAX_SAFE_INTEGER) - (b.cost ?? Number.MAX_SAFE_INTEGER));
     metrics.candidates = retained.length;
     metrics.searchMs = performance.now() - started;
     metrics.truncated ||= seen.size > MAX_CANDIDATES;

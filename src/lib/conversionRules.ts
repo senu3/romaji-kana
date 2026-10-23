@@ -70,7 +70,6 @@ export const typoCorrectionRule = {
     "The user prompt contains both the original romaji input and the mechanical kana.",
     "Use both signals to infer a minimal romaji typo repair before kana-kanji conversion.",
     "Assume the romaji input may contain a small typing error such as one wrong consonant.",
-    "For example, mododuki may be a typo of motoduki, yielding もとづき and 基づき.",
     "Repair only the minimum romaji or kana needed to produce a natural Japanese sentence.",
     "Do not paraphrase, summarize, or replace words whose reading already makes sense.",
     "Do not add new information. Keep the output close to the original wording.",
