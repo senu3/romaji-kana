@@ -1,4 +1,5 @@
 import { ConversionResponseError } from "./conversionDiagnostics";
+import { correctInput } from "./conversionCorrection";
 import { convertInputOnce } from "./conversionPipeline";
 import { isUsableConversionResult } from "./conversionPolicy";
 import { faithfulConversionRule } from "./conversionRules";
@@ -6,7 +7,6 @@ import { createConversionSession, sessionResult } from "./conversionSession";
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { defaultKanaEngine } from "./kanaEngine";
-import { searchMissingLetter } from "./missingLetterCorrection";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings } from "./types";
 
@@ -15,7 +15,9 @@ export async function convertRomajiToJapaneseDetailed(input: string, settings: A
   options = { ...options, purpose: options.userRequestedSpeculation ? "speculative" : options.purpose ?? "normal", kanaEngine: options.kanaEngine ?? defaultKanaEngine };
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
-    const candidate = await convertInputOnce(input, settings, transport, attemptOptions);
+    const candidate = attemptOptions.purpose === "correction"
+      ? await correctInput(input, settings, transport, attemptOptions)
+      : await convertInputOnce(input, settings, transport, attemptOptions);
     const result = attemptOptions.purpose === "speculative" ? { ...candidate, conversionStrategy: "speculative" as const }
       : attemptOptions.purpose === "correction" ? { ...candidate, conversionStrategy: "correction" as const } : candidate;
     if (result.session || result.suggestionRejected) return result;
@@ -25,13 +27,12 @@ export async function convertRomajiToJapaneseDetailed(input: string, settings: A
   const runRescue = async (first: JapaneseConversionResult): Promise<JapaneseConversionResult> => {
     options.onRescueStart?.();
     const attempts: NonNullable<JapaneseConversionResult["attempts"]> = [{ stage: "normal", outcome: "rejected", detail: first.rejectionDetail }];
-    for (const stage of ["correction", "speculative"] as const) {
+    const stages = options.autoSpeculation === false ? ["correction"] as const : ["correction", "speculative"] as const;
+    for (const stage of stages) {
       throwIfConversionAborted(options.signal);
       let candidate: JapaneseConversionResult;
       try {
-        const searched = stage === "correction" && options.missingLetterCorrection !== false ? await searchMissingLetter(input, settings, transport, options) : undefined;
-        candidate = searched && isUsableConversionResult(searched, options) ? searched
-          : await runAttempt({ ...options, purpose: stage, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined });
+        candidate = await runAttempt({ ...options, purpose: stage, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined });
       } catch (error) {
         if (!(error instanceof ConversionResponseError)) throw error;
         candidate = { text: "", reviewKana: first.reviewKana, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: error.diagnostic };
@@ -39,6 +40,7 @@ export async function convertRomajiToJapaneseDetailed(input: string, settings: A
       const unchangedKana = candidate.text === candidate.reviewKana && candidate.changes?.sourceReading !== undefined && faithfulConversionRule.sameReading(candidate.changes.sourceReading, candidate.reviewKana);
       const usable = isUsableConversionResult(candidate, options) && !unchangedKana;
       attempts.push({ stage, outcome: usable ? "candidate" : "rejected", detail: unchangedKana ? "no-candidate" : candidate.rejectionDetail });
+      if (candidate.rejectionDetail === "ranking-invalid") return { ...candidate, attempts };
       if (usable) return { ...candidate, attempts };
     }
     return { text: "", reviewKana: first.reviewKana, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate", attempts };

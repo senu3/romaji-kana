@@ -136,6 +136,12 @@ export async function rankConversionSession(session: ConversionSession, settings
   const correcting = candidates.every(c => c.kind === "correction" && c.result.romajiCorrection);
   const shouldRank = candidates.length > 1 || correcting;
   const reading = candidates[0].result.changes?.sourceReading ?? candidates[0].result.reviewKana;
+  const invalidCorrectionRanking = (): JapaneseConversionResult => {
+    session.rerankStatus = "invalid";
+    session.state = "dismissed";
+    return { text: "", reviewKana: reading, suggestionRejected: true,
+      suggestionRejectedReason: "unconvertible", rejectionDetail: "ranking-invalid" };
+  };
   session.rerankStatus = shouldRank ? "pending" : "skipped";
   options.onLocalCandidates?.(sessionResult(session));
   if (shouldRank && options.rerank !== false) {
@@ -171,15 +177,27 @@ export async function rankConversionSession(session: ConversionSession, settings
           }))
         }),
       }, 8_000, options.signal);
-      const data = JSON.parse(stripThinkBlock(generatedText(response))) as { order?: unknown };
+      throwIfConversionAborted(options.signal);
+      let data: { order?: unknown };
+      try { data = JSON.parse(stripThinkBlock(generatedText(response))); }
+      catch (error) {
+        if (correcting) return invalidCorrectionRanking();
+        throw error;
+      }
+      if (correcting && (!data || typeof data !== "object" || Array.isArray(data) ||
+          Object.keys(data).length !== 1 || !Array.isArray(data.order) || data.order.length > Math.min(3, candidates.length))) {
+        return invalidCorrectionRanking();
+      }
       if (Array.isArray(data.order) && !data.order.length && session.state === "open" && !session.locked) {
         session.rerankStatus = "applied";
         return { text: "", reviewKana: reading, suggestionRejected: true, suggestionRejectedReason: "unconvertible", rejectionDetail: "no-plausible-candidate" };
       }
       session.rerankStatus = applySessionRanking(session, data.order) ? "applied" : session.locked || session.state !== "open" ? "skipped" : "invalid";
+      if (correcting && session.rerankStatus === "invalid") return invalidCorrectionRanking();
     } catch (error) {
       throwIfConversionAborted(options.signal);
       session.rerankStatus = "failed";
+      if (correcting) throw error;
     }
   } else session.rerankStatus = "skipped";
   throwIfConversionAborted(options.signal);

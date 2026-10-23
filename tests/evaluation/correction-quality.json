@@ -1,0 +1,19 @@
+{
+  "version": "2026-10-21-correction-quality-1",
+  "qualityProfile": "correction-v1",
+  "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "cases": [
+    { "id": "repair-time", "category": "typo-correction", "input": "jkan", "options": { "autoSpeculation": false, "contextBefore": "会議が始まる時刻を確認しています。" }, "acceptableExamples": ["時間"], "expectedRoutes": ["correction"], "criteria": ["欠けたiを補って時間とする"] },
+    { "id": "repair-negative", "category": "typo-correction", "input": "kaiginojkanwokaenaidekudasai.", "options": { "autoSpeculation": false, "contextBefore": "会議の開始時刻は確定しているので、そのままにする依頼です。" }, "acceptableExamples": ["会議の時間を変えないでください。"], "expectedRoutes": ["correction"], "criteria": ["時間を修復し否定の依頼を維持する"] },
+    { "id": "repair-confirm", "category": "typo-correction", "input": "shoruiwokakninshitekudasai.", "options": { "autoSpeculation": false }, "acceptableExamples": ["書類を確認してください。"], "expectedRoutes": ["correction"], "criteria": ["確認のuを補い依頼を保つ"] },
+    { "id": "repair-duplicate", "category": "typo-correction", "input": "ashitanoyottei.", "options": { "autoSpeculation": false }, "acceptableExamples": ["明日の予定。"], "expectedRoutes": ["correction"], "criteria": ["余分なtを削除して予定とする"] },
+    { "id": "repair-late-n", "category": "typo-correction", "input": "ashitanokaiginoshiryouwosakuseishitekakunishitekudasai.", "options": { "autoSpeculation": false }, "acceptableExamples": ["明日の会議の資料を作成して確認してください。"], "expectedRoutes": ["correction"], "criteria": ["文末近くの確認を修復する"] },
+    { "id": "repair-protected", "category": "typo-correction", "input": "`QX-73`nojkanwokaenaidekudasai.", "options": { "autoSpeculation": false, "contextBefore": "装置の待機時間は決まっているので、変更しない依頼です。" }, "acceptableExamples": ["QX-73の時間を変えないでください。"], "expectedRoutes": ["correction"], "criteria": ["識別子と否定を保持して時間を修復する"] },
+    { "id": "control-greeting", "category": "correct-input", "input": "arigatou.", "options": { "autoSpeculation": false }, "acceptableExamples": ["ありがとう。", "有難う。", "有り難う。"], "expectedRoutes": ["normal"], "criteria": ["正しい入力を修正しない"] },
+    { "id": "control-schedule", "category": "correct-input", "input": "ashitanoyoteiwokakuninshimasu.", "options": { "autoSpeculation": false }, "acceptableExamples": ["明日の予定を確認します。"], "expectedRoutes": ["normal"], "criteria": ["正しい予定の文を修正しない"] },
+    { "id": "control-negative", "category": "correct-input", "input": "kaiginojikanwokaenaidekudasai.", "options": { "autoSpeculation": false }, "acceptableExamples": ["会議の時間を変えないでください。"], "expectedRoutes": ["normal"], "criteria": ["正しい否定文を修正しない"] },
+    { "id": "control-protected", "category": "correct-input", "input": "`QX-73`no15jinojikanwokakuninshimasu.", "options": { "autoSpeculation": false }, "acceptableExamples": ["QX-73の15時の時間を確認します。"], "expectedRoutes": ["normal"], "criteria": ["数字と識別子を保持し読みを修正しない"] },
+    { "id": "unknown-letters", "category": "unknown-input", "input": "qxzvplm", "options": { "autoSpeculation": false }, "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["特定できない入力には辞退する"] },
+    { "id": "unknown-protected", "category": "unknown-input", "input": "`QX-73`noqzxvwokaenai.", "options": { "autoSpeculation": false }, "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["未知語を創作しない"] }
+  ]
+}

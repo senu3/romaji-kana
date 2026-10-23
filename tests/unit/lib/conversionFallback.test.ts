@@ -16,6 +16,16 @@ function candidate(text: string, source = "mozc", reading = "ほん"): EngineCan
 }
 
 describe("normal → correction → speculation → unchanged romaji", () => {
+  it("can evaluate normal conversion and correction without launching speculative rescue", async () => {
+    const h = harness();
+    h.generate.mockResolvedValue(json("", ""));
+    const result = await convertRomajiToJapaneseDetailed("hon", defaultSettings, h.transport, {
+      kanaEngine: h.engine, autoSpeculation: false,
+    });
+    expect(result.suggestionRejected).toBe(true);
+    expect(result.attempts?.map(attempt => attempt.stage)).toEqual(["normal", "correction"]);
+    expect(h.generate).toHaveBeenCalledOnce();
+  });
   it("removes synthetic passthrough from candidates and sends dictionary ranking evidence", async () => {
     const h = harness([candidate("本"), candidate("ほん", "literal"), candidate("奔")]);
     h.generate.mockResolvedValue({ response: '{"order":["candidate-0"]}' });

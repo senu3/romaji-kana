@@ -7,6 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import { createKanaEngineClient } from "../../tools/kana-engine-client.mjs";
 import { finalRoutes, observeRoute, summarizeRoutes } from "./routes.mjs";
+import { summarizeCorrectionQuality } from "./correction-quality.mjs";
 import { artifactPath, resolveArtifactPath } from "../helpers/artifacts.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -215,6 +216,7 @@ async function main() {
       groups[category] = { trials: rows.length, candidates: rows.filter(r => r.outcome === "candidate").length, rejected: rows.filter(r => r.outcome === "rejected").length, empty: rows.filter(r => r.outcome === "empty").length, errors: rows.filter(r => r.outcome === "error").length, medianMs: timings.length ? timings.length % 2 ? timings[mid] : (timings[mid - 1] + timings[mid]) / 2 : null };
     }
     await writeFile(resolve(out, "summary.json"), JSON.stringify({ stoppedOnError: stopped, plannedTrials: schedule.length, completedTrials: measured.length,
+      ...(dataset.qualityProfile === "correction-v1" ? { correctionQuality: summarizeCorrectionQuality(measured) } : {}),
       routes: summarizeRoutes(measured),
       exactReferenceMatch: { top: measured.filter(r => r.exactReferenceMatch.top).length,
         topEvaluated: measured.filter(r => r.exactReferenceMatch.top !== null).length,

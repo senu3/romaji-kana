@@ -147,6 +147,51 @@ describe("single missing romaji letter", () => {
     expect(await searchMissingLetter("jkan", defaultSettings, transport, { kanaEngine: engine }))
       .toMatchObject({ suggestionRejected: true, rejectionDetail: "no-plausible-candidate" });
   });
+  it.each([
+    "not JSON", "null", "[]", '{}', '{"order":"repair-0"}',
+    '{"order":["unknown"]}', '{"order":["repair-0","repair-0"]}',
+    '{"order":[],"explanation":"no"}',
+  ])("does not expose or regenerate an unselected correction after invalid ranking: %s", async response => {
+    const { engine, transport } = harness();
+    transport.generate.mockResolvedValue({ response });
+    const onLocalCandidates = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed("jkan", defaultSettings, transport, {
+      kanaEngine: engine, onLocalCandidates,
+    });
+    expect(result).toMatchObject({ text: "", suggestionRejected: true, rejectionDetail: "ranking-invalid" });
+    expect(result.session).toBeUndefined();
+    expect(result.attempts?.map(attempt => attempt.stage)).toEqual(["normal", "correction"]);
+    expect(onLocalCandidates).not.toHaveBeenCalled();
+    expect(transport.generate).toHaveBeenCalledOnce();
+  });
+  it("propagates a failed correction ranking connection without selecting a local candidate or generating again", async () => {
+    const { engine, transport } = harness();
+    const failure = new Error("ranking offline");
+    transport.generate.mockRejectedValue(failure);
+    await expect(convertRomajiToJapaneseDetailed("jkan", defaultSettings, transport, { kanaEngine: engine }))
+      .rejects.toBe(failure);
+    expect(transport.generate).toHaveBeenCalledOnce();
+  });
+  it("uses the same missing-letter search for an explicit correction request", async () => {
+    const { engine, transport } = harness();
+    const result = await convertRomajiToJapaneseDetailed("jkan", defaultSettings, transport, {
+      kanaEngine: engine, purpose: "correction",
+    });
+    expect(result.text).toBe("時間");
+    expect(result.romajiCorrection).toMatchObject({ before: "jkan", after: "jikan" });
+    expect(transport.generate).toHaveBeenCalledOnce();
+  });
+  it("cancels an in-flight correction ranking without returning the local repair", async () => {
+    const { engine, transport } = harness();
+    const controller = new AbortController();
+    transport.generate.mockImplementation(async () => {
+      controller.abort();
+      return { response: '{"order":["repair-0"]}' };
+    });
+    await expect(searchMissingLetter("jkan", defaultSettings, transport, {
+      kanaEngine: engine, signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+  });
   it("bounds dictionary requests and reports truncated exploration", async () => {
     const { engine, transport } = harness();
     const metrics = vi.fn();

@@ -30,6 +30,9 @@ export interface JapaneseConversionOptions {
   onRankedCandidates?: (result: JapaneseConversionResult) => void | Promise<void>;
   /** Disable correction/speculation for dictionary-only measurements. */
   autoRescue?: boolean;
+  /** Isolate normal conversion and correction in evaluations; default preserves
+   * the application's existing speculative rescue behavior. */
+  autoSpeculation?: boolean;
   /** Experimental branch: search one internal missing romaji letter before model repair. */
   missingLetterCorrection?: boolean;
   onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;
