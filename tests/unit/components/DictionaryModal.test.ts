@@ -3,6 +3,7 @@ import { act, createElement, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { DictionaryModal } from "../../../src/components/DictionaryModal";
+import { recordConversionChoice, conversionLearningChoices } from "../../../src/lib/conversionLearning";
 
 let dispose = () => {};
 afterEach(() => { dispose(); vi.unstubAllGlobals(); });
@@ -19,11 +20,22 @@ function mount(overrides: Partial<ComponentProps<typeof DictionaryModal>> = {}) 
 it("shows only the selected dictionary panel", () => {
   const { host } = mount();
   expect(host.querySelector('#dictionary-registered-tab')).toBeNull();
-  for (const tab of ["personal", "detected", "personal"]) {
+  for (const tab of ["personal", "detected", "learning", "personal"]) {
     act(() => host.querySelector<HTMLButtonElement>(`#dictionary-${tab}-tab`)!.click());
     expect([...host.querySelectorAll('[role="tabpanel"]')].map(p => p.id)).toEqual([`dictionary-${tab}-panel`]);
     expect(host.querySelector('[aria-selected="true"]')?.id).toBe(`dictionary-${tab}-tab`);
   }
+});
+it("lists learned choices and deletes individual and remaining preferences", () => {
+  localStorage.clear(); recordConversionChoice("こうかい", "後悔"); recordConversionChoice("こうかい", "航海");
+  const { host } = mount();
+  act(() => host.querySelector<HTMLButtonElement>('#dictionary-learning-tab')!.click());
+  expect(host.textContent).toContain("後悔");
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="こうかい → 後悔 の学習を削除"]')!.click());
+  expect(conversionLearningChoices().map(c => c.text)).toEqual(["航海"]);
+  act(() => [...host.querySelectorAll('button')].find(b => b.textContent === "学習履歴をすべて削除")!.click());
+  expect(conversionLearningChoices()).toEqual([]);
+  expect(host.textContent).toContain("学習履歴はありません");
 });
 function input(host: HTMLElement, label: string, value: string) {
   const field = host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;

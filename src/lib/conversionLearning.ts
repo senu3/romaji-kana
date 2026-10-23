@@ -1,11 +1,21 @@
 const KEY = "romaji-kana-conversion-learning-v1";
-interface Choice { reading: string; text: string; count: number; updated: number }
+export interface Choice { reading: string; text: string; count: number; updated: number }
 function load(): Choice[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
     return Array.isArray(value) ? value.filter((c): c is Choice => c && typeof c.reading === "string" && typeof c.text === "string" &&
       Number.isInteger(c.count) && c.count > 0 && Number.isFinite(c.updated)).slice(0, 500) : [];
   } catch { return []; }
+}
+export function conversionLearningChoices(): Choice[] { return load(); }
+export function forgetConversionChoice(reading: string, text: string): boolean {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(load().filter(choice => choice.reading !== reading || choice.text !== text)));
+    return true;
+  } catch { return false; }
+}
+export function clearConversionLearning(): boolean {
+  try { localStorage.removeItem(KEY); return true; } catch { return false; }
 }
 export function conversionLearningSnapshot(): (reading: string, text: string) => number {
   const bonuses = new Map(load().map(choice => [JSON.stringify([choice.reading, choice.text]), Math.min(choice.count, 4) * 1500]));

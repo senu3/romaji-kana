@@ -1,12 +1,29 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { conversionLearningSnapshot, recordConversionChoice } from "../../../src/lib/conversionLearning";
+import { conversionLearningSnapshot, recordConversionChoice, conversionLearningChoices, forgetConversionChoice, clearConversionLearning } from "../../../src/lib/conversionLearning";
 import { convertRomajiToJapaneseDetailed } from "../../../src/lib/ollama";
 import { defaultSettings } from "../../../src/lib/settings";
 
 describe("conversion learning snapshot", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.restoreAllMocks());
+
+  it("forgets only the selected pair and can clear all preferences", () => {
+    recordConversionChoice("きしゃ", "汽車"); recordConversionChoice("きしゃ", "記者");
+    const pending = conversionLearningSnapshot();
+    expect(forgetConversionChoice("きしゃ", "汽車")).toBe(true);
+    expect(conversionLearningChoices().map(c => c.text)).toEqual(["記者"]);
+    expect(conversionLearningSnapshot()("きしゃ", "汽車")).toBe(0);
+    expect(pending("きしゃ", "汽車")).toBe(1500);
+    expect(clearConversionLearning()).toBe(true);
+    expect(conversionLearningChoices()).toEqual([]);
+  });
+  it("reports deletion failures without claiming success", () => {
+    recordConversionChoice("きしゃ", "汽車");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw Error("unavailable"); });
+    expect(forgetConversionChoice("きしゃ", "汽車")).toBe(false);
+    expect(conversionLearningChoices()).toHaveLength(1);
+  });
 
   it("keeps the request's preferences stable and picks up new choices on the next request", () => {
     recordConversionChoice("きしゃ", "汽車");

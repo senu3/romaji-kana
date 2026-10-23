@@ -5,6 +5,7 @@ import { createId } from "../lib/id";
 import type { PersonalWord } from "../lib/kanaEngine";
 import { PersonalDictionary } from "./PersonalDictionary";
 import { normalizePersonalDictionary } from "../lib/settings";
+import { ConversionLearningPanel } from "./ConversionLearningPanel";
 
 
 export function DictionaryModal({
@@ -20,7 +21,7 @@ export function DictionaryModal({
   personalWords?: PersonalWord[];
   onPersonalWordsChange?: (words: PersonalWord[]) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"detected" | "personal">("personal");
+  const [activeTab, setActiveTab] = useState<"detected" | "personal" | "learning">("personal");
   const [detectedDraft, setDetectedDraft] = useState<{
     reading: string;
     output: string;
@@ -94,7 +95,12 @@ export function DictionaryModal({
         >
           文書から検出 {detectedTerms.length}
         </button>
+        <button type="button" role="tab" id="dictionary-learning-tab" aria-controls="dictionary-learning-panel"
+          aria-selected={activeTab === "learning"} className={activeTab === "learning" ? "selected" : ""}
+          onClick={() => setActiveTab("learning")}>学習履歴</button>
       </div>
+
+      {activeTab === "learning" && <div id="dictionary-learning-panel" role="tabpanel" aria-labelledby="dictionary-learning-tab"><ConversionLearningPanel /></div>}
 
       {activeTab === "personal" && <div id="dictionary-personal-panel" role="tabpanel" aria-labelledby="dictionary-personal-tab">
         <PersonalDictionary words={personalWords} onChange={onPersonalWordsChange ?? (() => undefined)} />
