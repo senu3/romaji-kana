@@ -122,6 +122,9 @@ export function useDocumentSession({ remoteMode, editorViewRef }: DocumentSessio
       userEvent: "document.open",
       annotations: Transaction.addToHistory.of(false),
     });
+    if (vocabularyTimerRef.current) clearTimeout(vocabularyTimerRef.current);
+    vocabularyTimerRef.current = null;
+    setDocumentVocabularyProfile(buildDocumentVocabularyProfile(content));
   }, []);
 
   const markDocumentClean = useCallback(() => {

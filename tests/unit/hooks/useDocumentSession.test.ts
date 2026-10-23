@@ -62,4 +62,15 @@ describe("document session lifecycle", () => {
     window.dispatchEvent(new Event("beforeunload"));
     expect(loadDocumentSession().content).toBe("last keystroke");
   });
+  it("replaces vocabulary immediately on document switch and cancels stale extraction", () => {
+    const editor = stateEditor("航海");
+    const hook = mountHook(() => useDocumentSession({ remoteMode: false, editorViewRef: { current: editor.view } }));
+    act(() => hook.current.persistDocumentChange("航海"));
+    act(() => hook.current.replaceDocumentContent("校正"));
+    expect(hook.current.documentVocabularyProfile.terms).toEqual(["校正"]);
+    act(() => vi.advanceTimersByTime(500));
+    expect(hook.current.documentVocabularyProfile.terms).toEqual(["校正"]);
+    act(() => hook.current.replaceDocumentContent(""));
+    expect(hook.current.documentVocabularyProfile.terms).toEqual([]);
+  });
 });

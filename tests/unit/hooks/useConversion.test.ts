@@ -51,6 +51,21 @@ describe("conversion lifecycle", () => {
     { id: "two", kind: "conversion", result: { text: "汽車", reviewKana: "きしゃ" } },
     { id: "typo", kind: "correction", result: { text: "会社", reviewKana: "かいしゃ" } },
   ]);
+  it.each(["typing", "shortcut"] as const)("passes only the current document vocabulary when enabled: %s", async trigger => {
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
+    const { hook, view, options } = harness("航海 hon");
+    options.settingsRef.current.conversionMode = "ghost";
+    options.settingsRef.current.useDocumentVocabulary = true;
+    await act(async () => { hook.current.handleConvert(range("hon", trigger, 3)); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.documentVocabulary).toContain("航海");
+    act(() => { hook.current.handleDismissGhost(); view.dispatch({ changes: { from: 0, to: 2, insert: "校正" } }); });
+    await act(async () => { hook.current.handleConvert(range("hon", trigger, 3)); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.documentVocabulary).toEqual(["校正"]);
+    act(() => hook.current.handleDismissGhost());
+    options.settingsRef.current.useDocumentVocabulary = false;
+    await act(async () => { hook.current.handleConvert(range("hon", trigger, 3)); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.documentVocabulary).toBeUndefined();
+  });
 
   it.each(["typing", "shortcut"] as const)("keeps a failed ranking provisional and reports it for %s", async trigger => {
     const session = candidateSession();

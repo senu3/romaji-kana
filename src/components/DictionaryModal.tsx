@@ -296,7 +296,7 @@ export function DictionaryModal({
             />
             <span>
               <strong>文書の語彙に合わせる</strong>
-              <small>現在の文書で見つけた表記を、同じ読みの候補選びに使います。</small>
+              <small>オンにすると、現在の文書の表記をモデルによる候補選びの参考にします。候補にない語は追加されません。モデル未接続時は使われません。</small>
             </span>
           </label>
 
