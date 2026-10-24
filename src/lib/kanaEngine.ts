@@ -22,6 +22,10 @@ export interface EngineToken {
 }
 export interface EngineCandidate { text: string; reading: string; cost: number; tokens: EngineToken[] }
 export interface EngineSearchResult { candidates: EngineCandidate[]; truncated: boolean; dictionaryRevision: string }
+export interface WordSuggestion { text: string; reading: string; source: "mozc" | "user" | "learning"; cost: number }
+export async function suggestWords(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<WordSuggestion[]> {
+  return (await request<{ candidates: WordSuggestion[] }>({ operation: "suggest", reading, words: words.filter(w => w.enabled) }, signal)).candidates;
+}
 export interface KanaEngine {
   search(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<EngineSearchResult>;
   verify(text: string, reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<"verified" | "unverified" | "contradicted">;
