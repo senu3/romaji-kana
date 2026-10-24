@@ -5,7 +5,7 @@ import type { ConversionRange, ConversionTrigger } from "./types";
 
 interface Range { from: number; to: number }
 export const rememberUnconvertedRange = StateEffect.define<Range>();
-const settledEvents = ["input.convert", "input.historyApply", "input.ghostAccept"];
+const settledEvents = ["input.convert", "input.historyApply", "input.ghostAccept", "input.autosuggest"];
 
 // Kept independently of ghost decorations: failed/rejected candidates must not
 // lose the original editing range. Positions follow CodeMirror transactions.

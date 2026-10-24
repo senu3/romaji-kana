@@ -51,7 +51,7 @@ describe("unconverted range retention", () => {
     expect(retainedConversionRange(state, 6, "typing")?.text).toBe("kaigi ni iku.");
   });
   it("clears memories after acceptance, deletion or document replacement", () => {
-    for (const userEvent of ["input.convert", "input.ghostAccept", "input.historyApply", "document.open", "delete.selection"]) {
+    for (const userEvent of ["input.convert", "input.ghostAccept", "input.historyApply", "input.autosuggest", "document.open", "delete.selection"]) {
       const state = remembered("ashita.").update({ changes: { from: 0, to: 7, insert: userEvent === "delete.selection" ? "" : "明日。" }, userEvent }).state;
       if (userEvent === "delete.selection" || userEvent === "document.open" || userEvent.startsWith("input.")) {
         expect(state.field(unconvertedRanges)).toEqual([]);
