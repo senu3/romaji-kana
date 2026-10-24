@@ -15,6 +15,7 @@ export const defaultSettings: AppSettings = {
   lmStudioApiUrl: "http://localhost:1234",
   modelName: "gemma3",
   autoConvert: true,
+  autoSuggest: true,
   conversionMode: "replace",
 
   triggers: {
@@ -57,6 +58,7 @@ export function saveSettings(settings: AppSettings): void {
 export function sharedConversionSettings(settings: AppSettings): SharedConversionSettings {
   return {
     autoConvert: settings.autoConvert,
+    autoSuggest: settings.autoSuggest,
     conversionMode: settings.conversionMode,
 
     triggers: settings.triggers,
@@ -90,6 +92,7 @@ function mergeSettings(settings: Partial<AppSettings>): AppSettings {
     ...defaultSettings, ...picked,
     conversionPrompt: settings.conversionPrompt || defaultConversionPrompt,
     think: settings.think === true,
+    autoSuggest: settings.autoSuggest !== false,
     inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: { ...defaultSettings.triggers, ...settings.triggers },

@@ -1,4 +1,6 @@
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
+import { suggestAfterConversion } from "../components/autoSuggestExtension";
+import { convertedSuggestTarget } from "../lib/autoSuggest";
 import type { EditorView } from "@codemirror/view";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -372,7 +374,9 @@ export function useConversion({
       acceptConversionSession(conversion.session);
       current.dispatch({
         changes: { from: latest.from, to: latest.to, insert: conversion.text },
-        effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id)],
+        effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id), suggestAfterConversion.of(convertedSuggestTarget(
+          latest.from, conversion.text, conversion.changes?.resultReading ?? conversion.reviewKana ?? "",
+        ))],
         userEvent: historical ? "input.historyApply" : "input.convert",
       });
       saveCurrentDocumentSession(current.state.doc.toString());

@@ -18,6 +18,7 @@ export interface AppSettings {
   lmStudioApiUrl: string;
   modelName: string;
   autoConvert: boolean;
+  autoSuggest: boolean;
   conversionMode: "replace" | "ghost";
 
   triggers: {
@@ -43,6 +44,7 @@ export interface AppSettings {
 export type SharedConversionSettings = Pick<
   AppSettings,
   | "autoConvert"
+  | "autoSuggest"
   | "conversionMode"
   | "triggers"
   | "punctuationConversion"

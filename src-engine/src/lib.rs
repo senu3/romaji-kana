@@ -69,6 +69,10 @@ pub struct SearchResult {
     pub dictionary_revision: &'static str,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Suggestion { pub text: String, pub reading: String, pub source: String, pub cost: i32 }
+
 #[derive(Clone)]
 struct Entry {
     reading: String,
@@ -105,7 +109,6 @@ impl Trie {
         found
     }
 
-    #[cfg(feature = "evaluation")]
     fn completions(&self, prefix: &[char]) -> Vec<usize> {
         let mut node = self;
         for ch in prefix {
@@ -432,6 +435,24 @@ impl Engine {
         })
     }
 
+    /// Independent, bounded word suggestions. No lattice search or model ranking.
+    pub fn suggest(&self, reading: &str, words: &[UserWord]) -> Vec<Suggestion> {
+        let prefix: Vec<char> = reading.chars().collect();
+        if prefix.len() < 2 || prefix.len() > 80 || !prefix.iter().all(|c| ('ぁ'..='ゖ').contains(c) || *c == 'ー') {
+            return vec![];
+        }
+        let matches = |key: &str| key.starts_with(reading) && key.chars().count() > prefix.len() && key.chars().count() <= prefix.len() + 12;
+        let mut found: Vec<Suggestion> = self.trie.completions(&prefix).into_iter().filter_map(|index| {
+            let entry = &self.entries[index];
+            matches(&entry.reading).then(|| Suggestion { text: entry.text.clone(), reading: entry.reading.clone(), source: "mozc".into(), cost: entry.cost })
+        }).collect();
+        found.extend(words.iter().filter(|w| matches(&w.reading) && !w.text.is_empty() && w.text.chars().count() <= 80).map(|w|
+            Suggestion { text: w.text.clone(), reading: w.reading.clone(), source: "user".into(), cost: 3000 }));
+        found.sort_by(|a, b| (a.source != "user").cmp(&(b.source != "user")).then(a.cost.cmp(&b.cost)).then(a.reading.len().cmp(&b.reading.len())).then(a.text.cmp(&b.text)));
+        let mut seen = HashSet::new();
+        found.into_iter().filter(|s| seen.insert((s.reading.clone(), s.text.clone()))).take(20).collect()
+    }
+
     /// Prefix completion proposes readings; it never silently changes typed characters.
     #[cfg(feature = "evaluation")]
     pub fn complete(&self, reading: &str, words: &[UserWord]) -> Vec<String> {
@@ -566,6 +587,7 @@ impl PartialOrd for Path {
 #[serde(tag = "operation", rename_all = "camelCase")]
 pub enum Request {
     Notices,
+    Suggest { reading: String, #[serde(default)] words: Vec<UserWord> },
     #[cfg(feature = "evaluation")]
     Complete {
         reading: String,
@@ -585,6 +607,10 @@ pub enum Request {
 }
 pub fn execute(request: Request) -> Result<serde_json::Value, String> {
     match request {
+        Request::Suggest { reading, words } => {
+            if words.len() > 500 { return Err("Too many personal words".into()); }
+            Ok(serde_json::json!({ "candidates": engine()?.suggest(&reading, &words) }))
+        }
         Request::Notices => Ok(serde_json::json!({
             "revision": "0136c35782536cb43d710575c311cd4185982738",
             "notice": include_str!("../data/NOTICE.txt"),

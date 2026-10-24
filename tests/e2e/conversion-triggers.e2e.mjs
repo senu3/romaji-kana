@@ -14,7 +14,7 @@ try {
     await context.addInitScript(settings => {
       localStorage.clear();
       localStorage.setItem('romaji-kana-settings', JSON.stringify({
-        conversionMode: 'ghost', inputPauseTiming: 'early', ...settings,
+        conversionMode: 'ghost', inputPauseTiming: 'early', autoSuggest: false, ...settings,
       }));
     }, settings);
     const page = await context.newPage();

@@ -8,6 +8,15 @@ fn production_rejects_retired_completion_requests() {
 }
 use super::*;
 #[test]
+fn independent_suggestions_extend_prefix_and_include_personal_words() {
+    let words = vec![UserWord { id: "word".into(), reading: "てすとしゃ".into(), text: "試験社".into(), pos: "organization".into() }];
+    let results = engine().unwrap().suggest("てすとし", &words);
+    assert_eq!(results[0].text, "試験社");
+    assert!(results.iter().all(|s| s.reading.starts_with("てすとし") && s.reading.chars().count() > 4));
+    assert!(results.len() <= 20);
+    for input in ["あ", "とうk", "東京", ""] { assert!(engine().unwrap().suggest(input, &words).is_empty()); }
+}
+#[test]
 fn real_dictionary_provides_paths_and_independent_reading_evidence() {
     let engine = engine().unwrap();
     let result = engine

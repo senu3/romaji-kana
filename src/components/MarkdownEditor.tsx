@@ -9,6 +9,8 @@ import {
   undoDepth,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
+import { autoSuggestExtension, suggestAfterConversion } from "./autoSuggestExtension";
+import { convertedSuggestTarget } from "../lib/autoSuggest";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
@@ -407,6 +409,7 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
   "input.ghostAccept",
+  "input.autosuggest",
   "input.speculativeDismiss",
 ]);
 
@@ -487,6 +490,7 @@ export function MarkdownEditor({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
+  useEffect(() => { viewRef.current?.dispatch({}); }, [settings.autoSuggest, settings.personalDictionary]);
 
   function clearPredictiveSuggestionTimer() {
     if (suggestionPauseTimerRef.current) {
@@ -716,6 +720,7 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        autoSuggestExtension(() => settingsRef.current, view => view.state.field(loadingDecorations).size > 0),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {
@@ -952,7 +957,9 @@ export function MarkdownEditor({
         to: suggestion.to,
         insert: suggestion.convertedText,
       },
-      effects: clearGhostSuggestion.of(suggestion.id),
+      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
+        suggestion.from, suggestion.convertedText, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
+      ))],
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);
@@ -1029,7 +1036,9 @@ export function MarkdownEditor({
         insert: replacement,
       },
       selection: { anchor: suggestion.from + replacement.length },
-      effects: clearGhostSuggestion.of(suggestion.id),
+      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
+        suggestion.from, replacement, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
+      ))],
       annotations: isolateHistory.of("full"),
       userEvent: "input.ghostAccept",
     });

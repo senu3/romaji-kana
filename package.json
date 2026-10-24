@@ -14,6 +14,7 @@
     "test:e2e:local": "node tests/run.mjs e2e:local",
     "test:e2e:triggers": "node tests/run.mjs e2e:triggers",
     "test:e2e:dictionary": "node tests/run.mjs e2e:dictionary",
+    "test:e2e:autosuggest": "node tests/run.mjs e2e:autosuggest",
     "test:engine": "node tests/run.mjs engine",
     "test:companion": "node tests/run.mjs companion",
     "eval:run": "node tests/run.mjs eval",
