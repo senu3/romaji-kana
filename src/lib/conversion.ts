@@ -1,5 +1,6 @@
 import { excludedRanges, isNumericSeparator, isPendingNumericSeparator, isSentenceBoundary } from "./conversionBoundaries";
 import type { AppSettings, ConversionRange, ConversionTrigger } from "./types";
+import { existingJapanesePrefixLength } from "./inputBoundaries";
 
 export function triggerFromCharacter(
   character: string,
@@ -88,7 +89,7 @@ export function extractConversionRange(
     if (range.kind !== "literal" && range.from < safeCursor && range.to > start) start = Math.max(start, range.to);
   }
   if (start >= safeCursor) return null;
-  const adjustedStart = start + startOffsetAfterExistingJapanese(doc.slice(start, safeCursor));
+  const adjustedStart = start + existingJapanesePrefixLength(doc.slice(start, safeCursor));
   const rawText = doc.slice(adjustedStart, safeCursor);
   const text = rawText.trimStart();
   const leadingWhitespace = rawText.length - text.length;
@@ -196,41 +197,6 @@ function getMarkdownLineBoundary(line: string): number {
   }
 
   return 0;
-}
-
-function startOffsetAfterExistingJapanese(text: string): number {
-  const boundary = findTrailingRomajiBoundaryAfterJapaneseText(text);
-  if (boundary !== -1) {
-    return boundary;
-  }
-
-  return 0;
-}
-
-function findTrailingRomajiBoundaryAfterJapaneseText(text: string): number {
-  let boundary = -1;
-
-  for (let index = 0;index < text.length;index += 1) {
-    const char = text[index] ?? "";
-    const previous = text[index - 1] ?? "";
-
-    if (/\s/u.test(char) && isJapaneseCharacter(previous)) {
-      let end = index + 1;
-      while (end < text.length && /\s/u.test(text[end] ?? "")) {
-        end += 1;
-      }
-
-      if (/[A-Za-z`]/.test(text[end] ?? "") && isJapaneseDominant(text.slice(0, index))) {
-        boundary = end;
-      }
-    }
-  }
-
-  return boundary;
-}
-
-function isJapaneseCharacter(char: string): boolean {
-  return /[\u3040-\u30ff\u3400-\u9fff。、]/u.test(char);
 }
 
 function isKanjiMixedRomajiInput(text: string): boolean {

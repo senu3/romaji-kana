@@ -129,6 +129,25 @@ try {
   await page.getByRole('button', { name: '変換を開く', exact: true }).click();
   assert.equal(await page.getByRole('radiogroup', { name: '入力補完レベル' }).count(), 0);
   await page.getByRole('button', { name: '変換 を閉じる' }).click();
+  await page.unroute('**/api/generate');
+  await page.route('**/api/generate', route => route.abort('connectionrefused'));
+  for (const prefix of ['テスト', 'もしかして', '試験']) {
+    const requests = [];
+    const capture = request => {
+      if (request.url().endsWith('/api/kana-engine')) requests.push(request.postDataJSON());
+    };
+    page.on('request', capture);
+    await editor.click(); await page.keyboard.press('Control+A');
+    await page.keyboard.insertText(prefix); await page.keyboard.type('gaarimasu');
+    await page.keyboard.press('Control+Enter');
+    await ghost.waitFor();
+    assert.equal(await ghost.textContent(), 'があります');
+    assert.ok(requests.some(r => r.operation === 'search' && r.reading === 'があります'));
+    assert.ok(!requests.some(r => r.operation === 'search' && r.reading.includes(prefix)));
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await documentText(page), `${prefix}があります`);
+    page.off('request', capture);
+  }
   await context.close();
   console.log('Local engine E2E passed: real dictionary, held candidates, late ranking, cancellation, learning, personal words, current conversion UI.');
 } finally { await browser?.close(); await server.close(); }

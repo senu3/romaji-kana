@@ -163,15 +163,22 @@ describe("extractConversionRange", () => {
     });
   });
 
-  it("allows kanji-first mixed romaji input", () => {
+  it("keeps an existing kanji prefix outside automatic range extraction", () => {
     const doc = "国立国会図書館niikimasu.";
     const range = extractConversionRange(doc, doc.length, "period");
     expect(range).toEqual({
-      from: 0,
+      from: "国立国会図書館".length,
       to: doc.length,
-      text: doc,
+      text: "niikimasu.",
       trigger: "period",
     });
+  });
+  it.each(["テスト", "もしかして", "試験", "テスト "])("converts only appended romaji after %s", prefix => {
+    const doc = prefix + "gaarimasu";
+    for (const trigger of ["typing", "shortcut", "enter", "space"] as const) {
+      expect(extractConversionRange(doc, doc.length, trigger)).toEqual({ from: prefix.length, to: doc.length, text: "gaarimasu", trigger });
+    }
+    expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")?.text).toBe(doc);
   });
 
   it("does not include markdown heading markers", () => {
