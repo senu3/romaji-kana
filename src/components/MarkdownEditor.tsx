@@ -9,7 +9,7 @@ import {
   undoDepth,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { autoSuggestExtension } from "./autoSuggestExtension";
+import { autoSuggestExtension, suggestAfterConversion } from "./autoSuggestExtension";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
@@ -719,7 +719,7 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
-        autoSuggestExtension(() => settingsRef.current, view => Boolean(view.state.field(ghostSuggestionField).suggestion) || view.state.field(loadingDecorations).size > 0),
+        autoSuggestExtension(() => settingsRef.current, view => view.state.field(loadingDecorations).size > 0),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {
@@ -956,7 +956,10 @@ export function MarkdownEditor({
         to: suggestion.to,
         insert: suggestion.convertedText,
       },
-      effects: clearGhostSuggestion.of(suggestion.id),
+      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of({
+        from: suggestion.from, to: suggestion.from + suggestion.convertedText.length,
+        original: suggestion.convertedText, reading: suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
+      })],
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);

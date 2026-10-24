@@ -118,7 +118,7 @@ export function ConversionPanel({
       <div className="conversion-panel-content">
         <section className="settings-group">
           <CheckRow label="オートサジェスト" checked={settings.autoSuggest} onChange={checked => update({ autoSuggest: checked })} />
-          <p className="field-help">入力中の読みから語を補完します。モデルは使いません。候補クリックか Alt+Enter で確定します。変換候補の表示中は補完を隠します。</p>
+          <p className="field-help">入力停止後や変換後に、読みから語を補完します。候補クリックか Alt+Enter で確定します。通常の変換候補と補完候補は、それぞれ選べます。</p>
         </section>
         <section className="settings-group conversion-start-settings" aria-labelledby={startHeadingId}>
           <h3 id={startHeadingId}>変換の開始</h3>

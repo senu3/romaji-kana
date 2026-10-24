@@ -72,6 +72,7 @@ try {
     await editor.dispatchEvent('compositionstart', { data: '' });
     assert.equal(await page.locator('.word-suggestions').count(), 0, 'IME composition hides suggestions');
     await editor.dispatchEvent('compositionend', { data: '' });
+    await page.locator('.word-suggestions').waitFor();
   });
   await scenario({ autoSuggest: false }, async (page, _editor, requests) => {
     await page.keyboard.type('kouka'); await page.waitForTimeout(450);
@@ -82,9 +83,24 @@ try {
     await page.keyboard.type('kouka');
     await page.locator('.cm-ghost-text-suggestion').waitFor();
     await page.waitForTimeout(200);
-    assert.equal(await page.locator('.word-suggestions').count(), 0, 'Conversion takes priority');
+    await page.locator('.word-suggestions').waitFor();
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 1, 'Both choices stay visible');
+    await page.screenshot({ path: await screenshotPath('test-results/e2e/autosuggest-with-conversion.png') });
     await page.keyboard.press('Tab');
     assert.ok((await page.locator('.cm-content').innerText()).includes('効果'));
+    await page.getByRole('button', { name: '航海 を補完' }).waitFor();
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await page.locator('.cm-content').innerText(), '航海', 'Completion replaces converted range using its retained reading');
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+  });
+  await scenario({ autoConvert: true, conversionMode: 'ghost', inputPauseTiming: 'early' }, async page => {
+    await page.keyboard.type('kouka');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    await page.getByRole('button', { name: '航海 を補完' }).click();
+    await page.waitForTimeout(600);
+    assert.equal(await page.locator('.cm-content').innerText(), '航海');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Choosing completion dismisses the old conversion');
   });
   await scenario({}, async (page) => {
     let release;
@@ -99,6 +115,31 @@ try {
     await page.keyboard.press('Control+a'); await page.keyboard.type('x');
     release(); await page.waitForTimeout(350);
     assert.equal(await page.locator('.word-suggestions').count(), 0, 'Stale response must not reappear');
+  });
+  await scenario({ autoConvert: true, conversionMode: 'replace', triggers: { typing: false } }, async (page, editor) => {
+    await page.keyboard.type('kouka');
+    await page.keyboard.press('Control+Enter');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '効果');
+    await page.getByRole('button', { name: '航海 を補完' }).click();
+    assert.equal(await editor.innerText(), '航海', 'Direct replacement also retains its reading for completion');
+  });
+  await scenario({ autoConvert: true, inputPauseTiming: 'early' }, async (page, editor) => {
+    let release, started;
+    const pending = new Promise(resolve => { release = resolve; });
+    const requested = new Promise(resolve => { started = resolve; });
+    await page.route('**/api/kana-engine', async route => {
+      const { operation, reading } = route.request().postDataJSON();
+      if (operation === 'suggest') return route.fallback();
+      started(); await pending;
+      await route.fulfill({ json: { candidates: [{ text: '効果', reading, cost: 0, tokens: [{ text: '効果', reading, from: 0, to: reading.length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 0 }] }], dictionaryRevision: 'test', truncated: false } }).catch(() => {});
+    });
+    await page.keyboard.type('kouka');
+    await page.getByRole('button', { name: '航海 を補完' }).waitFor();
+    await requested;
+    await page.getByRole('button', { name: '航海 を補完' }).click();
+    release(); await page.waitForTimeout(600);
+    assert.equal(await editor.innerText(), '航海', 'Late normal conversion must not overwrite accepted completion');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
   });
   await scenario({}, async (page, editor) => {
     await page.keyboard.type('kouka');
@@ -130,5 +171,5 @@ try {
     await page.locator('.word-suggestions').waitFor();
     assert.ok(await page.locator('.word-suggestions button').count() > 0, 'Real Mozc dictionary returns completions');
   });
-  console.log('Autosuggest E2E passed: real Mozc/personal vocabulary, independent requests, no LLM, keyboard/click acceptance, Undo, Escape, IME, disable, blur, conversion priority, stale response, narrow/dark layout.');
+  console.log('Autosuggest E2E passed: real dictionary, independent requests, no LLM, acceptance, Undo, Escape, IME completion, settings, blur, simultaneous choices, completion after preview/direct conversion, late conversion, stale response, narrow/dark layout.');
 } finally { await browser?.close(); await server.close(); }

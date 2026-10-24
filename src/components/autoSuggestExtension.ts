@@ -7,9 +7,19 @@ import { rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoS
 import type { AppSettings } from "../lib/types";
 
 interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: number }
-export function autoSuggestExtension(settings: () => AppSettings, blocked: (view: EditorView) => boolean) {
+// Conversion supplies the known reading; no reverse lookup or model call is needed.
+export const suggestAfterConversion = StateEffect.define<SuggestTarget>();
+export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean) {
   const setMenu = StateEffect.define<Menu | null>();
-  const allowed = (view: EditorView) => settings().autoSuggest && !blocked(view) && !view.composing && view.hasFocus && view.state.selection.main.empty;
+  const refresh = StateEffect.define<void>();
+  const allowed = (view: EditorView) => settings().autoSuggest && !view.composing && view.hasFocus && view.state.selection.main.empty;
+  const convertedTarget = StateField.define<SuggestTarget | null>({ create: () => null, update(value, tr) {
+    if (tr.docChanged) value = null;
+    for (const effect of tr.effects) if (effect.is(suggestAfterConversion)) value = effect.value;
+    if (value && (!tr.state.selection.main.empty || tr.state.selection.main.head !== value.to ||
+      tr.state.doc.sliceString(value.from, value.to) !== value.original || !/^[ぁ-ゖー]{2,80}$/u.test(value.reading))) return null;
+    return value;
+  } });
   const accept = (view: EditorView, index?: number) => {
     const menu = view.state.field(field);
     if (!menu || !allowed(view)) return false;
@@ -51,21 +61,24 @@ export function autoSuggestExtension(settings: () => AppSettings, blocked: (view
     timer?: ReturnType<typeof setTimeout>;
     revision = 0; destroyed = false; controller?: AbortController;
     cache = new Map<string, WordSuggestion[]>();
-    config = ""; wasBlocked = false;
+    config = ""; wasConverting = false;
     constructor(readonly view: EditorView) { this.config = this.configKey(); }
     configKey() { return JSON.stringify([settings().autoSuggest, settings().personalDictionary]); }
     update(update: ViewUpdate) {
-      const nextConfig = this.configKey(), nextBlocked = blocked(this.view) || this.view.composing;
+      const nextConfig = this.configKey(), nextConverting = converting(this.view);
       const configChanged = nextConfig !== this.config;
       this.config = nextConfig;
       if (configChanged) this.cache.clear();
-      const suppressed = nextBlocked !== this.wasBlocked; this.wasBlocked = nextBlocked;
-      if (!update.docChanged && !update.selectionSet && !update.focusChanged && !configChanged && !suppressed) return;
+      const conversionChanged = nextConverting !== this.wasConverting; this.wasConverting = nextConverting;
+      const converted = update.transactions.some(t => t.effects.some(e => e.is(suggestAfterConversion) || e.is(refresh)));
+      if (!update.docChanged && !update.selectionSet && !update.focusChanged && !configChanged && !conversionChanged && !converted) return;
       const revision = ++this.revision;
       clearTimeout(this.timer); this.controller?.abort();
-      queueMicrotask(() => { if (!this.destroyed && revision === this.revision && this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) }); });
+      // Keep existing alternatives visible while normal conversion is running.
+      if (!allowed(this.view) || configChanged) queueMicrotask(() => { if (!this.destroyed && revision === this.revision && this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) }); });
       if (!allowed(this.view) || update.transactions.some(t => t.isUserEvent("input.autosuggest") || t.isUserEvent("undo") || t.isUserEvent("redo"))) return;
-      const target = suggestTarget(this.view.state.doc.toString(), this.view.state.selection.main.head);
+      if (nextConverting) return;
+      const target = this.view.state.field(convertedTarget) ?? suggestTarget(this.view.state.doc.toString(), this.view.state.selection.main.head);
       if (!target) return;
       this.timer = setTimeout(async () => {
         const controller = new AbortController(); this.controller = controller;
@@ -88,12 +101,15 @@ export function autoSuggestExtension(settings: () => AppSettings, blocked: (view
     ++this.revision; clearTimeout(this.timer); this.controller?.abort();
     if (this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) });
     return false;
+  }, compositionend() {
+    queueMicrotask(() => { if (!this.destroyed) this.view.dispatch({ effects: refresh.of() }); });
+    return false;
   } } });
   const move = (view: EditorView, direction: number) => {
     const menu = view.state.field(field); if (!menu || !allowed(view)) return false;
     view.dispatch({ effects: setMenu.of({ ...menu, selected: (menu.selected + direction + menu.candidates.length) % menu.candidates.length }) }); return true;
   };
-  return [field, plugin, Prec.highest(keymap.of([
+  return [field, convertedTarget, plugin, Prec.highest(keymap.of([
     { key: "Alt-Enter", run: view => accept(view) },
     { key: "ArrowDown", run: view => move(view, 1) }, { key: "ArrowUp", run: view => move(view, -1) },
     { key: "Escape", run: view => { if (!view.state.field(field)) return false; view.dispatch({ effects: setMenu.of(null) }); return true; } },
