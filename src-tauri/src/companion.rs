@@ -462,7 +462,8 @@ fn update_shared_conversion_settings(
     shared: &Arc<RwLock<SharedState>>,
     request: UpdateSettingsRequest,
 ) -> Result<CompanionSnapshot, String> {
-    const SHARED_KEYS: [&str; 8] = [
+    const SHARED_KEYS: [&str; 9] = [
+        "autoSuggest",
         "autoConvert",
         "conversionMode",
         "triggers",

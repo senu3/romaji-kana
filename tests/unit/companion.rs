@@ -65,6 +65,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
         "lmStudioApiUrl": "http://localhost:1234",
         "modelName": "desktop-model",
         "autoConvert": true,
+        "autoSuggest": true,
         "conversionMode": "replace",
         "triggers": { "period": true, "comma": true, "enter": false, "manualShortcut": "Mod-Enter" },
         "punctuationConversion": { "periodToJapanese": true, "commaToJapanese": true },
@@ -82,6 +83,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
         UpdateSettingsRequest {
             settings: serde_json::json!({
                 "autoConvert": false,
+                "autoSuggest": false,
                 "conversionMode": "ghost",
                 "triggers": { "period": false, "comma": true, "enter": true, "manualShortcut": "Mod-Enter" },
                 "punctuationConversion": { "periodToJapanese": false, "commaToJapanese": true },
@@ -96,6 +98,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
     .expect("mobile conversion settings should update shared state");
 
     assert_eq!(snapshot.settings["modelName"], "desktop-model");
+    assert_eq!(snapshot.settings["autoSuggest"], false);
     assert_eq!(snapshot.settings["conversionMode"], "ghost");
     assert_eq!(snapshot.settings["conversionPrompt"], "mobile prompt");
     assert_eq!(snapshot.settings["inputPauseTiming"], "deliberate");

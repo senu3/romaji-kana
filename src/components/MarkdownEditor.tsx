@@ -9,6 +9,7 @@ import {
   undoDepth,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
+import { autoSuggestExtension } from "./autoSuggestExtension";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
@@ -407,6 +408,7 @@ const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
   "input.ghostAccept",
+  "input.autosuggest",
   "input.speculativeDismiss",
 ]);
 
@@ -487,6 +489,7 @@ export function MarkdownEditor({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
+  useEffect(() => { viewRef.current?.dispatch({}); }, [settings.autoSuggest, settings.personalDictionary]);
 
   function clearPredictiveSuggestionTimer() {
     if (suggestionPauseTimerRef.current) {
@@ -716,6 +719,7 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        autoSuggestExtension(() => settingsRef.current, view => Boolean(view.state.field(ghostSuggestionField).suggestion) || view.state.field(loadingDecorations).size > 0),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {

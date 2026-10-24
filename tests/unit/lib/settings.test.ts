@@ -10,13 +10,14 @@ describe("current settings contract", () => {
     expect(JSON.parse(localStorage.getItem("romaji-kana-settings")!)).toEqual(defaultSettings);
   });
   it("persists current preferences and shares them without model credentials", () => {
-    const settings = { ...defaultSettings, inputPauseTiming: "deliberate" as const, think: true };
+    const settings = { ...defaultSettings, inputPauseTiming: "deliberate" as const, think: true, autoSuggest: false };
     saveSettings(settings);
     expect(loadSettings()).toEqual(settings);
     const shared = sharedConversionSettings(settings);
     expect(shared).not.toHaveProperty("modelName");
     expect(shared).not.toHaveProperty("conversionEngine");
     expect(mergeSharedConversionSettings(defaultSettings, shared).inputPauseTiming).toBe("deliberate");
+    expect(mergeSharedConversionSettings(defaultSettings, shared).autoSuggest).toBe(false);
   });
   it("does not restore unknown settings or obsolete policy migrations", () => {
     localStorage.setItem("romaji-kana-settings", JSON.stringify({ userDictionary: [{ reading: "hon", output: "obsolete" }], inputCompletionLevel: "word", conversionEngine: "llm", thinkingMode: "on" }));
