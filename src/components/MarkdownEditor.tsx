@@ -2,15 +2,16 @@ import {
   defaultKeymap,
   history,
   historyKeymap,
-  isolateHistory,
   redo,
   redoDepth,
   undo,
   undoDepth,
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import { autoSuggestExtension, suggestAfterConversion } from "./autoSuggestExtension";
-import { convertedSuggestTarget } from "../lib/autoSuggest";
+import { autoSuggestExtension } from "./autoSuggestExtension";
+import { commitConversion } from "../lib/conversionCommit";
+import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
+export { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
@@ -18,7 +19,7 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, Facet, Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Facet, Prec, StateField, Transaction } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -30,7 +31,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
-import { acceptConversionSession, dismissConversionSession } from "../lib/conversionSession";
+import { dismissConversionSession } from "../lib/conversionSession";
 import {
   ChevronDown,
   FilePlus2,
@@ -108,11 +109,6 @@ export interface EditorDocumentStatus {
   characterCount: number;
   selectionCount: number;
 }
-
-export const addLoadingDecoration = StateEffect.define<{ id: string; from: number; to: number }>();
-export const removeLoadingDecoration = StateEffect.define<string>();
-export const showGhostSuggestion = StateEffect.define<GhostConversionSuggestion>();
-export const clearGhostSuggestion = StateEffect.define<string | null>();
 
 const loadingDecorations = StateField.define<DecorationSet>({
   create() {
@@ -950,18 +946,7 @@ export function MarkdownEditor({
       return true;
     }
 
-    acceptConversionSession(suggestion.session);
-    view.dispatch({
-      changes: {
-        from: suggestion.from,
-        to: suggestion.to,
-        insert: suggestion.convertedText,
-      },
-      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
-        suggestion.from, suggestion.convertedText, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
-      ))],
-      userEvent: "input.ghostAccept",
-    });
+    if (!commitConversion(view, suggestion, "explicit")) return false;
     onAcceptGhostRef.current(suggestion);
     return true;
   }
@@ -1028,25 +1013,9 @@ export function MarkdownEditor({
       settingsRef.current,
     );
     const replacement = `${suggestion.convertedText}${suffix}`;
-    acceptConversionSession(suggestion.session);
-    view.dispatch({
-      changes: {
-        from: suggestion.from,
-        to: suggestion.to,
-        insert: replacement,
-      },
-      selection: { anchor: suggestion.from + replacement.length },
-      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
-        suggestion.from, replacement, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
-      ))],
-      annotations: isolateHistory.of("full"),
-      userEvent: "input.ghostAccept",
-    });
-    onAcceptGhostRef.current({
-      ...suggestion,
-      convertedText: replacement,
-      trigger,
-    });
+    const accepted: GhostConversionSuggestion = { ...suggestion, convertedText: replacement, trigger };
+    if (!commitConversion(view, accepted, "explicit", "end")) return false;
+    onAcceptGhostRef.current(accepted);
     return true;
   }
 

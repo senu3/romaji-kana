@@ -1,6 +1,7 @@
-import { Prec, StateEffect, StateField, Transaction } from "@codemirror/state";
+import { Prec, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, showTooltip, type Tooltip, type ViewUpdate } from "@codemirror/view";
-import { isolateHistory } from "@codemirror/commands";
+import { commitEditorText } from "../lib/editorCommit";
+import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
@@ -10,7 +11,7 @@ interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: 
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
 // Conversion supplies the known reading; no reverse lookup or model call is needed.
-export const suggestAfterConversion = StateEffect.define<SuggestTarget>();
+
 export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean) {
   const setMenu = StateEffect.define<Menu | null>();
   const refresh = StateEffect.define<void>();
@@ -38,9 +39,8 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const candidate = menu.candidates[index ?? menu.selected];
     const insert = candidate.text + (target.suffix ?? "");
-    view.dispatch({ changes: { from: target.from, to: target.to, insert },
-      selection: { anchor: target.from + insert.length }, effects: setMenu.of(null),
-      annotations: [Transaction.userEvent.of("input.autosuggest"), isolateHistory.of("full")] });
+    if (!commitEditorText(view, { from: target.from, to: target.to, original: target.original, text: insert,
+      cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest" })) return false;
     view.focus();
     return true;
   };

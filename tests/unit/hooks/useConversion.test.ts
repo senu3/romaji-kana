@@ -12,6 +12,8 @@ import { defaultSettings } from "../../../src/lib/settings";
 import type { ConversionRange } from "../../../src/lib/types";
 import { deferred, mountHook, stateEditor } from "./testUtils";
 import { useConversion } from "../../../src/hooks/useConversion";
+import { commitConversion } from "../../../src/lib/conversionCommit";
+import { conversionLearningChoices } from "../../../src/lib/conversionLearning";
 
 vi.mock("../../../src/lib/ollama", async (importOriginal) => ({
   ...await importOriginal<typeof import("../../../src/lib/ollama")>(),
@@ -44,6 +46,31 @@ function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "v
 }
 
 describe("conversion lifecycle", () => {
+  it.each([false, true])("preserves learning policy and records one history/save (explicit=%s)", async explicit => {
+    localStorage.clear();
+    const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result: {
+      text: "本", reviewKana: "ほん", changes: {
+        ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+        readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+      },
+    } }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
+    const { hook, view, options } = harness("hon");
+    options.settingsRef.current.conversionMode = explicit ? "ghost" : "replace";
+    await act(async () => { hook.current.handleConvert(range("hon")); });
+    if (explicit) {
+      const value = view.state.field(ghostSuggestionField).suggestion!;
+      act(() => {
+        expect(commitConversion(view, value, "explicit")).toBe(true);
+        hook.current.handleAcceptGhost(value);
+      });
+    }
+    expect(conversionLearningChoices()).toHaveLength(explicit ? 1 : 0);
+    if (explicit) expect(conversionLearningChoices()[0].count).toBe(1);
+    expect(hook.current.history).toHaveLength(1);
+    expect(options.saveCurrentDocumentSession).toHaveBeenCalledOnce();
+    expect(view.state.doc.toString()).toBe("本");
+  });
   beforeEach(() => { vi.mocked(convertRomajiToJapaneseDetailed).mockReset(); });
 
   const candidateSession = () => createConversionSession("kisha", [

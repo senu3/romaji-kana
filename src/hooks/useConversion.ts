@@ -1,6 +1,5 @@
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
-import { suggestAfterConversion } from "../components/autoSuggestExtension";
-import { convertedSuggestTarget } from "../lib/autoSuggest";
+import { commitConversion } from "../lib/conversionCommit";
 import type { EditorView } from "@codemirror/view";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +14,7 @@ import { formatConversionError } from "../lib/appErrors";
 import type { ActivePanel } from "../lib/appTypes";
 import { recordConversionChoice } from "../lib/conversionLearning";
 import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
-import { acceptConversionSession, dismissConversionSession, lockConversionSession, createConversionSession, type ConversionSession } from "../lib/conversionSession";
+import { dismissConversionSession, lockConversionSession, createConversionSession, type ConversionSession } from "../lib/conversionSession";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { resolveConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
@@ -307,6 +306,62 @@ export function useConversion({
     return true;
   }, []);
 
+  const finishConversion = useCallback((suggestion: GhostConversionSuggestion, explicit: boolean, modelName = settingsRef.current.modelName) => {
+    if (explicit) { requestsRef.current.cancel(suggestion.id); syncPending(); }
+    if (explicit && suggestion.session) {
+      const selected = suggestion.session.candidates.find(c => c.id === suggestion.session!.selectedId);
+      if (selected?.kind === "conversion" && selected.result.changes?.readingAssessment?.status === "verified") {
+        recordConversionChoice(selected.result.reviewKana, selected.result.text);
+      }
+    }
+    if (explicit) invalidatePredictiveSuggestions(false);
+    const view = editorViewRef.current;
+    const nextAnchor: ConversionAnchor = {
+      from: suggestion.from,
+      to: suggestion.from + suggestion.convertedText.length,
+      originalText: suggestion.inputText,
+      appliedText: suggestion.convertedText,
+      docVersion: docVersionRef.current,
+    };
+
+    if (view) {
+      saveCurrentDocumentSession(view.state.doc.toString());
+    }
+
+    const historyItem: ConversionHistoryItem = {
+      id: suggestion.id,
+      status: "success",
+      input: suggestion.inputText,
+      output: suggestion.convertedText,
+      reviewKana: suggestion.reviewKana,
+      modelName,
+      createdAt: Date.now(),
+      source: suggestion.source,
+      anchor: nextAnchor,
+      conversionStrategy: suggestion.conversionStrategy,
+      changes: suggestion.changes,
+      session: suggestion.session,
+
+      documentVocabulary: suggestion.documentVocabulary,
+      documentVocabularyRevision: suggestion.documentVocabularyRevision,
+      retryOf: suggestion.retryOf,
+      avoidOutputs: suggestion.avoidOutputs,
+    };
+
+    setHistory((items) =>
+      upsertConversionHistory(items, historyItem),
+    );
+    setRecentRetryItem(historyItem);
+    setStatus({
+      kind: "success",
+      message: suggestion.conversionStrategy === "speculative"
+        ? "推測候補を確定しました。"
+        : suggestion.conversionStrategy === "correction"
+          ? "誤字修正候補を確定しました。"
+          : "変換候補を確定しました。",
+    });
+  }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
+
   const processQueuedConversion = useCallback(async (request: PendingConversion) => {
     const view = editorViewRef.current;
     const anchor = request.anchor;
@@ -369,24 +424,14 @@ export function useConversion({
             ? "誤字修正候補を表示しました。" : "変換候補を表示しました。" });
         return;
       }
-      // Clearing the ghost dismisses an open session in the editor state field.
-      // Mark acceptance first so the same session cannot be classified as closed by dismissal.
-      acceptConversionSession(conversion.session);
-      current.dispatch({
-        changes: { from: latest.from, to: latest.to, insert: conversion.text },
-        effects: [removeLoadingDecoration.of(request.id), clearGhostSuggestion.of(request.id), suggestAfterConversion.of(convertedSuggestTarget(
-          latest.from, conversion.text, conversion.changes?.resultReading ?? conversion.reviewKana ?? "",
-        ))],
-        userEvent: historical ? "input.historyApply" : "input.convert",
-      });
-      saveCurrentDocumentSession(current.state.doc.toString());
-      const item = historyItem(conversion, {
-        from: latest.from, to: latest.from + conversion.text.length,
-        originalText: historical ? request.originalText : latest.matchedText,
-        appliedText: conversion.text, docVersion: docVersionRef.current,
-      });
-      setHistory(items => upsertConversionHistory(items, item));
-      setRecentRetryItem(item);
+      const accepted: GhostConversionSuggestion = {
+        ...candidateDetails(conversion), id: request.id, from: latest.from, to: latest.to,
+        originalText: latest.matchedText, inputText: historical ? request.originalText : latest.matchedText,
+        source: request.source, retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
+        documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+      };
+      if (!commitConversion(current, accepted, historical ? "history" : "automatic")) return;
+      finishConversion(accepted, false, settings.modelName);
       setStatus({ kind: "success", message: historical
         ? "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
         : "変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。" });
@@ -408,7 +453,7 @@ export function useConversion({
           ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText) : [],
       });
     applyConversion(conversion);
-  }, [saveCurrentDocumentSession, skipQueuedConversion, showConversionPreview, deferRanking]);
+  }, [finishConversion, skipQueuedConversion, showConversionPreview, deferRanking]);
 
   const processConversionQueue = useCallback(async () => {
     if (processingQueueRef.current) {
@@ -547,62 +592,8 @@ export function useConversion({
   );
 
   const handleAcceptGhost = useCallback((suggestion: GhostConversionSuggestion) => {
-    requestsRef.current.cancel(suggestion.id);
-    syncPending();
-    if (suggestion.session) {
-      acceptConversionSession(suggestion.session);
-      const selected = suggestion.session.candidates.find(c => c.id === suggestion.session!.selectedId);
-      if (selected?.kind === "conversion" && selected.result.changes?.readingAssessment?.status === "verified") {
-        recordConversionChoice(selected.result.reviewKana, selected.result.text);
-      }
-    }
-    invalidatePredictiveSuggestions(false);
-    const view = editorViewRef.current;
-    const nextAnchor: ConversionAnchor = {
-      from: suggestion.from,
-      to: suggestion.from + suggestion.convertedText.length,
-      originalText: suggestion.inputText,
-      appliedText: suggestion.convertedText,
-      docVersion: docVersionRef.current,
-    };
-
-    if (view) {
-      saveCurrentDocumentSession(view.state.doc.toString());
-    }
-
-    const historyItem: ConversionHistoryItem = {
-      id: suggestion.id,
-      status: "success",
-      input: suggestion.inputText,
-      output: suggestion.convertedText,
-      reviewKana: suggestion.reviewKana,
-      modelName: settingsRef.current.modelName,
-      createdAt: Date.now(),
-      source: suggestion.source,
-      anchor: nextAnchor,
-      conversionStrategy: suggestion.conversionStrategy,
-      changes: suggestion.changes,
-      session: suggestion.session,
-
-      documentVocabulary: suggestion.documentVocabulary,
-      documentVocabularyRevision: suggestion.documentVocabularyRevision,
-      retryOf: suggestion.retryOf,
-      avoidOutputs: suggestion.avoidOutputs,
-    };
-
-    setHistory((items) =>
-      upsertConversionHistory(items, historyItem),
-    );
-    setRecentRetryItem(historyItem);
-    setStatus({
-      kind: "success",
-      message: suggestion.conversionStrategy === "speculative"
-        ? "推測候補を確定しました。"
-        : suggestion.conversionStrategy === "correction"
-          ? "誤字修正候補を確定しました。"
-          : "変換候補を確定しました。",
-    });
-  }, [invalidatePredictiveSuggestions, saveCurrentDocumentSession]);
+    finishConversion(suggestion, true);
+  }, [finishConversion]);
 
   const handleDismissGhost = useCallback((suggestion?: GhostConversionSuggestion) => {
     suggestion ??= editorViewRef.current?.state.field(ghostSuggestionField).suggestion ?? undefined;
