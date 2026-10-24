@@ -79,14 +79,30 @@ try {
     await page.locator('.word-suggestions').waitFor();
     const panel = await page.locator('.word-suggestions').elementHandle();
     await page.keyboard.type('k');
-    assert.equal(await page.getByRole('button', { name: '航海 を補完' }).isDisabled(), true);
-    await page.keyboard.press('Alt+Enter');
-    assert.equal(await editor.innerText(), 'kouk', 'Old suggestions cannot be accepted while updating');
+    assert.equal(await page.getByRole('button', { name: '航海 を補完' }).isDisabled(), false);
     await page.keyboard.type('a');
-    await page.waitForFunction(() => document.querySelector('.word-suggestions')?.getAttribute('aria-busy') === 'false');
     assert.ok(await panel.evaluate(el => el === document.querySelector('.word-suggestions')), 'Typing and response updates reuse the same panel');
-    await page.keyboard.type('i');
-    await page.waitForFunction(() => !document.querySelector('.word-suggestions'));
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), '航海', 'Retained suggestion replaces the entire current token');
+  });
+  await scenario({}, async (page, editor, requests) => {
+    await page.keyboard.type('kou');
+    await page.locator('.word-suggestions').waitFor();
+    const before = requests.length;
+    await page.keyboard.type('k'); await page.waitForTimeout(160);
+    assert.equal(requests.length, before);
+    await page.keyboard.type('a'); await page.waitForTimeout(160);
+    assert.equal(requests.length, before, 'Two typed characters do not refresh yet');
+    await page.keyboard.type('i'); await page.waitForTimeout(220);
+    assert.equal(requests.length, before + 1, 'Three typed characters refresh');
+    await page.keyboard.type('s'); await page.keyboard.type('h'); await page.keyboard.type('a');
+    await page.waitForTimeout(220);
+    const after = requests.length;
+    await page.keyboard.type('i'); await page.waitForTimeout(180);
+    assert.equal(requests.length, after);
+    await page.waitForTimeout(400);
+    assert.equal(requests.length, after + 1, 'Idle refresh covers fewer than three characters');
+    assert.equal(await editor.innerText(), 'koukaishai');
   });
   for (const [key, suffix, preview] of [[',', '、', true], ['.', '。', true], ['Enter', '\n', true], ['Enter', '\n', false]]) {
     await scenario({ autoConvert: true, conversionMode: 'replace', inputPauseTiming: 'early', triggers: { enter: true } }, async (page, editor) => {

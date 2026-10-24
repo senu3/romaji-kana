@@ -6,7 +6,9 @@ import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 
-interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: number; pending?: boolean }
+interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: number }
+const REFRESH_CHARACTER_COUNT = 3;
+const IDLE_REFRESH_MS = 500;
 // Conversion supplies the known reading; no reverse lookup or model call is needed.
 export const suggestAfterConversion = StateEffect.define<SuggestTarget>();
 export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean) {
@@ -31,7 +33,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   } });
   const accept = (view: EditorView, index?: number) => {
     const menu = view.state.field(field);
-    if (!menu || menu.pending || !allowed(view)) return false;
+    if (!menu || !allowed(view)) return false;
     const { target } = menu;
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const candidate = menu.candidates[index ?? menu.selected];
@@ -50,16 +52,14 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       const menu = view.state.field(field); if (!menu || menu === rendered) return;
       rendered = menu;
       dom.replaceChildren();
-      dom.setAttribute("aria-busy", String(Boolean(menu.pending)));
       const heading = dom.appendChild(document.createElement("div")); heading.className = "word-suggestions-heading";
-      heading.textContent = menu.pending ? "補完 · 更新中" : "補完 · ↑↓で選択 / Alt+Enterで確定";
+      heading.textContent = "補完 · ↑↓で選択 / Alt+Enterで確定";
       menu.candidates.forEach((c, index) => {
         const button = dom.appendChild(document.createElement("button")); button.type = "button";
         button.className = index === menu.selected ? "selected" : "";
         button.setAttribute("aria-label", `${c.text} を補完`);
         button.setAttribute("aria-pressed", String(index === menu.selected));
         button.tabIndex = -1;
-        button.disabled = Boolean(menu.pending);
         const text = button.appendChild(document.createElement("strong")); text.textContent = c.text;
         const reading = button.appendChild(document.createElement("small")); reading.textContent = c.reading;
         button.addEventListener("mousedown", event => event.preventDefault());
@@ -73,7 +73,18 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   const field = StateField.define<Menu | null>({ create: () => null, update(value, tr) {
     if (tr.docChanged && value && (tr.isUserEvent("input.type") || tr.isUserEvent("delete")) &&
       tr.state.selection.main.empty && tr.state.selection.main.head === tr.changes.mapPos(value.target.to, 1)) {
-      value = { ...value, pending: true, target: { ...value.target, to: tr.state.selection.main.head } };
+      const to = tr.state.selection.main.head;
+      const original = tr.state.doc.sliceString(value.target.from, to);
+      const target = suggestTarget(tr.state.doc.toString(), to);
+      // A deliberate selection replaces the current token, including incomplete romaji.
+      // Only retain choices while editing that same token, never across a delimiter.
+      if (!/^[A-Za-zぁ-ゖァ-ヶー]+$/u.test(original) || (target && target.from !== value.target.from)) value = null;
+      else {
+        const candidates = target ? value.candidates.filter(c => c.reading.startsWith(target.reading) && c.reading.length > target.reading.length) : value.candidates;
+        const selectedText = value.candidates[value.selected]?.text;
+        value = candidates.length ? { target: target ?? { ...value.target, to, original }, candidates,
+          selected: Math.max(0, candidates.findIndex(c => c.text === selectedText)) } : null;
+      }
     } else if (tr.docChanged || tr.selection) value = null;
     for (const effect of tr.effects) if (effect.is(setMenu)) value = effect.value;
     return value;
@@ -82,6 +93,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     timer?: ReturnType<typeof setTimeout>;
     revision = 0; destroyed = false; controller?: AbortController;
     cache = new Map<string, WordSuggestion[]>();
+    typedSinceRequest = 0; hasRequested = false;
     config = ""; wasConverting = false;
     constructor(readonly view: EditorView) { this.config = this.configKey(); }
     configKey() { return JSON.stringify([settings().autoSuggest, settings().personalDictionary]); }
@@ -93,6 +105,9 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       const conversionChanged = nextConverting !== this.wasConverting; this.wasConverting = nextConverting;
       const converted = update.transactions.some(t => t.effects.some(e => e.is(suggestAfterConversion) || e.is(refresh)));
       if (!update.docChanged && !update.selectionSet && !update.focusChanged && !configChanged && !conversionChanged && !converted) return;
+      const typing = update.docChanged && update.transactions.every(t => !t.docChanged || t.isUserEvent("input.type") || t.isUserEvent("delete"));
+      if (typing) update.changes.iterChanges((from, to, _fromB, _toB, inserted) => { this.typedSinceRequest += Math.max(to - from, inserted.length); });
+      else if (update.docChanged || update.selectionSet || configChanged) { this.typedSinceRequest = 0; this.hasRequested = false; }
       const revision = ++this.revision;
       clearTimeout(this.timer); this.controller?.abort();
       // Keep existing alternatives visible while normal conversion is running.
@@ -105,6 +120,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
         return;
       }
       this.timer = setTimeout(async () => {
+        this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
         try {
           let candidates = this.cache.get(target.reading);
@@ -120,7 +136,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
         } catch {
           if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) });
         }
-      }, 120);
+      }, typing && this.hasRequested ? (this.typedSinceRequest >= REFRESH_CHARACTER_COUNT ? 0 : IDLE_REFRESH_MS) : 120);
     }
     destroy() { this.destroyed = true; ++this.revision; clearTimeout(this.timer); this.controller?.abort(); }
   }, { eventHandlers: { compositionstart() {
@@ -132,7 +148,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     return false;
   } } });
   const move = (view: EditorView, direction: number) => {
-    const menu = view.state.field(field); if (!menu || menu.pending || !allowed(view)) return false;
+    const menu = view.state.field(field); if (!menu || !allowed(view)) return false;
     view.dispatch({ effects: setMenu.of({ ...menu, selected: (menu.selected + direction + menu.candidates.length) % menu.candidates.length }) }); return true;
   };
   return [field, convertedTarget, plugin, Prec.highest(keymap.of([
@@ -145,6 +161,5 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     ".word-suggestions button": { display: "flex", justifyContent: "space-between", gap: "16px", width: "100%", padding: "8px", background: "transparent", color: "inherit", border: "0", textAlign: "left", cursor: "pointer", overflowWrap: "anywhere" },
     ".word-suggestions button.selected, .word-suggestions button:hover": { background: "var(--accent-soft, #e4f5f0)" },
     ".word-suggestions button:focus-visible": { outline: "2px solid var(--accent, #007f83)" },
-    ".word-suggestions button:disabled": { cursor: "progress", opacity: "0.6" },
   })];
 }
