@@ -18,6 +18,11 @@ describe("independent word suggestions", () => {
     expect(suggestTarget("koukai", 5)).toBeNull();
     expect(suggestTarget("kouka1", 5)).toBeNull();
   });
+  it.each(["もしかして", "モシカシテ", "確定した文"])('isolates romaji after committed Japanese: %s', before => {
+    const doc = before + "watasiha";
+    expect(suggestTarget(doc, doc.length)).toEqual({ from: before.length, to: doc.length, original: "watasiha", reading: "わたしは" });
+    expect(suggestTarget(before + "watasih", before.length + 7)).toBeNull();
+  });
   const item = (text: string, reading = "こうかい", cost = 10, source: WordSuggestion["source"] = "mozc"): WordSuggestion => ({ text, reading, cost, source });
   it("reuses learning and personal vocabulary, removes duplicates, and limits to five", () => {
     const choices = [{ text: "航海", reading: "こうかい", count: 2, updated: 1 }];

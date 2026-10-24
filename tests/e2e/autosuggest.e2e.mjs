@@ -37,6 +37,27 @@ try {
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
+  for (const autoConvert of [false, true]) await scenario({ autoConvert, conversionMode: 'ghost' }, async (page, editor) => {
+    const readings = [];
+    await page.route('**/api/kana-engine', route => {
+      const { operation, reading } = route.request().postDataJSON();
+      if (operation !== 'suggest') return route.fallback();
+      readings.push(reading);
+      const candidates = reading === 'もし' ? [{ text: 'もしかして', reading: 'もしかして', cost: 0, source: 'mozc' }]
+        : reading === 'わたしは' ? [{ text: '私は医者', reading: 'わたしはいしゃ', cost: 0, source: 'user' }] : [];
+      return route.fulfill({ json: { candidates } });
+    });
+    await page.keyboard.type('moshi');
+    await page.getByRole('button', { name: 'もしかして を補完' }).waitFor();
+    await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+    assert.equal(await editor.innerText(), 'もしかして');
+    await page.keyboard.type('watasiha');
+    await page.getByRole('button', { name: '私は医者 を補完' }).waitFor();
+    assert.ok(readings.includes('わたしは'));
+    assert.ok(!readings.includes('もしかしてわたしは'));
+    await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+    assert.equal(await editor.innerText(), 'もしかして私は医者', 'The committed prefix survives a second completion');
+  });
   await scenario({}, async (page, editor, requests, calls) => {
     const before = calls();
     await page.keyboard.type('kouka');

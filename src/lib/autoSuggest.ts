@@ -11,7 +11,8 @@ export function convertedSuggestTarget(from: number, original: string, reading: 
 }
 export function suggestTarget(doc: string, cursor: number): SuggestTarget | null {
   if (isInsideExcludedMarkdown(doc, cursor) || /[\wぁ-ゖァ-ヶー]/u.test(doc[cursor] ?? "")) return null;
-  const match = /[A-Za-zぁ-ゖァ-ヶー]+$/u.exec(doc.slice(Math.max(0, cursor - 81), cursor));
+  // Kana already committed before romaji belongs to the document, not this token.
+  const match = /(?:[A-Za-z]+|[ぁ-ゖァ-ヶー]+)$/u.exec(doc.slice(Math.max(0, cursor - 81), cursor));
   if (!match || match[0].length > 80) return null;
   const original = match[0], from = cursor - original.length;
   if (/[\w]/u.test(doc[from - 1] ?? "")) return null;
