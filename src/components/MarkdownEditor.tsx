@@ -211,9 +211,14 @@ export const ghostSuggestionField = StateField.define<GhostState>({
     if (transaction.annotation(Transaction.userEvent)?.startsWith("document.")) {
       dismiss();
     } else if (suggestion && transaction.docChanged) {
+      let continued = false;
+      const end = suggestion.to;
+      transaction.changes.iterChanges((from, _to, _fromB, _toB, inserted) => {
+        if (from === end && /^[\p{L}\p{N}ー]/u.test(inserted.toString())) continued = true;
+      });
       const from = transaction.changes.mapPos(suggestion.from, 1);
       const to = transaction.changes.mapPos(suggestion.to, -1);
-      if (from >= to || transaction.state.doc.sliceString(from, to) !== suggestion.originalText) {
+      if (continued || from >= to || transaction.state.doc.sliceString(from, to) !== suggestion.originalText) {
         dismiss();
       } else {
         suggestion = { ...suggestion, from, to };
@@ -230,6 +235,8 @@ export const ghostSuggestionField = StateField.define<GhostState>({
         if (next.session && next.session.state !== "open") continue;
         if (next.from < 0 || next.from >= next.to || next.to > transaction.state.doc.length ||
           transaction.state.doc.sliceString(next.from, next.to) !== next.originalText) continue;
+        if ((next.trigger === "typing" || next.trigger === "space") &&
+          /^[\p{L}\p{N}ー]/u.test(transaction.state.doc.sliceString(next.to, next.to + 2))) continue;
         if (suggestion?.session !== next.session) dismiss();
         suggestion = next;
       }

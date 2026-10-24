@@ -36,6 +36,20 @@ try {
     } finally { await context.close(); }
   }
 
+  await scenario({}, async (page, editor, searches) => {
+    await page.keyboard.type('ai');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    await page.keyboard.type('s');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Typing past the target removes the outdated inline candidate immediately');
+    assert.equal(await editor.innerText(), 'ais');
+    await page.keyboard.type('iteru');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    assert.equal(searches.at(-1), 'あいしてる');
+    assert.ok((await editor.innerText()).startsWith('aisiteru'), 'The entire input precedes the updated inline candidate');
+    await page.screenshot({ path: await screenshotPath('test-results/e2e/continued-inline-conversion.png') });
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), 'あいしてる');
+  });
   const selectedCandidateFailures = [];
   for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {
     await scenario({ conversionMode: entry === 'ghost' ? 'ghost' : 'replace', triggers: { typing: true, space: true, enter: true } }, async (page, editor, searches) => {

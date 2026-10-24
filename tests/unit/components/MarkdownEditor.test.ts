@@ -49,13 +49,25 @@ describe("ghost candidate lifecycle", () => {
     expect(session.state).toBe("dismissed");
   });
 
-  it("preserves a valid candidate when text is inserted before or after it", () => {
+  it("preserves a valid candidate when unrelated text is inserted before or after it", () => {
     const { state, session } = setup();
     const shifted = state.update({ changes: { from: 0, insert: "mae " } }).state;
     expect(shifted.field(ghostSuggestionField).suggestion?.from).toBe(4);
-    const appended = shifted.update({ changes: { from: 7, insert: "wo" } }).state;
+    const appended = shifted.update({ changes: { from: 7, insert: " " } }).state;
     expect(appended.field(ghostSuggestionField).suggestion?.originalText).toBe("hon");
     expect(session.state).toBe("open");
+  });
+  it.each(["siteru", "を", "2"])("dismisses an outdated candidate when its input continues: %s", insert => {
+    const { state, session, candidate } = setup();
+    const updated = state.update({ changes: { from: 3, insert }, selection: { anchor: 3 + insert.length }, userEvent: "input.type" }).state;
+    expect(updated.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(session.state).toBe("dismissed");
+    expect(updated.update({ effects: showGhostSuggestion.of(candidate) }).state.field(ghostSuggestionField).suggestion).toBeNull();
+  });
+  it("rejects a late predictive result for a prefix of the continued token", () => {
+    const { candidate } = setup();
+    const state = EditorState.create({ doc: "hontou", extensions: [ghostSuggestionField] });
+    expect(state.update({ effects: showGhostSuggestion.of({ ...candidate, trigger: "typing" }) }).state.field(ghostSuggestionField).suggestion).toBeNull();
   });
 
   it("dismisses after deleting the source", () => {
