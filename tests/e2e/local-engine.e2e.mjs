@@ -56,7 +56,7 @@ try {
   await page.keyboard.press('Enter');
   assert.equal(await ghost.textContent(), selected, 'Late ranking must not move the selected candidate');
   assert.equal(modelCalls, 1, 'Stored candidate navigation must not call the model');
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('Alt+Enter');
   assert.equal(await documentText(page), selected);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('romaji-kana-conversion-learning-v1'))[0].text), selected);
   await page.keyboard.press('Control+/');
@@ -76,14 +76,14 @@ try {
   const historyButton = list.locator('.candidate-list-options button[aria-pressed="false"]').first();
   const historyText = await historyButton.locator('span').textContent();
   await historyButton.click();
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('Alt+Enter');
   assert.equal(await documentText(page), historyText + '\n'.repeat(80) + 'end', 'Offscreen history must scroll into view and return focus for Tab acceptance');
   assert.equal(modelCalls, 1, 'History list selection must not generate');
 
   await typeInput('kisha');
   await page.waitForTimeout(100);
   const accepted = await ghost.textContent();
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('Alt+Enter');
   release();
   await page.waitForTimeout(250);
   assert.equal(await documentText(page), accepted);
@@ -110,8 +110,8 @@ try {
   await page.waitForTimeout(150);
   assert.equal(await ghost.count(), 0, 'Late ranking must not restore a canceled candidate');
   await editor.focus();
-  await page.keyboard.press('Tab');
-  assert.notEqual(await documentText(page), '本を読む', 'Tab must not accept the canceled candidate');
+  await page.keyboard.press('Alt+Enter');
+  assert.notEqual(await documentText(page), '本を読む', 'Alt+Enter must not accept the canceled candidate');
 
   await page.getByRole('button', { name: /辞書を開く/ }).click();
   await page.getByRole('tab', { name: /個人語彙/ }).click();

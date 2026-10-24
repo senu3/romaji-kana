@@ -117,7 +117,7 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
         </button>
         {explicit ? <span className="conversion-kind" title={presentation.description}>{strategy ? presentation.label : "読み未確認"}</span> : null}
         {!target ? <>
-          <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Tab</kbd></button>
+          <button type="button" className="candidate-accept" onClick={onAccept}>確定 <kbd>Alt+Enter</kbd></button>
           <button type="button" className="candidate-action" aria-label="ほかの候補" onClick={onOpen} title="ほかの候補 · Ctrl/Cmd + /">候補 ▾</button>
           <button type="button" className="candidate-action candidate-details-toggle" aria-label="変更の詳細" title="変更の詳細"
             aria-expanded={detailsOpen} onClick={() => setDetailsOpen(!detailsOpen)}>⋯</button>

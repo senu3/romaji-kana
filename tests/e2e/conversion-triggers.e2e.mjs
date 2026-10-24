@@ -169,7 +169,7 @@ try {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/speculate-mobile.png'), fullPage: true });
         await editor.focus();
-        await page.keyboard.press('Tab');
+        await page.keyboard.press('Alt+Enter');
         assert.equal(await editor.innerText(), '資料を確認してください。');
       }
       assert.equal(proposals, 1, 'Explicit reinterpretation must issue only one proposal');
@@ -209,7 +209,7 @@ try {
       return clone.textContent;
     });
     assert.equal(documentText, source, 'Reconstructed protected output must remain a preview');
-    await editor.focus(); await page.keyboard.press('Tab');
+    await editor.focus(); await page.keyboard.press('Alt+Enter');
     assert.equal(await editor.innerText(), 'XR-34の更新は終わらなかった。');
     assert.equal(proposals, 1);
   });
@@ -252,20 +252,20 @@ try {
     release();
     await page.waitForTimeout(200);
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Late ranking must not restore a candidate after cursor movement');
-    await page.keyboard.press('Tab');
-    assert.equal(await editor.innerText(), 'mae\nhon', 'Tab must not accept a candidate dismissed by cursor movement');
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), 'mae\nhon', 'Alt+Enter must not accept a candidate dismissed by cursor movement');
   });
   await scenario({ autoConvert: false }, async (page, editor) => {
     await page.keyboard.type('hon');
     await page.keyboard.press('Control+Enter');
     await page.locator('.cm-ghost-text-suggestion').waitFor();
-    await page.keyboard.press('Tab');
+    await page.keyboard.press('Alt+Enter');
     await page.getByRole('button', { name: /履歴を開く/ }).click();
     await page.locator('.history-item.success').hover();
     await page.locator('.cm-history-preview').waitFor();
     await editor.focus();
-    await page.keyboard.press('Tab');
-    assert.equal(await page.locator('.history-item.success').count(), 1, 'Tab on a history preview must not record another acceptance');
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await page.locator('.history-item.success').count(), 1, 'Alt+Enter on a history preview must not record another acceptance');
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
   });
   await scenario({ autoConvert: false }, async (page, _editor, searches) => {
@@ -298,7 +298,7 @@ try {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
         assert.equal(await editor.innerText().then(text => text.startsWith('hon')), true);
         assert.match(await page.locator('.conversion-kind').textContent(), /修正候補/);
-        await page.keyboard.press('Tab');
+        await page.keyboard.press('Alt+Enter');
         assert.equal(await editor.innerText(), '本');
       } else {
         await page.getByText('通常変換・誤字修正で候補が得られなかったため、ローマ字を残しました。', { exact: true }).first().waitFor();
@@ -347,7 +347,7 @@ try {
       } else {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
         assert.match(await page.locator('.conversion-kind').textContent(), /誤字修正候補/);
-        await page.keyboard.press('Tab');
+        await page.keyboard.press('Alt+Enter');
         assert.equal(await editor.innerText(), `${text}。`);
       }
     });

@@ -6,6 +6,7 @@ import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
+import { completionSelection } from "../lib/completionSelection";
 
 interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: number }
 const REFRESH_CHARACTER_COUNT = 3;
@@ -34,7 +35,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   } });
   const accept = (view: EditorView, index?: number) => {
     const menu = view.state.field(field);
-    if (!menu || !allowed(view)) return false;
+    if (!menu || (index === undefined && menu.selected < 0) || !allowed(view)) return false;
     const { target } = menu;
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const candidate = menu.candidates[index ?? menu.selected];
@@ -53,7 +54,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       rendered = menu;
       dom.replaceChildren();
       const heading = dom.appendChild(document.createElement("div")); heading.className = "word-suggestions-heading";
-      heading.textContent = "補完 · ↑↓で選択 / Alt+Enterで確定";
+      heading.textContent = menu.selected < 0 ? "補完 · Tabで選択開始" : "補完 · ↑↓ / Tabで選択 · Enterで確定";
       menu.candidates.forEach((c, index) => {
         const button = dom.appendChild(document.createElement("button")); button.type = "button";
         button.className = index === menu.selected ? "selected" : "";
@@ -81,14 +82,14 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       if (!/^[A-Za-zぁ-ゖァ-ヶー]+$/u.test(original) || (target && target.from !== value.target.from)) value = null;
       else {
         const candidates = target ? value.candidates.filter(c => c.reading.startsWith(target.reading) && c.reading.length > target.reading.length) : value.candidates;
-        const selectedText = value.candidates[value.selected]?.text;
         value = candidates.length ? { target: target ?? { ...value.target, to, original }, candidates,
-          selected: Math.max(0, candidates.findIndex(c => c.text === selectedText)) } : null;
+          selected: -1 } : null;
       }
     } else if (tr.docChanged || tr.selection) value = null;
     for (const effect of tr.effects) if (effect.is(setMenu)) value = effect.value;
     return value;
-  }, provide: f => showTooltip.from(f, value => value ? tooltip(value) : null) });
+  }, provide: f => [showTooltip.from(f, value => value ? tooltip(value) : null),
+    completionSelection.from(f, value => Boolean(value && value.selected >= 0))] });
   const plugin = ViewPlugin.fromClass(class {
     timer?: ReturnType<typeof setTimeout>;
     revision = 0; destroyed = false; controller?: AbortController;
@@ -98,6 +99,10 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     constructor(readonly view: EditorView) { this.config = this.configKey(); }
     configKey() { return JSON.stringify([settings().autoSuggest, settings().personalDictionary]); }
     update(update: ViewUpdate) {
+      if (this.view.state.facet(completionSelection) && allowed(this.view) && this.config === this.configKey()) {
+        ++this.revision; clearTimeout(this.timer); this.controller?.abort();
+        return;
+      }
       const nextConfig = this.configKey(), nextConverting = converting(this.view);
       const configChanged = nextConfig !== this.config;
       this.config = nextConfig;
@@ -132,7 +137,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
           }
           if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
           const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices());
-          this.view.dispatch({ effects: setMenu.of(ranked.length ? { target, candidates: ranked, selected: 0 } : null) });
+          this.view.dispatch({ effects: setMenu.of(ranked.length ? { target, candidates: ranked, selected: -1 } : null) });
         } catch {
           if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) });
         }
@@ -147,12 +152,15 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     queueMicrotask(() => { if (!this.destroyed) this.view.dispatch({ effects: refresh.of() }); });
     return false;
   } } });
-  const move = (view: EditorView, direction: number) => {
+  const move = (view: EditorView, direction: number, start = false) => {
     const menu = view.state.field(field); if (!menu || !allowed(view)) return false;
-    view.dispatch({ effects: setMenu.of({ ...menu, selected: (menu.selected + direction + menu.candidates.length) % menu.candidates.length }) }); return true;
+    if (menu.selected < 0 && !start) return false;
+    view.dispatch({ effects: setMenu.of({ ...menu, selected: menu.selected < 0 ? 0 : (menu.selected + direction + menu.candidates.length) % menu.candidates.length }) }); return true;
   };
   return [field, convertedTarget, plugin, Prec.highest(keymap.of([
-    { key: "Alt-Enter", run: view => accept(view) },
+    { key: "Tab", run: view => move(view, 1, true) },
+    { key: "Shift-Tab", run: view => move(view, -1) },
+    { key: "Enter", run: view => accept(view) },
     { key: "ArrowDown", run: view => move(view, 1) }, { key: "ArrowUp", run: view => move(view, -1) },
     { key: "Escape", run: view => { if (!view.state.field(field)) return false; view.dispatch({ effects: setMenu.of(null) }); return true; } },
   ])), EditorView.baseTheme({

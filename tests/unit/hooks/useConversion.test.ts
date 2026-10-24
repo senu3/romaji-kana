@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
+import { StateEffect } from "@codemirror/state";
+import { completionSelection } from "../../../src/lib/completionSelection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ghostSuggestionField, showGhostSuggestion } from "../../../src/components/MarkdownEditor";
 import { classifyConversionChanges } from "../../../src/lib/conversionChanges";
@@ -46,6 +48,15 @@ function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "v
 }
 
 describe("conversion lifecycle", () => {
+  it("keeps automatic results provisional while completion selection is active", async () => {
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
+    const { hook, view, options } = harness("hon");
+    view.dispatch({ effects: StateEffect.appendConfig.of(completionSelection.of(true)) });
+    await act(async () => { hook.current.handleConvert(range("hon")); });
+    expect(view.state.doc.toString()).toBe("hon");
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
+  });
   it.each([false, true])("preserves learning policy and records one history/save (explicit=%s)", async explicit => {
     localStorage.clear();
     const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result: {

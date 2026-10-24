@@ -1,3 +1,4 @@
+import { isSelectingCompletion } from "../lib/completionSelection";
 import {
   defaultKeymap,
   history,
@@ -185,10 +186,10 @@ class InlineGhostWidget extends WidgetType {
       const kind = document.createElement("span");
       kind.className = "conversion-kind";
       kind.textContent = this.suggestion.conversionStrategy ? candidatePresentation(this.suggestion).label : "読み未確認";
-      kind.title = "内容を確認してTabで確定してください。";
+      kind.title = "内容を確認してAlt+Enterで確定してください。";
       element.append(kind);
     }
-    button("Tab", "確定 Tab", () => view.state.facet(inlineGhostActions)[0]?.accept(view));
+    button("Alt+Enter", "確定 Alt+Enter", () => view.state.facet(inlineGhostActions)[0]?.accept(view));
     button("▾", "ほかの候補", () => view.state.facet(inlineGhostActions)[0]?.open(this.suggestion));
     return element;
   }
@@ -531,6 +532,7 @@ export function MarkdownEditor({
     reason: PredictiveRequestReason,
   ) {
     clearPredictiveSuggestionTimer();
+    if (isSelectingCompletion(view.state)) return;
     const trigger: Extract<ConversionTrigger, "typing" | "space"> =
       reason === "space" ? "space" : "typing";
     if (
@@ -566,6 +568,7 @@ export function MarkdownEditor({
   }
 
   function schedulePredictiveSuggestion(view: EditorView) {
+    if (isSelectingCompletion(view.state)) return;
     if (
       composingRef.current ||
       !settingsRef.current.autoConvert ||
@@ -598,6 +601,7 @@ export function MarkdownEditor({
 
   const updateListener = useMemo(() => {
     return EditorView.updateListener.of((update) => {
+      if (isSelectingCompletion(update.state)) clearPredictiveSuggestionTimer();
       setVisibleSuggestion(update.state.field(ghostSuggestionField).suggestion);
       if (update.selectionSet) onCloseCandidateListRef.current?.();
       if (update.docChanged || update.selectionSet) {
@@ -746,7 +750,7 @@ export function MarkdownEditor({
               run: runManualConversion,
             },
             {
-              key: "Tab",
+              key: "Alt-Enter",
               run: acceptGhostSuggestion,
             },
             {
@@ -840,7 +844,7 @@ export function MarkdownEditor({
             run: runManualConversion,
           },
           {
-            key: "Tab",
+            key: "Alt-Enter",
             run: acceptGhostSuggestion,
           },
           {
@@ -967,6 +971,7 @@ export function MarkdownEditor({
       return false;
     }
 
+    if (isSelectingCompletion(view.state)) return false;
     const character = event.key;
     const cursor = view.state.selection.main.head;
     if (isPendingNumericSeparator(view.state.doc.sliceString(0, cursor) + character, cursor + 1)) return false;

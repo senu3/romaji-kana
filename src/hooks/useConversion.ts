@@ -1,3 +1,4 @@
+import { isSelectingCompletion } from "../lib/completionSelection";
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
 import { commitConversion } from "../lib/conversionCommit";
 import type { EditorView } from "@codemirror/view";
@@ -406,7 +407,7 @@ export function useConversion({
         skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
         return;
       }
-      if (conversion.session?.rerankStatus === "pending" || conversion.session?.rerankStatus === "failed" || settingsRef.current.conversionMode === "ghost" ||
+      if (isSelectingCompletion(current.state) || conversion.session?.rerankStatus === "pending" || conversion.session?.rerankStatus === "failed" || settingsRef.current.conversionMode === "ghost" ||
           requiresExplicitAcceptance(conversion) || isPredictiveSuggestionTrigger(request.range?.trigger)) {
         if (!showConversionPreview(conversion, {
           id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,

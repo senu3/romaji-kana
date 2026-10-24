@@ -118,7 +118,7 @@ export function ConversionPanel({
       <div className="conversion-panel-content">
         <section className="settings-group">
           <CheckRow label="オートサジェスト" checked={settings.autoSuggest} onChange={checked => update({ autoSuggest: checked })} />
-          <p className="field-help">入力停止後や変換後に、読みから語を補完します。候補クリックか Alt+Enter で確定します。通常の変換候補と補完候補は、それぞれ選べます。</p>
+          <p className="field-help">入力停止後や変換後に、読みから語を補完します。Tabで選択を開始し、Enterまたは候補クリックで確定します。通常の変換候補と補完候補は、それぞれ選べます。</p>
         </section>
         <section className="settings-group conversion-start-settings" aria-labelledby={startHeadingId}>
           <h3 id={startHeadingId}>変換の開始</h3>
@@ -190,7 +190,7 @@ export function ConversionPanel({
             </div>
             <small>
               {settings.conversionMode === "ghost"
-                ? "候補パネルで確認し、Tabまたは確定ボタンで本文に反映します。"
+                ? "候補パネルで確認し、Alt+Enterまたは確定ボタンで本文に反映します。"
                 : "変換後の日本語ですぐに置き換えます。"}
             </small>
           </div>

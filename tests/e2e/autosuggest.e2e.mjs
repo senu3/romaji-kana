@@ -41,9 +41,11 @@ try {
     const before = calls();
     await page.keyboard.type('kouka');
     await page.getByRole('group', { name: '補完候補', exact: true }).waitFor();
+    assert.equal(await page.locator('.word-suggestions [aria-pressed="true"]').count(), 0, 'Visible suggestions are not selected yet');
     await page.screenshot({ path: await screenshotPath('test-results/e2e/autosuggest-desktop.png') });
+    await page.keyboard.press('Tab');
     await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Alt+Enter');
+    await page.keyboard.press('Enter');
     assert.equal(await editor.innerText(), '公開');
     await page.waitForTimeout(700);
     assert.ok(requests.every(r => r.operation === 'suggest'));
@@ -74,6 +76,42 @@ try {
     await editor.dispatchEvent('compositionend', { data: '' });
     await page.locator('.word-suggestions').waitFor();
   });
+  await scenario({ autoConvert: true, conversionMode: 'replace', inputPauseTiming: 'early' }, async (page, editor, requests) => {
+    await page.keyboard.type('kouka');
+    await page.locator('.word-suggestions').waitFor();
+    await page.keyboard.press('Tab');
+    assert.equal(await page.getByRole('button', { name: '航海 を補完' }).getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.getByRole('button', { name: '公開 を補完' }).getAttribute('aria-pressed'), 'true');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await page.getByRole('button', { name: '航海 を補完' }).getAttribute('aria-pressed'), 'true');
+    const before = requests.length;
+    await page.waitForTimeout(700);
+    assert.equal(requests.length, before, 'Selecting candidates suspends delayed conversion and completion searches');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.word-suggestions').count(), 0);
+    await page.keyboard.type('i');
+    await page.waitForTimeout(700);
+    assert.ok(requests.length > before, 'Typing resumes requests');
+    assert.ok((await editor.innerText()).includes('koukai'));
+  });
+  await scenario({}, async (page, editor, requests) => {
+    await page.keyboard.type('kou');
+    await page.locator('.word-suggestions').waitFor();
+    await page.keyboard.press('Tab');
+    const before = requests.length;
+    await page.keyboard.type('ka');
+    assert.equal(await page.locator('.word-suggestions [aria-pressed="true"]').count(), 0, 'Typing leaves selection mode');
+    await page.waitForTimeout(650);
+    assert.ok(requests.length > before);
+    assert.equal(await editor.innerText(), 'kouka');
+  });
+  await scenario({}, async (page, editor) => {
+    await page.keyboard.type('kouka');
+    await page.locator('.word-suggestions').waitFor();
+    await page.keyboard.press('Enter');
+    assert.equal((await editor.locator('.cm-line').allTextContents()).join('\n'), 'kouka\n', 'Enter without Tab stays a newline');
+  });
   await scenario({}, async (page, editor) => {
     await page.keyboard.type('kou');
     await page.locator('.word-suggestions').waitFor();
@@ -82,7 +120,7 @@ try {
     assert.equal(await page.getByRole('button', { name: '航海 を補完' }).isDisabled(), false);
     await page.keyboard.type('a');
     assert.ok(await panel.evaluate(el => el === document.querySelector('.word-suggestions')), 'Typing and response updates reuse the same panel');
-    await page.keyboard.press('Alt+Enter');
+    await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
     assert.equal(await editor.innerText(), '航海', 'Retained suggestion replaces the entire current token');
   });
   await scenario({}, async (page, editor, requests) => {
@@ -126,10 +164,10 @@ try {
     await page.locator('.word-suggestions').waitFor();
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 1, 'Both choices stay visible');
     await page.screenshot({ path: await screenshotPath('test-results/e2e/autosuggest-with-conversion.png') });
-    await page.keyboard.press('Tab');
+    await page.keyboard.press('Alt+Enter');
     assert.ok((await page.locator('.cm-content').innerText()).includes('効果'));
     await page.getByRole('button', { name: '航海 を補完' }).waitFor();
-    await page.keyboard.press('Alt+Enter');
+    await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
     assert.equal(await page.locator('.cm-content').innerText(), '航海', 'Completion replaces converted range using its retained reading');
     await page.waitForTimeout(400);
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
