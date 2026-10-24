@@ -74,6 +74,30 @@ try {
     await editor.dispatchEvent('compositionend', { data: '' });
     await page.locator('.word-suggestions').waitFor();
   });
+  await scenario({}, async (page, editor) => {
+    await page.keyboard.type('kou');
+    await page.locator('.word-suggestions').waitFor();
+    const panel = await page.locator('.word-suggestions').elementHandle();
+    await page.keyboard.type('k');
+    assert.equal(await page.getByRole('button', { name: '航海 を補完' }).isDisabled(), true);
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), 'kouk', 'Old suggestions cannot be accepted while updating');
+    await page.keyboard.type('a');
+    await page.waitForFunction(() => document.querySelector('.word-suggestions')?.getAttribute('aria-busy') === 'false');
+    assert.ok(await panel.evaluate(el => el === document.querySelector('.word-suggestions')), 'Typing and response updates reuse the same panel');
+    await page.keyboard.type('i');
+    await page.waitForFunction(() => !document.querySelector('.word-suggestions'));
+  });
+  for (const [key, suffix, preview] of [[',', '、', true], ['.', '。', true], ['Enter', '\n', true], ['Enter', '\n', false]]) {
+    await scenario({ autoConvert: true, conversionMode: 'replace', inputPauseTiming: 'early', triggers: { enter: true } }, async (page, editor) => {
+      await page.keyboard.type('kouka');
+      if (preview) await page.locator('.cm-ghost-text-suggestion').waitFor();
+      await page.keyboard.press(key);
+      await page.getByRole('button', { name: '航海 を補完' }).click();
+      const text = await editor.locator('.cm-line').allTextContents();
+      assert.equal(text.join('\n'), `航海${suffix}`, `${key} completion preserves punctuation/newline`);
+    });
+  }
   await scenario({ autoSuggest: false }, async (page, _editor, requests) => {
     await page.keyboard.type('kouka'); await page.waitForTimeout(450);
     assert.equal(requests.length, 0);

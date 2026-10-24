@@ -10,6 +10,7 @@ import {
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { autoSuggestExtension, suggestAfterConversion } from "./autoSuggestExtension";
+import { convertedSuggestTarget } from "../lib/autoSuggest";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
   highlightSelectionMatches,
@@ -956,10 +957,9 @@ export function MarkdownEditor({
         to: suggestion.to,
         insert: suggestion.convertedText,
       },
-      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of({
-        from: suggestion.from, to: suggestion.from + suggestion.convertedText.length,
-        original: suggestion.convertedText, reading: suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
-      })],
+      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
+        suggestion.from, suggestion.convertedText, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
+      ))],
       userEvent: "input.ghostAccept",
     });
     onAcceptGhostRef.current(suggestion);
@@ -1036,7 +1036,9 @@ export function MarkdownEditor({
         insert: replacement,
       },
       selection: { anchor: suggestion.from + replacement.length },
-      effects: clearGhostSuggestion.of(suggestion.id),
+      effects: [clearGhostSuggestion.of(suggestion.id), suggestAfterConversion.of(convertedSuggestTarget(
+        suggestion.from, replacement, suggestion.changes?.resultReading ?? suggestion.reviewKana ?? "",
+      ))],
       annotations: isolateHistory.of("full"),
       userEvent: "input.ghostAccept",
     });

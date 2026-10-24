@@ -4,7 +4,11 @@ import { normalizeKanaWidth } from "./readingComparison";
 import type { Choice } from "./conversionLearning";
 import type { WordSuggestion } from "./kanaEngine";
 
-export interface SuggestTarget { from: number; to: number; original: string; reading: string }
+export interface SuggestTarget { from: number; to: number; original: string; reading: string; suffix?: string }
+export function convertedSuggestTarget(from: number, original: string, reading: string): SuggestTarget {
+  const suffix = /[、。，．,.\s]+$/u.exec(original)?.[0] ?? "";
+  return { from, to: from + original.length, original, reading: reading.replace(/[、。，．,.\s]+$/u, ""), suffix };
+}
 export function suggestTarget(doc: string, cursor: number): SuggestTarget | null {
   if (isInsideExcludedMarkdown(doc, cursor) || /[\wぁ-ゖァ-ヶー]/u.test(doc[cursor] ?? "")) return null;
   const match = /[A-Za-zぁ-ゖァ-ヶー]+$/u.exec(doc.slice(Math.max(0, cursor - 81), cursor));

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { rankSuggestions, suggestTarget } from "../../../src/lib/autoSuggest";
+import { convertedSuggestTarget, rankSuggestions, suggestTarget } from "../../../src/lib/autoSuggest";
 import type { WordSuggestion } from "../../../src/lib/kanaEngine";
 
 describe("independent word suggestions", () => {
+  it("keeps trailing punctuation and newlines separate from the lookup reading", () => {
+    expect(convertedSuggestTarget(3, "効果、\n", "こうか、\n")).toEqual({ from: 3, to: 7, original: "効果、\n", reading: "こうか", suffix: "、\n" });
+  });
   it("extracts only the trailing complete reading and its replacement range", () => {
     expect(suggestTarget("出発、kouka", 8)).toEqual({ from: 3, to: 8, original: "kouka", reading: "こうか" });
     expect(suggestTarget("コウカ", 3)?.reading).toBe("こうか");
