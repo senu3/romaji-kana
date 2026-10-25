@@ -13,6 +13,7 @@ const commands = {
   "e2e:appearance": [process.execPath, "tests/e2e/editor-appearance.e2e.mjs"],
   "e2e:local": [process.execPath, "tests/e2e/local-engine.e2e.mjs"],
   "e2e:triggers": [process.execPath, "tests/e2e/conversion-triggers.e2e.mjs"],
+  "e2e:settings": [process.execPath, "tests/e2e/settings-layout.e2e.mjs"],
   "e2e:dictionary": [process.execPath, "tests/e2e/dictionary.e2e.mjs"],
   "e2e:autosuggest": [process.execPath, "tests/e2e/autosuggest.e2e.mjs"],
   engine: ["cargo", "test", "--manifest-path", "src-engine/Cargo.toml", "--lib"],

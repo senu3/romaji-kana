@@ -3958,3 +3958,39 @@ button.model-chip:hover {
   .personal-word-form input, .personal-word-form select, .personal-word-actions button,
   .personal-word-table .icon-button, .dictionary-modal .text-button { min-height: 44px; }
 }
+
+
+/* Keep routine model selection above the less frequent connection controls. */
+.settings-content .provider-field { margin: 0 0 8px; }
+.model-connection-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -8px 0 0; color: var(--ink-muted); font-size: 13px; }
+.model-connection-row strong { font-weight: 500; }
+.model-connection-row.connected { color: var(--accent); }
+.model-connection-row.error, .model-connection-error { color: var(--theme-danger, #b91c1c); }
+.model-connection-error { margin: -8px 0 20px; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.model-details { border-top: 1px solid var(--line); padding-top: 4px; }
+.model-details summary { padding-block: 14px; cursor: pointer; color: var(--ink-muted); font-size: 13px; }
+.model-details .field { margin-top: 12px; }
+.model-details .check-row { margin-top: 20px; }
+.settings-help, .settings-help-details { color: var(--ink-muted); font-size: 12px; line-height: 1.65; }
+.settings-help { margin: 10px 0 0; }
+.settings-help-details summary { cursor: pointer; padding-block: 10px; }
+.settings-help-details p { margin: 8px 0; }
+.setup-modal .settings-heading { display: none; }
+.setup-modal .settings-content { padding: 20px 24px; overflow: auto; }
+.conversion-panel .settings-group { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0 0 20px; background: transparent; }
+.conversion-start-settings > .trigger-options { margin: 12px 0 0 12px; padding-left: 16px; border-left: 1px solid var(--line); }
+.conversion-start-settings .input-pause-field { margin: 12px 0 0 12px; }
+.conversion-panel .check-row { border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
+.conversion-panel .shortcut-help:empty { display: none; }
+.conversion-panel .shortcut-field { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); }
+.settings-content .model-options { max-height: 220px; overflow-y: auto; }
+@media (pointer: coarse) {
+  .model-connection-row .icon-button, .model-details summary, .settings-help-details summary { min-height: 44px; }
+}
+
+.status-main.is-empty::before { display: none; }
+.model-list-toggle { background: var(--surface); color: var(--ink); }
+.conversion-panel .settings-accordion { border-top: 0; border-bottom: 1px solid var(--line); }
+
+.status-bar.error .status-main::before { background: var(--theme-danger, #b91c1c); }
+.status-bar.warning .status-main::before, .status-bar.loading .status-main::before { background: var(--theme-warning, #9a4d09); }

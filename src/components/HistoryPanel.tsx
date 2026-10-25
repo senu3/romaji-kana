@@ -95,7 +95,7 @@ export function HistoryPanel({
 
       {history.length === 0 ? (
         <p className="empty-state">
-          この起動中に確定・適用した変換が最大100件残ります。選択範囲またはカーソルのある行は Ctrl/Cmd + Enter で変換できます。
+          確定した変換がここに表示されます。
         </p>
       ) : (
         <div className="history-list" role="list">

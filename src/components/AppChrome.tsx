@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ActivePanel } from "../lib/appTypes";
-import { providerLabel } from "../lib/modelProvider";
 import type {
   AppSettings,
   ConversionStatus,
@@ -136,22 +135,21 @@ export function formatModelStatusLabel(
   settings: AppSettings,
   ollamaConnection: OllamaConnectionStatus,
 ): string {
-  const label = providerLabel(settings);
   const modelName = settings.modelName.trim() || "モデル未選択";
 
   if (ollamaConnection.kind === "connected") {
-    return `${label} · ${modelName} · 接続済み`;
+    return `${modelName} · 接続済み`;
   }
   if (ollamaConnection.kind === "checking") {
-    return `${label} · ${modelName} · 確認中`;
+    return `${modelName} · 確認中`;
   }
   if (ollamaConnection.kind === "error") {
-    return `${label} · ${modelName} · 未接続`;
+    return `${modelName} · 未接続`;
   }
   if (ollamaConnection.kind === "warning") {
-    return `${label} · ${modelName} · 要確認`;
+    return `${modelName} · 要確認`;
   }
-  return `${label} · ${modelName} · 未確認`;
+  return `${modelName} · 未確認`;
 }
 
 export function InspectorDrawer({
@@ -164,7 +162,6 @@ export function InspectorDrawer({
   onClose: () => void;
 }) {
   const title = panelTitle(panel);
-  const eyebrow = panelEyebrow(panel);
 
   return (
     <div className="inspector-overlay" onMouseDown={onClose}>
@@ -176,7 +173,6 @@ export function InspectorDrawer({
       >
         <header className="inspector-header">
           <div>
-            <p className="eyebrow">{eyebrow}</p>
             <h2 id="inspector-title">{title}</h2>
           </div>
           <button
@@ -210,22 +206,6 @@ function panelTitle(panel: NonNullable<ActivePanel>): string {
   return "変換";
 }
 
-function panelEyebrow(panel: NonNullable<ActivePanel>): string {
-  if (panel === "model") {
-    return "ローカルAI";
-  }
-  if (panel === "history") {
-    return "変換履歴";
-  }
-  if (panel === "dictionary") {
-    return "ユーザー辞書";
-  }
-  if (panel === "companion") {
-    return "同じWi-Fiで接続";
-  }
-  return "入力と変換";
-}
-
 export function StatusBar({
   status,
   pending,
@@ -248,8 +228,8 @@ export function StatusBar({
 
   return (
     <div className={`status-bar ${status.kind} ${hasStatusActions ? "has-actions" : ""}`}>
-      <div className="status-main" role="status" aria-live="polite">
-        <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />
+      <div className={`status-main ${status.message ? "" : "is-empty"}`} role="status" aria-live="polite">
+        {status.message && <Icon size={16} className={status.kind === "loading" ? "spin" : ""} aria-hidden="true" />}
         <span className="status-message">{status.message}</span>
       </div>
       <div className="status-side">
@@ -275,8 +255,6 @@ export function StatusBar({
               ? `${editorStatus.selectionCount} 文字選択`
               : `${editorStatus.characterCount} 文字`}
           </span>
-          <span>UTF-8</span>
-          <span>Markdown</span>
         </div>
       </div>
     </div>

@@ -116,10 +116,6 @@ export function ConversionPanel({
   return (
     <section className="floating-panel prompt-panel conversion-panel" aria-label="変換設定">
       <div className="conversion-panel-content">
-        <section className="settings-group">
-          <CheckRow label="オートサジェスト" checked={settings.autoSuggest} onChange={checked => update({ autoSuggest: checked })} />
-          <p className="field-help">入力停止後や変換後に、読みから語を補完します。Tabで選択を開始し、Enterまたは候補クリックで確定します。通常の変換候補と補完候補は、それぞれ選べます。</p>
-        </section>
         <section className="settings-group conversion-start-settings" aria-labelledby={startHeadingId}>
           <h3 id={startHeadingId}>変換の開始</h3>
           <CheckRow
@@ -138,7 +134,7 @@ export function ConversionPanel({
               className={`mode-field compact-mode-field input-pause-field ${settings.autoConvert && (settings.triggers.typing ?? settings.triggers.space) ? "" : "disabled"
                 }`}
             >
-              <span>入力停止後の待ち時間</span>
+              <span>待ち時間</span>
               <div
                 className="segmented-control"
                 role="radiogroup"
@@ -161,7 +157,6 @@ export function ConversionPanel({
                   </label>
                 ))}
               </div>
-              <small>{inputPauseTimingDescription(settings.inputPauseTiming)}</small>
             </div>
           </div>
         </section>
@@ -169,7 +164,6 @@ export function ConversionPanel({
         <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
           <h3 id={resultHeadingId}>結果の適用</h3>
           <div className="mode-field">
-            <span>適用方法</span>
             <div className="segmented-control" role="group" aria-label="変換結果の適用方法">
               <button
                 className={settings.conversionMode === "replace" ? "selected" : ""}
@@ -188,15 +182,14 @@ export function ConversionPanel({
                 確認して確定
               </button>
             </div>
-            <small>
-              {settings.conversionMode === "ghost"
-                ? "候補パネルで確認し、Alt+Enterまたは確定ボタンで本文に反映します。"
-                : "変換後の日本語ですぐに置き換えます。"}
-            </small>
+
           </div>
-          <p className="panel-note">誤字修正・推測・読み未確認の候補は、どちらの設定でも確認して確定します。</p>
+          <p className="settings-help">誤字修正・推測・読み未確認の候補は、常に確認して確定します。</p>
         </section>
 
+        <section className="settings-group">
+          <CheckRow label="オートサジェスト" checked={settings.autoSuggest} onChange={checked => update({ autoSuggest: checked })} />
+        </section>
         <AccordionSection
           title="キー操作"
           summary={settings.autoConvert ? enabledKeys || "手動ショートカットのみ" : "自動変換はオフ"}
@@ -234,7 +227,6 @@ export function ConversionPanel({
             <div className="shortcut-field">
               <div>
                 <span>手動ショートカット</span>
-                <small>{formatShortcutLabel(settings.triggers.manualShortcut)}</small>
               </div>
               <div className="shortcut-controls">
                 <button
@@ -266,7 +258,7 @@ export function ConversionPanel({
                 </button>
               </div>
               <p className={`shortcut-help ${shortcutError ? "error" : ""}`}>
-                {shortcutError || "自動変換がオフでも手動変換は使えます。"}
+                {shortcutError}
               </p>
             </div>
           ) : null}
@@ -306,7 +298,12 @@ export function ConversionPanel({
             </div>
           </details>
         </AccordionSection>
-        <p className="panel-note">設定は自動保存されます。</p>
+        <details className="settings-help-details"><summary>変換と補完の操作</summary>
+          <p>オートサジェストは、入力停止後や変換後に読みから語を補完します。Tabで選択を開始し、Enterまたはクリックで確定します。</p>
+          <p>{inputPauseTimingDescription(settings.inputPauseTiming)}</p>
+          <p>「確認して確定」は、Alt+Enterまたは確定ボタンで候補を本文に反映します。「直接置換」は変換後すぐに置き換えます。</p>
+          <p>自動変換がオフでも手動ショートカットを使えます。設定は自動保存されます。</p>
+        </details>
       </div>
     </section>
   );

@@ -100,7 +100,7 @@ export function useModelConnection({
       });
       setStatus({
         kind: result.kind === "connected" ? "success" : "warning",
-        message: result.message,
+        message: result.kind === "connected" ? "" : result.message,
       });
     } catch (error: unknown) {
       if (connectionCheckIdRef.current !== checkId) {

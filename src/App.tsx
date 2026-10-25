@@ -61,8 +61,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
 
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
 
-  const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
-
   const [status, setStatus] = useState<ConversionStatus>({
     kind: "idle",
     message: "準備完了。",
@@ -272,14 +270,6 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     setActivePanel("model");
   }, []);
 
-  const openModelSettings = useCallback(() => {
-    setModelSettingsOpen(true);
-  }, []);
-
-  const closeModelSettings = useCallback(() => {
-    setModelSettingsOpen(false);
-  }, []);
-
   const modelAttention = ollamaConnection.kind === "warning" || ollamaConnection.kind === "error";
 
   const enabledDictionaryCount = (settings.personalDictionary ?? []).filter(entry => entry.enabled).length;
@@ -307,7 +297,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         }
         modelStatusKind={ollamaConnection.kind}
         onSettingsChange={setSettings}
-        onOpenModelSettings={openModelSettings}
+        onOpenModelSettings={openModelDrawer}
         onConvert={handleConvert}
         onDocumentChanged={handleDocumentChanged}
         onEditorStatusChange={setEditorStatus}
@@ -413,22 +403,10 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
           onSkip={completeSetup}
         />
       ) : null}
-      {setupComplete && modelSettingsOpen && !remoteMode ? (
-        <SetupModal
-          mode="settings"
-          settings={settings}
-          ollamaModels={ollamaModels}
-          ollamaConnection={ollamaConnection}
-          setupModelProvider={null}
-          onChange={setSettings}
-          onCheckOllama={handleCheckOllama}
-          onProviderSelected={handleModelSettingsProviderSelected}
-          onComplete={closeModelSettings}
-          onSkip={closeModelSettings}
-        />
-      ) : null}
       <StatusBar
-        status={status}
+        status={activePanel === "model" && status.message === ollamaConnection.message
+          ? { kind: "idle", message: "" }
+          : status}
         pending={delayedPending}
         pendingCount={pending.length}
         editorStatus={editorStatus}

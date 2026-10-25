@@ -35,8 +35,8 @@ export function CompanionPanel({
           <strong>{status.running ? "スマホから接続できます" : "スマホ連携は停止中です"}</strong>
           <p>
             {status.running
-              ? `ペアリング済み ${status.pairedClients} 回。PCが文書と変換処理を担当します。`
-              : "必要なときだけ開始できます。モデルAPIを直接ネットワークへ公開しません。"}
+              ? `ペアリング済み ${status.pairedClients} 回`
+              : "PCとスマホを同じWi-Fiに接続してください。"}
           </p>
         </div>
       </div>
@@ -65,7 +65,6 @@ export function CompanionPanel({
           <section className="companion-code" aria-labelledby="companion-code-title">
             <div>
               <h3 id="companion-code-title">接続コード</h3>
-              <p>スマホの接続画面に入力します。</p>
             </div>
             <output aria-label="6桁の接続コード">{status.pairCode ?? "------"}</output>
           </section>
@@ -87,6 +86,7 @@ export function CompanionPanel({
         {busy ? <Loader2 className="spin" size={18} aria-hidden="true" /> : status.running ? <WifiOff size={18} aria-hidden="true" /> : <Wifi size={18} aria-hidden="true" />}
         {busy ? "処理しています..." : status.running ? "スマホ連携を停止" : "スマホ連携を開始"}
       </button>
+      <details className="settings-help-details"><summary>接続の仕組み</summary><p>PCが文書と変換処理を担当します。モデルAPIを直接ネットワークへ公開しません。</p></details>
       <p className="companion-security-note">公共Wi-Fiでは使用せず、利用後は連携を停止してください。</p>
     </div>
   );

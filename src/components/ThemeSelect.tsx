@@ -19,7 +19,6 @@ export function ThemeSelect() {
   }, [preference]);
   return (
     <label className="theme-select">
-      <span>表示</span>
       <select aria-label="表示テーマ" value={preference} onChange={event => {
         const next = event.target.value as ThemePreference;
         saveThemePreference(next);
