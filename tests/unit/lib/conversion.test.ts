@@ -173,12 +173,18 @@ describe("extractConversionRange", () => {
       trigger: "period",
     });
   });
-  it.each(["テスト", "もしかして", "試験", "テスト "])("converts only appended romaji after %s", prefix => {
+  it.each(["テスト", "もしかして", "試験", "テスト ", "3Dモデルを", "2D図面を", "2026年に"])("converts only appended romaji after %s", prefix => {
     const doc = prefix + "gaarimasu";
     for (const trigger of ["typing", "shortcut", "enter", "space"] as const) {
       expect(extractConversionRange(doc, doc.length, trigger)).toEqual({ from: prefix.length, to: doc.length, text: "gaarimasu", trigger });
     }
     expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")?.text).toBe(doc);
+  });
+  it("preserves entirely romaji numeric input and isolates the suffix of a 3D label", () => {
+    const roman = "3dmoderuworakunikumitateru";
+    expect(extractConversionRange(roman, roman.length, "typing")?.text).toBe(roman);
+    const mixed = "3Dモデルをrakunikumitateru";
+    expect(extractConversionRange(mixed, mixed.length, "typing")).toEqual({ from: 6, to: mixed.length, text: "rakunikumitateru", trigger: "typing" });
   });
 
   it("does not include markdown heading markers", () => {

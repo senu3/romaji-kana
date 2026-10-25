@@ -1,7 +1,9 @@
 /** Existing Japanese before a new romaji run is reference text, not an edit target.
  * Do not split Japanese embedded inside a run that already starts with romaji. */
 export function existingJapanesePrefixLength(text: string): number {
-  const prefix = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆\t ]+(?=[A-Za-z`])/u.exec(text)?.[0];
+  // A numeric label such as 3D/2D may precede committed Japanese. Require
+  // Japanese after it so an entirely romaji/numeric input remains convertible.
+  const prefix = /^(?:[A-Za-z0-9]*[0-9][A-Za-z0-9]*[\t ]*)?[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々〆\t ]+(?=[A-Za-z`])/u.exec(text)?.[0];
   return prefix && /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(prefix) ? prefix.length : 0;
 }
 
