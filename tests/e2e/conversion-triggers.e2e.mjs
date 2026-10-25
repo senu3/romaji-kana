@@ -50,6 +50,13 @@ try {
     await page.keyboard.press('Alt+Enter');
     assert.equal(await editor.innerText(), 'あいしてる');
   });
+  await scenario({ conversionMode: 'replace' }, async (page, editor) => {
+    await page.keyboard.type('hon');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん');
+    assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+    await page.keyboard.press('Control+z');
+    assert.equal(await editor.innerText(), 'hon', 'Pause replacement is one undo step');
+  });
   const selectedCandidateFailures = [];
   for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {
     await scenario({ conversionMode: entry === 'ghost' ? 'ghost' : 'replace', triggers: { typing: true, space: true, enter: true } }, async (page, editor, searches) => {
@@ -322,8 +329,8 @@ try {
       assert.deepEqual(stages, ['correction']);
     });
   }
-  for (const cancel of [false, true]) {
-    await scenario({ autoConvert: false }, async (page, editor) => {
+  for (const [mode, cancel] of [['ghost', false], ['ghost', true], ['replace', false], ['replace', true]]) {
+    await scenario({ autoConvert: false, conversionMode: mode }, async (page, editor) => {
       const reading = 'かいぎのじかんをかえないでください';
       const text = '会議の時間を変えないでください';
       await page.route('**/api/kana-engine', route => {
@@ -358,6 +365,9 @@ try {
         await page.waitForTimeout(200);
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Canceled correction must not reappear');
         assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.');
+      } else if (mode === 'replace') {
+        await page.waitForFunction(expected => document.querySelector('.cm-content').textContent === expected, `${text}。`);
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Verified repair is applied after ranking');
       } else {
         await page.locator('.cm-ghost-text-suggestion').waitFor();
         assert.match(await page.locator('.conversion-kind').textContent(), /誤字修正候補/);

@@ -48,6 +48,51 @@ function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "v
 }
 
 describe("conversion lifecycle", () => {
+  it("does not directly apply an old pause result after typing continues", async () => {
+    const pending = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(pending.promise);
+    const { hook, view, options } = harness("hon");
+    act(() => { hook.current.handleConvert(range("hon", "typing")); });
+    view.dispatch({ changes: { from: 3, insert: "tou" }, userEvent: "input.type" });
+    options.docVersionRef.current++;
+    await act(async () => { pending.resolve({ text: "本", reviewKana: "ほん", changes: {
+      ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } }); });
+    expect(view.state.doc.toString()).toBe("hontou");
+    expect(hook.current.history).toHaveLength(0);
+  });
+  it.each(["typing", "shortcut"] as const)("directly applies verified corrections via %s without learning", async trigger => {
+    localStorage.clear();
+    const result: JapaneseConversionResult = { text: "本", reviewKana: "ほん", conversionStrategy: "correction", changes: {
+      ...classifyConversionChanges("ほ", "ほん", "repair-stage", true),
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } };
+    const session = createConversionSession("ho", [{ id: "first", kind: "correction", result }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockImplementation(async (_i, _s, _t, options) => {
+      options?.onLocalCandidates?.(sessionResult(session));
+      return sessionResult(session);
+    });
+    const { hook, view, options } = harness("ho");
+    await act(async () => { hook.current.handleConvert(range("ho", trigger)); });
+    expect(view.state.doc.toString()).toBe("本");
+    expect(hook.current.history).toHaveLength(1);
+    expect(options.saveCurrentDocumentSession).toHaveBeenCalledOnce();
+    expect(conversionLearningChoices()).toHaveLength(0);
+  });
+  it.each(["replace", "ghost"] as const)("uses the current mode for pause conversion: %s", async mode => {
+    const result: JapaneseConversionResult = { text: "本", reviewKana: "ほん", changes: {
+      ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } };
+    const session = createConversionSession("hon", [{ id: "first", kind: "conversion", result }]);
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
+    const { hook, view, options } = harness("hon");
+    options.settingsRef.current.conversionMode = mode;
+    await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
+    expect(view.state.doc.toString()).toBe(mode === "replace" ? "本" : "hon");
+    expect(Boolean(view.state.field(ghostSuggestionField).suggestion)).toBe(mode === "ghost");
+  });
   it("keeps automatic results provisional while completion selection is active", async () => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
     const { hook, view, options } = harness("hon");

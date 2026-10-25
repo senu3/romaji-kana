@@ -114,7 +114,7 @@ try {
     await page.keyboard.type('i');
     await page.waitForTimeout(700);
     assert.ok(requests.length > before, 'Typing resumes requests');
-    assert.ok((await editor.innerText()).includes('koukai'));
+    assert.equal(await editor.innerText(), '効果', 'Typing resumes direct replacement after completion selection ends');
   });
   await scenario({}, async (page, editor, requests) => {
     await page.keyboard.type('kou');
@@ -163,8 +163,8 @@ try {
     assert.equal(requests.length, after + 1, 'Idle refresh covers fewer than three characters');
     assert.equal(await editor.innerText(), 'koukaishai');
   });
-  for (const [key, suffix, preview] of [[',', '、', true], ['.', '。', true], ['Enter', '\n', true], ['Enter', '\n', false]]) {
-    await scenario({ autoConvert: true, conversionMode: 'replace', inputPauseTiming: 'early', triggers: { enter: true } }, async (page, editor) => {
+  for (const [key, suffix, preview] of [[',', '、', true], ['.', '。', true], ['Enter', '\n', false]]) {
+    await scenario({ autoConvert: true, conversionMode: preview ? 'ghost' : 'replace', inputPauseTiming: 'early', triggers: { enter: true } }, async (page, editor) => {
       await page.keyboard.type('kouka');
       if (preview) await page.locator('.cm-ghost-text-suggestion').waitFor();
       await page.keyboard.press(key);

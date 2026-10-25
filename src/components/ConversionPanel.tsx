@@ -184,7 +184,7 @@ export function ConversionPanel({
             </div>
 
           </div>
-          <p className="settings-help">誤字修正・推測・読み未確認の候補は、常に確認して確定します。</p>
+          <p className="settings-help">直接置換では、入力停止後の通常変換と、条件を満たす誤字修正も本文へ反映します。推測・読み未確認・順位付け待ちの候補は確認して確定します。</p>
         </section>
 
         <section className="settings-group">

@@ -1,6 +1,5 @@
-import { isSelectingCompletion } from "../lib/completionSelection";
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
-import { commitConversion } from "../lib/conversionCommit";
+import { canApplyConversionAutomatically, commitConversion } from "../lib/conversionCommit";
 import type { EditorView } from "@codemirror/view";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -23,7 +22,6 @@ import type { JapaneseConversionResult } from "../lib/japaneseConversionTypes";
 import { defaultKanaEngine } from "../lib/kanaEngine";
 import { buildProtectedDictionaryEntries, convertRomajiToJapaneseDetailed } from "../lib/ollama";
 import { RankingQueue } from "../lib/rankingQueue";
-import { requiresExplicitAcceptance } from "../lib/readingAssessment";
 import { normalizeReading } from "../lib/readingComparison";
 import type {
   AppSettings,
@@ -52,6 +50,7 @@ interface CandidateListTarget {
 
 interface PredictiveSuggestionRequest {
   id: string;
+  docVersion: number;
   revision: number;
   epoch: number;
   range: ConversionRange;
@@ -407,8 +406,7 @@ export function useConversion({
         skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
         return;
       }
-      if (isSelectingCompletion(current.state) || conversion.session?.rerankStatus === "pending" || conversion.session?.rerankStatus === "failed" || settingsRef.current.conversionMode === "ghost" ||
-          requiresExplicitAcceptance(conversion) || isPredictiveSuggestionTrigger(request.range?.trigger)) {
+      if (!canApplyConversionAutomatically(current, conversion, settingsRef.current.conversionMode, request.range?.trigger)) {
         if (!showConversionPreview(conversion, {
           id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,
           inputText: request.originalText, trigger: request.range?.trigger, source: request.source,
@@ -866,7 +864,7 @@ export function useConversion({
             request.range.from,
             request.range.to,
           );
-          if (!currentView || currentSource !== request.range.text) {
+          if (!currentView || currentSource !== request.range.text || request.docVersion !== docVersionRef.current) {
             return;
           }
           if (!requestsRef.current.display(request.id)) return;
@@ -883,6 +881,19 @@ export function useConversion({
             return;
           }
 
+          if (canApplyConversionAutomatically(currentView, conversion, settingsRef.current.conversionMode, request.range.trigger)) {
+            const accepted: GhostConversionSuggestion = {
+              ...candidateDetails(conversion), id: request.id, from: request.range.from, to: request.range.to,
+              originalText: request.range.text, inputText: request.range.text, trigger: request.range.trigger,
+              documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+              source: "editor",
+            };
+            if (commitConversion(currentView, accepted, "automatic")) {
+              displayedSuggestionRevisionRef.current = request.revision;
+              finishConversion(accepted, false, request.settings.modelName);
+            }
+            return;
+          }
           displayedSuggestionRevisionRef.current = request.revision;
           if (!showConversionPreview(conversion, {
             id: request.id, from: request.range.from, to: request.range.to,
@@ -930,7 +941,7 @@ export function useConversion({
         if (!rankingRequestsRef.current.has(request.id)) requestsRef.current.finish(request.id);
       }
     },
-    [showConversionPreview],
+    [showConversionPreview, finishConversion],
   );
 
   const processPredictiveSuggestionQueue = useCallback(async () => {
@@ -982,6 +993,7 @@ export function useConversion({
       predictiveSuggestionQueueRef.current = {
         id,
         revision: predictiveSuggestionRevisionRef.current,
+        docVersion: docVersionRef.current,
         epoch: predictiveSuggestionEpochRef.current,
         range,
         settings: settingsSnapshot,

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { EditorState, type TransactionSpec } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { history, undo } from "@codemirror/commands";
-import { commitConversion, type ConversionCommitReason } from "../../../src/lib/conversionCommit";
+import { canApplyConversionAutomatically, commitConversion, type ConversionCommitReason } from "../../../src/lib/conversionCommit";
+import type { JapaneseConversionResult } from "../../../src/lib/japaneseConversionTypes";
 import { commitEditorText } from "../../../src/lib/editorCommit";
 import { createConversionSession } from "../../../src/lib/conversionSession";
 import { ghostSuggestionField } from "../../../src/components/MarkdownEditor";
@@ -18,6 +19,28 @@ function suggestion(): GhostConversionSuggestion {
     session: createConversionSession("kouka", [{ id: "one", kind: "conversion", result: { text: "効果", reviewKana: "こうか" } }]) };
 }
 describe("shared acceptance", () => {
+  it("only automatically applies verified notation or validated correction in replace mode", () => {
+    const view = editor();
+    const result: JapaneseConversionResult = { text: "効果", reviewKana: "こうか", conversionStrategy: "correction", changes: {
+      kind: "correction", evidence: "repair-stage", sourceReading: "こか", resultReading: "こうか", additions: [],
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } };
+    expect(canApplyConversionAutomatically(view, result, "replace", "typing")).toBe(true);
+    expect(canApplyConversionAutomatically(view, result, "ghost", "typing")).toBe(false);
+    expect(canApplyConversionAutomatically(view, result, "replace", "space")).toBe(false);
+    expect(canApplyConversionAutomatically(view, { ...result, conversionStrategy: "speculative" }, "replace")).toBe(false);
+    for (const kind of ["addition", "rewrite", "unknown"] as const) {
+      expect(canApplyConversionAutomatically(view, { ...result, changes: { ...result.changes!, kind } }, "replace")).toBe(false);
+    }
+    for (const status of ["unverified", "contradicted"] as const) {
+      expect(canApplyConversionAutomatically(view, { ...result, changes: { ...result.changes!, readingAssessment: { status, origin: "dictionary" } } }, "replace")).toBe(false);
+    }
+    const session = suggestion().session!;
+    for (const status of ["pending", "failed"] as const) {
+      session.rerankStatus = status;
+      expect(canApplyConversionAutomatically(view, { ...result, session }, "replace")).toBe(false);
+    }
+  });
   it.each<ConversionCommitReason>(["explicit", "automatic", "history"])("isolates %s acceptance from preceding typing and rejects duplicates", reason => {
     const view = editor(), value = suggestion();
     view.dispatch({ changes: { from: 5, insert: "i" }, userEvent: "input.type" });
