@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "cases": [
+    {"id":"request-i","input":"annwoonegasimasu","criterion":"案を依頼する。案内・番号など別の対象にしない。","examples":["案をお願いします"]},
+    {"id":"request-context","input":"annwoonegasimasu","before":"次のイベントの企画を考えています。","after":"候補を比較して決めたいです。","criterion":"企画案を依頼する。日時などを創作しない。","examples":["案をお願いします","企画案をお願いします"]},
+    {"id":"multiple-omissions","input":"siryouwootteokmasu","before":"会議で使う資料ができました。","criterion":"資料を送っておくという意図を拾う。okutteokimasuからkuとiを削除した入力。","examples":["資料を送っておきます"]},
+    {"id":"missing-n","input":"kakunishitekudasai","before":"提出前の資料です。","criterion":"資料の確認を依頼する。角煮などにしない。","examples":["確認してください"]},
+    {"id":"missing-vowel","input":"ashitnosiryouwojunbisimasu","criterion":"明日の資料を準備する。日付や資料の内容を創作しない。","examples":["明日の資料を準備します"]},
+    {"id":"word-omission","input":"siryouasitamadeonegasimasu","before":"会議用の資料が必要です。","criterion":"明日までの資料の準備・提出を依頼する。助詞や動詞の補充を許容する。","examples":["資料を明日までにお願いします","資料の準備を明日までにお願いします"]},
+    {"id":"clean-control","input":"annwoonegaisimasu","criterion":"案の依頼を維持する。正しい入力に不要な別解を足さない。","examples":["案をお願いします"]},
+    {"id":"negative-control","input":"madakakunishiteimasen","before":"資料は届いています。","criterion":"まだ確認していないことを伝える。確認済みに変えない。","examples":["まだ確認していません"]},
+    {"id":"literal-control","input":"`MR-62`nokakunioonegasimasu","criterion":"MR-62の確認を依頼し、識別子を正確に維持する。","examples":["MR-62の確認をお願いします"]},
+    {"id":"unrelated-context","input":"annwoonegasimasu","before":"昼食はカレーでした。","criterion":"案を依頼する。文脈に引かれてカレーの注文などに変えない。","examples":["案をお願いします"]}
+  ]
+}
