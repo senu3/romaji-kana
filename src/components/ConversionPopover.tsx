@@ -138,7 +138,8 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
           </ul>
           {target.session.candidates.length < 2 ? <p className="candidate-help">ほかの表記はありません。</p> : null}
           <footer className="candidate-reconsider">
-            <button type="button" className="candidate-action" onClick={() => { onSpeculate(); view.focus(); }}>読みも含めて見直す</button>
+            <button type="button" className="candidate-action" onMouseDown={event => { event.preventDefault(); view.focus(); }}
+              onClick={() => { onSpeculate(); view.focus(); }}>読みも含めて見直す</button>
             <p className="candidate-help">入力と前後の文脈から新しい候補を推測します。確定するまで本文は変わりません。</p>
           </footer>
         </div>

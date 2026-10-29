@@ -138,15 +138,15 @@ try {
         if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
         // The current request sends the reading and nearby context. Rejected
         // surfaces are enforced locally; the scenarios below check behavior.
-        assert.deepEqual(body.format.required, ['convertedText', 'completedKana']);
+        assert.deepEqual(body.format.required, ['candidates']);
         assert.match(body.prompt, /かくに/);
         assert.ok(!body.prompt.includes('角煮'));
         assert.match(body.prompt, /資料を/);
         assert.match(body.prompt, /してください。/);
         proposals++;
-        return route.fulfill({ json: { response: JSON.stringify(entry === 'recent'
+        return route.fulfill({ json: { response: JSON.stringify({ candidates: [entry === 'recent'
           ? { convertedText: '角煮', completedKana: 'かくに' }
-          : { convertedText: '確認', completedKana: 'かくにん' }) } });
+          : { convertedText: '確認', completedKana: 'かくにん' }] }) } });
       });
       await page.keyboard.insertText('資料をkakuniしてください。');
       await page.keyboard.press('Control+Home');
@@ -180,17 +180,17 @@ try {
         assert.equal(await editor.innerText(), '資料を角煮してください。');
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       } else {
-        await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '確認' }).waitFor();
-        await page.getByRole('button', { name: '変更の詳細', exact: true }).click();
-        assert.equal(await page.locator('.candidate-reading-change ins').textContent(), 'ん');
-        assert.match(await page.locator('.candidate-details').textContent(), /かくに.*かくにん/s);
+        await page.getByRole('button', { name: '確認 を採用', exact: true }).waitFor();
+        await page.getByText('置き換える範囲と読み', { exact: true }).click();
+        assert.match(await page.locator('.speculation-suggestions details').textContent(), /かくにん/s);
         const doc = await editor.evaluate(element => { const clone = element.cloneNode(true); clone.querySelectorAll('.cm-ghost-text').forEach(e => e.remove()); return clone.textContent; });
         assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/speculate-mobile.png'), fullPage: true });
         await editor.focus();
-        await page.keyboard.press('Alt+Enter');
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Enter');
         assert.equal(await editor.innerText(), '資料を確認してください。');
       }
       assert.equal(proposals, 1, 'Explicit reinterpretation must issue only one proposal');
@@ -209,13 +209,13 @@ try {
     await page.route('**/api/generate', route => {
       const body = route.request().postDataJSON();
       if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
-      const editableIds = body.format.properties.segments.items.properties.id.enum;
+      const editableIds = body.format.properties.candidates.items.properties.segments.items.properties.id.enum;
       assert.equal(editableIds.length, 1);
       assert.match(body.prompt, /XR-34/);
       assert.ok(!body.prompt.includes('講師'));
       proposals++;
-      return route.fulfill({ json: { response: JSON.stringify({ segments: [{ id: editableIds[0],
-        convertedText: '更新は終わらなかった。', completedKana: 'こうしんはおわらなかった。' }] }) } });
+      return route.fulfill({ json: { response: JSON.stringify({ candidates: [{ segments: [{ id: editableIds[0],
+        convertedText: '更新は終わらなかった。', completedKana: 'こうしんはおわらなかった。' }] }] }) } });
     });
     const source = '`XR-34` no koushihaowaranakatta.';
     await editor.click(); await page.keyboard.insertText(source);
@@ -223,14 +223,14 @@ try {
     await page.locator('.cm-ghost-text-suggestion').waitFor();
     await page.keyboard.press('Control+/');
     await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: '読みも含めて見直す', exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('.cm-ghost-text-suggestion')?.textContent === 'XR-34の更新は終わらなかった。');
+    await page.getByRole('button', { name: 'XR-34の更新は終わらなかった。 を採用', exact: true }).waitFor();
     const documentText = await editor.evaluate(element => {
       const clone = element.cloneNode(true);
       clone.querySelectorAll('.cm-ghost-text').forEach(widget => widget.remove());
       return clone.textContent;
     });
     assert.equal(documentText, source, 'Reconstructed protected output must remain a preview');
-    await editor.focus(); await page.keyboard.press('Alt+Enter');
+    await editor.focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
     assert.equal(await editor.innerText(), 'XR-34の更新は終わらなかった。');
     assert.equal(proposals, 1);
   });

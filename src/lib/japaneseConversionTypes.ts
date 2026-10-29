@@ -51,6 +51,8 @@ export interface JapaneseConversionOptions {
 
   /** The user rejected a valid conversion in this occurrence; reinterpret the original input. */
   userRequestedSpeculation?: boolean;
+  /** Explicit UI exploration: generate up to three interpretations in one request. */
+  speculationCandidates?: boolean;
 
   protectedDictionaryEntries?: ProtectedDictionaryEntry[];
   documentVocabulary?: string[];
