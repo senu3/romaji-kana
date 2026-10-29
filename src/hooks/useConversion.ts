@@ -1,4 +1,5 @@
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
+import { dispatchPreviewSelection } from "../lib/editorSelection";
 import { canApplyConversionAutomatically, commitConversion } from "../lib/conversionCommit";
 import type { EditorView } from "@codemirror/view";
 import type { Dispatch, RefObject, SetStateAction } from "react";
@@ -301,15 +302,10 @@ export function useConversion({
     const view = editorViewRef.current;
     if (!view || !isOpenConversionResult(conversion) || !requestsRef.current.valid(target.id) ||
         !requestsRef.current.display(target.id)) return false;
-    view.dispatch({ ...(conversion.conversionStrategy === "speculative" ? { selection: view.state.selection } : {}), effects: [removeLoadingDecoration.of(target.id),
-      showGhostSuggestion.of({ ...target, ...candidateDetails(conversion) })] });
-    if (conversion.conversionStrategy === "speculative" && view.hasFocus) {
-      // Replacing the inline widget with a marked source can detach Chromium's
-      // native caret while CodeMirror still holds the correct logical selection.
-      const selection = view.state.selection.main;
-      const anchor = view.domAtPos(selection.anchor), head = view.domAtPos(selection.head);
-      view.dom.ownerDocument.getSelection()?.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
-    }
+    const effects = [removeLoadingDecoration.of(target.id),
+      showGhostSuggestion.of({ ...target, ...candidateDetails(conversion) })];
+    if (conversion.conversionStrategy === "speculative") dispatchPreviewSelection(view, "preserve", effects);
+    else view.dispatch({ effects });
     return true;
   }, []);
 
@@ -717,15 +713,12 @@ export function useConversion({
     lockConversionSession(session);
     if (item.conversionStrategy === "speculative") {
       setCandidateList(null);
-      view.dispatch({ selection: { anchor: resolved.to }, effects: showGhostSuggestion.of({
+      dispatchPreviewSelection(view, resolved.to, showGhostSuggestion.of({
         ...candidateDetails(sessionResult(session)), id: createId("conversion"),
         from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
         inputText: item.input, source: "history", retryOf: item.id, avoidOutputs: item.avoidOutputs,
         documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
-      }) });
-      view.focus();
-      const caret = view.domAtPos(resolved.to);
-      view.dom.ownerDocument.getSelection()?.collapse(caret.node, caret.offset);
+      }));
       return true;
     }
     setCandidateList({
@@ -763,8 +756,7 @@ export function useConversion({
     if (visible && rangesOverlap(visible, resolved)) requestsRef.current.cancel(visible.id);
     invalidatePredictiveSuggestions();
     // This explicit action returns typing to the end of the replacement target.
-    view.dispatch({ selection: { anchor: resolved.to } });
-    view.focus();
+    dispatchPreviewSelection(view, resolved.to);
     return enqueueConversion({
       id: createId("conversion"), source: "history", status: "queued",
       originalText: item.input, createdAt: Date.now(), docVersion: docVersionRef.current,

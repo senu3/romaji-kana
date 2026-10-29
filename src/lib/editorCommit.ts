@@ -1,11 +1,12 @@
 import { isolateHistory } from "@codemirror/commands";
 import type { StateEffect } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { replacementSelection, type ReplacementCursor } from "./editorSelection";
 
 export interface EditorCommit {
   from: number; to: number; original: string; text: string;
   userEvent: "input.convert" | "input.historyApply" | "input.ghostAccept" | "input.autosuggest";
-  cursor?: "end" | "map";
+  cursor?: ReplacementCursor;
   effects?: StateEffect<unknown>[];
 }
 
@@ -16,7 +17,7 @@ export function commitEditorText(view: EditorView, commit: EditorCommit, beforeD
   beforeDispatch?.();
   view.dispatch({
     changes: { from: commit.from, to: commit.to, insert: commit.text },
-    selection: commit.cursor === "end" ? { anchor: commit.from + commit.text.length } : undefined,
+    selection: replacementSelection(commit.from, commit.text, commit.cursor),
     effects: commit.effects,
     userEvent: commit.userEvent,
     annotations: isolateHistory.of("full"),
