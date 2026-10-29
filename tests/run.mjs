@@ -4,9 +4,10 @@ import { artifactPath, projectRoot } from "./helpers/artifacts.mjs";
 
 const [suite, ...args] = process.argv.slice(2);
 const commands = {
+  intent: [process.execPath, "tests/evaluation/intent-smoke.mjs"],
   unit: [process.execPath, "node_modules/vitest/vitest.mjs", "run"],
   legacy: [process.execPath, "node_modules/vitest/vitest.mjs", "run", "--config", "tests/evaluation/legacy.vitest.config.ts"],
-  evaluation: [process.execPath, "--test", "tests/evaluation/runner.check.mjs", "tests/evaluation/routes.check.mjs", "tests/evaluation/isolation.check.mjs", "tests/evaluation/correction-quality.check.mjs", "tests/evaluation/speculation-ablation.check.mjs", "tests/evaluation/quality-comparison.check.mjs"],
+  evaluation: [process.execPath, "--test", "tests/evaluation/runner.check.mjs", "tests/evaluation/routes.check.mjs", "tests/evaluation/isolation.check.mjs", "tests/evaluation/correction-quality.check.mjs", "tests/evaluation/speculation-ablation.check.mjs", "tests/evaluation/quality-comparison.check.mjs", "tests/evaluation/intent-smoke.check.mjs"],
   "evaluation:legacy": [process.execPath, "--test", "tests/evaluation/legacy-runner.check.mjs"],
   eval: [process.execPath, "tests/evaluation/run.mjs"],
   e2e: [process.execPath, "tests/e2e/app.e2e.mjs"],

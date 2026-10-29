@@ -20,6 +20,7 @@
     "test:engine": "node tests/run.mjs engine",
     "test:companion": "node tests/run.mjs companion",
     "eval:run": "node tests/run.mjs eval",
+    "eval:intent": "node tests/run.mjs intent",
     "eval:test": "node tests/run.mjs evaluation",
     "eval:test:legacy": "node tests/run.mjs evaluation:legacy",
     "tauri": "tauri"
