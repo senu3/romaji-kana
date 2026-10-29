@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { resolveArtifactPath, temporaryArtifactDirectory } from "../helpers/artifacts.mjs";
 import { join } from "node:path";
 import { run } from "../helpers/evaluation-runner.mjs";
@@ -15,10 +15,11 @@ test("dry run validates data, deterministic order, and refuses overwrite", async
     }
     const a = JSON.parse(await readFile(join(dir, "a/manifest.json"), "utf8"));
     const b = JSON.parse(await readFile(join(dir, "b/manifest.json"), "utf8"));
-    assert.equal(a.schedule.length, 132);
+    assert.equal(a.schedule.length, a.cases.length * 3);
+    assert.ok(a.cases.every(c => !("inputCompletionLevel" in c.settings)));
     assert.deepEqual(a.schedule, b.schedule);
     assert.equal(a.cases.find(c => c.id === "vocabulary-01").settings.useDocumentVocabulary, true);
-    assert.equal(a.cases.find(c => c.id === "basic-01").settings.userDictionary.length, 0);
+    assert.equal(a.cases.find(c => c.id === "basic-01").settings.personalDictionary.length, 0);
     assert.equal((await run(["--dry-run", "--out", join(dir, "a")])).code, 1);
     assert.equal((await run(["--dry-run", "--case", "missing"])).code, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
@@ -41,20 +42,6 @@ test("keeps default and custom evaluation output inside test-results", async () 
   } finally { await rm(out, { recursive: true, force: true }); }
 });
 
-test("validates the unified speculation set and refuses to relabel historical full requests", async () => {
-  const dir = await temporaryArtifactDirectory("kana-unified-");
-  try {
-    const valid = await run(["--dry-run", "--dataset", "tests/evaluation/speculation-unification.json", "--repeats", "2", "--out", join(dir, "unified")]);
-    assert.equal(valid.code, 0, valid.output);
-    const manifest = JSON.parse(await readFile(join(dir, "unified/manifest.json"), "utf8"));
-    assert.equal(manifest.cases.length, 34);
-    assert.equal(manifest.schedule.length, 68);
-    const historical = await run(["--dry-run", "--dataset", "tests/evaluation/speculation-information.json", "--out", join(dir, "historical")]);
-    assert.equal(historical.code, 1);
-    assert.match(historical.output, /Unsupported historical speculation information mode/);
-  } finally { await rm(dir, { recursive: true, force: true }); }
-});
-
 test("validates rescue cases with unspecified acceptable text and route expectations", async () => {
   const dir = await temporaryArtifactDirectory("kana-rescue-");
   try {
@@ -68,18 +55,11 @@ test("validates rescue cases with unspecified acceptable text and route expectat
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test("records the experimental missing-letter switch and comparison set", async () => {
-  const dir = await temporaryArtifactDirectory("kana-missing-letter-");
-  try {
-    for (const mode of ["on", "off"]) {
-      const result = await run(["--dry-run", "--dataset", "tests/evaluation/missing-letter.json", "--missing-letter", mode, "--out", join(dir, mode)]);
-      assert.equal(result.code, 0, result.output);
-      const manifest = JSON.parse(await readFile(join(dir, mode, "manifest.json"), "utf8"));
-      assert.equal(manifest.cases.length, 12);
-      assert.ok(manifest.cases.every(c => c.options.missingLetterCorrection === (mode === "on")));
-    }
-    assert.equal((await run(["--dry-run", "--missing-letter", "invalid"])).code, 1);
-  } finally { await rm(dir, { recursive: true, force: true }); }
+test("retired CLI switches are rejected instead of silently changing production evaluation", async () => {
+  for (const args of [["--engine", "llm"], ["--missing-letter", "off"], ["--prompt", "old.txt"], ["--note", "old"]]) {
+    const result = await run(["--dry-run", ...args]);
+    assert.equal(result.code, 1, result.output);
+  }
 });
 
 test("production reinterpretation continues after validation errors, stops on 503, and keeps reference answers private", async () => {
@@ -124,7 +104,7 @@ test("production reinterpretation continues after validation errors, stops on 50
     const full = await run([...base, "--dry-run", "--out", join(dir, "full")]);
     assert.equal(full.code, 1, full.output);
     assert.equal(requests.length, 0);
-    assert.match(full.output, /Unsupported historical speculation information mode/);
+    assert.match(full.output, /Retired evaluation options/);
     delete source.cases[0].options.speculationInformation;
     await writeFile(dataset, JSON.stringify(source));
     fail = true;
@@ -144,4 +124,18 @@ test("production reinterpretation continues after validation errors, stops on 50
     await new Promise(resolve => server.close(resolve));
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+
+test("all retained datasets use supported production settings and candidate routes", async () => {
+  const dir = await temporaryArtifactDirectory("kana-datasets-");
+  try {
+    const files = (await readdir(new URL("./", import.meta.url))).filter(name => name.endsWith(".json"));
+    for (const file of files) {
+      const dataset = JSON.parse(await readFile(new URL(file, import.meta.url), "utf8"));
+      if (!dataset.defaults) continue; // Candidate recall and manual intent review have their own runners.
+      const result = await run(["--dry-run", "--dataset", "tests/evaluation/" + file, "--out", join(dir, file)]);
+      assert.equal(result.code, 0, file + ": " + result.output);
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

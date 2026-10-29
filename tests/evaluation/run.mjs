@@ -9,7 +9,6 @@ import { createKanaEngineClient } from "../../tools/kana-engine-client.mjs";
 import { finalRoutes, observeRoute, summarizeRoutes } from "./routes.mjs";
 import { summarizeCorrectionQuality } from "./correction-quality.mjs";
 import { artifactPath, resolveArtifactPath } from "../helpers/artifacts.mjs";
-import { ablateSpeculationRequest, historicalSpeculationRequest, validateSpeculationAblation } from "./speculation-ablation.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { values: args } = parseArgs({ options: {
@@ -17,20 +16,18 @@ const { values: args } = parseArgs({ options: {
   provider: { type: "string", default: "ollama" }, model: { type: "string" },
   url: { type: "string" }, repeats: { type: "string", default: "3" },
   seed: { type: "string", default: "20260922" }, case: { type: "string" },
-  out: { type: "string" }, prompt: { type: "string" }, note: { type: "string", default: "" },
+  out: { type: "string" },
   engine: { type: "string", default: "hybrid" },
   dataset: { type: "string", default: "tests/evaluation/cases.json" },
-  "missing-letter": { type: "string", default: "on" },
 } });
 
 if (args.help) {
   console.log(`Usage: npm run eval:run -- --model MODEL [options]
   --provider ollama|lmstudio  --url http://localhost:PORT
-  --engine hybrid|local|llm
+  --engine hybrid|local
   --dataset tests/evaluation/holdout.json
-  --missing-letter on|off
   --repeats 3  --seed 20260922  --case basic-01,basic-02
-  --prompt FILE  --note TEXT  --out test-results/evaluation/NEW_DIRECTORY  --dry-run
+  --out test-results/evaluation/NEW_DIRECTORY  --dry-run
 Dry run validates cases and writes the schedule without contacting a model.
 Actual runs include one unscored warmup. Response validation errors are recorded;
 transport and unexpected errors stop the run.`);
@@ -43,8 +40,7 @@ async function main() {
     `evaluation/runs/${new Date().toISOString().replaceAll(":", "-")}-${randomUUID().slice(0, 8)}`,
   );
   if (!["ollama", "lmstudio"].includes(args.provider)) throw new Error("Invalid provider");
-  if (!["hybrid", "local", "llm"].includes(args.engine)) throw new Error("Invalid engine");
-  if (!["on", "off"].includes(args["missing-letter"])) throw new Error("Invalid missing-letter mode");
+  if (!["hybrid", "local"].includes(args.engine)) throw new Error("Invalid engine");
   const repeats = Number(args.repeats), seed = Number(args.seed);
   if (!Number.isSafeInteger(repeats) || repeats < 1 || repeats > 100) throw new Error("repeats must be 1..100");
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error("seed must be uint32");
@@ -55,51 +51,48 @@ async function main() {
   }
   const source = await readFile(resolve(root, args.dataset), "utf8");
   const dataset = JSON.parse(source);
+  if (!Array.isArray(dataset.cases) || !dataset.cases.length) throw new Error("Dataset must contain cases");
   const ids = new Set();
   for (const c of dataset.cases) {
-    validateSpeculationAblation(c.speculationAblation);
-    if (c.speculationAblation && (c.options?.purpose !== "speculative" || c.options?.speculationInformation !== "reduced")) {
-      throw new Error("Speculation ablation requires direct reduced speculation");
-    }
     if (!c.id || ids.has(c.id) || !c.input || !c.category || !c.criteria?.length || !Array.isArray(c.acceptableExamples)) throw new Error(`Invalid case: ${c.id}`);
     if (c.expectedRoutes !== undefined && (!Array.isArray(c.expectedRoutes) || !c.expectedRoutes.length ||
         c.expectedRoutes.some(route => !finalRoutes.includes(route)))) throw new Error(`Invalid expectedRoutes: ${c.id}`);
     if (!c.acceptableExamples.length && !c.expectedRoutes) throw new Error(`Empty examples require expectedRoutes: ${c.id}`);
-    if (!["none", "word", "sentence"].includes(c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel)) throw new Error(`Invalid mode: ${c.id}`);
-    if (c.options?.speculationInformation !== undefined && c.options.speculationInformation !== "reduced") {
-      throw new Error(`Unsupported historical speculation information mode: ${c.options.speculationInformation}`);
+    const retired = ["completionMode", "speculativeMode", "alternativeMode", "speculationInformation", "missingLetterCorrection"];
+    if (c.speculationAblation || c.settingsOverrides?.inputCompletionLevel || retired.some(key => key in (c.options ?? {}))) {
+      throw new Error(`Retired evaluation options: ${c.id}`);
+    }
+    if (c.options?.userRequestedSpeculation && !c.options.speculationCandidates) {
+      throw new Error(`Explicit speculation requires candidate generation: ${c.id}`);
     }
     ids.add(c.id);
   }
   const selected = args.case ? args.case.split(",") : [...ids];
   if (new Set(selected).size !== selected.length || selected.some(id => !ids.has(id))) throw new Error("Unknown or duplicate case ID");
   const cases = dataset.cases.filter(c => selected.includes(c.id));
-  if (args.engine === "local" && cases.some(c => (c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel) !== "none" || c.options?.completionMode || c.options?.speculativeMode || c.options?.alternativeMode || c.options?.userRequestedSpeculation || (c.options?.purpose && c.options.purpose !== "normal"))) {
-    throw new Error("--engine local requires faithful conversion cases without repair/completion/speculation");
+  if (args.engine === "local" && cases.some(c => c.options?.userRequestedSpeculation || (c.options?.purpose && c.options.purpose !== "normal"))) {
+    throw new Error("--engine local requires faithful conversion cases");
   }
-  const prompt = args.prompt ? await readFile(resolve(args.prompt), "utf8") : null;
   const { createServer } = await import("vite");
   const vite = await createServer({ root, configFile: false, cacheDir: artifactPath("cache/evaluation"), optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: "custom" });
   const nativeFetch = globalThis.fetch;
-  const usesLegacy = c => args.engine === "llm" || (c.settingsOverrides?.inputCompletionLevel ?? dataset.defaults.inputCompletionLevel) !== "none" || Boolean(c.options?.alternativeMode);
-  const needCurrent = cases.some(c => !usesLegacy(c));
-  const needLegacy = cases.some(usesLegacy);
   let engineClient;
   try {
-    const defaultSettings = needCurrent ? (await vite.ssrLoadModule("/src/lib/settings.ts")).defaultSettings : null;
-    const comparisonSettings = needLegacy ? (await vite.ssrLoadModule("/tests/evaluation/legacy/settings.ts")).defaultSettings : null;
+    const { defaultSettings } = await vite.ssrLoadModule("/src/lib/settings.ts");
     const { documentVocabulary, ...defaults } = dataset.defaults;
+    for (const settings of [defaults, ...cases.map(c => c.settingsOverrides ?? {})]) {
+      const unknown = Object.keys(settings).filter(key => !(key in defaultSettings));
+      if (unknown.length) throw new Error(`Unsupported settings: ${unknown.join(", ")}`);
+    }
     const configured = cases.map(c => ({
       ...c,
       settings: {
-        ...structuredClone(usesLegacy(c) ? comparisonSettings : defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
+        ...structuredClone(defaultSettings), ...structuredClone(defaults), ...structuredClone(c.settingsOverrides ?? {}),
         modelProvider: args.provider, modelName: args.model ?? "DRY_RUN",
-        conversionEngine: args.engine === "llm" ? "llm" : "local",
         [args.provider === "ollama" ? "ollamaApiUrl" : "lmStudioApiUrl"]: endpoint.href,
         useDocumentVocabulary: Boolean(c.options?.documentVocabulary?.length),
-        ...(prompt === null ? {} : { conversionPrompt: prompt }),
       },
-      options: structuredClone({ documentVocabulary, ...c.options, missingLetterCorrection: args["missing-letter"] === "on" }),
+      options: structuredClone({ documentVocabulary, ...c.options }),
     }));
     let state = seed;
     const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
@@ -121,8 +114,8 @@ async function main() {
       gpu: "unknown", vram: "unknown", serverVersion: "unknown", modelDigest: "unknown", quantization: "unknown",
       provider: args.provider, model: args.model ?? null, endpoint: endpoint.href,
       engine: args.engine,
-      dictionary: args.engine === "llm" ? null : JSON.parse(await readFile(resolve(root, "src-engine/data/manifest.json"), "utf8")),
-      seed, repeats, note: args.note, loadState: "unknown; no cold-start claim",
+      dictionary: JSON.parse(await readFile(resolve(root, "src-engine/data/manifest.json"), "utf8")),
+      seed, repeats, loadState: "unknown; no cold-start claim",
       promptSha256: hash(configured[0].settings.conversionPrompt),
       cases: configured, schedule,
     };
@@ -132,14 +125,10 @@ async function main() {
 
     // Data checks need settings only. Load converters and build a dictionary
     // process only when an actual trial requires them.
-    const convertRomajiToJapaneseDetailed = needCurrent ? (await vite.ssrLoadModule("/src/lib/ollama.ts")).convertRomajiToJapaneseDetailed : null;
-    const compareLegacy = needLegacy ? (await vite.ssrLoadModule("/tests/evaluation/legacy/ollama.ts")).convertRomajiToJapaneseDetailed : null;
+    const { convertRomajiToJapaneseDetailed: convert } = await vite.ssrLoadModule("/src/lib/ollama.ts");
     const { defaultOllamaTransport } = await vite.ssrLoadModule("/src/lib/ollamaProxy.ts");
-    const { romajiToKana } = await vite.ssrLoadModule("/src/lib/romajiKana.ts");
-    const { prepareConversionRequest } = await vite.ssrLoadModule("/src/lib/conversionRequest.ts");
-    const { hasConvertibleRomaji } = await vite.ssrLoadModule("/src/lib/conversionInput.ts");
     const { ConversionResponseError } = await vite.ssrLoadModule("/src/lib/conversionDiagnostics.ts");
-    engineClient = createKanaEngineClient({ evaluation: needLegacy });
+    engineClient = createKanaEngineClient();
     let calls = [];
     let engineCalls = [];
     const engineRequest = async body => {
@@ -150,7 +139,6 @@ async function main() {
       finally { record.elapsedMs = performance.now() - started; }
     };
     const kanaEngine = {
-      complete: async (reading, words) => (await engineRequest({ operation: "complete", reading, words: words.filter(w => w.enabled) })).readings,
       search: (reading, words) => engineRequest({ operation: "search", reading, words: words.filter(w => w.enabled), limit: 24 }),
       verify: async (text, reading, words) => (await engineRequest({ operation: "verify", text, reading, words: words.filter(w => w.enabled) })).status,
     };
@@ -174,30 +162,14 @@ async function main() {
       calls = [];
       engineCalls = [];
       const started = performance.now();
-      const row = { ...trial, category: c.category, mode: c.settings.inputCompletionLevel, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options: c.options };
+      const row = { ...trial, category: c.category, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options: c.options };
       row.firstDictionaryCandidateMs = null;
       row.rescueStartedMs = null;
       row.missingLetterSearches = [];
       try {
-        const comparison = args.engine === "llm" || c.settings.inputCompletionLevel !== "none" || c.options.alternativeMode;
-        row.implementation = comparison ? "legacy-evaluation" : "production";
-        const convert = comparison ? compareLegacy : convertRomajiToJapaneseDetailed;
-        const transport = c.speculationAblation ? { ...defaultOllamaTransport,
-          generate: (provider, url, request, ...rest) => {
-            const { parts } = prepareConversionRequest(c.input, c.settings, c.options);
-            const target = request.outputSchema?.properties?.segments
-              ? parts.map((part, index) => part.type === "text" && hasConvertibleRomaji(part.value)
-                ? { id: "edit-" + index, originalInput: part.value } : { literal: part.type === "text" ? part.value : part.output })
-              : parts.map(part => part.type === "text" ? part.value : part.output).join("");
-            return defaultOllamaTransport.generate(provider, url,
-              ablateSpeculationRequest(historicalSpeculationRequest(request, target), c.speculationAblation, text => romajiToKana(text).kana), ...rest);
-          },
-        } : defaultOllamaTransport;
-        if (c.speculationAblation) row.speculationAblation = c.speculationAblation;
-        row.result = await convert(c.input, c.settings, transport, {
-          ...c.options, ...(args.engine === "llm" ? {} : { kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local" }),
-          ...(!comparison && c.options.completionMode ? { purpose: "correction" } : {}),
-          ...(!comparison && c.options.speculativeMode ? { purpose: "speculative" } : {}),
+        row.implementation = "production";
+        row.result = await convert(c.input, c.settings, defaultOllamaTransport, {
+          ...c.options, kanaEngine, rerank: args.engine === "hybrid", autoRescue: args.engine !== "local",
           onLocalCandidates: () => { row.firstDictionaryCandidateMs ??= performance.now() - started; },
           onRescueStart: () => { row.rescueStartedMs = performance.now() - started; },
           onMissingLetterSearch: metrics => { row.missingLetterSearches.push(metrics); },
@@ -205,7 +177,7 @@ async function main() {
         row.outcome = row.result.suggestionRejected ? "rejected" : row.result.text?.trim() ? "candidate" : "empty";
         row.route = observeRoute(row.result, c.expectedRoutes);
       } catch (error) {
-        row.outcome = "error"; row.error = String(error);
+        row.outcome = "error"; row.error = String(error) + (error.cause ? ` (${error.cause})` : "");
         if (error?.diagnostic) row.errorDiagnostic = error.diagnostic;
         // A completed but invalid response is a quality failure, not evidence of
         // an in-flight server generation. Keep it in the denominator and continue.
@@ -227,7 +199,7 @@ async function main() {
       row.review = { fidelity: null, naturalness: null, modeFit: null, criticalFailure: null, additionsIncorrect: null, usable: null, notes: "" };
       await appendFile(resolve(out, "trials.jsonl"), JSON.stringify(row) + "\n");
       results.push(row);
-      console.log(`${row.phase} ${row.caseId} #${row.repeat}: ${row.outcome} (${Math.round(row.elapsedMs)} ms, ${calls.length} HTTP attempts)`);
+      console.log(`${row.phase} ${row.caseId} #${row.repeat}: ${row.outcome} (${Math.round(row.elapsedMs)} ms, ${calls.length} HTTP attempts)${row.error ? `: ${row.error}` : ""}`);
       if (stopped) break; // A timed-out generation may still occupy the server.
     }
     const measured = results.filter(r => r.phase === "measured");

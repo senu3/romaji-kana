@@ -187,7 +187,7 @@ try {
         assert.equal(doc, entry === 'ghost' ? '資料をkakuniしてください。' : '資料を角煮してください。', 'Speculation must await explicit acceptance even in replace mode');
         await page.setViewportSize({ width: 390, height: 520 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/prototypes/inline/speculate-mobile.png'), fullPage: true });
+        if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/e2e/triggers-speculate-mobile.png'), fullPage: true });
         await editor.focus();
         await page.keyboard.press('Tab');
         await page.keyboard.press('Enter');

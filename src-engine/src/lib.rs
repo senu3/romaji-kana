@@ -453,61 +453,6 @@ impl Engine {
         found.into_iter().filter(|s| seen.insert((s.reading.clone(), s.text.clone()))).take(20).collect()
     }
 
-    /// Prefix completion proposes readings; it never silently changes typed characters.
-    #[cfg(feature = "evaluation")]
-    pub fn complete(&self, reading: &str, words: &[UserWord]) -> Vec<String> {
-        let chars: Vec<char> = reading.chars().collect();
-        if chars.len() < 2
-            || chars.len() > MAX_READING
-            || !chars
-                .iter()
-                .all(|c| ('ぁ'..='ゖ').contains(c) || *c == 'ー')
-        {
-            return vec![];
-        }
-        for start in 0..chars.len() - 1 {
-            let prefix = &chars[start..];
-            let before: String = chars[..start].iter().collect();
-            let mut found: Vec<(usize, i32, String)> = Vec::new();
-            for index in self.trie.completions(prefix) {
-                let entry = &self.entries[index];
-                let length = entry.reading.chars().count();
-                if length > prefix.len() && length <= prefix.len() + 12 {
-                    found.push((
-                        length - prefix.len(),
-                        entry.cost,
-                        format!("{before}{}", entry.reading),
-                    ));
-                }
-            }
-            for word in words {
-                let key: Vec<char> = word.reading.chars().collect();
-                if key.len() > prefix.len()
-                    && key.len() <= prefix.len() + 12
-                    && key.starts_with(prefix)
-                {
-                    found.push((
-                        key.len() - prefix.len(),
-                        3000,
-                        format!("{before}{}", word.reading),
-                    ));
-                }
-            }
-            found.sort();
-            let mut seen = HashSet::new();
-            let results: Vec<String> = found
-                .into_iter()
-                .map(|(_, _, key)| key)
-                .filter(|key| key.chars().count() <= MAX_READING && seen.insert(key.clone()))
-                .take(3)
-                .collect();
-            if !results.is_empty() {
-                return results;
-            }
-        }
-        vec![]
-    }
-
     /// Existence of a surface/reading alignment, independent of ranked N-best results.
     /// A missing path is unknown: this dictionary cannot establish exhaustive pronunciation.
     pub fn verify(&self, text: &str, reading: &str, words: &[UserWord]) -> &'static str {
@@ -588,12 +533,6 @@ impl PartialOrd for Path {
 pub enum Request {
     Notices,
     Suggest { reading: String, #[serde(default)] words: Vec<UserWord> },
-    #[cfg(feature = "evaluation")]
-    Complete {
-        reading: String,
-        #[serde(default)]
-        words: Vec<UserWord>,
-    },
     Search {
         #[serde(flatten)]
         request: SearchRequest,
@@ -616,13 +555,6 @@ pub fn execute(request: Request) -> Result<serde_json::Value, String> {
             "notice": include_str!("../data/NOTICE.txt"),
             "license": include_str!("../data/MOZC-LICENSE"),
         })),
-        #[cfg(feature = "evaluation")]
-        Request::Complete { reading, words } => {
-            if words.len() > 500 {
-                return Err("Too many personal words".into());
-            }
-            Ok(serde_json::json!({ "readings": engine()?.complete(&reading, &words) }))
-        }
         Request::Search { request } => {
             serde_json::to_value(engine()?.search(&request)?).map_err(|e| e.to_string())
         }

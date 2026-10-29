@@ -1,34 +1,231 @@
 {
   "version": "2026-10-21-reinterpretation-output-quality-contextual-2",
-  "defaults": { "inputCompletionLevel": "none", "think": false, "userDictionary": [], "documentVocabulary": [] },
+  "defaults": {
+    "think": false,
+    "documentVocabulary": [],
+    "personalDictionary": []
+  },
   "speculativeRubric": "推測経路では参考語句への完全一致を要求しない。入力と文脈に根拠がある言い換え・構文変更・省略語の補いを合格に含める。否定・未完了・依頼・数字・識別子を保持し、根拠のない事実を追加しない。通常変換・誤字修正の制約は緩めない。過去の評価得点とは直接比較しない。",
   "cases": [
-    { "id": "output-01", "category": "normal-control", "input": "atodekaerimasu.", "acceptableExamples": ["後で帰ります。", "あとで帰ります。"], "expectedRoutes": ["normal"], "criteria": ["帰る時点を後とし、通常経路で返す"] },
-    { "id": "output-02", "category": "normal-control", "input": "nokoriha23kendesu.", "acceptableExamples": ["残りは23件です。"], "expectedRoutes": ["normal"], "criteria": ["残件数23を保持する"] },
-    { "id": "output-03", "category": "protected-reinterpretation", "input": "`KT-86` no sayouwokentoushimasu.",
-      "options": { "contextBefore": "新しい部品を製品に取り入れるかどうか検討する段階です。", "userRequestedSpeculation": true, "avoidOutputs": ["KT-86の作用を検討します。"] },
-      "acceptableExamples": ["KT-86の採用を検討します。"], "expectedRoutes": ["speculative"], "criteria": ["採用という解釈を提案し、識別子と助詞を保持する"] },
-    { "id": "output-04", "category": "protected-reinterpretation", "input": "`綾瀬` no kaihouwoshinaidekudasai.",
-      "options": { "contextBefore": "綾瀬という製品名の窓を開ける操作について説明しています。", "userRequestedSpeculation": true, "avoidOutputs": ["綾瀬の解放をしないでください。"] },
-      "acceptableExamples": ["綾瀬の開放をしないでください。"], "expectedRoutes": ["speculative"], "criteria": ["窓の開放という解釈を選ぶ。同じ読みの別の意味を禁止しない"], "criticalChecks": ["綾瀬と否定の依頼を保持する"] },
-    { "id": "output-05", "category": "protected-reinterpretation", "input": "azusa no sayouhamadakimeteinai.",
-      "settingsOverrides": { "userDictionary": [{ "id": "person-fixture", "reading": "azusa", "output": "梓", "enabled": true, "note": "" }] },
-      "options": { "contextBefore": "面接を受けた人を雇うかどうかの判断について話しています。", "userRequestedSpeculation": true, "avoidOutputs": ["梓の作用はまだ決めていない。"] },
-      "acceptableExamples": ["梓の採用はまだ決めていない。"], "expectedRoutes": ["speculative"], "criteria": ["保護した人名の読みを生成せず、採用への見直しを提案する"], "criticalChecks": ["梓と未決定を保持する"] },
-    { "id": "output-06", "category": "protected-reinterpretation", "input": "`BR-27` kara `TM-91` he hassoushimasen.",
-      "options": { "contextBefore": "荷物を出荷元から配送先へ送る手続きについて説明しています。", "userRequestedSpeculation": true, "avoidOutputs": ["BR-27からTM-91へ発想しません。"] },
-      "acceptableExamples": ["BR-27からTM-91へ発送しません。"], "expectedRoutes": ["speculative"], "criteria": ["複数の固定区間を挟んでも発送という解釈へ変更する"], "criticalChecks": ["両識別子とから・へ・否定を保持する"] },
-    { "id": "output-07", "category": "protected-reinterpretation", "input": "`SD-58` no hassouwotomeru.`SD-58`",
-      "options": { "contextBefore": "荷物の出荷を止める指示です。末尾には同じ管理番号を再掲しています。", "userRequestedSpeculation": true, "avoidOutputs": ["SD-58の発想を止める。SD-58"] },
-      "acceptableExamples": ["SD-58の発送を止める。SD-58"], "expectedRoutes": ["speculative"], "criteria": ["反復する保護語と末尾の固定区間を保持して発送へ見直す"] },
-    { "id": "output-08", "category": "underdetermined", "input": "sousa",
-      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["操作"] },
-      "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["文脈なしでは走査など別の解釈を特定できない。新しい事実を作らない"] },
-    { "id": "output-09", "category": "underdetermined", "input": "qzvpxr",
-      "options": { "userRequestedSpeculation": true, "avoidOutputs": ["クズブ"] },
-      "acceptableExamples": [], "expectedRoutes": ["rejected"], "criteria": ["意味の根拠がない英字列を無理に日本語へ変えない"] },
-    { "id": "output-10", "category": "surface-rejection", "input": "renrakuhamadashiteinai.",
-      "options": { "contextBefore": "まだ相手に連絡していない状態です。", "userRequestedSpeculation": true, "avoidOutputs": ["連絡はまだしていない。"] },
-      "acceptableExamples": ["相手への連絡は未実施です。"], "expectedRoutes": ["speculative", "rejected"], "criteria": ["未連絡の状態を保つ実質的な言い換えを許す。丁寧語尾だけの再提示は棄却する。根拠のない理由や完了事実を追加しない。"] }
+    {
+      "id": "output-01",
+      "category": "normal-control",
+      "input": "atodekaerimasu.",
+      "acceptableExamples": [
+        "後で帰ります。",
+        "あとで帰ります。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "帰る時点を後とし、通常経路で返す"
+      ]
+    },
+    {
+      "id": "output-02",
+      "category": "normal-control",
+      "input": "nokoriha23kendesu.",
+      "acceptableExamples": [
+        "残りは23件です。"
+      ],
+      "expectedRoutes": [
+        "normal"
+      ],
+      "criteria": [
+        "残件数23を保持する"
+      ]
+    },
+    {
+      "id": "output-03",
+      "category": "protected-reinterpretation",
+      "input": "`KT-86` no sayouwokentoushimasu.",
+      "options": {
+        "contextBefore": "新しい部品を製品に取り入れるかどうか検討する段階です。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "KT-86の作用を検討します。"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "KT-86の採用を検討します。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "採用という解釈を提案し、識別子と助詞を保持する"
+      ]
+    },
+    {
+      "id": "output-04",
+      "category": "protected-reinterpretation",
+      "input": "`綾瀬` no kaihouwoshinaidekudasai.",
+      "options": {
+        "contextBefore": "綾瀬という製品名の窓を開ける操作について説明しています。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "綾瀬の解放をしないでください。"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "綾瀬の開放をしないでください。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "窓の開放という解釈を選ぶ。同じ読みの別の意味を禁止しない"
+      ],
+      "criticalChecks": [
+        "綾瀬と否定の依頼を保持する"
+      ]
+    },
+    {
+      "id": "output-05",
+      "category": "protected-reinterpretation",
+      "input": "azusa no sayouhamadakimeteinai.",
+      "settingsOverrides": {
+        "personalDictionary": [
+          {
+            "id": "person-fixture",
+            "reading": "azusa",
+            "text": "梓",
+            "pos": "noun",
+            "enabled": true
+          }
+        ]
+      },
+      "options": {
+        "contextBefore": "面接を受けた人を雇うかどうかの判断について話しています。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "梓の作用はまだ決めていない。"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "梓の採用はまだ決めていない。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "保護した人名の読みを生成せず、採用への見直しを提案する"
+      ],
+      "criticalChecks": [
+        "梓と未決定を保持する"
+      ]
+    },
+    {
+      "id": "output-06",
+      "category": "protected-reinterpretation",
+      "input": "`BR-27` kara `TM-91` he hassoushimasen.",
+      "options": {
+        "contextBefore": "荷物を出荷元から配送先へ送る手続きについて説明しています。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "BR-27からTM-91へ発想しません。"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "BR-27からTM-91へ発送しません。"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "複数の固定区間を挟んでも発送という解釈へ変更する"
+      ],
+      "criticalChecks": [
+        "両識別子とから・へ・否定を保持する"
+      ]
+    },
+    {
+      "id": "output-07",
+      "category": "protected-reinterpretation",
+      "input": "`SD-58` no hassouwotomeru.`SD-58`",
+      "options": {
+        "contextBefore": "荷物の出荷を止める指示です。末尾には同じ管理番号を再掲しています。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "SD-58の発想を止める。SD-58"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "SD-58の発送を止める。SD-58"
+      ],
+      "expectedRoutes": [
+        "speculative"
+      ],
+      "criteria": [
+        "反復する保護語と末尾の固定区間を保持して発送へ見直す"
+      ]
+    },
+    {
+      "id": "output-08",
+      "category": "underdetermined",
+      "input": "sousa",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "操作"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "文脈なしでは走査など別の解釈を特定できない。新しい事実を作らない"
+      ]
+    },
+    {
+      "id": "output-09",
+      "category": "underdetermined",
+      "input": "qzvpxr",
+      "options": {
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "クズブ"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "意味の根拠がない英字列を無理に日本語へ変えない"
+      ]
+    },
+    {
+      "id": "output-10",
+      "category": "surface-rejection",
+      "input": "renrakuhamadashiteinai.",
+      "options": {
+        "contextBefore": "まだ相手に連絡していない状態です。",
+        "userRequestedSpeculation": true,
+        "avoidOutputs": [
+          "連絡はまだしていない。"
+        ],
+        "speculationCandidates": true
+      },
+      "acceptableExamples": [
+        "相手への連絡は未実施です。"
+      ],
+      "expectedRoutes": [
+        "speculative",
+        "rejected"
+      ],
+      "criteria": [
+        "未連絡の状態を保つ実質的な言い換えを許す。丁寧語尾だけの再提示は棄却する。根拠のない理由や完了事実を追加しない。"
+      ]
+    }
   ]
 }

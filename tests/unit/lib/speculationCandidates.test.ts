@@ -11,6 +11,28 @@ function setup(candidates: unknown[]) {
 const proposal = (convertedText: string, completedKana: string) => ({ convertedText, completedKana });
 
 describe("explicit speculative candidate session", () => {
+  it.each([
+    null,
+    proposal("案をお願いします", "あんをおねがいします"),
+    { candidates: [], extra: true },
+    { candidates: Array.from({ length: 4 }, () => proposal("案をお願いします", "あんをおねがいします")) },
+  ])("rejects a response outside the current candidate contract: %j", async response => {
+    const h = setup([]);
+    h.generate.mockResolvedValue({ response: JSON.stringify(response) });
+    await expect(convertRomajiToJapaneseDetailed("annwoonegasimasu", defaultSettings, h.transport, h.options))
+      .rejects.toMatchObject({ diagnostic: "response-format" });
+    expect(h.options.kanaEngine.verify).not.toHaveBeenCalled();
+  });
+
+  it("verifies each interpretation and keeps an alternative after a reading contradiction", async () => {
+    const h = setup([proposal("案をお願いします", "あんをおねがいします"), proposal("企画案をお願いします", "きかくあんをおねがいします")]);
+    h.options.kanaEngine.verify.mockResolvedValueOnce("contradicted");
+    const result = await convertRomajiToJapaneseDetailed("annwoonegasimasu", defaultSettings, h.transport, h.options);
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["企画案をお願いします"]);
+    expect(h.options.kanaEngine.verify).toHaveBeenCalledTimes(2);
+    expect(h.generate).toHaveBeenCalledOnce();
+  });
+
   it("keeps different readings in order, deduplicates punctuation variants, and makes one generation", async () => {
     const h = setup([proposal("案をお願いします", "あんをおねがいします"), proposal("企画案をお願いします", "きかくあんをおねがいします"), proposal("案をお願いします。", "あんをおねがいします。")]);
     const result = await convertRomajiToJapaneseDetailed("annwoonegasimasu", defaultSettings, h.transport, h.options);

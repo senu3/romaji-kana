@@ -1,5 +1,4 @@
 #[test]
-#[cfg(not(feature = "evaluation"))]
 fn production_rejects_retired_completion_requests() {
     assert!(serde_json::from_value::<super::Request>(serde_json::json!({
         "operation": "complete", "reading": "てすとし", "words": []
@@ -90,24 +89,6 @@ fn personal_words_and_unknown_literals_survive() {
         .is_err());
 }
 
-#[test]
-#[cfg(feature = "evaluation")]
-fn prefix_completions_only_extend_the_entered_reading() {
-    let engine = engine().unwrap();
-    let words = vec![UserWord {
-        id: "user".into(),
-        reading: "てすとしゃ".into(),
-        text: "試験社".into(),
-        pos: "organization".into(),
-    }];
-    let completions = engine.complete("てすとし", &words);
-    assert!(completions.iter().any(|r| r == "てすとしゃ"));
-    assert!(completions
-        .iter()
-        .all(|r| r.starts_with("てすとし") && r.chars().count() > 4));
-    assert!(engine.complete("あ", &[]).is_empty());
-    assert!(engine.complete("10じ", &[]).is_empty());
-}
 #[test]
 fn astar_matches_exhaustive_paths_in_a_tiny_dictionary() {
     let entries = vec![

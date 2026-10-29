@@ -1,14 +1,13 @@
 {
   "version": "2026-10-17-holdout-1",
   "defaults": {
-    "inputCompletionLevel": "none",
     "punctuationConversion": {
       "periodToJapanese": true,
       "commaToJapanese": true
     },
     "think": false,
-    "userDictionary": [],
-    "documentVocabulary": []
+    "documentVocabulary": [],
+    "personalDictionary": []
   },
   "cases": [
     {
@@ -124,39 +123,6 @@
       "criteria": [
         "長い入力でも読みを変更せず候補を保持する",
         "期限や依頼内容を追加しない"
-      ]
-    },
-    {
-      "id": "holdout-09",
-      "category": "word",
-      "input": "renrakusakinosette",
-      "settingsOverrides": {
-        "inputCompletionLevel": "word"
-      },
-      "acceptableExamples": [
-        "連絡先の設定"
-      ],
-      "criteria": [
-        "末尾の語の完成に限定する",
-        "設定方法などの新しい句を追加しない"
-      ]
-    },
-    {
-      "id": "holdout-10",
-      "category": "sentence",
-      "input": "ashitanoannai madaokutteina",
-      "settingsOverrides": {
-        "inputCompletionLevel": "sentence"
-      },
-      "acceptableExamples": [
-        "明日の案内はまだ送っていない。"
-      ],
-      "criteria": [
-        "未送付という中心的な意図を維持する",
-        "送付先や送付時刻を創作しない"
-      ],
-      "criticalChecks": [
-        "未送付を送付済みに変えない"
       ]
     }
   ]
