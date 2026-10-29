@@ -7,16 +7,17 @@ import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { completionSelection } from "../lib/completionSelection";
+import { moveSuggestion, suggestionMenuTheme } from "./suggestionMenu";
 
 interface Menu { target: SuggestTarget; candidates: WordSuggestion[]; selected: number }
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
 // Conversion supplies the known reading; no reverse lookup or model call is needed.
 
-export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean) {
+export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean, blocked: (view: EditorView) => boolean = () => false) {
   const setMenu = StateEffect.define<Menu | null>();
   const refresh = StateEffect.define<void>();
-  const allowed = (view: EditorView) => settings().autoSuggest && !view.composing && view.hasFocus && view.state.selection.main.empty;
+  const allowed = (view: EditorView) => settings().autoSuggest && !blocked(view) && !view.composing && view.hasFocus && view.state.selection.main.empty;
   const convertedTarget = StateField.define<SuggestTarget | null>({ create: () => null, update(value, tr) {
     if (tr.docChanged && value) {
       const to = tr.changes.mapPos(value.to, 1);
@@ -154,8 +155,9 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   } } });
   const move = (view: EditorView, direction: number, start = false) => {
     const menu = view.state.field(field); if (!menu || !allowed(view)) return false;
-    if (menu.selected < 0 && !start) return false;
-    view.dispatch({ effects: setMenu.of({ ...menu, selected: menu.selected < 0 ? 0 : (menu.selected + direction + menu.candidates.length) % menu.candidates.length }) }); return true;
+    const selected = moveSuggestion(menu.selected, menu.candidates.length, direction, start);
+    if (selected === null) return false;
+    view.dispatch({ effects: setMenu.of({ ...menu, selected }) }); return true;
   };
   return [field, convertedTarget, plugin, Prec.highest(keymap.of([
     { key: "Tab", run: view => move(view, 1, true) },
@@ -163,11 +165,5 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     { key: "Enter", run: view => accept(view) },
     { key: "ArrowDown", run: view => move(view, 1) }, { key: "ArrowUp", run: view => move(view, -1) },
     { key: "Escape", run: view => { if (!view.state.field(field)) return false; view.dispatch({ effects: setMenu.of(null) }); return true; } },
-  ])), EditorView.baseTheme({
-    ".cm-tooltip.word-suggestions": { minWidth: "220px", maxWidth: "min(360px, 90vw)", padding: "6px", background: "var(--surface, white)", color: "var(--ink, #16343b)", border: "1px solid var(--line, #cbd8dc)" },
-    ".word-suggestions-heading": { padding: "6px", fontSize: "11px" },
-    ".word-suggestions button": { display: "flex", justifyContent: "space-between", gap: "16px", width: "100%", padding: "8px", background: "transparent", color: "inherit", border: "0", textAlign: "left", cursor: "pointer", overflowWrap: "anywhere" },
-    ".word-suggestions button.selected, .word-suggestions button:hover": { background: "var(--accent-soft, #e4f5f0)" },
-    ".word-suggestions button:focus-visible": { outline: "2px solid var(--accent, #007f83)" },
-  })];
+  ])), suggestionMenuTheme];
 }

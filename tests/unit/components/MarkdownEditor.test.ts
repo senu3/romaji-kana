@@ -19,6 +19,13 @@ function setup() {
 }
 
 describe("ghost candidate lifecycle", () => {
+  it("marks speculative source without an inline result and dismisses it when typing continues", () => {
+    const { state, candidate } = setup();
+    const shown = state.update({ effects: showGhostSuggestion.of({ ...candidate, conversionStrategy: "speculative" }) }).state;
+    expect(shown.field(ghostSuggestionField).decorations.size).toBe(1);
+    const continued = shown.update({ changes: { from: 3, insert: " " }, selection: { anchor: 4 }, userEvent: "input.type" }).state;
+    expect(continued.field(ghostSuggestionField).suggestion).toBeNull();
+  });
   it.each(["request", null])("dismisses the session when clearing %s and rejects late display", id => {
     const { state, session, candidate } = setup();
     const cleared = state.update({ effects: clearGhostSuggestion.of(id) }).state;

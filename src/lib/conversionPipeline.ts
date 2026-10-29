@@ -1,6 +1,7 @@
 import { classifyConversionChanges } from "./conversionChanges";
 import { isRejectedSurfaceVariant } from "./conversionOutput";
-import { generateKanaConversion, generateSpeculationSegments } from "./conversionGeneration";
+import { generateKanaConversion, generateSpeculationSegments, generateSpeculationCandidates } from "./conversionGeneration";
+import { createConversionSession, sessionResult, type SessionCandidate } from "./conversionSession";
 import { hasConvertibleRomaji, normalizeRomajiReadingCandidate } from "./conversionInput";
 import { isAllowedSpeculativeConversion } from "./conversionPolicy";
 import { preservesInputLineBreaks, preservesProtectedContent, type ConversionProtection } from "./conversionProtection";
@@ -103,29 +104,44 @@ async function speculateWholeTarget(settings: AppSettings, transport: OllamaTran
     : { literal: part.type === "text" ? part.value : part.output });
   const editableReadings = parts.flatMap(part => part.type === "text" && hasConvertibleRomaji(part.value)
     ? [romajiToKana(normalizeRomajiReadingCandidate(part.value)).kana] : []);
-  const generated = hasLiterals
+  const groups = options.speculationCandidates && options.userRequestedSpeculation
+    ? await generateSpeculationCandidates(request, hasLiterals ? layout : undefined, editableReadings, settings, transport, options)
+    : [hasLiterals
     ? await generateSpeculationSegments(request, layout, editableReadings, settings, transport, options)
-    : [await generateKanaConversion(request, settings, transport, options)];
-  if (!generated.length || generated.some(segment => !segment.text)) return rejected();
-  const segments: GeneratedSegment[] = [];
-  let index = 0;
-  // Both entry points generate the complete target in one request. Immutable
-  // spans are inserted by the app, never generated or pronounced by the model.
-  for (const part of hasLiterals ? layout : [{ id: "whole", originalInput: request.target.originalRomaji }]) {
-    throwIfConversionAborted(options.signal);
-    if ("literal" in part) {
-      segments.push({ text: part.literal, reading: part.literal, source: part.literal,
-        assessment: { status: "verified", origin: "literal", proof: "preserved" } });
-      continue;
+    : [await generateKanaConversion(request, settings, transport, options)]];
+  const candidates: SessionCandidate[] = [];
+  let lastRejected: JapaneseConversionResult | undefined;
+  const seen = new Set<string>();
+  for (const generated of groups) {
+    if (!generated.length || generated.some(segment => !segment.text)) continue;
+    const segments: GeneratedSegment[] = [];
+    let index = 0;
+    // Both entry points generate the complete target in one request. Immutable
+    // spans are inserted by the app, never generated or pronounced by the model.
+    for (const part of hasLiterals ? layout : [{ id: "whole", originalInput: request.target.originalRomaji }]) {
+      throwIfConversionAborted(options.signal);
+      if ("literal" in part) {
+        segments.push({ text: part.literal, reading: part.literal, source: part.literal,
+          assessment: { status: "verified", origin: "literal", proof: "preserved" } });
+        continue;
+      }
+      const candidate = generated[index];
+      const segmentSource = hasLiterals ? romajiToKana(part.originalInput).kana : source;
+      index++;
+      const assessment = await assessReadingWithEngine(candidate.text, candidate.reading, true, options.readingVerifier,
+        options.kanaEngine, settings.personalDictionary, options.signal);
+      throwIfConversionAborted(options.signal);
+      segments.push({ text: candidate.text, reading: candidate.reading, source: segmentSource, assessment,
+        reported: candidate.reportedReading, numeric: candidate.numericReadingNormalized });
     }
-    const candidate = generated[index];
-    const segmentSource = hasLiterals ? romajiToKana(part.originalInput).kana : source;
-    index++;
-    const assessment = await assessReadingWithEngine(candidate.text, candidate.reading, true, options.readingVerifier,
-      options.kanaEngine, settings.personalDictionary, options.signal);
-    throwIfConversionAborted(options.signal);
-    segments.push({ text: candidate.text, reading: candidate.reading, source: segmentSource, assessment,
-      reported: candidate.reportedReading, numeric: candidate.numericReadingNormalized });
+    const result = finishGeneration(segments, protection, options);
+    if (result.suggestionRejected) { lastRejected = result; continue; }
+    const key = result.text.normalize("NFKC").replace(/[\s。、,.!?！？]+/gu, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ id: `proposal-${candidates.length}`, kind: "proposal", result: { ...result, conversionStrategy: "speculative" } });
   }
-  return finishGeneration(segments, protection, options);
+  if (!candidates.length) return lastRejected ?? rejected();
+  if (!options.speculationCandidates) return candidates[0].result;
+  return sessionResult(createConversionSession(preparedInput.originalInput, candidates, options));
 }

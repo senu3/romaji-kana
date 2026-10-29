@@ -1,6 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import type { GhostConversionSuggestion } from "./types";
 import { commitEditorText } from "./editorCommit";
+import type { ReplacementCursor } from "./editorSelection";
 import { acceptConversionSession } from "./conversionSession";
 import { convertedSuggestTarget } from "./autoSuggest";
 import { clearGhostSuggestion, removeLoadingDecoration, suggestAfterConversion } from "./editorConversionEffects";
@@ -19,7 +20,7 @@ export function canApplyConversionAutomatically(view: EditorView, result: Japane
 
 export type ConversionCommitReason = "explicit" | "automatic" | "history";
 export function commitConversion(view: EditorView, suggestion: GhostConversionSuggestion,
-  reason: ConversionCommitReason, cursor: "end" | "map" = "map"): boolean {
+  reason: ConversionCommitReason, cursor: ReplacementCursor = "map"): boolean {
   if (suggestion.previewOnly || (suggestion.session && suggestion.session.state !== "open")) return false;
   return commitEditorText(view, {
     from: suggestion.from, to: suggestion.to, original: suggestion.originalText, text: suggestion.convertedText, cursor,

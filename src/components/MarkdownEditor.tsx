@@ -10,6 +10,7 @@ import {
 } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { autoSuggestExtension } from "./autoSuggestExtension";
+import { speculationExtension } from "./speculationExtension";
 import { commitConversion } from "../lib/conversionCommit";
 import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
 export { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
@@ -215,6 +216,7 @@ export const ghostSuggestionField = StateField.define<GhostState>({
       const end = suggestion.to;
       transaction.changes.iterChanges((from, _to, _fromB, _toB, inserted) => {
         if (from === end && /^[\p{L}\p{N}ー]/u.test(inserted.toString())) continued = true;
+        if (suggestion?.conversionStrategy === "speculative" && from >= suggestion.from && from <= end) continued = true;
       });
       const from = transaction.changes.mapPos(suggestion.from, 1);
       const to = transaction.changes.mapPos(suggestion.to, -1);
@@ -262,10 +264,10 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
   }
 
   const sourceDecoration = Decoration.mark({
-    class: suggestion.previewOnly ? "cm-history-preview" : "cm-ghost-source",
+    class: suggestion.previewOnly ? "cm-history-preview" : suggestion.conversionStrategy === "speculative" ? "cm-speculation-source" : "cm-ghost-source",
   }).range(suggestion.from, suggestion.to);
 
-  return suggestion.previewOnly ? Decoration.set([sourceDecoration]) : Decoration.set([
+  return suggestion.previewOnly || suggestion.conversionStrategy === "speculative" ? Decoration.set([sourceDecoration]) : Decoration.set([
     sourceDecoration,
     Decoration.widget({ widget: new InlineGhostWidget(suggestion), side: 1 }).range(suggestion.to),
   ]);
@@ -727,7 +729,19 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
-        autoSuggestExtension(() => settingsRef.current, view => view.state.field(loadingDecorations).size > 0),
+        speculationExtension(state => state.field(ghostSuggestionField).suggestion, {
+          accept: (view, suggestion) => {
+            if (suggestion.session) {
+              const candidate = suggestion.session.candidates.find(c => c.result.text === suggestion.convertedText);
+              if (candidate) suggestion.session.selectedId = candidate.id;
+            }
+            if (commitConversion(view, suggestion, "explicit", "end")) { onAcceptGhostRef.current(suggestion); view.focus(); }
+          },
+          dismiss: dismissGhostSuggestion,
+        }),
+        autoSuggestExtension(() => settingsRef.current,
+          view => view.state.field(loadingDecorations).size > 0 || view.state.field(ghostSuggestionField).suggestion?.conversionStrategy === "speculative",
+          view => view.state.field(ghostSuggestionField).suggestion?.conversionStrategy === "speculative"),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {

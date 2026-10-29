@@ -1,4 +1,5 @@
 import { candidateDetails, isOpenConversionResult } from "../lib/conversionCandidate";
+import { dispatchPreviewSelection } from "../lib/editorSelection";
 import { canApplyConversionAutomatically, commitConversion } from "../lib/conversionCommit";
 import type { EditorView } from "@codemirror/view";
 import type { Dispatch, RefObject, SetStateAction } from "react";
@@ -14,7 +15,7 @@ import { formatConversionError } from "../lib/appErrors";
 import type { ActivePanel } from "../lib/appTypes";
 import { recordConversionChoice } from "../lib/conversionLearning";
 import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
-import { dismissConversionSession, lockConversionSession, createConversionSession, type ConversionSession } from "../lib/conversionSession";
+import { dismissConversionSession, lockConversionSession, createConversionSession, sessionResult, type ConversionSession } from "../lib/conversionSession";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { resolveConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
@@ -301,8 +302,10 @@ export function useConversion({
     const view = editorViewRef.current;
     if (!view || !isOpenConversionResult(conversion) || !requestsRef.current.valid(target.id) ||
         !requestsRef.current.display(target.id)) return false;
-    view.dispatch({ effects: [removeLoadingDecoration.of(target.id),
-      showGhostSuggestion.of({ ...target, ...candidateDetails(conversion) })] });
+    const effects = [removeLoadingDecoration.of(target.id),
+      showGhostSuggestion.of({ ...target, ...candidateDetails(conversion) })];
+    if (conversion.conversionStrategy === "speculative") dispatchPreviewSelection(view, "preserve", effects);
+    else view.dispatch({ effects });
     return true;
   }, []);
 
@@ -447,6 +450,7 @@ export function useConversion({
         },
         ...conversionContext(view, resolved),
         avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,
+        speculationCandidates: request.userRequestedSpeculation === true,
         documentVocabulary: request.documentVocabulary,
         protectedDictionaryEntries: historical && resolved && resolved.matchedText !== request.originalText
           ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText) : [],
@@ -693,7 +697,7 @@ export function useConversion({
     const candidates = reading ? (stored?.candidates ?? []).filter(candidate => {
       const result = candidate.result;
       if (result.suggestionRejected || !result.text.trim() ||
-        normalizeReading(result.changes?.resultReading ?? result.reviewKana) !== normalizeReading(reading) || seen.has(result.text)) return false;
+        (item.conversionStrategy !== "speculative" && normalizeReading(result.changes?.resultReading ?? result.reviewKana) !== normalizeReading(reading)) || seen.has(result.text)) return false;
       seen.add(result.text);
       return true;
     }) : [];
@@ -707,6 +711,16 @@ export function useConversion({
     const session = createConversionSession(item.input, candidates);
     session.selectedId = candidates.find(candidate => candidate.result.text === item.output)!.id;
     lockConversionSession(session);
+    if (item.conversionStrategy === "speculative") {
+      setCandidateList(null);
+      dispatchPreviewSelection(view, resolved.to, showGhostSuggestion.of({
+        ...candidateDetails(sessionResult(session)), id: createId("conversion"),
+        from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
+        inputText: item.input, source: "history", retryOf: item.id, avoidOutputs: item.avoidOutputs,
+        documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
+      }));
+      return true;
+    }
     setCandidateList({
       item, ghost, session, documentText: view.state.doc.toString(), docVersion: docVersionRef.current,
       anchor: { from: resolved.from, to: resolved.to, originalText: resolved.matchedText, docVersion: docVersionRef.current }
@@ -741,6 +755,8 @@ export function useConversion({
     const visible = view.state.field(ghostSuggestionField).suggestion;
     if (visible && rangesOverlap(visible, resolved)) requestsRef.current.cancel(visible.id);
     invalidatePredictiveSuggestions();
+    // This explicit action returns typing to the end of the replacement target.
+    dispatchPreviewSelection(view, resolved.to);
     return enqueueConversion({
       id: createId("conversion"), source: "history", status: "queued",
       originalText: item.input, createdAt: Date.now(), docVersion: docVersionRef.current,
