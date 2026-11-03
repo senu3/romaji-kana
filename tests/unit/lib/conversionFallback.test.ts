@@ -72,10 +72,11 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(prompt).not.toHaveProperty("styleGuidance");
     expect(prompt.candidates[0]).toMatchObject({ localRank: 1, cost: 100 });
   });
-  it("keeps natural dictionary-backed hiragana without correction or speculation", async () => {
+  it("keeps the sole dictionary-backed hiragana candidate without rescue", async () => {
     const h = harness([candidate("ありがとう", "mozc", "ありがとう")]);
     const result = await convertRomajiToJapaneseDetailed("arigatou", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });
     expect(result.text).toBe("ありがとう");
+    expect(result.session?.candidates).toHaveLength(1);
     expect(h.generate).not.toHaveBeenCalled();
   });
   it("tries a bounded typo correction after normal conversion has no candidate", async () => {
@@ -105,7 +106,7 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(h.generate.mock.calls[1][2].system).toContain("本来入力したかった内容");
     expect(h.generate.mock.calls[1][2].outputSchema.required).toEqual(["convertedText", "completedKana"]);
   });
-  it("allows an inferred natural hiragana word without inventing a kanji paraphrase", async () => {
+  it("keeps a sole inferred hiragana candidate including terminal punctuation", async () => {
     const h = harness();
     h.generate.mockResolvedValueOnce(json("ありが。", "ありが。")).mockResolvedValueOnce(json("ありがとう。", "ありがとう。"));
     const result = await convertRomajiToJapaneseDetailed("ariga.", defaultSettings, h.transport, { autoSpeculation: true, kanaEngine: h.engine });

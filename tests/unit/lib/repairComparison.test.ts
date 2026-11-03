@@ -40,13 +40,13 @@ it("does not replace an option the user selected while comparison was running", 
   const result = await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, {
     kanaEngine: h.engine, onLocalCandidates: result => { original = result; },
   });
-  expect(result.text).toBe("よってい");
+  expect(result.text).toBe("寄ってい");
   expect(result.session).toBe(original?.session);
 });
 it("keeps the unchanged option when repair evidence is insufficient", async () => {
   const h = setup(true, false);
   const result = await convertRomajiToJapaneseDetailed("yottei", defaultSettings, h.transport, { kanaEngine: h.engine });
-  expect(result.text).toBe("よってい");
+  expect(result.text).toBe("寄ってい");
   expect(result.conversionStrategy).toBeUndefined();
   expect(result.repairRequested).toBeUndefined();
 });

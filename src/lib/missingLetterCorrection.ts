@@ -1,4 +1,5 @@
 import { preservesProtectedContent } from "./conversionProtection";
+import { filterHiraganaCandidates } from "./conversionOutput";
 import { prepareConversionRequest, type PreparedConversionInput } from "./conversionRequest";
 import { missingLetterReadings } from "./romajiRepairPlans";
 export { missingLetterReadings } from "./romajiRepairPlans";
@@ -87,7 +88,7 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     const baselineCandidate = baseline?.session?.candidates.find(c => c.id === baseline.session?.selectedId);
     const unchanged: SessionCandidate[] = baseline ? [{ id: "unchanged", kind: "conversion", cost: baselineCandidate?.cost,
       tokens: baselineCandidate?.tokens, result: { ...baseline, session: undefined, repairRequested: undefined } }] : [];
-    const retained = [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
+    const retained = filterHiraganaCandidates([...unchanged, ...first, ...alternatives], c => c.result.text).slice(0, MAX_CANDIDATES);
     // Reserve the unchanged option without falsely labeling it the best local path.
     if (baseline) retained.sort((a, b) => (a.cost ?? Number.MAX_SAFE_INTEGER) - (b.cost ?? Number.MAX_SAFE_INTEGER));
     metrics.candidates = retained.length;

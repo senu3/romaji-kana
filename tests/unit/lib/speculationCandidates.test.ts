@@ -11,6 +11,17 @@ function setup(candidates: unknown[]) {
 const proposal = (convertedText: string, completedKana: string) => ({ convertedText, completedKana });
 
 describe("explicit speculative candidate session", () => {
+  it("keeps a sole hiragana proposal", async () => {
+    const h = setup([proposal("おねがいします。", "おねがいします。")]);
+    const result = await convertRomajiToJapaneseDetailed("onegaismasu.", defaultSettings, h.transport, h.options);
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["おねがいします。"]);
+  });
+  it("discards all-hiragana proposals while retaining mixed-script alternatives", async () => {
+    const h = setup([proposal("おねがいします。", "おねがいします。"), proposal("お願いします。", "おねがいします。")]);
+    const result = await convertRomajiToJapaneseDetailed("onegaismasu.", defaultSettings, h.transport, h.options);
+    expect(result.text).toBe("お願いします。");
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["お願いします。"]);
+  });
   it.each([
     null,
     proposal("案をお願いします", "あんをおねがいします"),

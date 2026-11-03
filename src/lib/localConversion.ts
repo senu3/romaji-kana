@@ -1,7 +1,7 @@
 import { classifyConversionChanges } from "./conversionChanges";
 import { hasConvertibleRomaji } from "./conversionInput";
 import { conversionLearningSnapshot } from "./conversionLearning";
-import { isAvoidedConversionOutput } from "./conversionOutput";
+import { filterHiraganaCandidates, isAvoidedConversionOutput } from "./conversionOutput";
 import { preservesInputLineBreaks, preservesProtectedContent } from "./conversionProtection";
 import { prepareConversionRequest, type PreparedConversionInput } from "./conversionRequest";
 import { finalReadingRule } from "./conversionRules";
@@ -74,7 +74,6 @@ export async function convertLocally(input: string, settings: AppSettings, trans
       revision = found.dictionaryRevision;
       truncated ||= found.truncated;
       // Reject synthetic kana passthrough, including partial unknown fragments.
-      // Kana spellings backed by dictionary entries (e.g. ありがとう) remain valid.
       const dictionaryCandidates = found.candidates;
       if (!dictionaryCandidates.length) return unavailable("no-candidate");
       const next: Combined[] = [];
@@ -92,7 +91,7 @@ export async function convertLocally(input: string, settings: AppSettings, trans
     }
   }
   const reading = combined[0]?.reading ?? sourceReading;
-  const candidates: SessionCandidate[] = combined.filter(c => preservesInputLineBreaks(protection, c.text) && finalReadingRule.acceptsControls({ completedKana: c.reading, convertedText: c.text }) && preservesProtectedContent(plan?.correction ? protection.source : sourceReading, c.text, protection.literalTerms) &&
+  let candidates: SessionCandidate[] = combined.filter(c => preservesInputLineBreaks(protection, c.text) && finalReadingRule.acceptsControls({ completedKana: c.reading, convertedText: c.text }) && preservesProtectedContent(plan?.correction ? protection.source : sourceReading, c.text, protection.literalTerms) &&
     !isAvoidedConversionOutput(c.text, options.avoidOutputs)).map((c, i) => {
       const dictionaryPath = c.tokens.some(t => t.source !== "literal");
       const changes = classifyConversionChanges(sourceReading, c.reading, dictionaryPath ? "dictionary-path" : "literal",
@@ -111,14 +110,17 @@ export async function convertLocally(input: string, settings: AppSettings, trans
     });
   candidates.sort((a, b) => (a.cost! - learnedBonus(reading, a.result.text)) - (b.cost! - learnedBonus(reading, b.result.text)));
   if (!candidates.length) return { text: "", reviewKana: reading, suggestionRejected: true, suggestionRejectedReason: "protected" };
+  const hadAlternatives = candidates.length > 1;
+  // Compare complete valid outputs, keeping kana chunks within mixed-script text.
+  candidates = filterHiraganaCandidates(candidates, c => c.result.text).map((c, i) => ({ ...c, id: `candidate-${i}` }));
   const session = createConversionSession(input, candidates, options);
   session.dictionaryRevision = revision;
   session.truncated = truncated;
-  return rankConversionSession(session, settings, transport, options, learnedBonus);
+  return rankConversionSession(session, settings, transport, options, learnedBonus, hadAlternatives);
 }
 
 export async function rankConversionSession(session: ConversionSession, settings: AppSettings, transport: OllamaTransport,
-  options: JapaneseConversionOptions, learnedBonus = conversionLearningSnapshot()): Promise<JapaneseConversionResult> {
+  options: JapaneseConversionOptions, learnedBonus = conversionLearningSnapshot(), hadAlternatives = false): Promise<JapaneseConversionResult> {
   if (options.deferRanking && options.rerank !== false && session.candidates.length > 1) {
     session.rerankStatus = "pending";
     options.onLocalCandidates?.(sessionResult(session));
@@ -128,7 +130,7 @@ export async function rankConversionSession(session: ConversionSession, settings
         return;
       }
       const result = await rankConversionSession(session, settings, transport,
-        { ...options, deferRanking: undefined, onLocalCandidates: undefined }, learnedBonus);
+        { ...options, deferRanking: undefined, onLocalCandidates: undefined }, learnedBonus, hadAlternatives);
       if (session.state === "open" && !session.locked) {
         if (result.suggestionRejected) dismissConversionSession(session);
         await options.onRankedCandidates?.(result);
@@ -141,7 +143,7 @@ export async function rankConversionSession(session: ConversionSession, settings
   }
   const candidates = session.candidates;
   const correcting = candidates.some(c => c.kind === "correction" && c.result.romajiCorrection);
-  const shouldRank = candidates.length > 1 || correcting;
+  const shouldRank = candidates.length > 1 || correcting || hadAlternatives;
   const reading = candidates[0].result.changes?.sourceReading ?? candidates[0].result.reviewKana;
   const invalidCorrectionRanking = (): JapaneseConversionResult => {
     session.rerankStatus = "invalid";

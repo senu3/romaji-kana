@@ -1,5 +1,5 @@
 import { classifyConversionChanges } from "./conversionChanges";
-import { isRejectedSurfaceVariant } from "./conversionOutput";
+import { filterHiraganaCandidates, isRejectedSurfaceVariant } from "./conversionOutput";
 import { generateKanaConversion, generateSpeculationSegments, generateSpeculationCandidates } from "./conversionGeneration";
 import { createConversionSession, sessionResult, type SessionCandidate } from "./conversionSession";
 import { hasConvertibleRomaji, normalizeRomajiReadingCandidate } from "./conversionInput";
@@ -142,6 +142,7 @@ async function speculateWholeTarget(settings: AppSettings, transport: OllamaTran
     candidates.push({ id: `proposal-${candidates.length}`, kind: "proposal", result: { ...result, conversionStrategy: "speculative" } });
   }
   if (!candidates.length) return lastRejected ?? rejected();
-  if (!options.speculationCandidates) return candidates[0].result;
-  return sessionResult(createConversionSession(preparedInput.originalInput, candidates, options));
+  const retained = filterHiraganaCandidates(candidates, c => c.result.text);
+  if (!options.speculationCandidates) return retained[0].result;
+  return sessionResult(createConversionSession(preparedInput.originalInput, retained, options));
 }
