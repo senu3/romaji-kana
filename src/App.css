@@ -1697,9 +1697,10 @@ h3 {
   color: var(--ink-muted);
 }
 .candidate-reconsider {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line-strong);
+  flex: 0 0 auto;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
 }
 .conversion-popover button:focus-visible {
   outline: 2px solid var(--accent);
@@ -3817,7 +3818,7 @@ button.model-chip:hover {
   overflow: auto;
   overscroll-behavior: contain;
 }
-.candidate-review { flex: 1 1 auto; }
+.candidate-review, .candidate-alternatives { flex: 1 1 auto; }
 
 /* Prototype 2: a single quiet row beside the current conversion target. */
 .conversion-bar {

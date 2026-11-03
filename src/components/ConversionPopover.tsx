@@ -127,22 +127,23 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
       </div>
       {textExpanded ? <p className="candidate-full-text">{text}</p> : null}
       {target ? (
-        <div className="candidate-alternatives">
-          <p className="candidate-help">同じ読みの候補です。選んだあとに確定できます。</p>
-          <ul className="candidate-list-options" aria-label="同じ読みの候補">
-            {target.session.candidates.map(c => (
-              <li key={c.id}><button type="button" aria-pressed={c.id === target.session.selectedId} onClick={() => onSelect(c.id)}>
-                <span>{c.result.text}</span>{c.id === target.session.selectedId ? <small>選択中</small> : null}
-              </button></li>
-            ))}
-          </ul>
-          {target.session.candidates.length < 2 ? <p className="candidate-help">ほかの表記はありません。</p> : null}
+        <>
+          <div className="candidate-alternatives">
+            <p className="candidate-help">同じ読みの候補です。選んだあとに確定できます。</p>
+            <ul className="candidate-list-options" aria-label="同じ読みの候補">
+              {target.session.candidates.map(c => (
+                <li key={c.id}><button type="button" aria-pressed={c.id === target.session.selectedId} onClick={() => onSelect(c.id)}>
+                  <span>{c.result.text}</span>{c.id === target.session.selectedId ? <small>選択中</small> : null}
+                </button></li>
+              ))}
+            </ul>
+            {target.session.candidates.length < 2 ? <p className="candidate-help">ほかの表記はありません。</p> : null}
+          </div>
           <footer className="candidate-reconsider">
             <button type="button" className="candidate-action" onMouseDown={event => { event.preventDefault(); view.focus(); }}
               onClick={() => { onSpeculate(); view.focus(); }}>読みも含めて見直す</button>
-            <p className="candidate-help">入力と前後の文脈から新しい候補を推測します。確定するまで本文は変わりません。</p>
           </footer>
-        </div>
+        </>
       ) : (
         detailsOpen ? <div className="candidate-review">
           {changes?.sourceReading && changes.resultReading && changes.sourceReading !== changes.resultReading ? (

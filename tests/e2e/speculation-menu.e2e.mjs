@@ -13,8 +13,8 @@ const responses = [
 ];
 try {
   await server.listen(); browser = await chromium.launch({ headless: true });
-  async function scenario(run, candidates = responses) {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  async function scenario(run, candidates = responses, options = {}) {
+    const context = await browser.newContext({ viewport: options.viewport ?? { width: 1280, height: 900 } });
     await context.addInitScript(() => {
       localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, autoSuggest: true, conversionMode: 'ghost' }));
       localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: '' }));
@@ -32,7 +32,11 @@ try {
       if (body.operation === 'verify') return route.fulfill({ json: { status: 'verified' } });
       if (body.operation === 'suggest') return route.fulfill({ json: { candidates: [{ text: '案内', reading: 'あんない', cost: 0, source: 'mozc' }] } });
       const text = '餡をおねがします', reading = body.reading;
-      return route.fulfill({ json: { candidates: [{ text, reading, cost: 0, tokens: [{ text, reading, from: 0, to: reading.length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 0 }] }], dictionaryRevision: 'test', truncated: false } });
+      const spellings = Array.from({ length: options.manyCandidates ? 20 : 1 }, (_, index) => {
+        const spelling = text + '案'.repeat(index);
+        return { text: spelling, reading, cost: index, tokens: [{ text: spelling, reading, from: 0, to: reading.length, source: 'mozc', entryId: `test-${index}`, lid: 0, rid: 0, wordCost: index }] };
+      });
+      return route.fulfill({ json: { candidates: spellings, dictionaryRevision: 'test', truncated: false } });
     });
     try {
       await page.goto(server.resolvedUrls.local[0]);
@@ -41,6 +45,27 @@ try {
       await page.keyboard.press('Control+Enter');
       await page.locator('.cm-inline-candidate').waitFor();
       await page.getByRole('button', { name: 'ほかの候補', exact: true }).first().click();
+      if (options.manyCandidates) {
+        const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
+        const footerButton = list.getByRole('button', { name: '読みも含めて見直す', exact: true });
+        const scrollArea = list.locator('.candidate-alternatives');
+        await list.waitFor();
+        assert.equal(await list.locator('.candidate-list-options button').count(), 20, 'All candidates remain available');
+        assert.ok(await scrollArea.evaluate(el => el.scrollHeight > el.clientHeight), 'Long candidate lists scroll');
+        const before = await footerButton.boundingBox();
+        const panel = await list.boundingBox();
+        assert.ok(before.y >= panel.y && before.y + before.height <= panel.y + panel.height, 'Speculation is visible before scrolling');
+        await scrollArea.evaluate(el => { el.scrollTop = el.scrollHeight; });
+        const after = await footerButton.boundingBox();
+        assert.ok(Math.abs(before.y - after.y) <= 1, 'Footer stays in place while candidates scroll');
+        await list.locator('.candidate-list-options button').first().focus();
+        await page.keyboard.press('End');
+        const last = await list.locator('.candidate-list-options button').last().boundingBox();
+        assert.ok(last.y + last.height <= after.y + 1, 'Keyboard navigation reveals the last candidate above the footer');
+        await page.keyboard.press('Tab');
+        assert.equal(await footerButton.evaluate(el => el === document.activeElement), true, 'Footer follows the candidate list in tab order');
+        await page.screenshot({ path: await screenshotPath(`test-results/e2e/candidate-footer-${options.viewport ? 'mobile' : 'desktop'}.png`) });
+      }
       await page.getByRole('button', { name: '読みも含めて見直す' }).click();
       if (candidates.length) await page.getByRole('group', { name: '推測候補', exact: true }).waitFor();
       else await page.getByText('意図に合う推測候補を作れませんでした。本文は変更していません。').waitFor();
@@ -49,6 +74,12 @@ try {
       await run(page, editor);
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
+  }
+  for (const viewport of [undefined, { width: 390, height: 600 }]) {
+    await scenario(async (page, editor) => {
+      assert.equal(await editor.innerText(), input, 'Opening speculation does not commit text');
+      await page.keyboard.press('Escape');
+    }, responses, { manyCandidates: true, viewport });
   }
   await scenario(async (page, editor) => {
     const menu = page.getByRole('group', { name: '推測候補', exact: true });
