@@ -84,6 +84,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
             settings: serde_json::json!({
                 "autoConvert": false,
                 "autoSuggest": false,
+                "autoSpeculation": true,
                 "conversionMode": "ghost",
                 "triggers": { "period": false, "comma": true, "enter": true, "manualShortcut": "Mod-Enter" },
                 "punctuationConversion": { "periodToJapanese": false, "commaToJapanese": true },
@@ -99,6 +100,7 @@ fn mobile_settings_update_only_shared_conversion_fields() {
 
     assert_eq!(snapshot.settings["modelName"], "desktop-model");
     assert_eq!(snapshot.settings["autoSuggest"], false);
+    assert_eq!(snapshot.settings["autoSpeculation"], true);
     assert_eq!(snapshot.settings["conversionMode"], "ghost");
     assert_eq!(snapshot.settings["conversionPrompt"], "mobile prompt");
     assert_eq!(snapshot.settings["inputPauseTiming"], "deliberate");

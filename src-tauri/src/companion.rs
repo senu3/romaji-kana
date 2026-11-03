@@ -490,6 +490,13 @@ fn update_shared_conversion_settings(
             .ok_or_else(|| format!("変換設定に {key} がありません。"))?;
         current.insert(key.to_string(), value.clone());
     }
+    // Older clients omit this opt-in setting; preserve the desktop preference.
+    if let Some(value) = incoming.get("autoSpeculation") {
+        current.insert(
+            "autoSpeculation".to_string(),
+            serde_json::json!(value.as_bool().unwrap_or(false)),
+        );
+    }
     shared.settings_updated_by = request.client_id;
 
     Ok(CompanionSnapshot {

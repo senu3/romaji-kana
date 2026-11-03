@@ -16,6 +16,7 @@ export const defaultSettings: AppSettings = {
   modelName: "gemma3",
   autoConvert: true,
   autoSuggest: true,
+  autoSpeculation: false,
   conversionMode: "replace",
 
   triggers: {
@@ -59,6 +60,7 @@ export function sharedConversionSettings(settings: AppSettings): SharedConversio
   return {
     autoConvert: settings.autoConvert,
     autoSuggest: settings.autoSuggest,
+    autoSpeculation: settings.autoSpeculation,
     conversionMode: settings.conversionMode,
 
     triggers: settings.triggers,
@@ -78,6 +80,7 @@ export function mergeSharedConversionSettings(
   return {
     ...settings,
     ...shared,
+    autoSpeculation: shared.autoSpeculation === true,
 
     conversionPrompt: shared.conversionPrompt,
     triggers: { ...shared.triggers },
@@ -93,6 +96,7 @@ function mergeSettings(settings: Partial<AppSettings>): AppSettings {
     conversionPrompt: settings.conversionPrompt || defaultConversionPrompt,
     think: settings.think === true,
     autoSuggest: settings.autoSuggest !== false,
+    autoSpeculation: settings.autoSpeculation === true,
     inputPauseTiming: normalizeInputPauseTiming(settings.inputPauseTiming),
     useDocumentVocabulary: settings.useDocumentVocabulary === true,
     triggers: { ...defaultSettings.triggers, ...settings.triggers },

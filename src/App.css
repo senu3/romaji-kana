@@ -3978,11 +3978,29 @@ button.model-chip:hover {
 .setup-modal .settings-heading { display: none; }
 .setup-modal .settings-content { padding: 20px 24px; overflow: auto; }
 .conversion-panel .settings-group { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 0 0 20px; background: transparent; }
-.conversion-start-settings > .trigger-options { margin: 12px 0 0 12px; padding-left: 16px; border-left: 1px solid var(--line); }
-.conversion-start-settings .input-pause-field { margin: 12px 0 0 12px; }
+.conversion-panel .conversion-auto-options,
+.conversion-panel .conversion-pause-options { min-width: 0; border: 0; padding: 0; margin: 0; }
+.conversion-panel .conversion-auto-options { margin-left: 16px; display: grid; gap: 8px; }
+.conversion-panel .conversion-pause-options { margin: 0 0 8px 16px; }
+.conversion-pause-options .segmented-control { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.conversion-trigger-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+.conversion-auto-options:disabled,
+.conversion-pause-options:disabled { opacity: 0.45; }
+.conversion-auto-options:disabled .conversion-pause-options { opacity: 1; }
+.conversion-panel fieldset:disabled label { cursor: default; }
+.conversion-panel fieldset:disabled .segmented-control label:hover { background: inherit; }
+.conversion-panel .conversion-manual-shortcut { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 12px; padding: 0; margin: 8px 0 0; border: 0; font-size: 13px; }
+.conversion-manual-shortcut .shortcut-controls { justify-self: end; }
+.conversion-manual-shortcut .shortcut-recorder,
+.conversion-manual-shortcut .shortcut-reset { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.conversion-manual-shortcut .shortcut-recorder:hover,
+.conversion-manual-shortcut .shortcut-reset:hover,
+.conversion-manual-shortcut .shortcut-recorder.recording { background: var(--accent-soft); border-color: var(--accent); }
+.conversion-manual-shortcut .shortcut-recorder { font-weight: 500; }
+.conversion-manual-shortcut .shortcut-help { grid-column: 1 / -1; }
+.conversion-key-reference { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink-muted); font-size: 12px; min-height: 24px; }
 .conversion-panel .check-row { border: 0; border-radius: 0; padding: 8px 0; background: transparent; }
 .conversion-panel .shortcut-help:empty { display: none; }
-.conversion-panel .shortcut-field { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); }
 .settings-content .model-options { max-height: 220px; overflow-y: auto; }
 @media (pointer: coarse) {
   .model-connection-row .icon-button, .model-details summary, .settings-help-details summary { min-height: 44px; }

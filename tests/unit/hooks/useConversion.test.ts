@@ -48,6 +48,23 @@ function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "v
 }
 
 describe("conversion lifecycle", () => {
+  it.each(["typing", "space", "shortcut"] as const)("passes automatic speculation preference and keeps its result provisional: %s", async trigger => {
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん", conversionStrategy: "speculative", changes: {
+      ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } });
+    const { hook, view, options } = harness("hon");
+    for (const enabled of [false, true]) {
+      options.settingsRef.current.autoSpeculation = enabled;
+      await act(async () => { hook.current.handleConvert(range("hon", trigger)); });
+      expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]?.autoSpeculation).toBe(enabled);
+      expect(view.state.doc.toString()).toBe("hon");
+      expect(view.state.field(ghostSuggestionField).suggestion?.conversionStrategy).toBe("speculative");
+      act(() => hook.current.handleDismissGhost());
+    }
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
+  });
+
   it("does not directly apply an old pause result after typing continues", async () => {
     const pending = deferred<JapaneseConversionResult>();
     vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(pending.promise);

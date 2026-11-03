@@ -391,7 +391,9 @@ export function useConversion({
         skipQueuedConversion(request, request.userRequestedSpeculation
           ? "意図に合う推測候補を作れませんでした。本文は変更していません。"
           : conversion.suggestionRejectedReason === "unconvertible"
-            ? "通常変換・誤字修正で候補が得られなかったため、ローマ字を残しました。"
+            ? conversion.attempts?.some(attempt => attempt.stage === "speculative")
+              ? "通常変換・誤字修正・推測で候補が得られなかったため、ローマ字を残しました。"
+              : "通常変換・誤字修正で候補が得られなかったため、ローマ字を残しました。"
             : "候補を安全に適用できなかったため表示しませんでした。入力を続けると新しい候補を生成します。");
         return;
       }
@@ -449,6 +451,7 @@ export function useConversion({
           setStatus({ kind: "loading", message: "通常変換で適切な候補がないため、誤字修正を試しています。" });
         },
         ...conversionContext(view, resolved),
+        autoSpeculation: settings.autoSpeculation,
         avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,
         speculationCandidates: request.userRequestedSpeculation === true,
         documentVocabulary: request.documentVocabulary,
@@ -890,7 +893,7 @@ export function useConversion({
             currentView.dispatch({ effects: clearGhostSuggestion.of(null) });
             setStatus({
               kind: "warning",
-              message: conversion.suggestionRejectedReason === "speculative"
+              message: conversion.suggestionRejectedReason === "speculative" || conversion.attempts?.some(attempt => attempt.stage === "speculative")
                 ? "適切な推測候補を作れなかったため、ローマ字を残しました。入力を続けると再生成します。"
                 : "候補を安全に適用できなかったため表示しませんでした。入力を続けると再生成します。",
             });
@@ -938,6 +941,7 @@ export function useConversion({
           undefined,
           {
             documentVocabulary: request.documentVocabulary, kanaEngine: defaultKanaEngine,
+            autoSpeculation: request.settings.autoSpeculation,
             signal: requestsRef.current.get(request.id)?.controller.signal,
             deferRanking: deferRanking(request.id),
             onLocalCandidates: applyConversion,

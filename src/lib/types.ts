@@ -19,6 +19,7 @@ export interface AppSettings {
   modelName: string;
   autoConvert: boolean;
   autoSuggest: boolean;
+  autoSpeculation: boolean;
   conversionMode: "replace" | "ghost";
 
   triggers: {
@@ -45,6 +46,7 @@ export type SharedConversionSettings = Pick<
   AppSettings,
   | "autoConvert"
   | "autoSuggest"
+  | "autoSpeculation"
   | "conversionMode"
   | "triggers"
   | "punctuationConversion"
