@@ -1,3 +1,4 @@
+import { analyzeInput, type InputSpan } from "./inputAnalysis";
 
 interface DictionaryTextPart {
   type: "text";
@@ -69,8 +70,9 @@ export function buildProtectedDictionaryEntries(
 export function splitInputForConversion(
   input: string,
   entries: ProtectedDictionaryEntry[],
+  spans: readonly InputSpan[] = analyzeInput(input),
 ): ConversionSplitPart[] {
-  const literalParts = splitInputByLiteralNouns(input).flatMap((part) => {
+  const literalParts = splitInputByLiteralNouns(input, spans).flatMap((part) => {
     if (part.type === "literal") {
       return [part];
     }
@@ -104,41 +106,10 @@ export function splitInputForConversion(
   });
 }
 
-function splitInputByLiteralNouns(input: string): Array<DictionaryTextPart | LiteralNounPart> {
-  const parts: Array<DictionaryTextPart | LiteralNounPart> = [];
-  let index = 0;
-  let lastCopiedIndex = 0;
-
-  while (index < input.length) {
-    if (input[index] !== "`" || isEscapedBacktick(input, index)) {
-      index += 1;
-      continue;
-    }
-
-    const end = findClosingBacktick(input, index + 1);
-    if (end === -1) {
-      index += 1;
-      continue;
-    }
-
-    if (lastCopiedIndex < index) {
-      parts.push({ type: "text", value: input.slice(lastCopiedIndex, index) });
-    }
-
-    parts.push({ type: "literal", output: input.slice(index + 1, end) });
-    index = end + 1;
-    lastCopiedIndex = index;
-  }
-
-  if (parts.length === 0) {
-    return [{ type: "text", value: input }];
-  }
-
-  if (lastCopiedIndex < input.length) {
-    parts.push({ type: "text", value: input.slice(lastCopiedIndex) });
-  }
-
-  return parts;
+function splitInputByLiteralNouns(input: string, spans: readonly InputSpan[]): Array<DictionaryTextPart | LiteralNounPart> {
+  return spans.map(span => span.kind === "text"
+    ? { type: "text", value: input.slice(span.from, span.to) }
+    : { type: "literal", output: input.slice(span.contentFrom, span.contentTo) });
 }
 
 function splitInputByInlineKanjiTerms(input: string): Array<DictionaryTextPart | LiteralNounPart> {
@@ -261,23 +232,6 @@ function isJapaneseTermCharacter(character: string): boolean {
 
 function isKanjiCharacter(character: string): boolean {
   return /[\u3400-\u9fff々〆]/u.test(character);
-}
-
-function findClosingBacktick(input: string, start: number): number {
-  for (let index = start; index < input.length; index += 1) {
-    if (input[index] === "`" && !isEscapedBacktick(input, index)) {
-      return index;
-    }
-  }
-  return -1;
-}
-
-function isEscapedBacktick(input: string, index: number): boolean {
-  let slashCount = 0;
-  for (let position = index - 1; position >= 0 && input[position] === "\\"; position -= 1) {
-    slashCount += 1;
-  }
-  return slashCount % 2 === 1;
 }
 
 function splitInputByDictionary(

@@ -22,6 +22,10 @@ async function convertWithinBudget(input: string, settings: AppSettings,
   transport: OllamaTransport, options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
   options = { ...options, purpose: options.userRequestedSpeculation ? "speculative" : options.purpose ?? "normal", kanaEngine: options.kanaEngine ?? defaultKanaEngine };
   const preparedInput = prepareConversionRequest(input, settings, options);
+  if (!preparedInput.hasEditableInput || preparedInput.excludedInput) return {
+    text: "", reviewKana: preparedInput.sourceReading, suggestionRejected: true,
+    suggestionRejectedReason: preparedInput.excludedInput ? "protected" : "unconvertible", rejectionDetail: "no-candidate",
+  };
   const runAttempt = async (attemptOptions: JapaneseConversionOptions) => {
     throwIfConversionAborted(attemptOptions.signal);
     const candidate = attemptOptions.purpose === "correction"

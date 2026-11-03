@@ -5,6 +5,7 @@ import type { ConversionProtection } from "./conversionProtection";
 import type { JapaneseConversionOptions } from "./japaneseConversionTypes";
 import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
+import { analyzeInput, hasEditableRomaji, isExcludedInput } from "./inputAnalysis";
 
 export interface ConversionTarget {
   /** Source fragment after prompt punctuation normalization, before kana conversion. */
@@ -37,9 +38,10 @@ function referenceSections(reference: ConversionReference): string[] {
 /** Only the original target supplies mandatory protection. Reference data can
  * support interpretation, but cannot introduce mandatory protected content. */
 export function prepareConversionRequest(input: string, settings: AppSettings, options: JapaneseConversionOptions) {
-  const parts = splitInputForConversion(normalizeInputForPrompt(input, settings), [
+  const spans = analyzeInput(input);
+  const parts = splitInputForConversion(normalizeInputForPrompt(input, settings, spans), [
     ...(options.protectedDictionaryEntries ?? []),
-  ]);
+  ], spans);
   const readings = parts.map(part => romajiToKana(part.type === "text" ? part.value : part.output));
   const protection: ConversionProtection = {
     lineBreaks: input.match(/\r\n|\r|\n/g) ?? [],
@@ -53,6 +55,7 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
   };
   const sourceReading = parts.map((part, index) => part.type === "text" ? readings[index].kana : part.output).join("");
   return { originalInput: input, parts, readings, sourceReading, protection,
+    hasEditableInput: hasEditableRomaji(input), excludedInput: spans.some(isExcludedInput),
     learnedBonus: conversionLearningSnapshot(), documentVocabulary: options.documentVocabulary?.slice() };
 }
 

@@ -1,6 +1,7 @@
 import { excludedRanges, isNumericSeparator, isPendingNumericSeparator, isSentenceBoundary } from "./conversionBoundaries";
 import type { AppSettings, ConversionRange, ConversionTrigger } from "./types";
 import { existingJapanesePrefixLength } from "./inputBoundaries";
+import { analyzeInput, containsInputPosition, cutsFixedInput, hasEditableRomaji, isExcludedInput, type InputSpan } from "./inputAnalysis";
 
 export function triggerFromCharacter(
   character: string,
@@ -86,7 +87,7 @@ export function extractConversionRange(
   // A URL or code span earlier on the line is a hard boundary. Complete
   // single-backtick literals retain their existing fixed-replacement semantics.
   for (const range of excludedRanges(doc)) {
-    if (range.kind !== "literal" && range.from < safeCursor && range.to > start) start = Math.max(start, range.to);
+    if (isExcludedInput(range) && range.from < safeCursor && range.to > start) start = Math.max(start, range.to);
   }
   if (start >= safeCursor) return null;
   const adjustedStart = start + existingJapanesePrefixLength(doc.slice(start, safeCursor));
@@ -98,7 +99,7 @@ export function extractConversionRange(
   if (
     from >= safeCursor ||
     !text.trim() ||
-    !/[A-Za-z]/.test(text) ||
+    !hasEditableRomaji(text) ||
     (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))
   ) {
     return null;
@@ -131,7 +132,7 @@ export function extractSelectedConversionRange(
   const to = safeTo - trailingWhitespace;
   const text = doc.slice(from, to);
 
-  if (from >= to || !text.trim() || !/[A-Za-z]/.test(text) || (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))) {
+  if (from >= to || !text.trim() || !hasEditableRomaji(text) || (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))) {
     return null;
   }
 
@@ -146,9 +147,10 @@ export function extractSelectedConversionRange(
 export function normalizeInputForPrompt(
   text: string,
   settings: AppSettings,
+  spans: readonly InputSpan[] = analyzeInput(text),
 ): string {
   let normalized = text;
-  const protectedRanges = excludedRanges(text);
+  const protectedRanges = spans.filter(span => span.kind !== "text");
   const preserveMark = (source: string, index: number) => isNumericSeparator(source, index) ||
     protectedRanges.some(range => range.from <= index && index < range.to);
   if (settings.punctuationConversion.periodToJapanese) {
@@ -174,8 +176,7 @@ export function isJapaneseDominant(text: string): boolean {
 }
 
 export function isInsideExcludedMarkdown(doc: string, position: number): boolean {
-  return excludedRanges(doc).some(range =>
-    position >= range.from && (position < range.to || (range.kind === "url" && position === range.to)));
+  return analyzeInput(doc).some(range => range.kind !== "text" && containsInputPosition(range, position));
 }
 
 function getLineAt(doc: string, position: number): { from: number; to: number; text: string } {
@@ -204,10 +205,5 @@ function isKanjiMixedRomajiInput(text: string): boolean {
 }
 
 function rangeIntersectsExcludedMarkdown(doc: string, from: number, to: number): boolean {
-  return excludedRanges(doc).some(range => {
-    if (range.from >= to || range.to <= from) return false;
-    // Complete single-backtick literals are explicitly supported by the
-    // conversion pipeline; partial selections inside them are not.
-    return range.kind !== "literal" || from > range.from || to < range.to;
-  });
+  return cutsFixedInput(doc, from, to);
 }

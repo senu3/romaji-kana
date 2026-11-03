@@ -4,6 +4,7 @@ import { normalizeKanaWidth } from "./readingComparison";
 import type { Choice } from "./conversionLearning";
 import type { WordSuggestion } from "./kanaEngine";
 import { trailingReadingToken } from "./inputBoundaries";
+import { analyzeInput } from "./inputAnalysis";
 
 export interface SuggestTarget { from: number; to: number; original: string; reading: string; suffix?: string }
 export function convertedSuggestTarget(from: number, original: string, reading: string): SuggestTarget {
@@ -13,11 +14,12 @@ export function convertedSuggestTarget(from: number, original: string, reading: 
 export function suggestTarget(doc: string, cursor: number): SuggestTarget | null {
   if (isInsideExcludedMarkdown(doc, cursor) || /[\wぁ-ゖァ-ヶー]/u.test(doc[cursor] ?? "")) return null;
   // Kana already committed before romaji belongs to the document, not this token.
-  const original = trailingReadingToken(doc.slice(Math.max(0, cursor - 81), cursor));
+  const span = analyzeInput(doc).find(part => part.kind === "text" && part.from < cursor && part.to >= cursor);
+  if (!span) return null;
+  const original = trailingReadingToken(doc.slice(Math.max(span.from, cursor - 81), cursor));
   if (!original || original.length > 80) return null;
   const from = cursor - original.length;
-  if (/[\w]/u.test(doc[from - 1] ?? "")) return null;
-  if (isInsideExcludedMarkdown(doc, from)) return null;
+  if (from > span.from && /[\w]/u.test(doc[from - 1] ?? "")) return null;
   const converted = romajiToKana(normalizeKanaWidth(original));
   if (converted.lowConfidenceSpans.length || !/^[ぁ-ゖー]{2,80}$/u.test(converted.kana)) return null;
   return { from, to: cursor, original, reading: converted.kana };

@@ -2,6 +2,7 @@ import { isSentenceBoundary } from "./conversionBoundaries";
 import { StateEffect, StateField, Transaction, type EditorState } from "@codemirror/state";
 import { extractConversionRange, isInsideExcludedMarkdown } from "./conversion";
 import type { ConversionRange, ConversionTrigger } from "./types";
+import { cutsFixedInput } from "./inputAnalysis";
 
 interface Range { from: number; to: number }
 export const rememberUnconvertedRange = StateEffect.define<Range>();
@@ -84,6 +85,7 @@ export function retainedConversionRange(
   if (!range || range.from > position) return extractConversionRange(doc, position, trigger);
   if (retained && retained.from > range.from) {
     const from = retained.from;
+    if (cutsFixedInput(doc, from, range.to)) return null;
     return { from, to: range.to, text: doc.slice(from, range.to), trigger };
   }
   return range;
