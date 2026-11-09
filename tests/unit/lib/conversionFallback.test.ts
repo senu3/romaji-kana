@@ -263,6 +263,9 @@ describe("first-pass comparison of normal and one-key repairs", () => {
     const repaired = "あんをおねがいします";
     const h = harness([
       candidate("案をおねがします", "mozc", source),
+      candidate("案を尾根がします", "mozc", source),
+      candidate("あんをおねがします", "mozc", source),
+      candidate("餡をおねがします", "mozc", source),
       candidate("案をお願いします", "mozc", repaired),
     ]);
     h.generate.mockImplementation(async (_provider, _url, request) => {
@@ -280,6 +283,7 @@ describe("first-pass comparison of normal and one-key repairs", () => {
     });
     expect(h.generate).toHaveBeenCalledTimes(1);
     expect(result.text).toBe(response === "select" ? "案をお願いします。" : "案をおねがします。");
+    expect(result.session?.candidates.map(candidate => candidate.result.text)).toContain("餡をおねがします。");
   });
 
   it("maps an alias for a contextual spelling back to its candidate", async () => {

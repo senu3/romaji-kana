@@ -20,7 +20,11 @@ try {
     const page = await context.newPage();
     const searches = [];
     await page.route('**/api/tags', route => route.fulfill({ json: { models: [{ name: 'gemma3' }] } }));
-    await page.route('**/api/generate', route => route.fulfill({ json: { response: JSON.stringify({ order: ['candidate-0'] }) } }));
+    await page.route('**/api/generate', route => {
+      const body = route.request().postDataJSON();
+      const ids = body.format?.properties?.c?.enum;
+      return route.fulfill({ json: { response: JSON.stringify(ids ? { c: ids[0] } : { order: ['candidate-0'] }) } });
+    });
     await page.route('**/api/kana-engine', route => {
       const { reading } = route.request().postDataJSON();
       searches.push(reading);
@@ -52,10 +56,43 @@ try {
   });
   await scenario({ conversionMode: 'replace' }, async (page, editor) => {
     await page.keyboard.type('hon');
-    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん');
+    await page.locator('.cm-ghost-text-suggestion').waitFor();
+    assert.equal(await editor.locator('.cm-ghost-source').textContent(), 'hon');
+    await page.keyboard.type('.');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん。');
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
     await page.keyboard.press('Control+z');
-    assert.equal(await editor.innerText(), 'hon', 'Pause replacement is one undo step');
+    assert.equal(await editor.innerText(), 'hon.', 'Boundary replacement is one undo step');
+  });
+  await scenario({ conversionMode: 'replace', triggers: { typing: false } }, async (page, editor) => {
+    const entries = new Map([['あんをおねがします', '案をおねがします'], ['あんをおねがいします', '案をお願いします']]);
+    await page.route('**/api/kana-engine', route => {
+      const { reading } = route.request().postDataJSON();
+      const text = entries.get(reading);
+      return route.fulfill({ json: { candidates: text ? [{ text, reading, cost: 100,
+        tokens: [{ text, reading, from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }] : [],
+      dictionaryRevision: 'test', truncated: false } });
+    });
+    let release;
+    const ready = new Promise(resolve => { release = resolve; });
+    let selected;
+    await page.route('**/api/generate', async route => {
+      const body = route.request().postDataJSON();
+      if (!body.format?.properties?.c) return route.fallback();
+      const repair = JSON.parse(body.prompt).candidates.find(candidate => candidate.text === '案をお願いします。');
+      assert.ok(repair);
+      selected = repair.id;
+      await ready;
+      return route.fulfill({ json: { response: JSON.stringify({ c: repair.id }) } });
+    });
+    await page.keyboard.type('annwoonegasimasu.tugi');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '案をおねがします。tugi');
+    assert.match(selected, /^[a-z]$/);
+    release();
+    await page.waitForTimeout(150);
+    assert.equal(await editor.innerText(), '案をおねがします。tugi');
+    await page.locator('.recent-retry-chip-main').click();
+    await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: /案をお願いします。.*追加候補/ }).waitFor();
   });
   const selectedCandidateFailures = [];
   for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {
@@ -127,9 +164,8 @@ try {
       await page.route('**/api/kana-engine', route => {
         const request = route.request().postDataJSON();
         if (request.operation === 'verify') return route.fulfill({ json: { status: 'verified' } });
-        assert.equal(request.reading, 'かくに');
-        return route.fulfill({ json: { candidates: [{ text: '角煮', reading: 'かくに', cost: 100,
-          tokens: [{ text: '角煮', reading: 'かくに', from: 0, to: 3, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }],
+        return route.fulfill({ json: { candidates: request.reading === 'かくに' ? [{ text: '角煮', reading: 'かくに', cost: 100,
+          tokens: [{ text: '角煮', reading: 'かくに', from: 0, to: 3, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }] : [],
           dictionaryRevision: 'test', truncated: false } });
       });
       let proposals = 0;
@@ -209,6 +245,7 @@ try {
     await page.route('**/api/generate', route => {
       const body = route.request().postDataJSON();
       if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+      if (body.format?.properties?.c) return route.fallback();
       const editableIds = body.format.properties.candidates.items.properties.segments.items.properties.id.enum;
       assert.equal(editableIds.length, 1);
       assert.match(body.prompt, /XR-34/);
@@ -357,14 +394,13 @@ try {
       await selection;
       assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.', 'Dictionary repair must not replace the original while ranking');
       if (cancel) {
-        await page.getByRole('button', { name: /履歴を開く/ }).click();
-        await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+        await page.keyboard.press('Backspace');
       }
       release();
       if (cancel) {
         await page.waitForTimeout(200);
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Canceled correction must not reappear');
-        assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai.');
+        assert.equal(await editor.innerText(), 'kaiginojkanwokaenaidekudasai');
       } else if (mode === 'replace') {
         await page.waitForFunction(expected => document.querySelector('.cm-content').textContent === expected, `${text}。`);
         assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0, 'Verified repair is applied after ranking');

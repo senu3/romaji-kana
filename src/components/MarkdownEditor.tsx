@@ -21,7 +21,7 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, Facet, Prec, StateField, Transaction } from "@codemirror/state";
+import { Compartment, EditorState, Facet, Prec, StateField, Transaction, type ChangeDesc } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -91,7 +91,7 @@ interface MarkdownEditorProps {
   onSettingsChange: (settings: AppSettings) => void;
   onOpenModelSettings: () => void;
   onConvert: (range: ConversionRange) => boolean;
-  onDocumentChanged: (documentText: string) => void;
+  onDocumentChanged: (documentText: string, changes: ChangeDesc) => void;
   onEditorStatusChange: (status: EditorDocumentStatus) => void;
   onNewFile: () => void;
   onOpenFile: () => void;
@@ -623,7 +623,7 @@ export function MarkdownEditor({
         return;
       }
 
-      onDocumentChangedRef.current(update.state.doc.toString());
+      onDocumentChangedRef.current(update.state.doc.toString(), update.changes);
       const userEvent = update.transactions
         .map((transaction) => transaction.annotation(Transaction.userEvent))
         .find(Boolean);
@@ -1002,6 +1002,7 @@ export function MarkdownEditor({
     if (
       !suggestion ||
       suggestion.previewOnly ||
+      ((suggestion.trigger === "typing" || suggestion.trigger === "space") && !suggestion.session?.locked) ||
       !selection.empty ||
       selection.head !== suggestion.to
     ) {

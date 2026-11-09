@@ -29,6 +29,7 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
   const [detailsOpen, setDetailsOpen] = useState(!target);
   const [textExpanded, setTextExpanded] = useState(!target);
   const candidate = target ? target.session.candidates.find(c => c.id === target.session.selectedId)?.result : null;
+  const hasReviewCandidates = target?.session.candidates.some(c => c.kind === "proposal");
   const text = candidate?.text ?? suggestion?.convertedText ?? "";
   const changes = candidate?.changes ?? suggestion?.changes;
   const strategy = target ? candidate?.conversionStrategy : suggestion?.conversionStrategy;
@@ -129,11 +130,11 @@ export function ConversionPopover({ view, suggestion, target, onAccept, onDismis
       {target ? (
         <>
           <div className="candidate-alternatives">
-            <p className="candidate-help">同じ読みの候補です。選んだあとに確定できます。</p>
-            <ul className="candidate-list-options" aria-label="同じ読みの候補">
+            <p className="candidate-help">{hasReviewCandidates ? "後から届いた候補も選べます。" : "同じ読みの候補です。選んだあとに確定できます。"}</p>
+            <ul className="candidate-list-options" aria-label={hasReviewCandidates ? "変換候補" : "同じ読みの候補"}>
               {target.session.candidates.map(c => (
                 <li key={c.id}><button type="button" aria-pressed={c.id === target.session.selectedId} onClick={() => onSelect(c.id)}>
-                  <span>{c.result.text}</span>{c.id === target.session.selectedId ? <small>選択中</small> : null}
+                  <span>{c.result.text}</span>{c.id === target.session.selectedId ? <small>選択中</small> : c.kind === "proposal" ? <small>追加候補</small> : null}
                 </button></li>
               ))}
             </ul>

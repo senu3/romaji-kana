@@ -1,5 +1,5 @@
 import { ConversionResponseError } from "./conversionDiagnostics";
-import { withConversionBudget } from "./conversionBudget";
+import { deferConversionDecision, withConversionBudget } from "./conversionBudget";
 import { correctInput } from "./conversionCorrection";
 import { convertInputOnce } from "./conversionPipeline";
 import { prepareConversionRequest } from "./conversionRequest";
@@ -76,12 +76,16 @@ async function convertWithinBudget(input: string, settings: AppSettings,
   };
   if (automatic && options.compareRepairsEarly && options.rerank !== false) {
     const localOptions = { ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined };
-    const baseline = await runAttempt({ ...localOptions, rerank: false });
-    if (baseline.session && isUsableConversionResult(baseline, options)) {
+    const preparing = runAttempt({ ...localOptions, rerank: false });
+    const compare = async (baseline: JapaneseConversionResult) => {
+      if (!baseline.session || !isUsableConversionResult(baseline, options)) return resolveNormal(baseline);
       const compared = await searchMissingLetter(input, settings, transport, { ...localOptions, repairBaseline: baseline }, preparedInput);
       return compared && isUsableConversionResult(compared, options) ? compared : baseline;
-    }
-    return resolveNormal(baseline);
+    };
+    return deferConversionDecision(preparing, {
+      text: "", reviewKana: preparedInput.sourceReading, suggestionRejected: true,
+      suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate",
+    }, compare, options);
   }
   const result = await resolveNormal(await runAttempt(automatic && options.onRankedCandidates ? {
     ...options,

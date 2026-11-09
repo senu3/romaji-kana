@@ -1,4 +1,4 @@
-import { EditorState, type TransactionSpec } from "@codemirror/state";
+import { EditorState, type ChangeDesc, type TransactionSpec } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -45,12 +45,12 @@ export function deferred<T>() {
 }
 
 // Use real CodeMirror transactions, without a DOM view or layout timers.
-export function stateEditor(content: string, onChange?: (text: string) => void) {
+export function stateEditor(content: string, onChange?: (text: string, changes: ChangeDesc) => void) {
   let state = EditorState.create({ doc: content, extensions: [ghostSuggestionField] });
   const dispatch = vi.fn((spec: TransactionSpec) => {
     const transaction = state.update(spec);
     state = transaction.state;
-    if (transaction.docChanged) onChange?.(state.doc.toString());
+    if (transaction.docChanged) onChange?.(state.doc.toString(), transaction.changes);
   });
   const view = {
     get state() { return state; },

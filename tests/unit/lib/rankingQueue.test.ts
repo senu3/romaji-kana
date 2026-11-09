@@ -19,3 +19,16 @@ it("bounds ranking to one running job and replaces the waiting job", async () =>
   expect(replaced).not.toHaveBeenCalled();
   expect(latest).toHaveBeenCalledOnce();
 });
+
+it("runs every boundary ahead of the replaceable waiting job", async () => {
+  const queue = new RankingQueue();
+  const order: string[] = [];
+  let release!: () => void;
+  queue.schedule(() => new Promise<void>(resolve => { release = resolve; }), vi.fn());
+  const run = (name: string, boundary = false) => queue.schedule(async () => { order.push(name); }, vi.fn(), boundary);
+  run("preview");
+  run("first", true);
+  run("second", true);
+  release();
+  await vi.waitFor(() => expect(order).toEqual(["first", "second", "preview"]));
+});

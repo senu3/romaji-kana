@@ -2,7 +2,7 @@ import { preservesProtectedContent } from "./conversionProtection";
 import { prepareConversionRequest, type PreparedConversionInput } from "./conversionRequest";
 import { missingLetterReadings } from "./romajiRepairPlans";
 export { missingLetterReadings } from "./romajiRepairPlans";
-import { createConversionSession, type SessionCandidate } from "./conversionSession";
+import { createConversionSession, sessionResult, type SessionCandidate } from "./conversionSession";
 import { throwIfConversionAborted } from "./generationUtils";
 import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japaneseConversionTypes";
 import { convertLocally } from "./localConversion";
@@ -118,10 +118,18 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     const session = createConversionSession(input, retained, options);
     session.dictionaryRevision = revision;
     session.truncated = metrics.truncated;
-    return await rankConversionSession(session, settings, transport, {
+    const ranked = await rankConversionSession(session, settings, transport, {
       ...options,
       onLocalCandidates: undefined, onRankedCandidates: undefined, deferRanking: undefined
     }, preparedInput.learnedBonus);
+    if (!comparison || !baseline?.session || !ranked.session) return ranked;
+    // Limit what the model sees, then restore the other normal spellings for
+    // the candidate list without changing the selected result.
+    const offered = new Set(session.candidates.map(candidate => candidate.id));
+    const all = createConversionSession(input, [
+      ...session.candidates, ...baseline.session.candidates.filter(candidate => !offered.has(candidate.id)),
+    ], options);
+    return sessionResult({ ...session, candidates: all.candidates, readingPlans: all.readingPlans });
   } finally {
     metrics.elapsedMs = performance.now() - started;
     options.onMissingLetterSearch?.(metrics);

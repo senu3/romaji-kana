@@ -41,10 +41,13 @@ export interface JapaneseConversionOptions {
   autoSpeculation?: boolean;
   /** Evaluation only: compare narrow and broad triggers for normal candidates. */
   typoSpeculation?: "suspected" | "all-normal";
-  /** Evaluation only: compare normal and single-key repairs in the first ranking request. */
+  /** Compare normal and single-key repairs in the first ranking request. */
   compareRepairsEarly?: "full" | "compact";
-  /** Evaluation only: return one short candidate ID in the first-pass comparison. */
+  /** Return one short candidate ID in the first-pass comparison. */
   shortRepairId?: boolean;
+  /** Absolute editor deadline. A decision after it is review-only. */
+  decisionDeadline?: number;
+  onLateCandidates?: (result: JapaneseConversionResult) => void;
   /** Search one romaji insertion, deletion, adjacent transposition or keyboard-neighbor replacement before model repair. */
   missingLetterCorrection?: boolean;
   onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;

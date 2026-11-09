@@ -25,9 +25,14 @@ try {
     modelCalls++;
     latestCandidates = JSON.parse(body.prompt).candidates;
     await new Promise(resolve => { release = resolve; });
-    await route.fulfill({ json: { response: JSON.stringify({ order: latestCandidates.map(c => c.id).reverse() }) } });
+    const selected = latestCandidates.at(-1).id;
+    await route.fulfill({ json: { response: JSON.stringify(body.format?.properties?.c ? { c: selected } : { order: [selected] }) } });
   });
   await page.goto(url);
+  const warmed = await page.request.post(new URL('/api/kana-engine', url).href, {
+    data: { operation: 'search', reading: 'ほん', words: [], limit: 1 },
+  });
+  assert.ok(warmed.ok(), 'Warm the real dictionary before measuring the boundary deadline');
   const editor = page.locator('.cm-content');
   const ghost = page.locator('.cm-ghost-text-suggestion');
   async function typeInput(text) {
@@ -97,14 +102,12 @@ try {
   assert.equal(await documentText(page), 'honwoyomu');
   assert.equal(await ghost.count(), 0, 'A dismissed session must not be resurrected');
 
-  // Canceling the request must also revoke its already displayed candidates.
+  // Editing the target revokes its already displayed candidates and late work.
   const rankingRequest = page.waitForRequest(request => request.url().endsWith('/api/generate') && request.postDataJSON().prompt !== 'ok');
   await typeInput('honwoyomu');
   await rankingRequest;
-  await page.getByRole('button', { name: /履歴を開く/ }).click();
-  await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  assert.equal(await ghost.count(), 0, 'Canceled local candidates must disappear immediately');
-  await page.getByRole('button', { name: '履歴 を閉じる', exact: true }).click();
+  await page.keyboard.press('Backspace');
+  assert.equal(await ghost.count(), 0, 'Editing the source dismisses local candidates');
   release();
   // Browser cancellation may abort the request instead of delivering a response.
   await page.waitForTimeout(150);

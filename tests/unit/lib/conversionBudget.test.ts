@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EngineCandidate } from "../../../src/lib/kanaEngine";
 import { convertRomajiToJapaneseDetailed } from "../../../src/lib/ollama";
 import { defaultSettings } from "../../../src/lib/settings";
+import { BOUNDARY_DECISION_MS, deferConversionDecision } from "../../../src/lib/conversionBudget";
 
 function harness(candidates: EngineCandidate[] = []) {
   const engine = { search: vi.fn().mockResolvedValue({ candidates, dictionaryRevision: "test", truncated: false }),
@@ -75,5 +76,49 @@ describe("whole conversion budget", () => {
     controller.abort();
     await assertion;
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("boundary decision", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("includes the ranking queue in the deadline and skips an expired comparison", async () => {
+    const normal = { text: "本", reviewKana: "ほん" };
+    const compare = vi.fn();
+    const decide = vi.fn();
+    let queued!: () => Promise<void>;
+    await deferConversionDecision(Promise.resolve(normal), { text: "", reviewKana: "ほん" }, compare, {
+      decisionDeadline: Date.now() + BOUNDARY_DECISION_MS,
+      deferRanking: run => { queued = run; },
+      onRankedCandidates: decide,
+    });
+    await vi.advanceTimersByTimeAsync(BOUNDARY_DECISION_MS);
+    expect(decide).toHaveBeenCalledExactlyOnceWith(normal);
+    await queued();
+    expect(compare).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("leaves the original at the deadline if the dictionary has not returned", async () => {
+    const unavailable = { text: "", reviewKana: "ほん", suggestionRejected: true };
+    const normal = { text: "本", reviewKana: "ほん" };
+    let ready!: (result: typeof normal) => void;
+    const prepare = new Promise<typeof normal>(resolve => { ready = resolve; });
+    const decide = vi.fn();
+    const late = vi.fn();
+    const compare = vi.fn();
+    const result = deferConversionDecision(prepare, unavailable, compare, {
+      decisionDeadline: Date.now() + BOUNDARY_DECISION_MS,
+      deferRanking: vi.fn(),
+      onRankedCandidates: decide,
+      onLateCandidates: late,
+    });
+    await vi.advanceTimersByTimeAsync(BOUNDARY_DECISION_MS);
+    expect(decide).toHaveBeenCalledExactlyOnceWith(unavailable);
+    ready(normal);
+    await result;
+    expect(compare).not.toHaveBeenCalled();
+    expect(late).toHaveBeenCalledExactlyOnceWith(normal);
   });
 });

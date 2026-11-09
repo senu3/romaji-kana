@@ -89,7 +89,7 @@ try {
     const { operation, reading } = route.request().postDataJSON();
     if (operation === 'suggest') return route.fulfill({ json: { candidates: [] } });
     assert.equal(operation, 'search');
-    assert.equal(reading, 'きしゃ');
+    if (reading !== 'きしゃ') return route.fulfill({ json: { candidates: [], truncated: false, dictionaryRevision: 'test' } });
     return route.fulfill({ json: { candidates: [{ text: '記者', reading, cost: 100,
       tokens: [{ text: '記者', reading, from: 0, to: 3, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }],
       truncated: false, dictionaryRevision: 'test' } });

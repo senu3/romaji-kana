@@ -19,6 +19,8 @@ export interface ConversionSession {
   contextBefore: string;
   contextAfter: string;
   candidates: SessionCandidate[];
+  /** Late alternatives available through an explicit review. */
+  reviewCandidates?: SessionCandidate[];
   selectedId: string;
   /** Shared across async producer and UI; selection permanently locks ordering. */
   locked: boolean;

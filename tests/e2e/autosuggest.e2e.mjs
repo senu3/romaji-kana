@@ -114,7 +114,12 @@ try {
     await page.keyboard.type('i');
     await page.waitForTimeout(700);
     assert.ok(requests.length > before, 'Typing resumes requests');
-    assert.equal(await editor.innerText(), '効果', 'Typing resumes direct replacement after completion selection ends');
+    const source = await editor.evaluate(element => {
+      const copy = element.cloneNode(true);
+      copy.querySelectorAll('.cm-ghost-text').forEach(widget => widget.remove());
+      return copy.textContent;
+    });
+    assert.equal(source, 'koukai', 'Resuming input does not commit a pause candidate');
   });
   await scenario({}, async (page, editor, requests) => {
     await page.keyboard.type('kou');
@@ -168,6 +173,10 @@ try {
       await page.keyboard.type('kouka');
       if (preview) await page.locator('.cm-ghost-text-suggestion').waitFor();
       await page.keyboard.press(key);
+      if (preview) {
+        await page.locator('.cm-ghost-text-suggestion').filter({ hasText: suffix }).waitFor();
+        await page.keyboard.press('Alt+Enter');
+      }
       await page.getByRole('button', { name: '航海 を補完' }).click();
       const text = await editor.locator('.cm-line').allTextContents();
       assert.equal(text.join('\n'), `航海${suffix}`, `${key} completion preserves punctuation/newline`);

@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import type { ChangeDesc } from "@codemirror/state";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
@@ -124,6 +125,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     handleRerunHistory,
     previewHistoryGhost,
     clearHistoryGhost,
+    trackConversionEdits,
   } = useConversion({
     editorViewRef,
     settingsRef,
@@ -189,11 +191,12 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     editorReady,
   });
 
-  const handleDocumentChanged = useCallback((documentText: string) => {
+  const handleDocumentChanged = useCallback((documentText: string, changes: ChangeDesc) => {
+    trackConversionEdits(changes);
     closeCandidateList();
     persistDocumentChange(documentText);
     syncDocumentChange(documentText);
-  }, [closeCandidateList, persistDocumentChange, syncDocumentChange]);
+  }, [closeCandidateList, persistDocumentChange, syncDocumentChange, trackConversionEdits]);
 
   const { handleNewFile, handleOpenFile, handleSaveFile, handleSaveFileAs } = useDocumentFiles({
     documentEpochRef,
