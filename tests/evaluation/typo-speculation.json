@@ -1,0 +1,229 @@
+{
+  "version": "2026-11-09-typo-speculation-v1",
+  "defaults": {
+    "think": false,
+    "documentVocabulary": [],
+    "personalDictionary": []
+  },
+  "cases": [
+    {
+      "id": "baseline-book",
+      "category": "normal-control",
+      "input": "honwoyomimasu.",
+      "acceptableExamples": [
+        "本を読みます。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "baseline-polite",
+      "category": "normal-control",
+      "input": "arigatou.",
+      "acceptableExamples": [
+        "ありがとう。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "baseline-tsu",
+      "category": "normal-control",
+      "input": "kittewokaimasu.",
+      "acceptableExamples": [
+        "切手を買います。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "baseline-announce",
+      "category": "normal-control",
+      "input": "annwoonegaisimasu.",
+      "options": {
+        "contextBefore": "次の企画について話し合っています。"
+      },
+      "acceptableExamples": [
+        "案をお願いします。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "baseline-negation",
+      "category": "normal-control",
+      "input": "kekkahakawatteinai.",
+      "acceptableExamples": [
+        "結果は変わっていない。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "baseline-protected",
+      "category": "normal-control",
+      "input": "`QX-73`wo3kenhenkoushinaidekudasai.",
+      "acceptableExamples": [
+        "QX-73を3件変更しないでください。"
+      ],
+      "criteria": [
+        "読みと意味を維持する"
+      ]
+    },
+    {
+      "id": "duplicate-schedule",
+      "category": "typo",
+      "input": "ashitanoyottei.",
+      "acceptableExamples": [
+        "明日の予定。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "duplicate-confirm",
+      "category": "typo",
+      "input": "konoshiryouwokakkuninshimasu.",
+      "acceptableExamples": [
+        "この資料を確認します。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "duplicate-letter",
+      "category": "typo",
+      "input": "shiryounogojjiwonaoshimasu.",
+      "acceptableExamples": [
+        "資料の誤字を直します。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "vowel-confirm",
+      "category": "typo",
+      "input": "shoruiwokakninshitekudasai.",
+      "acceptableExamples": [
+        "書類を確認してください。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "vowel-late",
+      "category": "typo",
+      "input": "ashitanokaiginojkanwokakuninshimasu.",
+      "acceptableExamples": [
+        "明日の会議の時間を確認します。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "missing-announce",
+      "category": "typo",
+      "input": "annwoonegasimasu.",
+      "options": {
+        "contextBefore": "次の企画について話し合っています。"
+      },
+      "acceptableExamples": [
+        "案をお願いします。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "missing-announce-distractor",
+      "category": "typo",
+      "input": "annwoonegasimasu.",
+      "options": {
+        "contextBefore": "昼食にはパンを食べました。"
+      },
+      "acceptableExamples": [
+        "案をお願いします。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "missing-consonant",
+      "category": "typo",
+      "input": "ashitnosiryouwojunbisimasu.",
+      "acceptableExamples": [
+        "明日の資料を準備します。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "natural-wrong-word",
+      "category": "typo",
+      "input": "yuujinntoekiadeaimasita.",
+      "acceptableExamples": [
+        "友人と駅で会いました。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "extra-tsu-protected",
+      "category": "typo",
+      "input": "`QX-73`noyotteiwokaenaidekudasai.",
+      "acceptableExamples": [
+        "QX-73の予定を変えないでください。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "multi-edit",
+      "category": "typo",
+      "input": "ashitnoyotteiwokakninshimasu.",
+      "acceptableExamples": [
+        "明日の予定を確認します。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "incomplete",
+      "category": "ambiguous",
+      "input": "ariga.",
+      "acceptableExamples": [
+        "ありがとう。"
+      ],
+      "criteria": [
+        "意図した語句・意味を復元する"
+      ]
+    },
+    {
+      "id": "unknown",
+      "category": "ambiguous",
+      "input": "qxzvplm",
+      "acceptableExamples": [],
+      "expectedRoutes": [
+        "rejected"
+      ],
+      "criteria": [
+        "根拠なく意図を補わない"
+      ]
+    }
+  ]
+}

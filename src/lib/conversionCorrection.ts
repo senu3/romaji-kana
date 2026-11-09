@@ -6,6 +6,7 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import { searchMissingLetter } from "./missingLetterCorrection";
 import type { OllamaTransport } from "./ollamaProxy";
 import type { AppSettings } from "./types";
+import { speculateAfterRepair } from "./typoSpeculation";
 
 /** Shared by automatic rescue and explicit correction requests. A valid empty
  * ranking is abstention; an invalid ranking is failure, not permission to invent
@@ -20,8 +21,15 @@ export async function correctInput(input: string, settings: AppSettings, transpo
   const searched = options.missingLetterCorrection !== false
     ? await searchMissingLetter(input, settings, transport, correctionOptions, preparedInput) : undefined;
   // A suspicion is not permission to replace a usable normal result with free generation.
-  if (options.repairBaseline) return searched && isUsableConversionResult(searched, options)
-    ? searched : { ...options.repairBaseline, repairRequested: undefined };
+  if (options.repairBaseline) {
+    const retained = searched && isUsableConversionResult(searched, options)
+      ? searched : { ...options.repairBaseline, repairRequested: undefined };
+    if (options.speculateAfterUnresolvedRepair && options.autoSpeculation &&
+        retained.conversionStrategy !== "correction" && searched?.rejectionDetail !== "ranking-invalid") {
+      return speculateAfterRepair(input, settings, transport, correctionOptions, preparedInput, retained);
+    }
+    return retained;
+  }
   if (searched && (isUsableConversionResult(searched, options) || searched.rejectionDetail === "ranking-invalid")) return searched;
   return convertInputOnce(input, settings, transport, correctionOptions, preparedInput);
 }

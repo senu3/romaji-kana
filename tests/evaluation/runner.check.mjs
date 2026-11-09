@@ -42,6 +42,24 @@ test("keeps default and custom evaluation output inside test-results", async () 
   } finally { await rm(out, { recursive: true, force: true }); }
 });
 
+test("pairs the two typo speculation variants for every case and repeat", async () => {
+  const dir = await temporaryArtifactDirectory("kana-typo-speculation-");
+  try {
+    const out = join(dir, "run");
+    const result = await run(["--dry-run", "--compare-typo-speculation", "--dataset",
+      "tests/evaluation/typo-speculation.json", "--repeats", "2", "--out", out]);
+    assert.equal(result.code, 0, result.output);
+    const { cases, schedule } = JSON.parse(await readFile(join(out, "manifest.json"), "utf8"));
+    assert.equal(schedule.length, cases.length * 2 * 2);
+    for (let i = 0; i < schedule.length; i += 2) {
+      const [a, b] = schedule.slice(i, i + 2);
+      assert.equal(a.caseId, b.caseId);
+      assert.equal(a.repeat, b.repeat);
+      assert.deepEqual([a.variant, b.variant].sort(), ["current", "experimental"]);
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test("validates rescue cases with unspecified acceptable text and route expectations", async () => {
   const dir = await temporaryArtifactDirectory("kana-rescue-");
   try {

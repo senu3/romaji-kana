@@ -168,3 +168,60 @@ describe("normal → correction → speculation → unchanged romaji", () => {
     expect(h.generate).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("experimental speculation after an unresolved comparison", () => {
+  const input = "ashitanoyottei.";
+  const original = "あしたのよってい";
+  const corrected = "あしたのよてい";
+  const options = { autoSpeculation: true, speculateAfterUnresolvedRepair: true, missingLetterCorrection: false };
+
+  function suspectedTypo(...extra: EngineCandidate[]) {
+    const h = harness([candidate("明日のよっ程", "mozc", original), candidate("明日のよってい", "mozc", original), ...extra]);
+    h.generate.mockResolvedValueOnce({ response: '{"order":["candidate-0"],"repairNeeded":true}' });
+    return h;
+  }
+
+  it("tries a targeted dictionary lookup for the guessed reading and keeps the result in review", async () => {
+    const h = suspectedTypo(candidate("明日の予定", "mozc", corrected));
+    h.generate.mockResolvedValueOnce(json("明日のよてい。", corrected + "。"));
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { ...options, kanaEngine: h.engine });
+    expect(result).toMatchObject({
+      text: "明日の予定。", conversionStrategy: "speculative", changes: { evidence: "dictionary-path" },
+      romajiCorrection: { before: "ashitanoyottei。", after: "ashitanoyotei。" },
+    });
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+    expect(h.engine.search).toHaveBeenCalledWith(corrected, expect.anything(), expect.any(AbortSignal));
+  });
+
+  it("returns the verified proposal for review when the targeted dictionary lookup has no candidate", async () => {
+    const h = suspectedTypo();
+    h.generate.mockResolvedValueOnce(json("明日の予定。", corrected + "。"));
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { ...options, kanaEngine: h.engine });
+    expect(result).toMatchObject({ text: "明日の予定。", conversionStrategy: "speculative", changes: { evidence: "model-reading" } });
+    expect(result.romajiCorrection).toBeUndefined();
+    expect(requiresExplicitAcceptance(result)).toBe(true);
+  });
+
+  it("retains the selected spelling when the proposed reading is unchanged", async () => {
+    const h = suspectedTypo();
+    h.generate.mockResolvedValueOnce(json("明日のよってい。", original + "。"));
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { ...options, kanaEngine: h.engine });
+    expect(result.text).toBe("明日のよっ程。");
+    expect(h.generate).toHaveBeenCalledTimes(2);
+    expect(h.engine.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the user's selection when the session locks during speculation", async () => {
+    const h = suspectedTypo();
+    let lock: () => void;
+    h.generate.mockImplementationOnce(async () => {
+      lock();
+      return json("明日の予定。", corrected + "。");
+    });
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
+      ...options, kanaEngine: h.engine, onLocalCandidates: initial => { lock = () => { initial.session!.locked = true; }; },
+    });
+    expect(result.text).toBe("明日のよっ程。");
+    expect(h.engine.search).toHaveBeenCalledTimes(1);
+  });
+});
