@@ -22,9 +22,17 @@ try {
     calls++;
     const prompt = JSON.parse(body.prompt);
     const candidate = prompt.candidates.find(c => c.text === expected);
+    if (body.format?.properties?.c) {
+      const selectable = prompt.candidates.flatMap(c => [c, ...(c.alternativeSpellings ?? [])]);
+      return route.fulfill({ json: { response: JSON.stringify({ c: selectable.find(c => c.id && c.text === expected)?.id ?? '-' }) } });
+    }
     return route.fulfill({ json: { response: JSON.stringify({ order: candidate ? [candidate.id] : [], repairNeeded: false }) } });
   });
   await page.goto(server.resolvedUrls.local[0]);
+  const warmed = await page.request.post(new URL('/api/kana-engine', server.resolvedUrls.local[0]).href, {
+    data: { operation: 'search', reading: 'ほん', words: [], limit: 1 },
+  });
+  assert.ok(warmed.ok(), 'Warm the real dictionary before testing protected input');
   const editor = page.locator('.cm-content');
   const ghost = page.locator('.cm-ghost-text-suggestion');
   const documentText = () => editor.innerText();
