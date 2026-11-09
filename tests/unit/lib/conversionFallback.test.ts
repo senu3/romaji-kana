@@ -257,4 +257,46 @@ describe("first-pass comparison of normal and one-key repairs", () => {
     expect(h.generate).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ text: corrected + "。", conversionStrategy: "correction" });
   });
+
+  it.each(["select", "-", "invalid"])("handles a short ranking response (%s)", async response => {
+    const source = "あんをおねがします";
+    const repaired = "あんをおねがいします";
+    const h = harness([
+      candidate("案をおねがします", "mozc", source),
+      candidate("案をお願いします", "mozc", repaired),
+    ]);
+    h.generate.mockImplementation(async (_provider, _url, request) => {
+      const prompt = JSON.parse(request.prompt);
+      const fixed = prompt.candidates.find((c: { kind: string }) => c.kind === "correction");
+      expect(fixed.id).toMatch(/^[a-f]$/u);
+      expect(request.outputSchema).toMatchObject({
+        properties: { c: { enum: expect.arrayContaining([fixed.id, "-"]) } },
+        required: ["c"], additionalProperties: false,
+      });
+      return { response: JSON.stringify({ c: response === "select" ? fixed.id : response }) };
+    });
+    const result = await convertRomajiToJapaneseDetailed("annwoonegasimasu.", defaultSettings, h.transport, {
+      compareRepairsEarly: "compact", shortRepairId: true, kanaEngine: h.engine,
+    });
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe(response === "select" ? "案をお願いします。" : "案をおねがします。");
+  });
+
+  it("maps an alias for a contextual spelling back to its candidate", async () => {
+    const h = harness([
+      candidate("案をおねがします", "mozc", "あんをおねがします"),
+      candidate("餡をおねがします", "mozc", "あんをおねがします"),
+      candidate("案をお願いします", "mozc", "あんをおねがいします"),
+    ]);
+    h.generate.mockImplementation(async (_provider, _url, request) => {
+      const prompt = JSON.parse(request.prompt);
+      const normal = prompt.candidates.find((c: { kind: string }) => c.kind === "conversion");
+      expect(normal.alternativeSpellings).toEqual([{ id: expect.stringMatching(/^[a-f]$/u), text: "餡をおねがします。" }]);
+      return { response: JSON.stringify({ c: normal.alternativeSpellings[0].id }) };
+    });
+    const result = await convertRomajiToJapaneseDetailed("annwoonegasimasu.", defaultSettings, h.transport, {
+      compareRepairsEarly: "compact", shortRepairId: true, kanaEngine: h.engine, contextBefore: "和菓子を作ります。",
+    });
+    expect(result.text).toBe("餡をおねがします。");
+  });
 });

@@ -23,6 +23,7 @@ const { values: args } = parseArgs({ options: {
   "probe-all-normal": { type: "boolean" },
   "compare-repairs-early": { type: "boolean" },
   "compact-repairs": { type: "boolean" },
+  "compare-short-repair-id": { type: "boolean" },
 } });
 
 if (args.help) {
@@ -33,6 +34,7 @@ if (args.help) {
   --probe-all-normal          Use the broad trigger in the experimental arm of that comparison.
   --compare-repairs-early    Compare normal and one-key repairs in the first ranking request.
   --compact-repairs          Use the shorter shortlist and dictionary budget for the early comparison.
+  --compare-short-repair-id  Pair compact first-pass rankings using full and short-ID responses.
   --dataset tests/evaluation/holdout.json
   --repeats 3  --seed 20260922  --case basic-01,basic-02
   --out test-results/evaluation/NEW_DIRECTORY  --dry-run
@@ -49,11 +51,14 @@ async function main() {
   );
   if (!["ollama", "lmstudio"].includes(args.provider)) throw new Error("Invalid provider");
   if (!["hybrid", "local"].includes(args.engine)) throw new Error("Invalid engine");
-  const compare = Boolean(args["compare-typo-speculation"] || args["compare-repairs-early"]);
+  const shortId = Boolean(args["compare-short-repair-id"]);
+  const compare = Boolean(args["compare-typo-speculation"] || args["compare-repairs-early"] || shortId);
+  if (shortId && (args["compare-typo-speculation"] || args["compare-repairs-early"])) throw new Error("Select one comparison");
   if (args["probe-all-normal"] && !args["compare-typo-speculation"]) throw new Error("The broad trigger requires --compare-typo-speculation");
   if (args["compare-typo-speculation"] && args["compare-repairs-early"]) throw new Error("Select one comparison");
   if (args["compact-repairs"] && !args["compare-repairs-early"]) throw new Error("Compact repairs requires --compare-repairs-early");
-  const experimentalVariant = args["compare-repairs-early"]
+  const controlVariant = shortId ? "early-compact" : "current";
+  const experimentalVariant = shortId ? "early-short-id" : args["compare-repairs-early"]
     ? args["compact-repairs"] ? "early-compact" : "early-repair"
     : args["probe-all-normal"] ? "all-normal" : "experimental";
   if (compare && args.engine !== "hybrid") throw new Error("Typo speculation comparison requires the hybrid engine");
@@ -118,7 +123,7 @@ async function main() {
       for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       for (const c of order) {
         if (!compare) { schedule.push({ caseId: c.id, repeat }); continue; }
-        const variants = random() < 0.5 ? ["current", experimentalVariant] : [experimentalVariant, "current"];
+        const variants = random() < 0.5 ? [controlVariant, experimentalVariant] : [experimentalVariant, controlVariant];
         for (const variant of variants) schedule.push({ caseId: c.id, repeat, variant });
       }
     }
@@ -184,7 +189,8 @@ async function main() {
       const started = performance.now();
       const options = compare ? { ...c.options, autoSpeculation: true,
         typoSpeculation: trial.variant === "all-normal" ? "all-normal" : trial.variant === "experimental" ? "suspected" : undefined,
-        compareRepairsEarly: trial.variant === "early-compact" ? "compact" : trial.variant === "early-repair" ? "full" : undefined,
+        compareRepairsEarly: trial.variant === "early-compact" || trial.variant === "early-short-id" ? "compact" : trial.variant === "early-repair" ? "full" : undefined,
+        shortRepairId: trial.variant === "early-short-id",
       } : c.options;
       const row = { ...trial, category: c.category, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options };
       row.firstDictionaryCandidateMs = null;

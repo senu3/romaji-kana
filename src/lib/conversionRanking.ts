@@ -55,10 +55,16 @@ export async function rankConversionSession(session: ConversionSession, settings
     const hasContext = Boolean(options.contextBefore?.trim() || options.contextAfter?.trim());
     const contextualIds = correcting && hasContext
       ? rankedGroups.flatMap(group => group.slice(1).map(candidate => candidate.id)) : [];
+    const shortId = options.shortRepairId && options.repairBaseline && options.compareRepairsEarly === "compact";
+    const aliases = new Map(shortId ? [...rankableIds, ...contextualIds].map((id, i) => [id, String.fromCharCode(97 + i)]) : []);
+    const candidateId = (id: string) => shortId ? aliases.get(id)! : id;
     try {
       const response = await transport.generate(settings.modelProvider, currentProviderBaseUrl(settings), {
         model: settings.modelName, stream: false, think: false, keep_alive: "5m", options: { temperature: 0 },
-        outputSchema: {
+        outputSchema: shortId ? {
+          type: "object", properties: { c: { type: "string", enum: [...aliases.values(), "-"] } },
+          required: ["c"], additionalProperties: false,
+        } : {
           type: "object", properties: {
             order: {
               type: "array", items: {
@@ -77,31 +83,48 @@ export async function rankConversionSession(session: ConversionSession, settings
             "Reject implausible words, broken grammar, unwanted completion, and changes of meaning, negation or tense. "
             : "The candidates preserve a fixed input reading and their dictionary paths have been checked. ") +
           (correcting
-            ? "Each top-level candidate represents one reading. Rank the readings using the top-level IDs in order. Its text is the dictionary's default spelling. Consider alternative spellings as evidence for the reading. "
+            ? "Each top-level candidate represents one reading. " +
+              (shortId ? "" : "Rank the readings using the top-level IDs in order. ") +
+              "Its text is the dictionary's default spelling. Consider alternative spellings as evidence for the reading. "
             : "Rank the supplied spellings, using their dictionary order as the default. ") +
-          "Return JSON with order (up to three exact top-level IDs, best first, without duplicates) and repairNeeded. " +
-          (contextualIds.length ? "Set contextualSpelling to one alternative ID of the first ranked reading only when before/after context clearly supports that spelling. Otherwise set it to null. " : "") +
+          (shortId
+            ? 'Return JSON with only c: the best supplied ID, or "-" if none is plausible. ' +
+              (contextualIds.length ? "Choose an alternative spelling ID only when before/after context clearly supports it for the best reading. " : "")
+            : "Return JSON with order (up to three exact top-level IDs, best first, without duplicates) and repairNeeded. " +
+              (contextualIds.length ? "Set contextualSpelling to one alternative ID of the first ranked reading only when before/after context clearly supports that spelling. Otherwise set it to null. " : "")) +
           "Preserve the supplied spellings. Hiragana is conventional for many words and grammatical expressions. " +
           "Only prefer a different spelling over the best localRank when the text or context supports it. " +
-          "If no candidate is a plausible natural rendering of this input, return an empty order; the application will try typo correction. " +
+          (shortId ? "" : "If no candidate is a plausible natural rendering of this input, return an empty order; the application will try typo correction. ") +
           "Do not invent text or infer missing facts. " +
-          "For fixed-reading candidates, set repairNeeded:true only when all offered spellings are unnatural and a small typing error is likely; keep the best unchanged candidate in order for comparison. Otherwise set repairNeeded:false. " +
+          (shortId ? "" : "For fixed-reading candidates, set repairNeeded:true only when all offered spellings are unnatural and a small typing error is likely; keep the best unchanged candidate in order for comparison. Otherwise set repairNeeded:false. ") +
           "When unchanged and edited candidates are offered together, first reject broken grammar in either group. Prefer unchanged when both are equally natural and plausible. Never repair merely to prefer a different wording.",
         prompt: JSON.stringify({
           reading, ...(correcting ? { originalInput: session.originalInput } : {}), before: options.contextBefore ?? "", after: options.contextAfter ?? "",
           vocabulary: options.documentVocabulary ?? [], candidates: rankedGroups.map(([c, ...alternatives], index) => ({
-            id: c.id, text: c.result.text, localRank: index + 1, cost: c.cost,
+            id: candidateId(c.id), text: c.result.text, localRank: index + 1, cost: c.cost,
             reading: c.result.reviewKana, kind: c.kind, ...(c.result.romajiCorrection ? { edit: c.result.romajiCorrection } : {}),
             personalPreference: learnedBonus(c.result.reviewKana, c.result.text),
             ...(alternatives.length ? { alternativeSpellings: alternatives.map(candidate => ({
-              text: candidate.result.text, ...(contextualIds.includes(candidate.id) ? { id: candidate.id } : {}),
+              text: candidate.result.text, ...(contextualIds.includes(candidate.id) ? { id: candidateId(candidate.id) } : {}),
             })) } : {}),
           }))
         }),
       }, 8_000, options.signal);
       throwIfConversionAborted(options.signal);
       let data: { order?: unknown; repairNeeded?: unknown; contextualSpelling?: unknown };
-      try { data = JSON.parse(stripThinkBlock(generatedText(response))); }
+      try {
+        const parsed = JSON.parse(stripThinkBlock(generatedText(response)));
+        if (shortId) {
+          if (!parsed || Object.keys(parsed).length !== 1 || typeof parsed.c !== "string") return invalidCorrectionRanking();
+          const selected = [...aliases].find(([, alias]) => alias === parsed.c)?.[0];
+          if (parsed.c === "-") data = { order: [] };
+          else if (!selected) return invalidCorrectionRanking();
+          else {
+            const group = rankedGroups.find(group => group.some(candidate => candidate.id === selected))!;
+            data = { order: [group[0].id], contextualSpelling: selected === group[0].id ? undefined : selected };
+          }
+        } else data = parsed;
+      }
       catch (error) {
         if (correcting) return invalidCorrectionRanking();
         throw error;
