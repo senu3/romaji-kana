@@ -16,11 +16,11 @@ describe("explicit speculative candidate session", () => {
     const result = await convertRomajiToJapaneseDetailed("onegaismasu.", defaultSettings, h.transport, h.options);
     expect(result.session?.candidates.map(c => c.result.text)).toEqual(["おねがいします。"]);
   });
-  it("discards all-hiragana proposals while retaining mixed-script alternatives", async () => {
+  it("keeps a valid hiragana proposal alongside mixed-script alternatives", async () => {
     const h = setup([proposal("おねがいします。", "おねがいします。"), proposal("お願いします。", "おねがいします。")]);
     const result = await convertRomajiToJapaneseDetailed("onegaismasu.", defaultSettings, h.transport, h.options);
-    expect(result.text).toBe("お願いします。");
-    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["お願いします。"]);
+    expect(result.text).toBe("おねがいします。");
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["おねがいします。", "お願いします。"]);
   });
   it.each([
     null,

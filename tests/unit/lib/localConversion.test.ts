@@ -23,16 +23,15 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
-  it("filters all-hiragana spellings before publishing or ranking normal candidates", async () => {
+  it("keeps the dictionary's first spelling for nanode in the candidate list", async () => {
     const h = harness();
-    h.search.mockResolvedValue({ candidates: [candidate("きしゃ"), candidate("記者"), candidate("汽車")],
+    h.search.mockResolvedValue({ candidates: [candidate("なので", "なので", 3988), candidate("無ので", "なので", 6922)],
       truncated: false, dictionaryRevision: "test" });
-    const onLocalCandidates = vi.fn();
-    await convertRomajiToJapaneseDetailed("kisha", defaultSettings, h.transport, {
-      kanaEngine: h.engine, onLocalCandidates,
-    });
-    expect(onLocalCandidates.mock.calls[0][0].session.candidates.map((c: { result: { text: string } }) => c.result.text)).toEqual(["汽車", "記者"]);
-    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).candidates.map((c: { text: string }) => c.text)).toEqual(["記者", "汽車"]);
+    h.generate.mockResolvedValue({ response: '{"order":["candidate-0"]}' });
+    const result = await convertRomajiToJapaneseDetailed("nanode", defaultSettings, h.transport, { kanaEngine: h.engine });
+    expect(result.text).toBe("なので");
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["なので", "無ので"]);
+    expect(JSON.parse(h.generate.mock.calls[0][2].prompt).candidates[0]).toMatchObject({ text: "なので", localRank: 1 });
   });
   it.each(["hon\nwo\nyomu", "hon\n wo \nyomu", "本\nwo\nyomu", "hon\r\nwo\r\nyomu", "hon\rwo\ryomu"])("preserves line breaks around particles: %s", async input => {
     const h = harness();

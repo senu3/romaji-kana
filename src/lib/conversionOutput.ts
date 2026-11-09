@@ -2,18 +2,6 @@ export function comparableCharacters(value: string): string[] {
   return Array.from(value).filter((character) => !/\s/u.test(character));
 }
 
-/** Punctuation, spaces and decorative symbols do not make a kana-only spelling useful. */
-export function isAllHiraganaOutput(value: string): boolean {
-  const text = value.normalize("NFC");
-  return /\p{Script=Hiragana}/u.test(text) && /^[\p{Script=Hiragana}\p{M}ー\s\p{P}\p{S}]+$/u.test(text);
-}
-
-/** Keep one kana-only fallback only when no other spelling is available. */
-export function filterHiraganaCandidates<T>(candidates: T[], output: (candidate: T) => string): T[] {
-  const alternatives = candidates.filter(candidate => !isAllHiraganaOutput(output(candidate)));
-  return alternatives.length ? alternatives : candidates.slice(0, 1);
-}
-
 function isSubsequence(source: string[], candidate: string[]): boolean {
   let sourceIndex = 0;
   for (const character of candidate) {

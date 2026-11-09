@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConversionOutput, isRejectedSurfaceVariant, isAllHiraganaOutput } from "../../../src/lib/conversionOutput";
-
-describe("all-hiragana output", () => {
-  it.each(["おねがいします", "おねがいします。", " ありがとう！\n", "えーっと…", "か\u3099んは\u3099って", "「よろしく」😊"])("excludes %s", text => {
-    expect(isAllHiraganaOutput(text)).toBe(true);
-  });
-  it.each(["お願いします", "ファイル", "ファイルをひらく", "10じです", "APIをつかう", "", "。"])("keeps other output: %s", text => {
-    expect(isAllHiraganaOutput(text)).toBe(false);
-  });
-});
+import { parseConversionOutput, isRejectedSurfaceVariant } from "../../../src/lib/conversionOutput";
 
 describe("current structured output contract", () => {
   it("allows an explicit abstention as well as a text and reading pair", () => {

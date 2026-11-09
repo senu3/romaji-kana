@@ -158,9 +158,12 @@ export function romajiToKana(input: string): RomajiKanaResult {
 
     if (!/[a-z]/.test(char)) {
       const kind = /[\s。、.,!?！？]/u.test(originalChar) ? "punctuation" : "exact";
+      const isLongVowel = originalChar === "-" &&
+        /[ぁ-ゖァ-ヶー]$/u.test(tokens[tokens.length - 1]?.kana ?? "") &&
+        !/\d/u.test(input[index + 1] ?? "");
       kanaOffset = pushToken(tokens, {
         romaji: originalChar,
-        kana: originalChar,
+        kana: isLongVowel ? "ー" : originalChar,
         inputFrom: index,
         inputTo: index + 1,
         kanaFrom: kanaOffset,

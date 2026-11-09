@@ -35,11 +35,11 @@ describe("single romaji edit correction", () => {
     expect(result).toMatchObject({ text: "おねがいします", conversionStrategy: "correction" });
     expect(result.session?.candidates.map(c => c.result.text)).toEqual(["おねがいします"]);
   });
-  it("excludes all-hiragana spellings before ranking a missing i in onegaismasu", async () => {
+  it.each([false, true])("ranks the repaired reading separately from contextual spelling (context: %s)", async withContext => {
     const { engine, transport } = harness();
     vi.mocked(engine.search).mockImplementation(async reading => ({
       dictionaryRevision: "test", truncated: false,
-      candidates: reading === "おねがいします" ? ["おねがいします", "お願いします"].map((text, index) => ({
+      candidates: reading === "おねがいします" ? ["お願いします", "おねがいします"].map((text, index) => ({
         text, reading, cost: 100 + index, tokens: [{ text, reading, from: 0, to: [...reading].length,
           source: "mozc" as const, entryId: text, lid: 0, rid: 0, wordCost: 100 + index }],
       })) : [],
@@ -47,12 +47,19 @@ describe("single romaji edit correction", () => {
     transport.generate.mockImplementation(async (_provider, _url, request) => {
       const { candidates } = JSON.parse(request.prompt);
       expect(candidates.map((c: { text: string }) => c.text)).toEqual(["お願いします"]);
-      return { response: JSON.stringify({ order: [candidates[0].id], repairNeeded: false }) };
+      expect(candidates[0].alternativeSpellings).toEqual([
+        withContext ? { id: "repair-1", text: "おねがいします" } : { text: "おねがいします" },
+      ]);
+      return { response: JSON.stringify({ order: [candidates[0].id], repairNeeded: false,
+        ...(withContext ? { contextualSpelling: candidates[0].alternativeSpellings[0].id } : {}) }) };
     });
-    const result = await convertRomajiToJapaneseDetailed("onegaismasu", defaultSettings, transport, { kanaEngine: engine });
-    expect(result).toMatchObject({ text: "お願いします", conversionStrategy: "correction",
+    const result = await convertRomajiToJapaneseDetailed("onegaismasu", defaultSettings, transport, {
+      kanaEngine: engine, contextBefore: withContext ? "ひらがなでかきます。" : undefined,
+    });
+    const spellings = withContext ? ["おねがいします", "お願いします"] : ["お願いします", "おねがいします"];
+    expect(result).toMatchObject({ text: spellings[0], conversionStrategy: "correction",
       romajiCorrection: { after: "onegaisimasu", inserted: "i" } });
-    expect(result.session?.candidates.map(c => c.result.text)).toEqual(["お願いします"]);
+    expect(result.session?.candidates.map(c => c.result.text)).toEqual(spellings);
   });
   it("automatically generates internal insertions and coalesces equal readings", () => {
     const { plans } = missingLetterReadings("jkan");
