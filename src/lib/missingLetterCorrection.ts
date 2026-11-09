@@ -24,13 +24,17 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
   throwIfConversionAborted(options.signal);
   const started = performance.now();
   const { parts, protection } = preparedInput;
+  const comparison = options.compareRepairsEarly;
+  const compact = comparison === "compact" && Boolean(options.repairBaseline);
+  const planLimit = compact ? 48 : MAX_PLANS;
+  const engineLimit = compact ? 48 : MAX_ENGINE_CALLS;
   const metrics = { generated: 0, searched: 0, engineCalls: 0, candidates: 0, truncated: false, searchMs: 0, elapsedMs: 0 };
   const pool: SessionCandidate[] = [];
   const cache = new Map<string, Awaited<ReturnType<typeof options.kanaEngine.search>>>();
   const engine = {
     ...options.kanaEngine, search: async (reading: string) => {
       throwIfConversionAborted(options.signal);
-      if (metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; return { candidates: [], truncated: true, dictionaryRevision: "" }; }
+      if (metrics.engineCalls >= engineLimit) { metrics.truncated = true; return { candidates: [], truncated: true, dictionaryRevision: "" }; }
       metrics.engineCalls++;
       const result = await options.kanaEngine!.search(reading, settings.personalDictionary ?? [], options.signal);
       metrics.truncated ||= result.truncated;
@@ -48,11 +52,24 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     });
     // Protected literals split the input into parts. Give later editable parts
     // the same opportunity to use the bounded dictionary budget.
-    const scheduled = queues.flatMap(({ partIndex, part, plans }) => plans.map((plan, round) => ({ partIndex, part, plan, round })))
-      .sort((a, b) => a.plan.distance - b.plan.distance || a.round - b.round || a.partIndex - b.partIndex);
+    const scheduled = queues.flatMap(({ partIndex, part, plans }) => plans.map((plan, round) => {
+      const inserts = plan.value.length > part.value.length;
+      const vowelOrN = /^[aiueon]$/u.test(plan.inserted);
+      // Try doubled keys and likely omissions before exhausting the short search.
+      let priority = comparison === "full" && inserts && !vowelOrN ? 1 : 0;
+      if (compact) {
+        const key = part.value[plan.offset];
+        const previousKey = part.value[plan.offset - 1];
+        const doubled = !plan.inserted && (key === previousKey || key === part.value[plan.offset + 1]);
+        const omitted = inserts && vowelOrN && /[aiueo]/u.test(previousKey ?? "") && /[b-df-hj-np-tv-z]/u.test(key);
+        priority = doubled ? 0 : omitted ? 1 : inserts && !vowelOrN ? 3 : 2;
+      }
+      return { partIndex, part, plan, round, priority };
+    })).sort((a, b) => a.plan.distance - b.plan.distance || a.priority - b.priority ||
+      a.round - b.round || a.partIndex - b.partIndex);
     for (const { partIndex, part, plan } of scheduled) {
       throwIfConversionAborted(options.signal);
-      if (metrics.searched >= MAX_PLANS || metrics.engineCalls >= MAX_ENGINE_CALLS) { metrics.truncated = true; break; }
+      if (metrics.searched >= planLimit || metrics.engineCalls >= engineLimit) { metrics.truncated = true; break; }
       metrics.searched++;
       const result = await convertLocally(input, settings, transport, {
         ...options, kanaEngine: engine, rerank: false,
@@ -88,7 +105,10 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     const baselineCandidate = baseline?.session?.candidates.find(c => c.id === baseline.session?.selectedId);
     const unchanged: SessionCandidate[] = baseline ? [{ id: "unchanged", kind: "conversion", cost: baselineCandidate?.cost,
       tokens: baselineCandidate?.tokens, result: { ...baseline, session: undefined, repairRequested: undefined } }] : [];
-    const retained = [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
+    const comparisonLimit = compact ? 3 : 6;
+    const retained = comparison && baseline?.session
+      ? [...baseline.session.candidates.slice(0, comparisonLimit), ...first.slice(0, comparisonLimit)]
+      : [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
     // Reserve the unchanged option without falsely labeling it the best local path.
     if (baseline) retained.sort((a, b) => (a.cost ?? Number.MAX_SAFE_INTEGER) - (b.cost ?? Number.MAX_SAFE_INTEGER));
     metrics.candidates = retained.length;

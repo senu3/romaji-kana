@@ -235,3 +235,26 @@ describe("experimental speculation after an unresolved comparison", () => {
     expect(h.engine.search).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("first-pass comparison of normal and one-key repairs", () => {
+  it.each([
+    ["annwoonegasimasu.", "あんをおねがします", "案をおねがします", "あんをおねがいします", "案をお願いします", "i"],
+    ["konoshiryouwokakkuninshimasu.", "このしりょうをかっくにんします", "この資料を各区にんします",
+      "このしりょうをかくにんします", "この資料を確認します", ""],
+  ])("compares both readings in a single model call for %s", async (input, source, unchanged, fixed, corrected, edit) => {
+    const h = harness([candidate(unchanged, "mozc", source), candidate(corrected, "mozc", fixed)]);
+    h.generate.mockImplementation(async (_provider, _url, request) => {
+      const prompt = JSON.parse(request.prompt);
+      expect(prompt.candidates).toEqual(expect.arrayContaining([
+        expect.objectContaining({ text: unchanged + "。", kind: "conversion" }),
+        expect.objectContaining({ text: corrected + "。", kind: "correction", edit: expect.objectContaining({ inserted: edit }) }),
+      ]));
+      return { response: JSON.stringify({ order: [prompt.candidates.find((c: { kind: string }) => c.kind === "correction").id], repairNeeded: false }) };
+    });
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
+      compareRepairsEarly: "compact", kanaEngine: h.engine,
+    });
+    expect(h.generate).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ text: corrected + "。", conversionStrategy: "correction" });
+  });
+});

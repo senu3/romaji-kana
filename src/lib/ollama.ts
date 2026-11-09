@@ -12,6 +12,7 @@ import { defaultKanaEngine } from "./kanaEngine";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings } from "./types";
 import { speculateAfterRepair } from "./typoSpeculation";
+import { searchMissingLetter } from "./missingLetterCorrection";
 
 export async function convertRomajiToJapaneseDetailed(input: string, settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport, options: JapaneseConversionOptions = {}): Promise<JapaneseConversionResult> {
@@ -73,6 +74,15 @@ async function convertWithinBudget(input: string, settings: AppSettings,
     if (!automatic || candidate.session?.rerankStatus === "pending" || isUsableConversionResult(candidate, options) || candidate.suggestionRejectedReason === "protected") return candidate;
     return rescue ??= runRescue(candidate);
   };
+  if (automatic && options.compareRepairsEarly && options.rerank !== false) {
+    const localOptions = { ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined };
+    const baseline = await runAttempt({ ...localOptions, rerank: false });
+    if (baseline.session && isUsableConversionResult(baseline, options)) {
+      const compared = await searchMissingLetter(input, settings, transport, { ...localOptions, repairBaseline: baseline }, preparedInput);
+      return compared && isUsableConversionResult(compared, options) ? compared : baseline;
+    }
+    return resolveNormal(baseline);
+  }
   const result = await resolveNormal(await runAttempt(automatic && options.onRankedCandidates ? {
     ...options,
     onRankedCandidates: async candidate => { const resolved = await resolveNormal(candidate); throwIfConversionAborted(options.signal); await options.onRankedCandidates?.(resolved); },
