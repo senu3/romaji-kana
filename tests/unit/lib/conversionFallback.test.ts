@@ -173,7 +173,7 @@ describe("experimental speculation after an unresolved comparison", () => {
   const input = "ashitanoyottei.";
   const original = "あしたのよってい";
   const corrected = "あしたのよてい";
-  const options = { autoSpeculation: true, speculateAfterUnresolvedRepair: true, missingLetterCorrection: false };
+  const options = { autoSpeculation: true, typoSpeculation: "suspected" as const, missingLetterCorrection: false };
 
   function suspectedTypo(...extra: EngineCandidate[]) {
     const h = harness([candidate("明日のよっ程", "mozc", original), candidate("明日のよってい", "mozc", original), ...extra]);
@@ -209,6 +209,16 @@ describe("experimental speculation after an unresolved comparison", () => {
     expect(result.text).toBe("明日のよっ程。");
     expect(h.generate).toHaveBeenCalledTimes(2);
     expect(h.engine.search).toHaveBeenCalledTimes(1);
+  });
+
+  it("probes an accepted candidate without a typo signal only in the broad arm", async () => {
+    for (const typoSpeculation of ["suspected", "all-normal"] as const) {
+      const h = harness([candidate("明日のよってい", "mozc", original)]);
+      h.generate.mockResolvedValueOnce(json("明日の予定。", corrected + "。"));
+      const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { ...options, typoSpeculation, kanaEngine: h.engine });
+      expect(result.text).toBe(typoSpeculation === "all-normal" ? "明日の予定。" : "明日のよってい。");
+      expect(h.generate).toHaveBeenCalledTimes(typoSpeculation === "all-normal" ? 1 : 0);
+    }
   });
 
   it("retains the user's selection when the session locks during speculation", async () => {

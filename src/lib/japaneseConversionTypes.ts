@@ -39,8 +39,8 @@ export interface JapaneseConversionOptions {
   autoRescue?: boolean;
   /** Explicit opt-in for automatic reinterpretation; normal requests stop after repair by default. */
   autoSpeculation?: boolean;
-  /** Evaluation only: try speculation when a suspected typo kept its normal reading. */
-  speculateAfterUnresolvedRepair?: boolean;
+  /** Evaluation only: compare narrow and broad triggers for normal candidates. */
+  typoSpeculation?: "suspected" | "all-normal";
   /** Search one romaji insertion, deletion, adjacent transposition or keyboard-neighbor replacement before model repair. */
   missingLetterCorrection?: boolean;
   onMissingLetterSearch?: (metrics: { generated: number; searched: number; engineCalls: number; candidates: number; truncated: boolean; searchMs: number; elapsedMs: number }) => void;

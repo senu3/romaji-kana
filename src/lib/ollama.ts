@@ -11,6 +11,7 @@ import type { JapaneseConversionOptions, JapaneseConversionResult } from "./japa
 import { defaultKanaEngine } from "./kanaEngine";
 import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings } from "./types";
+import { speculateAfterRepair } from "./typoSpeculation";
 
 export async function convertRomajiToJapaneseDetailed(input: string, settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport, options: JapaneseConversionOptions = {}): Promise<JapaneseConversionResult> {
@@ -63,6 +64,11 @@ async function convertWithinBudget(input: string, settings: AppSettings,
     if (automatic && candidate.repairRequested && candidate.session?.state === "open" && !candidate.session.locked) {
       const compared = await correctInput(input, settings, transport, { ...options, repairBaseline: candidate }, preparedInput);
       return candidate.session.locked || candidate.session.state !== "open" ? sessionResult(candidate.session) : compared;
+    }
+    if (automatic && options.autoSpeculation && options.typoSpeculation === "all-normal" &&
+        candidate.session?.rerankStatus !== "pending" && candidate.session?.rerankStatus !== "failed" &&
+        candidate.session?.rerankStatus !== "invalid" && isUsableConversionResult(candidate, options)) {
+      return speculateAfterRepair(input, settings, transport, { ...options, repairBaseline: candidate }, preparedInput, candidate);
     }
     if (!automatic || candidate.session?.rerankStatus === "pending" || isUsableConversionResult(candidate, options) || candidate.suggestionRejectedReason === "protected") return candidate;
     return rescue ??= runRescue(candidate);

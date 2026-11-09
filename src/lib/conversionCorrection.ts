@@ -24,7 +24,7 @@ export async function correctInput(input: string, settings: AppSettings, transpo
   if (options.repairBaseline) {
     const retained = searched && isUsableConversionResult(searched, options)
       ? searched : { ...options.repairBaseline, repairRequested: undefined };
-    if (options.speculateAfterUnresolvedRepair && options.autoSpeculation &&
+    if (options.typoSpeculation && options.autoSpeculation &&
         retained.conversionStrategy !== "correction" && searched?.rejectionDetail !== "ranking-invalid") {
       return speculateAfterRepair(input, settings, transport, correctionOptions, preparedInput, retained);
     }

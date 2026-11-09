@@ -20,6 +20,7 @@ const { values: args } = parseArgs({ options: {
   engine: { type: "string", default: "hybrid" },
   dataset: { type: "string", default: "tests/evaluation/cases.json" },
   "compare-typo-speculation": { type: "boolean" },
+  "probe-all-normal": { type: "boolean" },
 } });
 
 if (args.help) {
@@ -27,6 +28,7 @@ if (args.help) {
   --provider ollama|lmstudio  --url http://localhost:PORT
   --engine hybrid|local
   --compare-typo-speculation   Pair current and experimental rescue with automatic speculation enabled in both.
+  --probe-all-normal          Use the broad trigger in the experimental arm of that comparison.
   --dataset tests/evaluation/holdout.json
   --repeats 3  --seed 20260922  --case basic-01,basic-02
   --out test-results/evaluation/NEW_DIRECTORY  --dry-run
@@ -44,6 +46,8 @@ async function main() {
   if (!["ollama", "lmstudio"].includes(args.provider)) throw new Error("Invalid provider");
   if (!["hybrid", "local"].includes(args.engine)) throw new Error("Invalid engine");
   const compare = Boolean(args["compare-typo-speculation"]);
+  if (args["probe-all-normal"] && !compare) throw new Error("The broad trigger requires --compare-typo-speculation");
+  const experimentalVariant = args["probe-all-normal"] ? "all-normal" : "experimental";
   if (compare && args.engine !== "hybrid") throw new Error("Typo speculation comparison requires the hybrid engine");
   const repeats = Number(args.repeats), seed = Number(args.seed);
   if (!Number.isSafeInteger(repeats) || repeats < 1 || repeats > 100) throw new Error("repeats must be 1..100");
@@ -106,7 +110,7 @@ async function main() {
       for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
       for (const c of order) {
         if (!compare) { schedule.push({ caseId: c.id, repeat }); continue; }
-        const variants = random() < 0.5 ? ["current", "experimental"] : ["experimental", "current"];
+        const variants = random() < 0.5 ? ["current", experimentalVariant] : [experimentalVariant, "current"];
         for (const variant of variants) schedule.push({ caseId: c.id, repeat, variant });
       }
     }
@@ -170,7 +174,9 @@ async function main() {
       calls = [];
       engineCalls = [];
       const started = performance.now();
-      const options = compare ? { ...c.options, autoSpeculation: true, speculateAfterUnresolvedRepair: trial.variant === "experimental" } : c.options;
+      const options = compare ? { ...c.options, autoSpeculation: true,
+        typoSpeculation: trial.variant === "all-normal" ? "all-normal" : trial.variant === "experimental" ? "suspected" : undefined,
+      } : c.options;
       const row = { ...trial, category: c.category, phase: trial.repeat === 0 ? "warmup" : "measured", startedAt: new Date().toISOString(), input: c.input, settings: c.settings, options };
       row.firstDictionaryCandidateMs = null;
       row.rescueStartedMs = null;

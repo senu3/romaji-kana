@@ -31,7 +31,9 @@ export async function speculateAfterRepair(input: string, settings: AppSettings,
       const plan = missingLetterReadings(part.value).plans.find(candidate =>
         faithfulConversionRule.sameReading(before + candidate.reading + after, guess.reviewKana));
       if (!plan) continue;
-      const local = await convertLocally(input, settings, transport, options,
+      const local = await convertLocally(input, settings, transport, {
+        ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined,
+      },
         { correction: { partIndex, value: plan.value } }, prepared);
       if (original.state !== "open" || original.locked) return retained;
       if (!isUsableConversionResult(local, options) || !local.session) continue;
