@@ -146,6 +146,10 @@ const kanaMap: Record<string, string> = {
 const romanKeys = Object.keys(kanaMap).sort((a, b) => b.length - a.length);
 const consonants = new Set("bcdfghjklmnpqrstvwxyz".split(""));
 
+export function romajiSpellingsForKana(kana: string): string[] {
+  return romanKeys.filter(key => kanaMap[key] === kana).reverse();
+}
+
 export function romajiToKana(input: string): RomajiKanaResult {
   const lower = input.toLowerCase();
   const tokens: RomajiKanaToken[] = [];

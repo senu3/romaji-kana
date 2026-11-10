@@ -237,19 +237,30 @@ describe("experimental speculation after an unresolved comparison", () => {
 });
 
 describe("first-pass comparison of normal and one-key repairs", () => {
-  it.each([false, true])("repairs a standalone request before ranking (boundary=%s)", async boundary => {
+  it.each([
+    ["onegasimasu", "おねがします", "尾根", "おね", "がします", "がします", "i", false],
+    ["onegasimasu", "おねがします", "尾根", "おね", "がします", "がします", "i", true],
+    ["onegaimasu", "おねがいます", "お願い", "おねがい", "ます", "ます", "si", false],
+    ["onegaimasu", "おねがいます", "お願い", "おねがい", "ます", "ます", "si", true],
+  ] as const)("repairs a standalone request before ranking (%s, %s, %s, %s, %s, %s, %s, boundary=%s)",
+    async (input, reading, prefix, prefixReading, suffix, suffixReading, inserted, boundary) => {
+    const normal = candidate(prefix + suffix, "mozc", reading);
+    normal.tokens = [
+      { ...normal.tokens[0], text: prefix, reading: prefixReading, to: prefixReading.length },
+      { ...normal.tokens[0], text: suffix, reading: suffixReading, from: prefixReading.length },
+    ];
     const h = harness([
-      candidate("尾根がします", "mozc", "おねがします"),
+      normal,
       candidate("お願いします", "mozc", "おねがいします"),
     ]);
     const publish = vi.fn();
     const queue = vi.fn();
-    const result = await convertRomajiToJapaneseDetailed("onegasimasu", defaultSettings, h.transport, {
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
       repairStandaloneRequests: true, kanaEngine: h.engine,
       ...(boundary ? { compareRepairsEarly: "compact", shortRepairId: true, decisionDeadline: Date.now() + 500,
         onRankedCandidates: publish, deferRanking: queue } : { rerank: false, autoRescue: false }),
     });
-    expect(result).toMatchObject({ text: "お願いします", conversionStrategy: "correction", romajiCorrection: { inserted: "i" } });
+    expect(result).toMatchObject({ text: "お願いします", conversionStrategy: "correction", romajiCorrection: { inserted } });
     expect(h.engine.search).toHaveBeenCalledTimes(2);
     expect(h.generate).not.toHaveBeenCalled();
     expect(queue).not.toHaveBeenCalled();
@@ -259,6 +270,7 @@ describe("first-pass comparison of normal and one-key repairs", () => {
   it.each([
     ["onegaisimasu", "お願いします", "おねがいします", "mozc"],
     ["okusuriwonomimasu", "お薬を飲みます", "おくすりをのみます", "mozc"],
+    ["kusai", "臭い", "くさい", "mozc"],
     ["onegasimasu", "登録語", "おねがします", "user"],
   ])("preserves ordinary readings and personal dictionary entries (%s)", async (input, text, reading, source) => {
     const h = harness([candidate(text, source, reading)]);

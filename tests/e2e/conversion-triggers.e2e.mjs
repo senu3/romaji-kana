@@ -65,19 +65,32 @@ try {
     assert.equal(await editor.innerText(), 'hon.', 'Boundary replacement is one undo step');
   });
   await scenario({ conversionMode: 'replace' }, async (page, editor) => {
-    const entries = new Map([['おねがします', '尾根がします'], ['おねがいします', 'お願いします']]);
+    const entries = new Map([
+      ['おねがします', [['尾根', 'おね'], ['がします', 'がします']]],
+      ['おねがいます', [['お願い', 'おねがい'], ['ます', 'ます']]],
+      ['おねがいします', [['お願いします', 'おねがいします']]],
+    ]);
     await page.route('**/api/kana-engine', route => {
       const { reading } = route.request().postDataJSON();
-      const text = entries.get(reading);
-      return route.fulfill({ json: { candidates: text ? [{ text, reading, cost: 100,
-        tokens: [{ text, reading, from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }] : [],
+      const words = entries.get(reading);
+      let offset = 0;
+      return route.fulfill({ json: { candidates: words ? [{ text: words.map(([text]) => text).join(''), reading, cost: 100,
+        tokens: words.map(([text, kana]) => {
+          const from = offset;
+          offset += kana.length;
+          return { text, reading: kana, from, to: offset, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 };
+        }) }] : [],
       dictionaryRevision: 'test', truncated: false } });
     });
-    await page.keyboard.type('onegasimasu');
-    await page.locator('.cm-ghost-text-suggestion').filter({ hasText: /^お願いします$/ }).waitFor();
-    assert.equal(await editor.locator('.cm-ghost-source').textContent(), 'onegasimasu');
-    await page.keyboard.type('.tugi');
-    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'お願いします。tugi');
+    for (const input of ['onegasimasu', 'onegaimasu']) {
+      await page.keyboard.press('Control+A');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(input);
+      await page.locator('.cm-ghost-text-suggestion').filter({ hasText: /^お願いします$/ }).waitFor();
+      assert.equal(await editor.locator('.cm-ghost-source').textContent(), input);
+      await page.keyboard.type('.tugi');
+      await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'お願いします。tugi');
+    }
   });
   await scenario({ conversionMode: 'replace', triggers: { typing: false } }, async (page, editor) => {
     const entries = new Map([['あんをおねがします', '案をおねがします'], ['あんをおねがいします', '案をお願いします']]);

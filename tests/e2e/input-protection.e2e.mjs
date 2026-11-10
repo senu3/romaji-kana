@@ -48,6 +48,7 @@ try {
     [String.raw`docs\Sample.psd wo hiraku.`, String.raw`docs\Sample.psdを開く。`],
     ['`docs\\Sample\\`wohiraku.', 'docs\\Sample\\を開く。'],
     ['PSDfariu', 'PSDファイル'],
+    ['kusai', '臭い'],
   ]) {
     expected = output;
     await enter(input);
@@ -57,12 +58,14 @@ try {
     assert.equal(await ghost.count(), 0);
     console.log('converted', JSON.stringify(input), '=>', JSON.stringify(output));
   }
-  const beforeStandalone = calls;
-  await enter('onegasimasu');
-  await ghost.filter({ hasText: /^お願いします$/ }).waitFor();
-  assert.equal(calls, beforeStandalone, 'A verified standalone request does not wait for model ranking');
-  await page.keyboard.press('Alt+Enter');
-  assert.equal(await documentText(), 'お願いします');
+  for (const input of ['onegasimasu', 'onegaimasu']) {
+    const beforeStandalone = calls;
+    await enter(input);
+    await ghost.filter({ hasText: /^お願いします$/ }).waitFor();
+    assert.equal(calls, beforeStandalone, 'A verified standalone request does not wait for model ranking');
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await documentText(), 'お願いします');
+  }
   for (const input of ['ASHITA', 'PSD', String.raw`docs\Sample.psd`]) {
     const before = calls;
     await enter(input);
