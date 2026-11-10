@@ -64,6 +64,21 @@ try {
     await page.keyboard.press('Control+z');
     assert.equal(await editor.innerText(), 'hon.', 'Boundary replacement is one undo step');
   });
+  await scenario({ conversionMode: 'replace' }, async (page, editor) => {
+    const entries = new Map([['おねがします', '尾根がします'], ['おねがいします', 'お願いします']]);
+    await page.route('**/api/kana-engine', route => {
+      const { reading } = route.request().postDataJSON();
+      const text = entries.get(reading);
+      return route.fulfill({ json: { candidates: text ? [{ text, reading, cost: 100,
+        tokens: [{ text, reading, from: 0, to: [...reading].length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 100 }] }] : [],
+      dictionaryRevision: 'test', truncated: false } });
+    });
+    await page.keyboard.type('onegasimasu');
+    await page.locator('.cm-ghost-text-suggestion').filter({ hasText: /^お願いします$/ }).waitFor();
+    assert.equal(await editor.locator('.cm-ghost-source').textContent(), 'onegasimasu');
+    await page.keyboard.type('.tugi');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'お願いします。tugi');
+  });
   await scenario({ conversionMode: 'replace', triggers: { typing: false } }, async (page, editor) => {
     const entries = new Map([['あんをおねがします', '案をおねがします'], ['あんをおねがいします', '案をお願いします']]);
     await page.route('**/api/kana-engine', route => {

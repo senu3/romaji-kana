@@ -8,16 +8,20 @@ export const BOUNDARY_DECISION_MS = 500;
 
 /** A queued comparison can improve the decision up to the deadline. Only
  * work already running at the deadline can produce a late review candidate. */
-export async function deferConversionDecision(preparing: Promise<JapaneseConversionResult>, unavailable: JapaneseConversionResult,
+export async function deferConversionDecision(prepare: (remember: (result: JapaneseConversionResult) => void) => Promise<JapaneseConversionResult>,
+  unavailable: JapaneseConversionResult,
   compare: (baseline: JapaneseConversionResult) => Promise<JapaneseConversionResult>, options: JapaneseConversionOptions): Promise<JapaneseConversionResult> {
   const { decisionDeadline, deferRanking, onRankedCandidates, onLateCandidates, signal } = options;
-  if (decisionDeadline === undefined || !deferRanking || !onRankedCandidates) return compare(await preparing);
+  if (decisionDeadline === undefined || !deferRanking || !onRankedCandidates) return compare(await prepare(() => {}));
   let baseline = unavailable;
-  let decided = false;
+  let decision: JapaneseConversionResult | undefined;
   const publish = (result: JapaneseConversionResult) => {
-    if (decided || signal?.aborted) return;
-    decided = true;
+    if (decision || signal?.aborted) return;
+    decision = result;
     void onRankedCandidates(result);
+  };
+  const review = (result: JapaneseConversionResult) => {
+    if (!signal?.aborted && !result.suggestionRejected && result.text.trim() && result.text !== decision?.text) onLateCandidates?.(result);
   };
   const fallback = () => publish(baseline);
   const timer = setTimeout(fallback, Math.max(0, decisionDeadline - Date.now()));
@@ -28,27 +32,34 @@ export async function deferConversionDecision(preparing: Promise<JapaneseConvers
   signal?.addEventListener("abort", clear, { once: true });
   if (Date.now() >= decisionDeadline) fallback();
   try {
-    const prepared = await preparing;
+    const prepared = await prepare(result => {
+      if (Date.now() < decisionDeadline) baseline = result;
+    });
     if (Date.now() >= decisionDeadline) fallback();
     baseline = prepared;
-    if (decided || signal?.aborted) {
-      if (!signal?.aborted && !baseline.suggestionRejected && baseline.text.trim()) onLateCandidates?.(baseline);
+    if (decision || signal?.aborted) {
+      review(baseline);
       clear();
       return baseline;
     }
   } catch (error) {
     clear();
-    if (signal?.aborted || !decided) throw error;
+    if (signal?.aborted || !decision) throw error;
+    return baseline;
+  }
+  if (baseline.conversionStrategy === "correction") {
+    clear();
+    publish(baseline);
     return baseline;
   }
   deferRanking(async () => {
     try {
-      if (decided || Date.now() >= decisionDeadline || signal?.aborted) { fallback(); return; }
+      if (decision || Date.now() >= decisionDeadline || signal?.aborted) { fallback(); return; }
       const result = await compare(baseline);
       if (signal?.aborted) return;
       if (Date.now() >= decisionDeadline) fallback();
-      if (!decided) publish(result);
-      else if (!result.suggestionRejected && result.text.trim() && result.text !== baseline.text) onLateCandidates?.(result);
+      if (!decision) publish(result);
+      else review(result);
     } catch {
       if (!signal?.aborted) fallback();
     } finally { clear(); }

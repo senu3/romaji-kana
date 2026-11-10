@@ -1,6 +1,8 @@
 import { preservesProtectedContent } from "./conversionProtection";
 import { normalizeReading } from "./readingComparison";
 
+export const politeRequestReadings = ["ください", "おねがいします", "おねがいいたします"] as const;
+
 /** Generation guidance and executable limits live together. Semantic guidance
  * is deliberately separate: a character guard cannot prove intended meaning. */
 

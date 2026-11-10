@@ -1,4 +1,5 @@
 import { normalizeReading } from "./readingComparison";
+import { politeRequestReadings } from "./conversionRules";
 
 // Deliberately narrow: compare recognized predicates, not occurrences of ない
 // inside arbitrary nouns. Unknown paraphrases remain unproven and require acceptance.
@@ -20,6 +21,9 @@ function predicate(reading: string) {
 export function hasSemanticConflict(source: string, output: string): boolean {
   const a = predicate(source), b = predicate(output);
   if (a && b && a.family === b.family && (a.positive !== b.positive || a.past !== b.past)) return true;
-  const request = (s: string) => /(?:ください|おねがいします|おねがいいたします)[。.!?！？\s]*$/u.test(normalizeReading(s));
+  const request = (s: string) => {
+    const body = normalizeReading(s).replace(/[。.!?！？]+$/u, "");
+    return politeRequestReadings.some(reading => body.endsWith(reading));
+  };
   return request(source) && !request(output);
 }

@@ -88,7 +88,7 @@ describe("boundary decision", () => {
     const compare = vi.fn();
     const decide = vi.fn();
     let queued!: () => Promise<void>;
-    await deferConversionDecision(Promise.resolve(normal), { text: "", reviewKana: "ほん" }, compare, {
+    await deferConversionDecision(async () => normal, { text: "", reviewKana: "ほん" }, compare, {
       decisionDeadline: Date.now() + BOUNDARY_DECISION_MS,
       deferRanking: run => { queued = run; },
       onRankedCandidates: decide,
@@ -108,7 +108,7 @@ describe("boundary decision", () => {
     const decide = vi.fn();
     const late = vi.fn();
     const compare = vi.fn();
-    const result = deferConversionDecision(prepare, unavailable, compare, {
+    const result = deferConversionDecision(() => prepare, unavailable, compare, {
       decisionDeadline: Date.now() + BOUNDARY_DECISION_MS,
       deferRanking: vi.fn(),
       onRankedCandidates: decide,
@@ -120,5 +120,26 @@ describe("boundary decision", () => {
     await result;
     expect(compare).not.toHaveBeenCalled();
     expect(late).toHaveBeenCalledExactlyOnceWith(normal);
+  });
+
+  it("uses the remembered normal candidate if a local correction is still pending at the deadline", async () => {
+    const normal = { text: "尾根がします", reviewKana: "おねがします" };
+    const correction = { text: "お願いします", reviewKana: "おねがいします", conversionStrategy: "correction" as const };
+    let finish!: (result: typeof correction) => void;
+    const prepare = new Promise<typeof correction>(resolve => { finish = resolve; });
+    const decide = vi.fn();
+    const late = vi.fn();
+    const queue = vi.fn();
+    const result = deferConversionDecision(remember => { remember(normal); return prepare; },
+      { text: "", reviewKana: "", suggestionRejected: true }, vi.fn(), {
+        decisionDeadline: Date.now() + BOUNDARY_DECISION_MS, deferRanking: queue,
+        onRankedCandidates: decide, onLateCandidates: late,
+      });
+    await vi.advanceTimersByTimeAsync(BOUNDARY_DECISION_MS);
+    expect(decide).toHaveBeenCalledExactlyOnceWith(normal);
+    finish(correction);
+    await result;
+    expect(late).toHaveBeenCalledExactlyOnceWith(correction);
+    expect(queue).not.toHaveBeenCalled();
   });
 });

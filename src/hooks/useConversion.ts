@@ -487,7 +487,7 @@ export function useConversion({
         anchor, deferRanking: deferRanking(request.id, request),
         onLocalCandidates: boundary ? undefined : applyConversion, onRankedCandidates: applyConversion,
         ...(boundary ? {
-          compareRepairsEarly: "compact" as const, shortRepairId: true,
+          compareRepairsEarly: "compact" as const, shortRepairId: true, repairStandaloneRequests: true,
           decisionDeadline: request.createdAt + BOUNDARY_DECISION_MS, onLateCandidates: retainLateCandidate,
         } : {}),
         onRescueStart: () => {
@@ -943,6 +943,7 @@ export function useConversion({
             documentVocabulary: request.documentVocabulary, kanaEngine: defaultKanaEngine,
             rerank: false,
             autoRescue: false,
+            repairStandaloneRequests: true,
             signal: requestsRef.current.get(request.id)?.controller.signal,
           },
         );

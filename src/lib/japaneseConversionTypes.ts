@@ -45,6 +45,8 @@ export interface JapaneseConversionOptions {
   compareRepairsEarly?: "full" | "compact";
   /** Return one short candidate ID in the first-pass comparison. */
   shortRepairId?: boolean;
+  /** Check a complete fixed request expression locally before model ranking. */
+  repairStandaloneRequests?: boolean;
   /** Absolute editor deadline. A decision after it is review-only. */
   decisionDeadline?: number;
   onLateCandidates?: (result: JapaneseConversionResult) => void;

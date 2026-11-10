@@ -13,6 +13,7 @@ import { defaultOllamaTransport, type OllamaTransport } from "./ollamaProxy";
 import type { AppSettings } from "./types";
 import { speculateAfterRepair } from "./typoSpeculation";
 import { searchMissingLetter } from "./missingLetterCorrection";
+import { repairStandaloneRequest, standaloneRequestPlan } from "./standaloneRequestRepair";
 
 export async function convertRomajiToJapaneseDetailed(input: string, settings: AppSettings,
   transport: OllamaTransport = defaultOllamaTransport, options: JapaneseConversionOptions = {}): Promise<JapaneseConversionResult> {
@@ -74,15 +75,24 @@ async function convertWithinBudget(input: string, settings: AppSettings,
     if (!automatic || candidate.session?.rerankStatus === "pending" || isUsableConversionResult(candidate, options) || candidate.suggestionRejectedReason === "protected") return candidate;
     return rescue ??= runRescue(candidate);
   };
-  if (automatic && options.compareRepairsEarly && options.rerank !== false) {
+  const earlyComparison = automatic && options.compareRepairsEarly && options.rerank !== false;
+  const fixedRequest = options.purpose === "normal" && options.repairStandaloneRequests && options.missingLetterCorrection !== false
+    ? standaloneRequestPlan(preparedInput) : undefined;
+  if (earlyComparison || fixedRequest) {
     const localOptions = { ...options, deferRanking: undefined, onLocalCandidates: undefined, onRankedCandidates: undefined };
-    const preparing = runAttempt({ ...localOptions, rerank: false });
+    const dictionaryOptions = { ...localOptions, rerank: false };
+    const prepare = async (remember: (result: JapaneseConversionResult) => void) => {
+      const baseline = await runAttempt(dictionaryOptions);
+      remember(baseline);
+      return fixedRequest ? repairStandaloneRequest(preparedInput, fixedRequest, baseline, settings, transport, dictionaryOptions) : baseline;
+    };
     const compare = async (baseline: JapaneseConversionResult) => {
+      if (!earlyComparison || baseline.conversionStrategy === "correction") return baseline;
       if (!baseline.session || !isUsableConversionResult(baseline, options)) return resolveNormal(baseline);
       const compared = await searchMissingLetter(input, settings, transport, { ...localOptions, repairBaseline: baseline }, preparedInput);
       return compared && isUsableConversionResult(compared, options) ? compared : baseline;
     };
-    return deferConversionDecision(preparing, {
+    return deferConversionDecision(prepare, {
       text: "", reviewKana: preparedInput.sourceReading, suggestionRejected: true,
       suggestionRejectedReason: "unconvertible", rejectionDetail: "no-candidate",
     }, compare, options);

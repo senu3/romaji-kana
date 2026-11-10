@@ -237,6 +237,39 @@ describe("experimental speculation after an unresolved comparison", () => {
 });
 
 describe("first-pass comparison of normal and one-key repairs", () => {
+  it.each([false, true])("repairs a standalone request before ranking (boundary=%s)", async boundary => {
+    const h = harness([
+      candidate("尾根がします", "mozc", "おねがします"),
+      candidate("お願いします", "mozc", "おねがいします"),
+    ]);
+    const publish = vi.fn();
+    const queue = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed("onegasimasu", defaultSettings, h.transport, {
+      repairStandaloneRequests: true, kanaEngine: h.engine,
+      ...(boundary ? { compareRepairsEarly: "compact", shortRepairId: true, decisionDeadline: Date.now() + 500,
+        onRankedCandidates: publish, deferRanking: queue } : { rerank: false, autoRescue: false }),
+    });
+    expect(result).toMatchObject({ text: "お願いします", conversionStrategy: "correction", romajiCorrection: { inserted: "i" } });
+    expect(h.engine.search).toHaveBeenCalledTimes(2);
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(queue).not.toHaveBeenCalled();
+    if (boundary) expect(publish).toHaveBeenCalledExactlyOnceWith(result);
+  });
+
+  it.each([
+    ["onegaisimasu", "お願いします", "おねがいします", "mozc"],
+    ["okusuriwonomimasu", "お薬を飲みます", "おくすりをのみます", "mozc"],
+    ["onegasimasu", "登録語", "おねがします", "user"],
+  ])("preserves ordinary readings and personal dictionary entries (%s)", async (input, text, reading, source) => {
+    const h = harness([candidate(text, source, reading)]);
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
+      repairStandaloneRequests: true, kanaEngine: h.engine, autoRescue: false, rerank: false,
+    });
+    expect(result.text).toBe(text);
+    expect(result.conversionStrategy).toBeUndefined();
+    expect(h.engine.search).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ["annwoonegasimasu.", "あんをおねがします", "案をおねがします", "あんをおねがいします", "案をお願いします", "i"],
     ["konoshiryouwokakkuninshimasu.", "このしりょうをかっくにんします", "この資料を各区にんします",
