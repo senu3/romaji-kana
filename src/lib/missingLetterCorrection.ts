@@ -109,8 +109,15 @@ export async function searchMissingLetter(input: string, settings: AppSettings, 
     const retained = comparison && baseline?.session
       ? [...baseline.session.candidates.slice(0, comparisonLimit), ...first.slice(0, comparisonLimit)]
       : [...unchanged, ...first, ...alternatives].slice(0, MAX_CANDIDATES);
-    // Reserve the unchanged option without falsely labeling it the best local path.
-    if (baseline) retained.sort((a, b) => (a.cost ?? Number.MAX_SAFE_INTEGER) - (b.cost ?? Number.MAX_SAFE_INTEGER));
+    // Keep the learned order of normal spellings when selecting the representative
+    // of their reading. Repair candidates still use their dictionary cost.
+    if (baseline) {
+      const cost = (candidate: SessionCandidate) => (candidate.cost ?? Number.MAX_SAFE_INTEGER) -
+        (comparison && candidate.kind === "conversion"
+          ? preparedInput.learnedBonus(candidate.result.reviewKana, candidate.result.text)
+          : 0);
+      retained.sort((a, b) => cost(a) - cost(b));
+    }
     metrics.candidates = retained.length;
     metrics.searchMs = performance.now() - started;
     metrics.truncated ||= seen.size > MAX_CANDIDATES;
