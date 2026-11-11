@@ -131,6 +131,65 @@ describe("conversion lifecycle", () => {
     expect(view.state.doc.toString()).toBe("pon. hon.");
     expect(hook.current.history).toHaveLength(0);
   });
+
+  it("keeps a boundary result in history when a newer prediction owns the preview", async () => {
+    const boundary = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValueOnce(boundary.promise)
+      .mockResolvedValueOnce({ text: "読む", reviewKana: "よむ" });
+    const { hook, view, options } = harness("hon.");
+    options.settingsRef.current.conversionMode = "ghost";
+    act(() => { hook.current.handleConvert(range("hon.", "period")); });
+    await act(async () => {
+      options.docVersionRef.current++;
+      view.dispatch({ changes: { from: 4, insert: "yomu" }, selection: { anchor: 8 } });
+      hook.current.handleConvert(range("yomu", "typing", 4));
+    });
+    await act(async () => { boundary.resolve({ text: "本。", reviewKana: "ほん。" }); });
+    expect(view.state.doc.toString()).toBe("hon.yomu");
+    expect(view.state.selection.main.head).toBe(8);
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("読む");
+    const [item] = hook.current.history;
+    expect(item).toMatchObject({ input: "hon.", output: "本。", anchor: { from: 0, to: 4, exactOnly: true } });
+
+    act(() => {
+      options.docVersionRef.current++;
+      view.dispatch({ changes: { from: 0, insert: "前。\n" } });
+    });
+    const moved = hook.current.history[0];
+    expect(moved.anchor?.from).toBe(3);
+    act(() => { expect(hook.current.openCandidateList(moved)).toBe(true); });
+    act(() => { hook.current.selectListedCandidate(hook.current.candidateList!.session.selectedId); });
+    const suggestion = view.state.field(ghostSuggestionField).suggestion!;
+    expect(suggestion).toMatchObject({ id: item.id, from: 3, convertedText: "本。" });
+    expect(view.state.doc.toString()).toBe("前。\nhon.yomu");
+    act(() => {
+      expect(commitConversion(view, suggestion, "explicit")).toBe(true);
+      hook.current.handleAcceptGhost(suggestion);
+    });
+    expect(view.state.doc.toString()).toBe("前。\n本。yomu");
+    expect(hook.current.history).toHaveLength(1);
+    expect(hook.current.history[0].anchor?.appliedText).toBe("本。");
+  });
+
+  it("invalidates a retained candidate after editing its range even when identical text remains nearby", async () => {
+    const boundary = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValueOnce(boundary.promise)
+      .mockResolvedValueOnce({ text: "読む", reviewKana: "よむ" });
+    const { hook, view, options } = harness("hon.yomu hon.");
+    options.settingsRef.current.conversionMode = "ghost";
+    act(() => { hook.current.handleConvert(range("hon.", "period")); });
+    await act(async () => { hook.current.handleConvert(range("yomu", "typing", 4)); });
+    await act(async () => { boundary.resolve({ text: "本。", reviewKana: "ほん。" }); });
+    const [oldItem] = hook.current.history;
+    expect(oldItem.anchor?.exactOnly).toBe(true);
+    act(() => {
+      options.docVersionRef.current++;
+      view.dispatch({ changes: { from: 0, to: 1, insert: "p" } });
+    });
+    expect(hook.current.history[0].anchor).toBeUndefined();
+    act(() => { expect(hook.current.openCandidateList(oldItem)).toBe(false); });
+    expect(view.state.doc.toString()).toBe("pon.yomu hon.");
+  });
   it("directly applies verified corrections at a boundary without learning", async () => {
     localStorage.clear();
     const result: JapaneseConversionResult = { text: "本", reviewKana: "ほん", conversionStrategy: "correction", changes: {
@@ -638,8 +697,10 @@ describe("conversion lifecycle", () => {
     const candidate = view.state.field(ghostSuggestionField).suggestion!;
     expect(candidate.changes?.readingAssessment?.status).toBe("unverified");
     // MarkdownEditor's Tab command applies the edit before this callback.
-    view.dispatch({ changes: { from: candidate.from, to: candidate.to, insert: candidate.convertedText } });
-    await act(async () => { hook.current.handleAcceptGhost(candidate); });
+    act(() => {
+      view.dispatch({ changes: { from: candidate.from, to: candidate.to, insert: candidate.convertedText } });
+      hook.current.handleAcceptGhost(candidate);
+    });
     expect(view.state.doc.toString()).toBe("本");
     expect(hook.current.history[0].changes?.readingAssessment?.status).toBe("unverified");
   });

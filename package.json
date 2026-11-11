@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "node tests/run.mjs check",
     "test:e2e": "node tests/run.mjs e2e",
+    "test:typing": "node tests/run.mjs typing",
     "test:engine": "node tests/run.mjs engine",
     "test:companion": "node tests/run.mjs companion",
     "eval:run": "node tests/run.mjs eval",

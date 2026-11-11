@@ -10,22 +10,38 @@ import type { AppSettings } from "./types";
 
 export function standaloneRequestPlan(prepared: PreparedConversionInput) {
   const [part] = prepared.parts;
-  if (prepared.parts.length !== 1 || part.type !== "text" || !/^[a-z]+[ \t。、,.!?！？]*$/u.test(part.value)) return;
+  if (prepared.parts.length !== 1 || part.type !== "text") return;
+  const body = /^([a-z]+)[ \t。、,.!?！？]*$/u.exec(part.value)?.[1];
+  if (!body) return;
   const source = normalizeComparableReading(prepared.sourceReading);
   if (politeRequestReadings.some(reading => reading === source)) return;
-  // Reinsert exactly one internal kana at a boundary in the original keystrokes.
+  const unfinished = source.match(/[a-z]+$/u)?.[0];
+  const tryInsertion = (reading: string, offset: number, inserted: string) => {
+    const value = part.value.slice(0, offset) + inserted + part.value.slice(offset);
+    const repaired = romajiToKana(value);
+    if (!repaired.lowConfidenceSpans.length && normalizeComparableReading(repaired.kana) === reading) {
+      return { value, reading, offset, inserted, before: part.value };
+    }
+  };
   const plans = politeRequestReadings.flatMap(reading => {
+    // Complete the last, already-started kana with one key. A complete kana
+    // prefix without the final consonant does not qualify for this route.
+    if (unfinished && source.slice(0, -unfinished.length) === reading.slice(0, -1)) {
+      for (const spelling of romajiSpellingsForKana(reading.slice(-1))) {
+        if (spelling.length !== unfinished.length + 1 || !spelling.startsWith(unfinished)) continue;
+        const plan = tryInsertion(reading, body.length, spelling.slice(-1));
+        if (plan) return [plan];
+      }
+    }
+    // Reinsert exactly one internal kana at a boundary in the original keystrokes.
     if (source.length + 1 !== reading.length) return [];
     for (const token of prepared.readings[0].tokens) {
       const i = token.kanaFrom;
       if (i === 0 || i >= source.length || reading.slice(0, i) + reading.slice(i + 1) !== source) continue;
       const offset = token.inputFrom;
       for (const inserted of romajiSpellingsForKana(reading[i])) {
-        const value = part.value.slice(0, offset) + inserted + part.value.slice(offset);
-        const repaired = romajiToKana(value);
-        if (!repaired.lowConfidenceSpans.length && normalizeComparableReading(repaired.kana) === reading) {
-          return [{ value, reading, offset, inserted, before: part.value }];
-        }
+        const plan = tryInsertion(reading, offset, inserted);
+        if (plan) return [plan];
       }
     }
     return [];

@@ -9,6 +9,7 @@ const commands = {
   unit: [process.execPath, "node_modules/vitest/vitest.mjs", "run"],
   evaluation: [process.execPath, "--test", ...(await readdir(new URL("./evaluation/", import.meta.url))).filter(name => name.endsWith(".check.mjs")).sort().map(name => "tests/evaluation/" + name)],
   eval: [process.execPath, "tests/evaluation/run.mjs"],
+  typing: [process.execPath, "tests/e2e/typing-replay.e2e.mjs"],
   "e2e:app": [process.execPath, "tests/e2e/app.e2e.mjs"],
   "e2e:appearance": [process.execPath, "tests/e2e/editor-appearance.e2e.mjs"],
   "e2e:local": [process.execPath, "tests/e2e/local-engine.e2e.mjs"],

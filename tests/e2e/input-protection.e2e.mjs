@@ -58,7 +58,7 @@ try {
     assert.equal(await ghost.count(), 0);
     console.log('converted', JSON.stringify(input), '=>', JSON.stringify(output));
   }
-  for (const input of ['onegasimasu', 'onegaimasu']) {
+  for (const input of ['onegasimasu', 'onegaimasu', 'onegaisimas']) {
     const beforeStandalone = calls;
     await enter(input);
     await ghost.filter({ hasText: /^お願いします$/ }).waitFor();

@@ -82,7 +82,7 @@ try {
         }) }] : [],
       dictionaryRevision: 'test', truncated: false } });
     });
-    for (const input of ['onegasimasu', 'onegaimasu']) {
+    for (const input of ['onegasimasu', 'onegaimasu', 'onegaisimas']) {
       await page.keyboard.press('Control+A');
       await page.keyboard.press('Backspace');
       await page.keyboard.type(input);
@@ -121,6 +121,30 @@ try {
     assert.equal(await editor.innerText(), '案をおねがします。tugi');
     await page.locator('.recent-retry-chip-main').click();
     await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: /案をお願いします。.*追加候補/ }).waitFor();
+  });
+  await scenario({ triggers: { typing: false, space: true } }, async (page, editor) => {
+    let release;
+    const ready = new Promise(resolve => { release = resolve; });
+    await page.route('**/api/generate', async route => {
+      const body = route.request().postDataJSON();
+      if (!body.format?.properties?.c) return route.fallback();
+      const normal = JSON.parse(body.prompt).candidates.find(candidate => candidate.text === 'ほん。');
+      assert.ok(normal);
+      await ready;
+      return route.fulfill({ json: { response: JSON.stringify({ c: normal.id }) } });
+    });
+    await page.keyboard.type('hon.yomu ');
+    const newer = page.locator('.cm-ghost-text-suggestion').filter({ hasText: 'よむ' });
+    await newer.waitFor();
+    release();
+    await page.getByRole('button', { name: /履歴を開く/ }).click();
+    const saved = page.locator('.history-item').filter({ hasText: 'ほん。' });
+    await saved.waitFor();
+    assert.equal(await newer.count(), 1, 'An earlier result must not replace the newer prediction');
+    await saved.getByRole('button', { name: 'ほかの候補', exact: true }).click();
+    await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: /^ほん。/ }).click();
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), 'ほん。yomu ');
   });
   const selectedCandidateFailures = [];
   for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {

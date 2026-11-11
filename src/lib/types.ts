@@ -105,6 +105,8 @@ export interface ConversionAnchor {
   originalText: string;
   appliedText?: string;
   docVersion: number;
+  /** An uncommitted candidate belongs only to the range that produced it. */
+  exactOnly?: boolean;
 }
 
 export interface GhostConversionSuggestion {

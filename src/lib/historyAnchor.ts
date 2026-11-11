@@ -1,4 +1,5 @@
 import type { ConversionAnchor } from "./types";
+import type { ChangeDesc } from "@codemirror/state";
 
 const SEARCH_RADIUS = 240;
 
@@ -12,7 +13,9 @@ export interface ResolvedConversionAnchor {
 export function resolveConversionAnchor(
   documentText: string,
   anchor: ConversionAnchor,
+  currentVersion?: number,
 ): ResolvedConversionAnchor | null {
+  if (anchor.exactOnly && currentVersion !== undefined && anchor.docVersion !== currentVersion) return null;
   const candidates = getCandidateTexts(anchor);
 
   for (const text of candidates) {
@@ -22,7 +25,14 @@ export function resolveConversionAnchor(
     }
   }
 
-  return resolveNearby(documentText, anchor, candidates);
+  return anchor.exactOnly ? null : resolveNearby(documentText, anchor, candidates);
+}
+
+export function mapUnchangedRange<T extends { from: number; to: number }>(range: T, changes: ChangeDesc): T | undefined {
+  let touched = false;
+  changes.iterChangedRanges((from, to) => { touched ||= from < range.to && to > range.from; });
+  if (touched) return undefined;
+  return { ...range, from: changes.mapPos(range.from, 1), to: changes.mapPos(range.to, -1) };
 }
 
 function resolveExact(

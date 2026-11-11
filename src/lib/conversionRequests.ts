@@ -1,4 +1,4 @@
-import { resolveConversionAnchor } from "./historyAnchor";
+import { mapUnchangedRange, resolveConversionAnchor } from "./historyAnchor";
 import type { ChangeDesc } from "@codemirror/state";
 
 interface Range { from: number; to: number; originalText?: string }
@@ -37,11 +37,9 @@ export class ConversionRequests {
   mapEdits(changes: ChangeDesc): void {
     for (const lease of this.active.values()) {
       if (!lease.trackEdits || !lease.range || !this.valid(lease.id) || this.replacing.has(lease.id)) continue;
-      const { from, to } = lease.range;
-      let touched = false;
-      changes.iterChangedRanges((start, end) => { touched ||= start < to && end > from; });
-      if (touched) this.cancel(lease.id);
-      else lease.range = { ...lease.range, from: changes.mapPos(from, 1), to: changes.mapPos(to, -1) };
+      const mapped = mapUnchangedRange(lease.range, changes);
+      if (mapped) lease.range = mapped;
+      else this.cancel(lease.id);
     }
   }
   replace(id: string, range: Range, commit: () => boolean): boolean {

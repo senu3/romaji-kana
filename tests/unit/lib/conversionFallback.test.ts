@@ -283,6 +283,33 @@ describe("first-pass comparison of normal and one-key repairs", () => {
   });
 
   it.each([
+    ["onegaisimas", "お願いします", "onegaisimasu", false],
+    ["onegaishimas", "お願いします", "onegaishimasu", false],
+    ["onegaisimas.", "お願いします。", "onegaisimasu。", true],
+  ] as const)("finishes an already-started kana in %s", async (input, text, after, boundary) => {
+    const h = harness([candidate("お願いします", "mozc", "おねがいします")]);
+    const publish = vi.fn();
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, {
+      repairStandaloneRequests: true, kanaEngine: h.engine,
+      ...(boundary ? { compareRepairsEarly: "compact", decisionDeadline: Date.now() + 500,
+        onRankedCandidates: publish, deferRanking: vi.fn() } : { rerank: false, autoRescue: false }),
+    });
+    expect(result).toMatchObject({ text, conversionStrategy: "correction", romajiCorrection: { inserted: "u", after } });
+    expect(h.engine.search).toHaveBeenCalledExactlyOnceWith("おねがいします", [], expect.any(AbortSignal));
+    expect(h.generate).not.toHaveBeenCalled();
+    if (boundary) expect(publish).toHaveBeenCalledExactlyOnceWith(result);
+  });
+
+  it("keeps a fully typed kana prefix without supplying the whole final kana", async () => {
+    const h = harness([candidate("お願いしま", "mozc", "おねがいしま"), candidate("お願いします", "mozc", "おねがいします")]);
+    const result = await convertRomajiToJapaneseDetailed("onegaisima", defaultSettings, h.transport, {
+      repairStandaloneRequests: true, kanaEngine: h.engine, rerank: false, autoRescue: false,
+    });
+    expect(result.text).toBe("お願いしま");
+    expect(result.conversionStrategy).toBeUndefined();
+  });
+
+  it.each([
     ["annwoonegasimasu.", "あんをおねがします", "案をおねがします", "あんをおねがいします", "案をお願いします", "i"],
     ["konoshiryouwokakkuninshimasu.", "このしりょうをかっくにんします", "この資料を各区にんします",
       "このしりょうをかくにんします", "この資料を確認します", ""],

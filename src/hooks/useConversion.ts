@@ -19,7 +19,7 @@ import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
 import { BOUNDARY_DECISION_MS } from "../lib/conversionBudget";
 import { dismissConversionSession, lockConversionSession, createConversionSession, sessionResult, type ConversionSession } from "../lib/conversionSession";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
-import { resolveConversionAnchor } from "../lib/historyAnchor";
+import { mapUnchangedRange, resolveConversionAnchor, type ResolvedConversionAnchor } from "../lib/historyAnchor";
 import { createId } from "../lib/id";
 import type { JapaneseConversionResult } from "../lib/japaneseConversionTypes";
 import { defaultKanaEngine } from "../lib/kanaEngine";
@@ -165,7 +165,15 @@ export function useConversion({
   const [now, setNow] = useState(() => Date.now());
 
   const requestsRef = useRef(new ConversionRequests());
-  const trackConversionEdits = useCallback((changes: ChangeDesc) => requestsRef.current.mapEdits(changes), []);
+  const trackConversionEdits = useCallback((changes: ChangeDesc) => {
+    requestsRef.current.mapEdits(changes);
+    const version = docVersionRef.current;
+    setHistory(items => items.some(item => item.anchor?.exactOnly) ? items.map(item => {
+      if (!item.anchor?.exactOnly) return item;
+      const mapped = mapUnchangedRange(item.anchor, changes);
+      return { ...item, anchor: mapped && { ...mapped, docVersion: version } };
+    }) : items);
+  }, [docVersionRef]);
 
   const conversionQueueRef = useRef<PendingConversion[]>([]);
 
@@ -241,6 +249,8 @@ export function useConversion({
     invalidatePredictiveSuggestions();
     conversionQueueRef.current = [];
     setPending([]);
+    setHistory(items => items.some(item => item.anchor?.exactOnly)
+      ? items.map(item => item.anchor?.exactOnly ? { ...item, anchor: undefined } : item) : items);
 
     const view = editorViewRef.current;
     if (view) {
@@ -367,13 +377,14 @@ export function useConversion({
   const processQueuedConversion = useCallback(async (request: PendingConversion) => {
     const view = editorViewRef.current;
     const boundary = isBoundaryConversion(request);
+    const tracked = boundary || request.anchor?.exactOnly;
     const currentAnchor = () => {
-      if (!boundary) return request.anchor;
+      if (!tracked) return request.anchor;
       const range = requestsRef.current.get(request.id)?.range;
       return range?.originalText === undefined ? undefined : { ...range, originalText: range.originalText, docVersion: docVersionRef.current };
     };
     const resolve = (current: EditorView, anchor: ConversionAnchor) => {
-      if (!boundary) return resolveConversionAnchor(current.state.doc.toString(), anchor);
+      if (!tracked) return resolveConversionAnchor(current.state.doc.toString(), anchor);
       const { from, to, originalText } = anchor;
       return current.state.doc.sliceString(from, to) === originalText ? { from, to, matchedText: originalText } : null;
     };
@@ -394,7 +405,17 @@ export function useConversion({
       retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
     });
     let displayed: JapaneseConversionResult | undefined;
+    let committed = false;
     let decided = false;
+    const retainBoundaryHistory = (conversion: JapaneseConversionResult, range: Pick<ResolvedConversionAnchor, "from" | "to" | "matchedText">) => {
+      const item = historyItem(conversion, {
+        from: range.from, to: range.to, originalText: request.originalText,
+        ...(committed ? { appliedText: range.matchedText } : { exactOnly: true }),
+        docVersion: docVersionRef.current,
+      });
+      setHistory(items => upsertConversionHistory(items, item));
+      setRecentRetryItem(existing => existing?.id === item.id ? item : existing);
+    };
     const applyConversion = (conversion: JapaneseConversionResult) => {
       if (!requestsRef.current.valid(request.id) || !isOpenConversionResult(conversion)) return;
       if (boundary) {
@@ -423,7 +444,7 @@ export function useConversion({
         } else skipQueuedConversion(request, "エディタを利用できないため、変換をスキップしました。");
         return;
       }
-      const liveAnchor = boundary ? currentAnchor() : {
+      const liveAnchor = tracked ? currentAnchor() : {
         ...anchor, from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
       };
       const latest = liveAnchor && resolve(current, liveAnchor);
@@ -432,12 +453,19 @@ export function useConversion({
         return;
       }
       if (!canApplyConversionAutomatically(current, conversion, settingsRef.current.conversionMode, request.range?.trigger)) {
-        if (!showConversionPreview(conversion, {
+        const shown = showConversionPreview(conversion, {
           id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,
           inputText: request.originalText, trigger: request.range?.trigger, source: request.source,
           retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
           documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
-        })) return;
+        });
+        if (!shown) {
+          if (boundary) {
+            displayed = conversion;
+            retainBoundaryHistory(conversion, latest);
+          }
+          return;
+        }
         displayed = conversion;
         if (historical) current.focus();
         if (conversion.session?.rerankStatus === "failed") {
@@ -458,6 +486,7 @@ export function useConversion({
       if (!requestsRef.current.replace(request.id, {
         from: accepted.from, to: accepted.from + accepted.convertedText.length, originalText: accepted.convertedText,
       }, () => commitConversion(current, accepted, historical ? "history" : "automatic"))) return;
+      committed = true;
       displayed = conversion;
       finishConversion(accepted, false, settings.modelName);
       setStatus({ kind: "success", message: historical
@@ -474,12 +503,7 @@ export function useConversion({
       if (session.candidates.some(candidate => candidate.result.text === result.text)) return;
       const { session: _session, ...review } = result;
       session.reviewCandidates = [{ id: "late-review", kind: "proposal", result: review }];
-      const item = historyItem({ ...original, session }, {
-        from: latest.from, to: latest.to, originalText: request.originalText,
-        appliedText: latest.matchedText, docVersion: docVersionRef.current,
-      });
-      setHistory(items => upsertConversionHistory(items, item));
-      setRecentRetryItem(existing => existing?.id === item.id ? item : existing);
+      retainBoundaryHistory({ ...original, session }, latest);
     };
     const conversion = await convertRomajiToJapaneseDetailed(
       historical ? request.originalText : resolved!.matchedText, settings, undefined, {
@@ -570,7 +594,7 @@ export function useConversion({
       setRecentRetryItem(null);
       requestsRef.current.refresh(editorViewRef.current?.state.doc.toString() ?? "");
       const boundary = isBoundaryConversion(request);
-      requestsRef.current.register(request.id, request.anchor, false, boundary);
+      requestsRef.current.register(request.id, request.anchor, false, boundary || request.anchor?.exactOnly);
       if (boundary) invalidatePredictiveSuggestions(false);
       const current = editorViewRef.current;
       const visible = current?.state.field(ghostSuggestionField).suggestion;
@@ -649,7 +673,7 @@ export function useConversion({
       return;
     }
 
-    const resolved = resolveConversionAnchor(view.state.doc.toString(), item.anchor);
+    const resolved = resolveConversionAnchor(view.state.doc.toString(), item.anchor, docVersionRef.current);
     if (!resolved) {
       return;
     }
@@ -671,7 +695,7 @@ export function useConversion({
         source: "history",
         retryOf: item.retryOf,
         avoidOutputs: item.avoidOutputs,
-        previewOnly: resolved.matchedText === item.output,
+        previewOnly: item.anchor.exactOnly || resolved.matchedText === item.output,
       }),
     });
   }, []);
@@ -686,6 +710,7 @@ export function useConversion({
   }, []);
 
   const handleRerunHistory = useCallback((item: ConversionHistoryItem) => {
+    if (item.anchor?.exactOnly && item.anchor.docVersion !== docVersionRef.current) return false;
     const request: PendingConversion = {
       id: createId("conversion"),
       anchor: item.anchor,
@@ -699,7 +724,7 @@ export function useConversion({
     };
 
     return enqueueConversion(request);
-  }, [enqueueConversion]);
+  }, [enqueueConversion, docVersionRef]);
 
   const dismissRecentRetryChip = useCallback(() => {
     setRecentRetryItem(null);
@@ -707,7 +732,7 @@ export function useConversion({
 
   const openCandidateList = useCallback((item: ConversionHistoryItem, ghost?: GhostConversionSuggestion) => {
     const view = editorViewRef.current;
-    const resolved = view && item.anchor && resolveConversionAnchor(view.state.doc.toString(), item.anchor);
+    const resolved = view && item.anchor && resolveConversionAnchor(view.state.doc.toString(), item.anchor, docVersionRef.current);
     if (!view || !resolved || !item.output || ghost?.previewOnly) return false;
     if (ghost && view.state.field(ghostSuggestionField).suggestion?.id !== ghost.id) return false;
     invalidatePredictiveSuggestions(false);
@@ -742,9 +767,9 @@ export function useConversion({
     if (item.conversionStrategy === "speculative") {
       setCandidateList(null);
       dispatchPreviewSelection(view, resolved.to, showGhostSuggestion.of({
-        ...candidateDetails(sessionResult(session)), id: createId("conversion"),
+        ...candidateDetails(sessionResult(session)), id: item.anchor?.exactOnly ? item.id : createId("conversion"),
         from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
-        inputText: item.input, source: "history", retryOf: item.id, avoidOutputs: item.avoidOutputs,
+        inputText: item.input, source: "history", retryOf: item.anchor?.exactOnly ? item.retryOf : item.id, avoidOutputs: item.avoidOutputs,
         documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
       }));
       return true;
@@ -775,7 +800,7 @@ export function useConversion({
 
   const handleSpeculateHistory = useCallback((item: ConversionHistoryItem) => {
     const view = editorViewRef.current;
-    const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor) : null;
+    const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor, docVersionRef.current) : null;
     if (!view || !resolved || !item.output) {
       setStatus({ kind: "warning", message: "元の箇所を確認できないため、推測し直せません。" });
       return false;
@@ -817,13 +842,13 @@ export function useConversion({
     editorViewRef.current!.dispatch({
       effects: showGhostSuggestion.of({
         ...candidateDetails(next), session,
-        id: ghost?.id ?? createId("conversion"),
+        id: ghost?.id ?? (item.anchor?.exactOnly ? item.id : createId("conversion")),
         from: anchor.from,
         to: anchor.to,
         originalText: anchor.originalText,
         inputText: item.input,
         source: ghost?.source ?? "history",
-        retryOf: item.id,
+        retryOf: item.anchor?.exactOnly ? item.retryOf : item.id,
         avoidOutputs: item.avoidOutputs,
         documentVocabulary: item.documentVocabulary,
         documentVocabularyRevision: item.documentVocabularyRevision

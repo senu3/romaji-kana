@@ -192,9 +192,9 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
   });
 
   const handleDocumentChanged = useCallback((documentText: string, changes: ChangeDesc) => {
-    trackConversionEdits(changes);
     closeCandidateList();
     persistDocumentChange(documentText);
+    trackConversionEdits(changes);
     syncDocumentChange(documentText);
   }, [closeCandidateList, persistDocumentChange, syncDocumentChange, trackConversionEdits]);
 
