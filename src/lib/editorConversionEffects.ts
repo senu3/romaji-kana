@@ -6,5 +6,5 @@ export const addLoadingDecoration = StateEffect.define<{ id: string; from: numbe
 export const removeLoadingDecoration = StateEffect.define<string>();
 export const showGhostSuggestion = StateEffect.define<GhostConversionSuggestion>();
 export const clearGhostSuggestion = StateEffect.define<string | null>();
-export const pauseConversionEnd = StateEffect.define<number>();
+export const rememberPauseConversion = StateEffect.define<{ from: number; to: number; original: string }>();
 export const suggestAfterConversion = StateEffect.define<SuggestTarget>();

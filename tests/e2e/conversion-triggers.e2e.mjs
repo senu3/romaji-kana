@@ -55,6 +55,25 @@ try {
     assert.equal(await editor.innerText(), 'あいしてる');
   });
   await scenario({ conversionMode: 'replace' }, async (page, editor) => {
+    const readings = [];
+    await page.route('**/api/kana-engine', route => {
+      const { reading } = route.request().postDataJSON();
+      readings.push(reading);
+      const text = reading === 'ほん' ? '本' : reading === 'ほんとう' ? '本当' : reading;
+      return route.fulfill({ json: { candidates: [{ text, reading, cost: 0,
+        tokens: [{ text, reading, from: 0, to: reading.length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 0 }],
+      }], dictionaryRevision: 'test', truncated: false } });
+    });
+    await page.keyboard.type('hon');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '本');
+    await page.keyboard.type('tou');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '本当');
+    assert.ok(readings.includes('ほんとう'), 'Continuation reuses the source before the pause');
+    assert.ok(!readings.includes('とう'), 'A mid-word pause must not split the reading');
+    await page.keyboard.type('.hon');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '本当。本');
+  });
+  await scenario({ conversionMode: 'replace' }, async (page, editor) => {
     await page.keyboard.type('hon');
     await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん');
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);

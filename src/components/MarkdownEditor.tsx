@@ -12,7 +12,8 @@ import { markdown } from "@codemirror/lang-markdown";
 import { autoSuggestExtension } from "./autoSuggestExtension";
 import { speculationExtension } from "./speculationExtension";
 import { commitConversion } from "../lib/conversionCommit";
-import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion, pauseConversionEnd } from "../lib/editorConversionEffects";
+import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
+import { pauseConversion, resumePauseConversion } from "../lib/pauseConversion";
 export { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
@@ -412,15 +413,6 @@ const editorPhrases = EditorState.phrases.of({
   "Go to line": "行へ移動",
   go: "移動",
 });
-const pauseConversionPosition = StateField.define<number | null>({
-  create: () => null,
-  update(previous, transaction) {
-    const applied = transaction.effects.find(effect => effect.is(pauseConversionEnd));
-    if (applied) return applied.value;
-    return transaction.docChanged || transaction.selection ? null : previous;
-  },
-});
-
 const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
@@ -743,7 +735,8 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
-        pauseConversionPosition,
+        pauseConversion,
+        resumePauseConversion,
         speculationExtension(state => state.field(ghostSuggestionField).suggestion, {
           accept: (view, suggestion) => {
             if (suggestion.session) {
@@ -1016,7 +1009,7 @@ export function MarkdownEditor({
     const suggestion = view.state.field(ghostSuggestionField).suggestion;
     const selection = view.state.selection.main;
     const settings = settingsRef.current;
-    if (!suggestion && selection.empty && view.state.field(pauseConversionPosition) === cursor &&
+    if (!suggestion && selection.empty && view.state.field(pauseConversion)?.to === cursor &&
       settings.autoConvert && isTriggerEnabled(trigger, settings)) {
       const insert = character === "." && settings.punctuationConversion.periodToJapanese ? "。"
         : character === "," && settings.punctuationConversion.commaToJapanese ? "、" : character;
