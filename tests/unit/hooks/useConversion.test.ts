@@ -217,10 +217,38 @@ describe("conversion lifecycle", () => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue(sessionResult(session));
     const { hook, view, options } = harness("hon");
     options.settingsRef.current.conversionMode = mode;
+    Object.defineProperty(view, "hasFocus", { value: true });
+    view.dispatch({ selection: { anchor: 3 } });
     await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
     expect(view.state.doc.toString()).toBe(mode === "replace" ? "本" : "hon");
     expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe(mode === "replace" ? undefined : "本");
     expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]).toMatchObject({ rerank: false, autoRescue: false });
+  });
+  it.each(["selection", "cursor", "blur", "composition"])("does not commit a pause response after %s", async change => {
+    const pending = deferred<JapaneseConversionResult>();
+    vi.mocked(convertRomajiToJapaneseDetailed).mockReturnValue(pending.promise);
+    const { hook, view, options } = harness("hon");
+    options.settingsRef.current.conversionMode = "replace";
+    let focused = true;
+    let composing = false;
+    Object.defineProperty(view, "hasFocus", { get: () => focused });
+    Object.defineProperty(view, "composing", { get: () => composing });
+    view.dispatch({ selection: { anchor: 3 } });
+    act(() => { hook.current.handleConvert(range("hon", "typing")); });
+    if (change === "selection") view.dispatch({ selection: { anchor: 0, head: 3 } });
+    if (change === "cursor") view.dispatch({ selection: { anchor: 0 } });
+    if (change === "blur") focused = false;
+    if (change === "composition") composing = true;
+    const selection = view.state.selection;
+    await act(async () => { pending.resolve({ text: "本", reviewKana: "ほん", changes: {
+      ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
+      readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
+    } }); });
+    expect(view.state.doc.toString()).toBe("hon");
+    expect(view.state.selection.eq(selection)).toBe(true);
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(hook.current.history).toHaveLength(0);
+    expect(options.saveCurrentDocumentSession).not.toHaveBeenCalled();
   });
   it("keeps automatic results provisional while completion selection is active", async () => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });

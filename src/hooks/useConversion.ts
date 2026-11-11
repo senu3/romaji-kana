@@ -987,6 +987,11 @@ export function useConversion({
           displayedSuggestionRevisionRef.current = request.revision;
           if (settingsRef.current.conversionMode === "replace" && request.range.trigger === "typing" &&
             canApplyConversionAutomatically(currentView, conversion, "replace", request.range.trigger)) {
+            // A pause is no longer permission to replace text once the user
+            // starts selecting, navigating, or composing somewhere else.
+            const selection = currentView.state.selection;
+            if (!currentView.hasFocus || currentView.composing || selection.ranges.length !== 1 ||
+              !selection.main.empty || selection.main.head !== request.range.to) return;
             const accepted: GhostConversionSuggestion = {
               ...candidateDetails(conversion), id: request.id, from: request.range.from, to: request.range.to,
               originalText: request.range.text, inputText: request.range.text, source: "editor", trigger: "typing",
