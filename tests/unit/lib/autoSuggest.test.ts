@@ -35,6 +35,6 @@ describe("independent word suggestions", () => {
     expect(candidates).toHaveLength(11);
   });
   it("only returns longer prefix matches within bounded length", () => {
-    expect(rankSuggestions("こうか", [item("効果", "こうか"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
+    expect(rankSuggestions("こうか", [item("効果", "こうか"), item("効果、", "こうか、"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
   });
 });

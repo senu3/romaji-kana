@@ -4,7 +4,7 @@ import { commitEditorText } from "./editorCommit";
 import type { ReplacementCursor } from "./editorSelection";
 import { acceptConversionSession } from "./conversionSession";
 import { convertedSuggestTarget } from "./autoSuggest";
-import { clearGhostSuggestion, removeLoadingDecoration, suggestAfterConversion } from "./editorConversionEffects";
+import { clearGhostSuggestion, removeLoadingDecoration, pauseConversionEnd, suggestAfterConversion } from "./editorConversionEffects";
 import type { JapaneseConversionResult } from "./japaneseConversionTypes";
 import type { AppSettings, ConversionTrigger } from "./types";
 import { isSelectingCompletion } from "./completionSelection";
@@ -26,6 +26,8 @@ export function commitConversion(view: EditorView, suggestion: GhostConversionSu
     from: suggestion.from, to: suggestion.to, original: suggestion.originalText, text: suggestion.convertedText, cursor,
     userEvent: reason === "explicit" ? "input.ghostAccept" : reason === "history" ? "input.historyApply" : "input.convert",
     effects: [removeLoadingDecoration.of(suggestion.id), clearGhostSuggestion.of(suggestion.id),
+      ...(reason === "automatic" && suggestion.trigger === "typing"
+        ? [pauseConversionEnd.of(suggestion.from + suggestion.convertedText.length)] : []),
       suggestAfterConversion.of(convertedSuggestTarget(suggestion.from, suggestion.convertedText,
         suggestion.changes?.resultReading ?? suggestion.reviewKana ?? ""))],
   }, () => acceptConversionSession(suggestion.session));

@@ -56,13 +56,10 @@ try {
   });
   await scenario({ conversionMode: 'replace' }, async (page, editor) => {
     await page.keyboard.type('hon');
-    await page.locator('.cm-ghost-text-suggestion').waitFor();
-    assert.equal(await editor.locator('.cm-ghost-source').textContent(), 'hon');
-    await page.keyboard.type('.');
-    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん。');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん');
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
-    await page.keyboard.press('Control+z');
-    assert.equal(await editor.innerText(), 'hon.', 'Boundary replacement is one undo step');
+    await page.keyboard.type('.');
+    assert.equal(await editor.innerText(), 'ほん。', 'Punctuation still converts after a pause commit');
   });
   await scenario({ conversionMode: 'replace' }, async (page, editor) => {
     const entries = new Map([
@@ -86,8 +83,8 @@ try {
       await page.keyboard.press('Control+A');
       await page.keyboard.press('Backspace');
       await page.keyboard.type(input);
-      await page.locator('.cm-ghost-text-suggestion').filter({ hasText: /^お願いします$/ }).waitFor();
-      assert.equal(await editor.locator('.cm-ghost-source').textContent(), input);
+      await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'お願いします');
+      assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
       await page.keyboard.type('.tugi');
       await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'お願いします。tugi');
     }
@@ -119,7 +116,7 @@ try {
     release();
     await page.waitForTimeout(150);
     assert.equal(await editor.innerText(), '案をおねがします。tugi');
-    await page.locator('.recent-retry-chip-main').click();
+    await page.keyboard.press('Control+/');
     await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: /案をお願いします。.*追加候補/ }).waitFor();
   });
   await scenario({ triggers: { typing: false, space: true } }, async (page, editor) => {
@@ -165,13 +162,17 @@ try {
         await page.getByRole('group', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true }).click();
       } else {
         await page.keyboard.press('Control+Enter');
-        if (entry === 'recent') await page.locator('.recent-retry-chip-main').click();
+        await page.waitForFunction(() => document.querySelector('.cm-content').textContent.endsWith('公開のときだ'));
+        if (entry === 'recent') await page.keyboard.press('Control+/');
         else {
           await page.getByRole('button', { name: /履歴を開く/ }).click();
           await page.locator('.history-item').getByRole('button', { name: 'ほかの候補' }).click();
         }
       }
-      await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: '航海のときだ', exact: true }).click();
+      const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
+      await list.getByRole('button', { name: '航海のときだ', exact: true }).click({ timeout: 3000 }).catch(async error => {
+        throw new Error(`${entry}/${JSON.stringify(trigger)}: ${await editor.innerText()} | ${await list.allTextContents()}`, { cause: error });
+      });
       await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '航海のときだ' }).waitFor();
       const previousSearches = searches.length;
       if (trigger === 'Enter') await page.keyboard.press('Enter');
@@ -242,15 +243,21 @@ try {
       for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowRight');
       await page.keyboard.press('Control+Enter');
       if (entry === 'ghost') await page.locator('.cm-ghost-text-suggestion').waitFor();
-      else await page.getByRole('complementary', { name: '変換結果の見直し' }).waitFor();
+      else {
+        await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '資料を角煮してください。');
+        await page.getByText('変換しました。Esc で見直せます。', { exact: true }).waitFor();
+      }
       assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
       if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();
       const action = entry === 'ghost' ? page.getByRole('group', { name: '変換候補', exact: true }).getByRole('button', { name: 'ほかの候補', exact: true })
-        : entry === 'recent' ? page.locator('.recent-retry-chip-main')
+        : entry === 'recent' ? null
         : page.locator('.history-item').getByRole('button', { name: 'ほかの候補' });
-      await action.click();
+      if (action) await action.click();
+      else await page.keyboard.press('Control+/');
       const list = page.getByRole('dialog', { name: 'ほかの候補', exact: true });
-      await list.waitFor();
+      await list.waitFor({ timeout: 5000 }).catch(async error => {
+        throw new Error(`${entry}: ${await editor.innerText()} | ${await page.locator('.status-message').textContent()}`, { cause: error });
+      });
       assert.equal(proposals, 0, 'Opening the list must not speculate');
       if (entry === 'ghost') {
         await page.keyboard.press('Escape');

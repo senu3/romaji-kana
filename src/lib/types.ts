@@ -132,6 +132,7 @@ export interface GhostConversionSuggestion {
 
 export interface PendingConversion {
   userRequestedSpeculation?: boolean;
+  escapeRetry?: boolean;
 
   id: string;
   range?: ConversionRange;

@@ -56,29 +56,30 @@ try {
   }
 
   if (real) {
-    await scenario('completion', { autoConvert: false }, async ({ page, menu, replay, documentText }) => {
+    await scenario('completion', { autoConvert: false }, async ({ page, completion, replay, documentText }) => {
       await replay('kouka', 75);
-      const candidate = menu.getByRole('button').first();
-      await candidate.waitFor({ state: 'visible' });
+      await completion.waitFor({ state: 'visible' });
+      const text = (await completion.textContent()).replace(/^ → /, '');
       await page.keyboard.press('Tab');
-      assert.equal(await candidate.getAttribute('aria-pressed'), 'true');
-      const text = await candidate.locator('strong').textContent();
-      await page.keyboard.press('Enter');
       assert.equal(await documentText(), text);
-      assert.equal(await menu.count(), 0);
+      assert.equal(await completion.count(), 0);
     });
   } else {
     for (const [name, suffix, reading] of [['completion-three-keys', 'kai', 'こうかい'], ['completion-idle', 'ka', 'こうか']]) {
-      await scenario(name, { autoConvert: false }, async ({ page, menu, wait, replay, requests, documentText }) => {
+      await scenario(name, { autoConvert: false }, async ({ page, completion, wait, replay, requests, documentText }) => {
         await replay('kou', 75);
+        const initial = page.waitForResponse(response => response.url().endsWith('/api/kana-engine'));
         await wait(120);
-        await menu.getByRole('button', { name: '航海士 を補完' }).waitFor();
-        for (const key of suffix.slice(0, 2)) {
-          await replay(key);
-          await wait(75);
-          assert.deepEqual(requests.map(request => request.reading), ['こう']);
-          assert.ok(await menu.getByRole('button', { name: '航海士 を補完' }).isVisible());
-        }
+        await initial;
+        await wait(40);
+        assert.equal(await completion.textContent(), ' → 航海士');
+        await replay('k');
+        await wait(75);
+        assert.equal(await completion.count(), 0, 'Hide while the reading is incomplete');
+        await replay('a');
+        await wait(75);
+        assert.deepEqual(requests.map(request => request.reading), ['こう']);
+        const updated = page.waitForResponse(response => response.url().endsWith('/api/kana-engine'));
         if (suffix.length === 3) {
           await replay('i');
           await wait(1);
@@ -87,16 +88,13 @@ try {
           assert.deepEqual(requests.map(request => request.reading), ['こう']);
           await wait(1);
         }
-        const choices = menu.getByRole('button');
-        await menu.getByRole('button', { name: '航海日誌 を補完' }).waitFor();
+        await updated;
+        await wait(40);
         assert.deepEqual(requests.map(request => request.reading), ['こう', reading]);
-        assert.deepEqual(await choices.locator('strong').allTextContents(), ['航海士', '航海日誌']);
+        assert.equal(await completion.textContent(), ' → 航海士');
         await page.keyboard.press('Tab');
-        await page.keyboard.press('Tab');
-        assert.equal(await choices.nth(1).getAttribute('aria-pressed'), 'true');
-        await page.keyboard.press('Enter');
-        assert.equal(await documentText(), '航海日誌');
-        assert.equal(await menu.count(), 0);
+        assert.equal(await documentText(), '航海士');
+        assert.equal(await completion.count(), 0);
       });
     }
   }
@@ -227,7 +225,7 @@ async function scenario(name, settings, run, { holdOriginal = false } = {}) {
     await run({
       page, replay, wait, documentText, requests: report.requests,
       ghost: page.locator('.cm-ghost-text-suggestion'),
-      menu: page.getByRole('group', { name: '補完候補', exact: true }),
+      completion: page.locator('.cm-autosuggest-ghost:visible'),
       releaseOriginal: async () => {
         releaseOriginal();
         await Promise.race([
@@ -266,12 +264,11 @@ function recordTimeline() {
   new MutationObserver(() => {
     const state = {
       conversion: editor.querySelector('.cm-ghost-text-suggestion')?.textContent ?? null,
-      suggestions: [...editor.querySelectorAll('.word-suggestions button')].map(button => button.getAttribute('aria-label')),
-      selected: editor.querySelector('.word-suggestions [aria-pressed="true"]')?.getAttribute('aria-label') ?? null,
+      suggestions: [...editor.querySelectorAll('.cm-autosuggest-ghost:not([hidden])')].map(button => button.getAttribute('aria-label')),
     };
     const changes = Object.fromEntries(Object.entries(state).filter(([key, value]) =>
       JSON.stringify(previous[key]) !== JSON.stringify(value)));
     if (Object.keys(changes).length) events.push({ ms: elapsed(), ...changes });
     previous = state;
-  }).observe(editor, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-pressed'] });
+  }).observe(editor, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-label'] });
 }

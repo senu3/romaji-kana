@@ -117,6 +117,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     selectListedCandidate,
     speculateFromCandidateList,
     retryRecentConversion,
+    retryAutomaticConversion,
     history,
     recentRetryItem,
     dismissRecentRetryChip,
@@ -312,6 +313,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onDismissGhost={handleDismissGhost}
         onRetryGhost={openGhostCandidates}
         onRetryRecent={retryRecentConversion}
+        onRetryAutomatic={retryAutomaticConversion}
         registerView={registerView}
       />
       <AppRail
@@ -327,7 +329,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onOpenModel={toggleModelDrawer}
         onOpenCompanion={() => setActivePanel((panel) => panel === "companion" ? null : "companion")}
       />
-      {recentRetryItem ? (
+      {recentRetryItem && settings.conversionMode === "ghost" ? (
         <RecentRetryChip
           item={recentRetryItem}
           onRetry={retryRecentConversion}

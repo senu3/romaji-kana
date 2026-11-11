@@ -86,7 +86,7 @@ try {
     assert.equal(await editor.innerText(), input);
     assert.equal(await menu.locator(':scope > button').count(), 2, 'Duplicate interpretations are removed');
     assert.equal(await menu.locator('[aria-pressed="true"]').count(), 0);
-    assert.equal(await page.getByRole('group', { name: '補完候補', exact: true }).count(), 0);
+    assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0);
     assert.equal(await page.locator('.cm-speculation-source').innerText(), input);
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
     await page.screenshot({ path: await screenshotPath('test-results/e2e/speculation-desktop.png') });

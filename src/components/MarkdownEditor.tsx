@@ -12,7 +12,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { autoSuggestExtension } from "./autoSuggestExtension";
 import { speculationExtension } from "./speculationExtension";
 import { commitConversion } from "../lib/conversionCommit";
-import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
+import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion, pauseConversionEnd } from "../lib/editorConversionEffects";
 export { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
@@ -101,6 +101,7 @@ interface MarkdownEditorProps {
   onDismissGhost: (suggestion?: GhostConversionSuggestion) => void;
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
+  onRetryAutomatic?: (view: EditorView) => boolean;
   registerView: (view: EditorView | null) => void;
 }
 
@@ -411,6 +412,15 @@ const editorPhrases = EditorState.phrases.of({
   "Go to line": "行へ移動",
   go: "移動",
 });
+const pauseConversionPosition = StateField.define<number | null>({
+  create: () => null,
+  update(previous, transaction) {
+    const applied = transaction.effects.find(effect => effect.is(pauseConversionEnd));
+    if (applied) return applied.value;
+    return transaction.docChanged || transaction.selection ? null : previous;
+  },
+});
+
 const AUTO_TRIGGER_SUPPRESSED_USER_EVENTS = new Set([
   "input.convert",
   "input.historyApply",
@@ -468,6 +478,7 @@ export function MarkdownEditor({
   onDismissGhost,
   onRetryGhost,
   onRetryRecent,
+  onRetryAutomatic,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -480,6 +491,7 @@ export function MarkdownEditor({
   const onDismissGhostRef = useRef(onDismissGhost);
   const onRetryGhostRef = useRef(onRetryGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
+  const onRetryAutomaticRef = useRef(onRetryAutomatic);
   const onCloseCandidateListRef = useRef(onCloseCandidateList);
   onCloseCandidateListRef.current = onCloseCandidateList;
   const initialDocumentRef = useRef(initialDocument);
@@ -691,6 +703,7 @@ export function MarkdownEditor({
     onDismissGhostRef.current = onDismissGhost;
     onRetryGhostRef.current = onRetryGhost;
     onRetryRecentRef.current = onRetryRecent;
+    onRetryAutomaticRef.current = onRetryAutomatic;
     settingsRef.current = settings;
   }, [
     onAcceptGhost,
@@ -700,6 +713,7 @@ export function MarkdownEditor({
     onEditorStatusChange,
     onRetryGhost,
     onRetryRecent,
+    onRetryAutomatic,
     settings,
   ]);
 
@@ -729,6 +743,7 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        pauseConversionPosition,
         speculationExtension(state => state.field(ghostSuggestionField).suggestion, {
           accept: (view, suggestion) => {
             if (suggestion.session) {
@@ -740,8 +755,9 @@ export function MarkdownEditor({
           dismiss: dismissGhostSuggestion,
         }),
         autoSuggestExtension(() => settingsRef.current,
-          view => view.state.field(loadingDecorations).size > 0 || view.state.field(ghostSuggestionField).suggestion?.conversionStrategy === "speculative",
-          view => view.state.field(ghostSuggestionField).suggestion?.conversionStrategy === "speculative"),
+          view => view.state.field(loadingDecorations).size > 0 || Boolean(view.state.field(ghostSuggestionField).suggestion),
+          view => Boolean(view.state.field(ghostSuggestionField).suggestion),
+          view => onRetryAutomaticRef.current?.(view) ?? false),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {
@@ -999,6 +1015,14 @@ export function MarkdownEditor({
     const trigger = character === "." ? "period" : "comma";
     const suggestion = view.state.field(ghostSuggestionField).suggestion;
     const selection = view.state.selection.main;
+    const settings = settingsRef.current;
+    if (!suggestion && selection.empty && view.state.field(pauseConversionPosition) === cursor &&
+      settings.autoConvert && isTriggerEnabled(trigger, settings)) {
+      const insert = character === "." && settings.punctuationConversion.periodToJapanese ? "。"
+        : character === "," && settings.punctuationConversion.commaToJapanese ? "、" : character;
+      view.dispatch({ changes: { from: cursor, insert }, selection: { anchor: cursor + insert.length }, userEvent: "input.type" });
+      return true;
+    }
     if (
       !suggestion ||
       suggestion.previewOnly ||

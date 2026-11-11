@@ -158,6 +158,7 @@ export function useConversion({
 
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
 
+  const lastAutomaticConversion = useRef<ConversionHistoryItem | null>(null);
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [candidateList, setCandidateList] = useState<CandidateListTarget | null>(null);
   const closeCandidateList = useCallback(() => setCandidateList(null), []);
@@ -363,6 +364,7 @@ export function useConversion({
     setHistory((items) =>
       upsertConversionHistory(items, historyItem),
     );
+    lastAutomaticConversion.current = !explicit && suggestion.source === "editor" ? historyItem : null;
     setRecentRetryItem(historyItem);
     setStatus({
       kind: "success",
@@ -452,7 +454,10 @@ export function useConversion({
         skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
         return;
       }
-      if (!canApplyConversionAutomatically(current, conversion, settingsRef.current.conversionMode, request.range?.trigger)) {
+      if (request.escapeRetry && (!current.hasFocus || !current.state.selection.main.empty ||
+        current.state.selection.main.head !== latest.to || request.docVersion !== docVersionRef.current)) return;
+      if (request.userRequestedSpeculation ||
+        !canApplyConversionAutomatically(current, conversion, settingsRef.current.conversionMode, request.range?.trigger)) {
         const shown = showConversionPreview(conversion, {
           id: request.id, from: latest.from, to: latest.to, originalText: latest.matchedText,
           inputText: request.originalText, trigger: request.range?.trigger, source: request.source,
@@ -491,7 +496,7 @@ export function useConversion({
       finishConversion(accepted, false, settings.modelName);
       setStatus({ kind: "success", message: historical
         ? "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
-        : "変換しました。Ctrl/Cmd+/ で候補一覧を開けます。元に戻すとローマ字に戻ります。" });
+        : "変換しました。Esc で見直せます。" });
     };
     const retainLateCandidate = (result: JapaneseConversionResult) => {
       const current = editorViewRef.current;
@@ -522,7 +527,7 @@ export function useConversion({
         ...conversionContext(view, resolved),
         autoSpeculation: settings.autoSpeculation,
         avoidOutputs: request.avoidOutputs, userRequestedSpeculation: request.userRequestedSpeculation,
-        speculationCandidates: request.userRequestedSpeculation === true,
+        speculationCandidates: request.userRequestedSpeculation === true && !request.escapeRetry,
         documentVocabulary: request.documentVocabulary,
         protectedDictionaryEntries: historical && resolved && resolved.matchedText !== request.originalText
           ? buildProtectedDictionaryEntries(request.originalText, resolved.matchedText) : [],
@@ -798,7 +803,7 @@ export function useConversion({
     return openCandidateList(recentRetryItem);
   }, [openCandidateList, recentRetryItem]);
 
-  const handleSpeculateHistory = useCallback((item: ConversionHistoryItem) => {
+  const handleSpeculateHistory = useCallback((item: ConversionHistoryItem, escapeRetry = false) => {
     const view = editorViewRef.current;
     const resolved = item.anchor && view ? resolveConversionAnchor(view.state.doc.toString(), item.anchor, docVersionRef.current) : null;
     if (!view || !resolved || !item.output) {
@@ -809,16 +814,47 @@ export function useConversion({
     if (visible && rangesOverlap(visible, resolved)) requestsRef.current.cancel(visible.id);
     invalidatePredictiveSuggestions();
     // This explicit action returns typing to the end of the replacement target.
-    dispatchPreviewSelection(view, resolved.to);
-    return enqueueConversion({
-      id: createId("conversion"), source: "history", status: "queued",
+    if (!escapeRetry) dispatchPreviewSelection(view, resolved.to);
+    const id = createId("conversion");
+    const queued = enqueueConversion({
+      id, source: "history", status: "queued", escapeRetry,
       originalText: item.input, createdAt: Date.now(), docVersion: docVersionRef.current,
-      anchor: { ...item.anchor!, from: resolved.from, to: resolved.to, originalText: resolved.matchedText },
+      anchor: { ...item.anchor!, from: resolved.from, to: resolved.to, originalText: resolved.matchedText,
+        ...(escapeRetry ? { exactOnly: true, docVersion: docVersionRef.current } : {}) },
       retryOf: item.id, userRequestedSpeculation: true,
       avoidOutputs: collectAvoidOutputs(item.avoidOutputs, item.output),
       documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision
     });
+    if (escapeRetry && queued) view.dispatch({ effects: addLoadingDecoration.of({ id, from: resolved.from, to: resolved.to }) });
+    return queued;
   }, [enqueueConversion, invalidatePredictiveSuggestions]);
+
+  const retryAutomaticConversion = useCallback((view: EditorView) => {
+    const item = lastAutomaticConversion.current;
+    const anchor = item?.anchor;
+    if (activePanel || candidateList || settingsRef.current.conversionMode !== "replace" ||
+      view.state.field(ghostSuggestionField).suggestion || !item || !anchor ||
+      anchor.docVersion !== docVersionRef.current || !view.state.selection.main.empty ||
+      view.state.selection.main.head !== anchor.to ||
+      view.state.doc.sliceString(anchor.from, anchor.to) !== item.output) return false;
+    const avoidOutputs = collectAvoidOutputs(item.avoidOutputs, item.output);
+    const alternative = item.session?.candidates.find(({ kind, result }) =>
+      kind === "conversion" && result.changes?.readingAssessment?.status === "verified" &&
+      result.reviewKana === item.reviewKana && !avoidOutputs.includes(result.text));
+    if (alternative) {
+      view.dispatch({ effects: showGhostSuggestion.of({
+        ...candidateDetails(alternative.result),
+        id: createId("conversion"), from: anchor.from, to: anchor.to, originalText: item.output!,
+        inputText: item.input, source: "history", retryOf: item.id, avoidOutputs,
+        documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
+      }) });
+      setStatus({ kind: "success", message: "別の表記です。Alt+Enter で確定できます。" });
+      return true;
+    }
+    if (conversionQueueRef.current.some(request => request.escapeRetry && request.retryOf === item.id &&
+      requestsRef.current.valid(request.id))) return true;
+    return handleSpeculateHistory(item, true);
+  }, [activePanel, candidateList, docVersionRef, handleSpeculateHistory, settingsRef, setStatus]);
 
   const candidateListIsCurrent = useCallback(() => {
     const view = editorViewRef.current;
@@ -949,6 +985,19 @@ export function useConversion({
           }
 
           displayedSuggestionRevisionRef.current = request.revision;
+          if (settingsRef.current.conversionMode === "replace" && request.range.trigger === "typing" &&
+            canApplyConversionAutomatically(currentView, conversion, "replace", request.range.trigger)) {
+            const accepted: GhostConversionSuggestion = {
+              ...candidateDetails(conversion), id: request.id, from: request.range.from, to: request.range.to,
+              originalText: request.range.text, inputText: request.range.text, source: "editor", trigger: "typing",
+              documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
+            };
+            if (commitConversion(currentView, accepted, "automatic")) {
+              finishConversion(accepted, false, request.settings.modelName);
+              setStatus({ kind: "success", message: "変換しました。Esc で見直せます。" });
+            }
+            return;
+          }
           if (!showConversionPreview(conversion, {
             id: request.id, from: request.range.from, to: request.range.to,
             originalText: request.range.text, inputText: request.range.text, trigger: request.range.trigger,
@@ -981,7 +1030,7 @@ export function useConversion({
         requestsRef.current.finish(request.id);
       }
     },
-    [showConversionPreview, setStatus],
+    [finishConversion, showConversionPreview, setStatus],
   );
 
   const processPredictiveSuggestionQueue = useCallback(async () => {
@@ -1124,6 +1173,7 @@ export function useConversion({
     speculateFromCandidateList,
     handleSpeculateHistory,
     retryRecentConversion,
+    retryAutomaticConversion,
     history,
     recentRetryItem,
     dismissRecentRetryChip,

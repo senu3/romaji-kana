@@ -125,7 +125,7 @@ export function ConversionPanel({
             </button>
           </div>
           {previewMode ? <div className="conversion-key-reference"><span>候補を確定</span><kbd>Alt + Enter</kbd></div>
-            : <p className="settings-help">推測・読み未確認の候補は、確認して確定します。</p>}
+            : <p className="settings-help">直前の変換は Esc で見直せます。推測・読み未確認の候補は、確認して確定します。</p>}
           {!remoteMode ? (
             <div className="shortcut-field conversion-manual-shortcut">
               <span id={shortcutId}>手動変換</span>
@@ -184,6 +184,7 @@ export function ConversionPanel({
           <CheckRow label="候補がないときは自動で推測" checked={settings.autoSpeculation}
             onChange={checked => update({ autoSpeculation: checked })} />
           <CheckRow label="オートサジェスト" checked={settings.autoSuggest} onChange={checked => update({ autoSuggest: checked })} />
+          <p className="settings-help">入力行に補完を1件表示します。Tab で確定します。</p>
         </section>
         <AccordionSection
           title="詳細設定"

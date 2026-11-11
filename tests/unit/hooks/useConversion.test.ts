@@ -208,7 +208,7 @@ describe("conversion lifecycle", () => {
     expect(options.saveCurrentDocumentSession).toHaveBeenCalledOnce();
     expect(conversionLearningChoices()).toHaveLength(0);
   });
-  it.each(["replace", "ghost"] as const)("keeps pause conversion provisional in %s mode", async mode => {
+  it.each(["replace", "ghost"] as const)("uses the selected mode for verified pause conversion: %s", async mode => {
     const result: JapaneseConversionResult = { text: "本", reviewKana: "ほん", changes: {
       ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),
       readingAssessment: { status: "verified", origin: "dictionary", proof: "independent" },
@@ -218,8 +218,8 @@ describe("conversion lifecycle", () => {
     const { hook, view, options } = harness("hon");
     options.settingsRef.current.conversionMode = mode;
     await act(async () => { hook.current.handleConvert(range("hon", "typing")); });
-    expect(view.state.doc.toString()).toBe("hon");
-    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe("本");
+    expect(view.state.doc.toString()).toBe(mode === "replace" ? "本" : "hon");
+    expect(view.state.field(ghostSuggestionField).suggestion?.convertedText).toBe(mode === "replace" ? undefined : "本");
     expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.lastCall?.[3]).toMatchObject({ rerank: false, autoRescue: false });
   });
   it("keeps automatic results provisional while completion selection is active", async () => {

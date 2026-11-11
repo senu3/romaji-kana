@@ -29,7 +29,7 @@ export function rankSuggestions(reading: string, candidates: WordSuggestion[], c
   const learned = choices.map(c => ({ reading: c.reading, text: c.text, source: "learning" as const, cost: 0 }));
   const seen = new Set<string>();
   return [...learned, ...candidates].filter(c => c.reading.startsWith(reading) && c.reading.length > reading.length &&
-    c.reading.length <= reading.length + 12 && c.text.length <= 80 && c.text.length > 0 && !/[\r\n]/u.test(c.text))
+    c.reading.length <= reading.length + 12 && /^[ぁ-ゖー]+$/u.test(c.reading) && c.text.length <= 80 && c.text.length > 0 && !/[\r\n]/u.test(c.text))
     .sort((a, b) => (counts.get(JSON.stringify([b.reading, b.text])) ?? 0) - (counts.get(JSON.stringify([a.reading, a.text])) ?? 0) ||
       Number(b.source === "user") - Number(a.source === "user") || a.cost - b.cost || a.reading.length - b.reading.length || a.text.localeCompare(b.text, "ja"))
     .filter(c => !seen.has(c.text) && Boolean(seen.add(c.text))).slice(0, 5);
