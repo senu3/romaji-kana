@@ -159,12 +159,11 @@ try {
     assert.equal(await newer.count(), 1, 'An earlier result must not replace the newer prediction');
     await saved.getByRole('button', { name: 'ほかの候補', exact: true }).click();
     await page.getByRole('dialog', { name: 'ほかの候補', exact: true }).getByRole('button', { name: /^ほん。/ }).click();
-    await page.keyboard.press('Alt+Enter');
     assert.equal(await editor.innerText(), 'ほん。yomu ');
   });
   const selectedCandidateFailures = [];
   for (const entry of ['ghost', 'recent', 'history']) for (const trigger of [',', '.', ' ', 'Enter', 'pause']) {
-    await scenario({ conversionMode: entry === 'ghost' ? 'ghost' : 'replace', triggers: { typing: true, space: true, enter: true } }, async (page, editor, searches) => {
+    await scenario({ conversionMode: entry === 'ghost' ? 'ghost' : 'replace', triggers: { typing: entry === 'ghost', space: true, enter: true } }, async (page, editor, searches) => {
       await page.route('**/api/kana-engine', route => {
         const { reading } = route.request().postDataJSON();
         searches.push(reading);
@@ -192,25 +191,17 @@ try {
       await list.getByRole('button', { name: '航海のときだ', exact: true }).click({ timeout: 3000 }).catch(async error => {
         throw new Error(`${entry}/${JSON.stringify(trigger)}: ${await editor.innerText()} | ${await list.allTextContents()}`, { cause: error });
       });
-      await page.locator('.cm-ghost-text-suggestion').filter({ hasText: '航海のときだ' }).waitFor();
+      assert.equal(await editor.innerText(), 'さあ船出のときだ、航海のときだ', 'Click adopts the chosen candidate directly');
       const previousSearches = searches.length;
       if (trigger === 'Enter') await page.keyboard.press('Enter');
       else if (trigger !== 'pause') await page.keyboard.type(trigger);
       await page.waitForTimeout(700);
       try {
-        if (trigger === 'pause' || trigger === ' ') {
-          assert.equal(await page.locator('.cm-ghost-text-suggestion').textContent(), '航海のときだ');
-        } else {
-          const suffix = trigger === ',' ? '、' : trigger === '.' ? '。' : trigger === 'Enter' ? '\n' : ' ';
-          const text = await editor.locator('.cm-line').evaluateAll(lines => lines.map(line => {
-            const copy = line.cloneNode(true);
-            copy.querySelectorAll('.cm-ghost-text').forEach(widget => widget.remove());
-            return copy.textContent;
-          }).join('\n'));
-          assert.equal(text, `さあ船出のときだ、航海のときだ${suffix}`);
-          assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
-        }
-        assert.equal(searches.length, previousSearches, 'A selected candidate must not start another conversion');
+        const suffix = trigger === 'pause' ? '' : trigger === 'Enter' ? '\n' : trigger;
+        const text = (await editor.locator('.cm-line').allTextContents()).join('\n');
+        assert.equal(text, `さあ船出のときだ、航海のときだ${suffix}`);
+        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+        assert.equal(searches.length, previousSearches, 'Adoption must not start another conversion');
       } catch (error) { selectedCandidateFailures.push(`${entry}/${JSON.stringify(trigger)}: ${error.message}`); }
     });
   }
@@ -304,7 +295,6 @@ try {
         if (entry === 'ghost') await page.screenshot({ path: await screenshotPath('test-results/e2e/triggers-speculate-mobile.png'), fullPage: true });
         await editor.focus();
         await page.keyboard.press('Tab');
-        await page.keyboard.press('Enter');
         assert.equal(await editor.innerText(), '資料を確認してください。');
       }
       assert.equal(proposals, 1, 'Explicit reinterpretation must issue only one proposal');
@@ -345,7 +335,7 @@ try {
       return clone.textContent;
     });
     assert.equal(documentText, source, 'Reconstructed protected output must remain a preview');
-    await editor.focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
+    await editor.focus(); await page.keyboard.press('Tab');
     assert.equal(await editor.innerText(), 'XR-34の更新は終わらなかった。');
     assert.equal(proposals, 1);
   });

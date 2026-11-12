@@ -1,4 +1,6 @@
 import { isSelectingCompletion } from "../lib/completionSelection";
+import { candidateBindings, candidateAcceptLabel } from "../lib/candidateInteraction";
+import { candidateSurface, candidatePanelOpen, setCandidatePanelOpen } from "./candidateSurface";
 import {
   defaultKeymap,
   history,
@@ -29,7 +31,6 @@ import {
   keymap,
   lineNumbers,
   placeholder,
-  WidgetType,
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
@@ -78,7 +79,7 @@ import { rememberUnconvertedRange, retainedConversionRange, unconvertedRanges } 
 
 interface MarkdownEditorProps {
   candidateList?: CandidateListTarget | null;
-  onSelectCandidate?: (id: string) => void;
+  onSelectCandidate?: (id: string, accept?: boolean) => void;
   onSpeculate?: () => void;
   onCloseCandidateList?: () => void;
   settings: AppSettings;
@@ -156,10 +157,9 @@ const inlineGhostActions = Facet.define<{
   details: (suggestion: GhostConversionSuggestion) => void;
 }>();
 
-class InlineGhostWidget extends WidgetType {
-  constructor(private readonly suggestion: GhostConversionSuggestion) { super(); }
+class InlineCandidate {
+  constructor(private readonly suggestion: GhostConversionSuggestion) {}
 
-  eq(other: InlineGhostWidget) { return this.suggestion === other.suggestion; }
 
   toDOM(view: EditorView) {
     const element = document.createElement("span");
@@ -189,15 +189,14 @@ class InlineGhostWidget extends WidgetType {
       const kind = document.createElement("span");
       kind.className = "conversion-kind";
       kind.textContent = this.suggestion.conversionStrategy ? candidatePresentation(this.suggestion).label : "読み未確認";
-      kind.title = "内容を確認してAlt+Enterで確定してください。";
+      kind.title = "内容を確認してTabで採用してください。";
       element.append(kind);
     }
-    button("Alt+Enter", "確定 Alt+Enter", () => view.state.facet(inlineGhostActions)[0]?.accept(view));
+    button("採用 Tab", candidateAcceptLabel, () => view.state.facet(inlineGhostActions)[0]?.accept(view));
     button("▾", "ほかの候補", () => view.state.facet(inlineGhostActions)[0]?.open(this.suggestion));
     return element;
   }
 
-  ignoreEvent() { return true; }
 }
 
 export const ghostSuggestionField = StateField.define<GhostState>({
@@ -269,10 +268,7 @@ function buildGhostDecorations(suggestion: GhostConversionSuggestion | null): De
     class: suggestion.previewOnly ? "cm-history-preview" : suggestion.conversionStrategy === "speculative" ? "cm-speculation-source" : "cm-ghost-source",
   }).range(suggestion.from, suggestion.to);
 
-  return suggestion.previewOnly || suggestion.conversionStrategy === "speculative" ? Decoration.set([sourceDecoration]) : Decoration.set([
-    sourceDecoration,
-    Decoration.widget({ widget: new InlineGhostWidget(suggestion), side: 1 }).range(suggestion.to),
-  ]);
+  return Decoration.set([sourceDecoration]);
 }
 
 const theme = EditorView.theme({
@@ -501,6 +497,8 @@ export function MarkdownEditor({
   const [canRedo, setCanRedo] = useState(false);
   settingsRef.current = settings;
   useEffect(() => { viewRef.current?.dispatch({}); }, [settings.autoSuggest, settings.personalDictionary]);
+  const panelIsOpen = Boolean(candidateList || (visibleSuggestion && inlineDetailsId === visibleSuggestion.id));
+  useEffect(() => { viewRef.current?.dispatch({ effects: setCandidatePanelOpen.of(panelIsOpen) }); }, [panelIsOpen]);
 
   function clearPredictiveSuggestionTimer() {
     if (suggestionPauseTimerRef.current) {
@@ -735,6 +733,20 @@ export function MarkdownEditor({
         lineNumbers(),
         loadingDecorations,
         ghostSuggestionField,
+        candidatePanelOpen,
+        candidateSurface(view => {
+          const suggestion = view.state.field(ghostSuggestionField).suggestion;
+          return suggestion && !suggestion.previewOnly && suggestion.conversionStrategy !== "speculative" ? suggestion.to : null;
+        }, view => {
+          let rendered = view.state.field(ghostSuggestionField).suggestion!;
+          const dom = new InlineCandidate(rendered).toDOM(view);
+          return { dom, update: () => {
+            const suggestion = view.state.field(ghostSuggestionField).suggestion!;
+            if (suggestion === rendered) return;
+            rendered = suggestion;
+            dom.replaceChildren(...new InlineCandidate(suggestion).toDOM(view).childNodes);
+          } };
+        }, true),
         pauseConversion,
         resumePauseConversion,
         speculationExtension(state => state.field(ghostSuggestionField).suggestion, {
@@ -749,7 +761,7 @@ export function MarkdownEditor({
         }),
         autoSuggestExtension(() => settingsRef.current,
           view => view.state.field(loadingDecorations).size > 0 || Boolean(view.state.field(ghostSuggestionField).suggestion),
-          view => Boolean(view.state.field(ghostSuggestionField).suggestion),
+          view => view.state.field(candidatePanelOpen) || Boolean(view.state.field(ghostSuggestionField).suggestion),
           view => onRetryAutomaticRef.current?.(view) ?? false),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
@@ -779,10 +791,7 @@ export function MarkdownEditor({
               key: settingsRef.current.triggers.manualShortcut,
               run: runManualConversion,
             },
-            {
-              key: "Alt-Enter",
-              run: acceptGhostSuggestion,
-            },
+            ...candidateBindings({ accept: acceptGhostSuggestion }),
             {
               key: "Mod-/",
               run: retryGhostSuggestion,
@@ -873,10 +882,7 @@ export function MarkdownEditor({
             key: settings.triggers.manualShortcut,
             run: runManualConversion,
           },
-          {
-            key: "Alt-Enter",
-            run: acceptGhostSuggestion,
-          },
+          ...candidateBindings({ accept: acceptGhostSuggestion }),
           {
             key: "Mod-/",
             run: retryGhostSuggestion,
@@ -1253,7 +1259,7 @@ export function MarkdownEditor({
           onAccept={() => runEditorCommand(acceptGhostSuggestion)}
           onDismiss={() => { setInlineDetailsId(null); viewRef.current?.focus(); }}
           onOpen={() => { setInlineDetailsId(null); runEditorCommand(retryGhostSuggestion); }}
-          onSelect={onSelectCandidate ?? (() => {})}
+          onSelect={id => onSelectCandidate?.(id, true)}
           onSpeculate={onSpeculate ?? (() => {})}
           onClose={() => { onCloseCandidateList?.(); viewRef.current?.focus(); }}
         />

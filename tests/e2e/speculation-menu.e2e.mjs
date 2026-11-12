@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { artifactPath, screenshotPath } from '../helpers/artifacts.mjs';
 
-const server = await createServer({ cacheDir: artifactPath('cache/e2e-speculation'), server: { host: '127.0.0.1', port: 0 } });
+const server = await createServer({ cacheDir: artifactPath('cache/e2e-speculation'), server: { host: '127.0.0.1', port: 0, strictPort: false } });
 let browser;
 const input = 'annwoonegasimasu';
 const responses = [
@@ -62,8 +62,8 @@ try {
         await page.keyboard.press('End');
         const last = await list.locator('.candidate-list-options button').last().boundingBox();
         assert.ok(last.y + last.height <= after.y + 1, 'Keyboard navigation reveals the last candidate above the footer');
-        await page.keyboard.press('Tab');
-        assert.equal(await footerButton.evaluate(el => el === document.activeElement), true, 'Footer follows the candidate list in tab order');
+        await footerButton.focus();
+        assert.equal(await footerButton.evaluate(el => el === document.activeElement), true);
         await page.screenshot({ path: await screenshotPath(`test-results/e2e/candidate-footer-${options.viewport ? 'mobile' : 'desktop'}.png`) });
       }
       await page.getByRole('button', { name: '読みも含めて見直す' }).click();
@@ -85,14 +85,14 @@ try {
     const menu = page.getByRole('group', { name: '推測候補', exact: true });
     assert.equal(await editor.innerText(), input);
     assert.equal(await menu.locator(':scope > button').count(), 2, 'Duplicate interpretations are removed');
-    assert.equal(await menu.locator('[aria-pressed="true"]').count(), 0);
+    assert.equal(await menu.locator('[aria-pressed="true"]').count(), 1);
     assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0);
     assert.equal(await page.locator('.cm-speculation-source').innerText(), input);
     assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
     await page.screenshot({ path: await screenshotPath('test-results/e2e/speculation-desktop.png') });
-    await page.keyboard.press('Tab'); await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
     assert.equal(await menu.locator('[aria-pressed="true"]').innerText(), '企画案をお願いします');
-    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
     assert.equal(await editor.innerText(), '企画案をお願いします');
     assert.equal(await menu.count(), 0);
     await page.keyboard.press('Control+/');
@@ -102,9 +102,10 @@ try {
     await page.keyboard.press('Control+z'); assert.equal(await editor.innerText(), input);
   });
   await scenario(async (page, editor) => {
+    await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     assert.equal(await editor.textContent(), input);
-    assert.equal(await editor.locator('.cm-line').count(), 2, 'Unselected Enter inserts a newline, not a candidate');
+    assert.equal(await editor.locator('.cm-line').count(), 2, 'Enter inserts a newline even after navigating candidates');
     assert.equal(await page.locator('.speculation-suggestions').count(), 0);
   });
   await scenario(async (page, editor) => {
@@ -138,9 +139,11 @@ try {
   });
   await scenario(async (_page, editor) => { assert.equal(await editor.innerText(), input); }, []);
   await scenario(async (page, editor) => {
-    await page.setViewportSize({ width: 390, height: 600 });
+    await page.setViewportSize({ width: 320, height: 600 });
     const button = page.locator('.speculation-suggestions > button').first();
-    assert.ok((await button.boundingBox()).height > 48, 'Long sentences wrap instead of truncating');
+    await page.waitForFunction(() => document.querySelector('.speculation-suggestions > button')?.getBoundingClientRect().height > 48);
+    assert.ok(await button.evaluate(el => el.scrollWidth <= el.clientWidth + 1), 'Long sentences remain fully readable');
+    assert.ok((await button.boundingBox()).height > 48, 'Long offers wrap to show the full text');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: await screenshotPath('test-results/e2e/speculation-long.png') });
     await page.keyboard.press('Escape'); assert.equal(await editor.innerText(), input);

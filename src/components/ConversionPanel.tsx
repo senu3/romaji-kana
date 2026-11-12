@@ -124,7 +124,7 @@ export function ConversionPanel({
               確認して確定
             </button>
           </div>
-          {previewMode ? <div className="conversion-key-reference"><span>候補を確定</span><kbd>Alt + Enter</kbd></div>
+          {previewMode ? <div className="conversion-key-reference"><span>候補を採用</span><kbd>Tab / Alt + Enter</kbd></div>
             : <p className="settings-help">直前の変換は Esc で見直せます。推測・読み未確認の候補は、確認して確定します。</p>}
           {!remoteMode ? (
             <div className="shortcut-field conversion-manual-shortcut">

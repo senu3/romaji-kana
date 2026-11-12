@@ -3828,7 +3828,6 @@ button.model-chip:hover {
   border-radius: 6px;
 }
 .candidate-bar-row { display: flex; align-items: center; gap: 4px; flex-shrink: 0; min-width: 0; }
-.candidate-preview-toggle { flex: 1 1 auto; min-width: 32px; border: 0; padding: 4px 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
 .conversion-bar .cm-ghost-text-suggestion { display: block; min-height: 0; max-height: none; overflow: hidden; margin: 0; font-size: 14px; line-height: 24px; white-space: nowrap; text-overflow: ellipsis; }
 .candidate-bar-row .candidate-action, .candidate-bar-row .candidate-accept { flex-shrink: 0; min-height: 32px; padding: 3px 7px; white-space: nowrap; }
 .candidate-bar-row .candidate-accept { background: var(--accent-soft); color: var(--ink); }
@@ -3836,7 +3835,6 @@ button.model-chip:hover {
 .candidate-bar-row .candidate-close { font-size: 18px; color: var(--ink-muted); }
 .candidate-bar-row .conversion-kind { flex-shrink: 0; font-size: 11px; }
 .conversion-bar .candidate-review, .conversion-bar .candidate-alternatives { padding: 4px 6px 8px; border-top: 1px solid var(--line); }
-.candidate-full-text { max-height: 150px; flex-shrink: 1; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 6px; font-size: 14px; }
 @media (pointer: coarse) {
   .candidate-bar-row button { min-height: 40px; }
 }
@@ -3886,7 +3884,28 @@ button.model-chip:hover {
 .cm-inline-candidate .cm-ghost-text-suggestion { background: transparent; color: var(--accent); }
 .cm-inline-candidate .conversion-kind { font-size: 10px; }
 .cm-inline-candidate button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.conversion-bar .candidate-popover-text { display: block; overflow: hidden; font-size: 14px; line-height: 24px; white-space: nowrap; text-overflow: ellipsis; }
+.conversion-bar .candidate-popover-text { display: block; flex: 1 1 160px; min-width: 0; font-size: 14px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.conversion-bar .candidate-bar-row { flex-wrap: wrap; }
+
+/* Shared candidate surfaces stay outside document layout and never truncate an offer. */
+.candidate-surface { position: fixed; z-index: 40; box-sizing: border-box; width: max-content; max-width: min(420px, calc(100vw - 16px)); overflow: auto; }
+.candidate-completion { display: flex; align-items: baseline; gap: 8px; padding: 2px 5px; border: 1px solid transparent; border-radius: 3px; background: var(--surface); color: var(--ink-muted); font-family: var(--editor-font-family, monospace); font-size: var(--editor-font-size, 16px); line-height: 1.5; text-align: left; cursor: pointer; }
+.candidate-completion[hidden] { display: none; }
+.candidate-completion-text { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.candidate-accept-hint { flex: 0 0 auto; color: var(--ink); font: 11px/1.5 system-ui, sans-serif; }
+.candidate-accept-hint kbd { border: 1px solid var(--line-strong); border-radius: 3px; padding: 1px 3px; font: inherit; }
+.candidate-completion[data-placement="floating"] { padding: 8px; border-color: var(--line-strong); }
+.candidate-completion:hover { background: var(--accent-soft); color: var(--ink); }
+.candidate-completion:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.candidate-surface.cm-inline-candidate { margin: 0; padding: 4px 6px; background: var(--surface); align-items: baseline; flex-wrap: wrap; border: 1px solid transparent; }
+.candidate-surface.cm-inline-candidate[data-placement="floating"] { border-color: var(--line-strong); }
+.candidate-surface.cm-inline-candidate button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; overflow: visible; }
+.candidate-surface.cm-inline-candidate .cm-ghost-text-suggestion { flex: 1 1 auto; text-align: left; }
+@media (pointer: coarse) {
+  .candidate-completion { min-height: 44px; padding: 8px; border-color: var(--line-strong); }
+  .candidate-accept-hint { font-size: 13px; }
+  .candidate-accept-hint kbd { display: none; }
+}
 @media (max-width: 480px) {
   .cm-inline-candidate { gap: 3px; margin-inline: 4px; }
   .cm-inline-candidate button { max-width: 16ch; }

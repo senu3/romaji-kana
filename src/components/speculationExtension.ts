@@ -1,9 +1,11 @@
 import { Prec, StateEffect, StateField, type EditorState } from "@codemirror/state";
-import { EditorView, keymap, showTooltip, type Tooltip } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import type { GhostConversionSuggestion } from "../lib/types";
 import { candidateDetails } from "../lib/conversionCandidate";
 import { completionSelection } from "../lib/completionSelection";
-import { moveSuggestion, suggestionMenuTheme } from "./suggestionMenu";
+import { suggestionMenuTheme } from "./suggestionMenu";
+import { candidateBindings, candidateHelp, moveCandidateIndex } from "../lib/candidateInteraction";
+import { candidateSurface } from "./candidateSurface";
 
 interface Menu { suggestion: GhostConversionSuggestion; choices: GhostConversionSuggestion[]; selected: number }
 
@@ -20,7 +22,7 @@ export function speculationExtension(getSuggestion: (state: EditorState) => Ghos
     const choices = (suggestion.session?.candidates.map(c => ({ ...suggestion, ...candidateDetails(c.result), session: suggestion.session })) ?? [suggestion])
       .filter(c => { const key = c.convertedText.normalize("NFKC").replace(/[\s。、,.!?！？]+/gu, ""); if (!key || seen.has(key)) return false; seen.add(key); return true; }).slice(0, 3);
     if (!choices.length) return null;
-    let selected = previous?.suggestion === suggestion ? previous.selected : -1;
+    let selected = previous?.suggestion === suggestion ? previous.selected : 0;
     for (const effect of tr.effects) if (effect.is(select)) selected = effect.value;
     return { suggestion, choices, selected: selected < choices.length ? selected : -1 };
   }, provide: field => completionSelection.from(field, menu => Boolean(menu)) });
@@ -33,7 +35,7 @@ export function speculationExtension(getSuggestion: (state: EditorState) => Ghos
     actions.accept(view, suggestion);
     return true;
   };
-  const create: Tooltip["create"] = view => {
+  const create = (view: EditorView) => {
     const dom = document.createElement("div"); dom.className = "word-suggestions speculation-suggestions";
     dom.setAttribute("role", "group"); dom.setAttribute("aria-label", "推測候補");
     dom.addEventListener("keydown", event => {
@@ -47,7 +49,7 @@ export function speculationExtension(getSuggestion: (state: EditorState) => Ghos
       rendered = menu; dom.replaceChildren();
       const heading = dom.appendChild(document.createElement("div")); heading.className = "word-suggestions-heading";
       heading.setAttribute("aria-live", "polite");
-      heading.textContent = menu.selected < 0 ? "推測候補 · Tabで選択開始 · Escで閉じる" : "推測候補 · ↑↓ / Tabで選択 · Enterで確定";
+      heading.textContent = `推測候補 · ${candidateHelp}`;
       menu.choices.forEach((choice, index) => {
         const button = dom.appendChild(document.createElement("button")); button.type = "button";
         button.className = index === menu.selected ? "selected" : "";
@@ -70,19 +72,15 @@ export function speculationExtension(getSuggestion: (state: EditorState) => Ghos
     };
     render(); return { dom, update: render };
   };
-  const move = (view: EditorView, direction: number, start = false) => {
+  const move = (view: EditorView, direction: number) => {
     const menu = view.state.field(field); if (!menu || view.composing) return false;
-    const selected = moveSuggestion(menu.selected, menu.choices.length, direction, start);
+    const selected = moveCandidateIndex(menu.selected, menu.choices.length, direction);
     if (selected === null) return false;
     if (menu.suggestion.session) menu.suggestion.session.locked = true;
     view.dispatch({ effects: select.of(selected) }); return true;
   };
-  return [field, showTooltip.from(field, menu => menu ? { pos: menu.suggestion.to, above: false, strictSide: false, create } : null),
-    Prec.highest(keymap.of([
-      { key: "Tab", run: view => move(view, 1, true) }, { key: "Shift-Tab", run: view => move(view, -1) },
-      { key: "ArrowDown", run: view => move(view, 1) }, { key: "ArrowUp", run: view => move(view, -1) },
-      { key: "Enter", run: view => accept(view) },
-      { key: "Alt-Enter", run: view => { if (!view.state.field(field)) return false; accept(view); return true; } },
-      { key: "Escape", run: view => { if (!view.state.field(field)) return false; actions.dismiss(view); return true; } },
-    ])), EditorView.domEventHandlers({ compositionstart: (_event, view) => { if (view.state.field(field)) actions.dismiss(view); return false; } }), suggestionMenuTheme];
+  return [field, candidateSurface(view => view.state.field(field)?.suggestion.to ?? null, create),
+    Prec.highest(keymap.of(candidateBindings({ accept, move,
+      dismiss: view => { if (!view.state.field(field)) return false; actions.dismiss(view); return true; },
+    }))), EditorView.domEventHandlers({ compositionstart: (_event, view) => { if (view.state.field(field)) actions.dismiss(view); return false; } }), suggestionMenuTheme];
 }

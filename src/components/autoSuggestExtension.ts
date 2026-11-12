@@ -6,15 +6,8 @@ import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
-
-interface GhostPosition {
-  text: string;
-  candidate: string;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
+import { candidateBindings } from "../lib/candidateInteraction";
+import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
 
 interface Menu { target: SuggestTarget; candidates: WordSuggestion[] }
 const REFRESH_CHARACTER_COUNT = 3;
@@ -43,7 +36,8 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   } });
   const accept = (view: EditorView) => {
     const menu = view.state.field(field);
-    if (!menu || !allowed(view) || pluginValue(view)?.ghost.hidden !== false) return false;
+    if (!menu || !allowed(view) || pluginValue(view)?.ghost.hidden !== false ||
+      pluginValue(view)?.ghost.style.visibility !== "visible") return false;
     const { target } = menu;
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const candidate = menu.candidates[0];
@@ -76,56 +70,49 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     typedSinceRequest = 0; hasRequested = false;
     config = ""; wasConverting = false;
     ghost = document.createElement("button");
+    observer?: ResizeObserver;
     constructor(readonly view: EditorView) {
       this.config = this.configKey();
       this.ghost.type = "button";
-      this.ghost.className = "cm-autosuggest-ghost";
+      this.ghost.className = "cm-autosuggest-ghost candidate-surface candidate-completion";
       this.ghost.hidden = true;
       this.ghost.tabIndex = -1;
       this.ghost.addEventListener("mousedown", event => event.preventDefault());
       this.ghost.addEventListener("click", () => accept(view));
       view.dom.appendChild(this.ghost);
+      this.observer = new ResizeObserver(this.requestPlacement);
+      this.observer.observe(this.ghost);
+      window.visualViewport?.addEventListener("resize", this.requestPlacement);
+      window.visualViewport?.addEventListener("scroll", this.requestPlacement);
     }
+    requestPlacement = () => this.view.requestMeasure(this.measureGhost);
     measureGhost = {
       key: this,
       read: (view: EditorView) => {
         const menu = view.state.field(field);
         if (!menu || !allowed(view)) return null;
         const { target } = menu;
-        if (view.state.doc.lineAt(target.to).to !== target.to) return null;
-        const caret = view.coordsAtPos(target.to, 1);
-        const viewport = view.scrollDOM.getBoundingClientRect();
-        const editor = view.dom.getBoundingClientRect();
-        if (!caret || caret.left < viewport.left || caret.right + 24 > viewport.right ||
-          caret.top < viewport.top || caret.bottom > viewport.bottom) return null;
-        const candidate = menu.candidates[0];
-        const prefix = target.suffix ? target.original.slice(0, -target.suffix.length) : target.original;
-        const continuation = !target.suffix && candidate.text.startsWith(prefix);
-        return {
-          text: continuation ? candidate.text.slice(prefix.length) : ` → ${candidate.text}`,
-          candidate: candidate.text,
-          left: caret.right - editor.left + 2,
-          top: caret.top - editor.top,
-          width: viewport.right - caret.right - 8,
-          height: caret.bottom - caret.top,
-        };
+        return measureCandidate(view, target.to, this.ghost, view.state.doc.lineAt(target.to).to === target.to);
       },
-      write: (position: GhostPosition | null) => {
-        this.ghost.hidden = !position;
-        if (!position) return;
-        this.ghost.textContent = position.text;
-        this.ghost.setAttribute("aria-label", `${position.candidate} を補完 (Tab)`);
-        this.ghost.title = `${position.candidate} を補完 (Tab)`;
-        Object.assign(this.ghost.style, {
-          left: `${position.left}px`, top: `${position.top}px`,
-          maxWidth: `${position.width}px`, lineHeight: `${position.height}px`,
-        });
-      },
+      write: (position: CandidatePlacement | null) => applyCandidatePlacement(this.ghost, position),
     };
     configKey() { return JSON.stringify([settings().autoSuggest, settings().personalDictionary]); }
     update(update: ViewUpdate) {
       const completion = update.state.field(field);
       if (!completion || !allowed(this.view)) this.ghost.hidden = true;
+      else if (completion !== update.startState.field(field) || this.ghost.hidden) {
+        const { target } = completion, candidate = completion.candidates[0];
+        const prefix = target.suffix ? target.original.slice(0, -target.suffix.length) : target.original;
+        const continuation = !target.suffix && candidate.text.startsWith(prefix);
+        const text = document.createElement("span"); text.className = "candidate-completion-text";
+        text.textContent = continuation ? candidate.text.slice(prefix.length) : ` → ${candidate.text}`;
+        const hint = document.createElement("span"); hint.className = "candidate-accept-hint";
+        hint.innerHTML = '採用 <kbd>Tab</kbd>';
+        this.ghost.replaceChildren(text, hint);
+        this.ghost.setAttribute("aria-label", `${candidate.text} を補完 (Tabで採用)`);
+        this.ghost.hidden = false;
+        this.ghost.style.visibility = "hidden";
+      }
       if (update.viewportChanged || update.geometryChanged || update.focusChanged ||
         completion !== update.startState.field(field)) this.view.requestMeasure(this.measureGhost);
       const nextConfig = this.configKey(), nextConverting = converting(this.view);
@@ -185,6 +172,9 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       clearTimeout(this.timer);
       this.controller?.abort();
       this.ghost.remove();
+      this.observer?.disconnect();
+      window.visualViewport?.removeEventListener("resize", this.requestPlacement);
+      window.visualViewport?.removeEventListener("scroll", this.requestPlacement);
     }
   }, { eventHandlers: { scroll() { this.view.requestMeasure(this.measureGhost); }, compositionstart() {
     ++this.revision; clearTimeout(this.timer); this.controller?.abort();
@@ -195,20 +185,13 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     return false;
   } } });
   const pluginValue = (view: EditorView) => view.plugin(plugin);
-  return [field, convertedTarget, plugin, Prec.highest(keymap.of([
-    { key: "Tab", run: accept },
-    { key: "Escape", run: view => {
-      if (view.composing) return false;
+  return [field, convertedTarget, plugin, Prec.highest(keymap.of(candidateBindings({
+    accept,
+    dismiss: view => {
       const retry = retryConversion(view);
       if (!retry && !view.state.field(field)) return false;
       pluginValue(view)?.dismiss();
       return true;
-    } },
-  ])), EditorView.baseTheme({
-    ".cm-autosuggest-ghost": {
-      position: "absolute", zIndex: "2", border: "0", padding: "0", background: "transparent",
-      color: "var(--ink-muted)", font: "inherit", fontFamily: "var(--editor-font-family, monospace)",
-      fontSize: "var(--editor-font-size, 16px)", whiteSpace: "pre", overflow: "hidden", textOverflow: "ellipsis",
     },
-  })];
+  })))];
 }

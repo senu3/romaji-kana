@@ -1,13 +1,7 @@
 import { EditorView } from "@codemirror/view";
 
-/** Navigation begins deliberately with Tab; unselected Enter remains an editor key. */
-export function moveSuggestion(selected: number, count: number, direction: number, start = false): number | null {
-  if (!count || (selected < 0 && !start)) return null;
-  return selected < 0 ? 0 : (selected + direction + count) % count;
-}
-
 export const suggestionMenuTheme = EditorView.baseTheme({
-  ".cm-tooltip.word-suggestions": { minWidth: "220px", maxWidth: "min(420px, 90vw)", maxHeight: "min(420px, 55vh)", overflowY: "auto", padding: "6px", background: "var(--surface, white)", color: "var(--ink, #16343b)", border: "1px solid var(--line, #cbd8dc)" },
+  ".candidate-surface.word-suggestions": { width: "max-content", maxWidth: "min(420px, calc(100vw - 16px))", overflowY: "auto", padding: "6px", background: "var(--surface, white)", color: "var(--ink, #16343b)", border: "1px solid var(--line, #cbd8dc)" },
   ".word-suggestions-heading": { padding: "6px", fontSize: "11px" },
   ".word-suggestions button": { display: "flex", justifyContent: "space-between", gap: "16px", width: "100%", padding: "8px", background: "transparent", color: "inherit", border: "0", textAlign: "left", cursor: "pointer", overflowWrap: "anywhere", whiteSpace: "normal" },
   ".word-suggestions button.selected, .word-suggestions button:hover": { background: "var(--accent-soft, #e4f5f0)" },

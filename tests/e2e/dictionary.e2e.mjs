@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { artifactPath, screenshotPath } from '../helpers/artifacts.mjs';
 
-const server = await createServer({ cacheDir: artifactPath('cache/e2e-dictionary'), server: { host: '127.0.0.1', port: 0 } });
+const server = await createServer({ cacheDir: artifactPath('cache/e2e-dictionary'), server: { host: '127.0.0.1', port: 0, strictPort: false } });
 let browser;
 try {
   await server.listen();

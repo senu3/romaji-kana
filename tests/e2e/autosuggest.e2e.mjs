@@ -233,6 +233,45 @@ try {
     await page.waitForTimeout(300);
     assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0, 'Setting change applies immediately');
   });
+  await scenario({}, async (page, editor) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.keyboard.insertText('前'.repeat(12));
+    await page.keyboard.type('kouka');
+    const ghost = page.locator('.cm-autosuggest-ghost:visible');
+    await ghost.waitFor();
+    await page.waitForFunction(() => document.querySelector('.cm-autosuggest-ghost')?.dataset.placement === 'floating');
+    const rect = await ghost.boundingBox();
+    assert.ok(rect.x >= 0 && rect.x + rect.width <= 390, 'Right-edge candidate stays inside the screen');
+    assert.equal(await ghost.locator('.candidate-accept-hint').innerText(), '採用 Tab');
+    await page.screenshot({ path: await screenshotPath('test-results/e2e/candidate-right-edge.png') });
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '前'.repeat(12) + '航海');
+  });
+  await scenario({}, async (page, editor) => {
+    await page.setViewportSize({ width: 390, height: 600 });
+    const long = '航海の記録を確かめながら次の目的地を決める';
+    await page.route('**/api/kana-engine', route => route.fulfill({ json: { candidates: [
+      { text: long, reading: 'こうかい', cost: 0, source: 'mozc' },
+    ] } }));
+    await page.keyboard.type('kouka');
+    const ghost = page.locator('.cm-autosuggest-ghost:visible');
+    await ghost.waitFor();
+    assert.equal(await ghost.locator('.candidate-completion-text').textContent(), ` → ${long}`);
+    assert.ok(await ghost.evaluate(el => el.scrollWidth <= el.clientWidth + 1), 'Long candidates wrap without hidden horizontal text');
+    await page.screenshot({ path: await screenshotPath('test-results/e2e/candidate-long-completion.png') });
+    await page.keyboard.press('Alt+Enter');
+    assert.equal(await editor.innerText(), long);
+  });
+  await scenario({}, async (page, editor) => {
+    await page.keyboard.type('kouka.tail');
+    await page.keyboard.press('Home');
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
+    const ghost = page.locator('.cm-autosuggest-ghost:visible');
+    await ghost.waitFor();
+    assert.equal(await ghost.getAttribute('data-placement'), 'floating', 'Mid-line offers use the same fallback surface');
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '航海.tail', 'Acceptance preserves the suffix beside the caret');
+  });
   await scenario({ personalDictionary: [
     { id: 'custom', reading: 'てすとしゃ', text: '補完試験社', pos: 'organization', enabled: true },
     { id: 'disabled', reading: 'てすとしゃ', text: '無効語彙', pos: 'organization', enabled: false },

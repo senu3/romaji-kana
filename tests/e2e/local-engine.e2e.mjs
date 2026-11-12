@@ -59,7 +59,7 @@ try {
   await page.keyboard.press('ArrowDown');
   assert.equal(await candidateButtons.nth(1).evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Enter');
-  assert.equal(await ghost.textContent(), selected, 'Late ranking must not move the selected candidate');
+  assert.equal(await documentText(page), selected, 'Navigation and acceptance use the same candidate');
   assert.equal(modelCalls, 1, 'Stored candidate navigation must not call the model');
   await page.keyboard.press('Alt+Enter');
   assert.equal(await documentText(page), selected);
@@ -67,7 +67,7 @@ try {
   await page.keyboard.press('Control+/');
   await list.waitFor();
   await candidateButtons.first().click();
-  await ghost.waitFor();
+  assert.equal(await ghost.count(), 0);
   assert.equal(modelCalls, 1, 'History alternatives also use the retained candidate set');
   await page.keyboard.press('Escape');
 

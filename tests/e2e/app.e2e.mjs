@@ -127,7 +127,7 @@ try {
   await page.keyboard.press('Control+/');
   await list.waitFor();
   await page.keyboard.press('Escape');
-  await preview.getByRole('button', { name: '確定 Alt+Enter', exact: true }).click();
+  await preview.getByRole('button', { name: '採用 Tab', exact: true }).click();
   assert.equal(await editor.innerText(), '記者');
   await page.getByRole('button', { name: /変換を開く/ }).click();
   const conversionSettings = page.getByRole('region', { name: '変換設定', exact: true });

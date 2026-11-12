@@ -38,7 +38,7 @@ try {
         await wait(275);
         assert.equal(await ghost.count(), 0, 'No preview during the initial pause');
         await wait(105);
-        if (name === 'fast') await ghost.waitFor({ state: 'visible' });
+        if (name === 'fast') await waitForPreview(page, ghost);
         else {
           assert.equal(await ghost.count(), 0, 'Slow typing still has no preview at 380 ms');
           await wait(90);
@@ -46,7 +46,7 @@ try {
           await wait(130);
         }
       }
-      await ghost.waitFor({ state: 'visible' });
+      await waitForPreview(page, ghost);
       assert.equal(await ghost.textContent(), '本を読む');
       assert.equal(await documentText(), 'honwoyomu');
       await page.keyboard.press('Alt+Enter');
@@ -59,7 +59,7 @@ try {
     await scenario('completion', { autoConvert: false }, async ({ page, completion, replay, documentText }) => {
       await replay('kouka', 75);
       await completion.waitFor({ state: 'visible' });
-      const text = (await completion.textContent()).replace(/^ → /, '');
+      const text = (await completion.locator('.candidate-completion-text').textContent()).replace(/^ → /, '');
       await page.keyboard.press('Tab');
       assert.equal(await documentText(), text);
       assert.equal(await completion.count(), 0);
@@ -72,7 +72,7 @@ try {
         await wait(120);
         await initial;
         await wait(40);
-        assert.equal(await completion.textContent(), ' → 航海士');
+        assert.equal(await completion.locator('.candidate-completion-text').textContent(), ' → 航海士');
         await replay('k');
         await wait(75);
         assert.equal(await completion.count(), 0, 'Hide while the reading is incomplete');
@@ -91,7 +91,7 @@ try {
         await updated;
         await wait(40);
         assert.deepEqual(requests.map(request => request.reading), ['こう', reading]);
-        assert.equal(await completion.textContent(), ' → 航海士');
+        assert.equal(await completion.locator('.candidate-completion-text').textContent(), ' → 航海士');
         await page.keyboard.press('Tab');
         assert.equal(await documentText(), '航海士');
         assert.equal(await completion.count(), 0);
@@ -104,7 +104,7 @@ try {
     await replay('honwoyomu', 75);
     await wait(380);
     await requested;
-    if (real) await ghost.waitFor({ state: 'visible' });
+    if (real) await waitForPreview(page, ghost);
     await page.keyboard.press('Backspace');
     await wait(75);
     await page.keyboard.press('Backspace');
@@ -112,7 +112,7 @@ try {
     await wait(75);
     await replay('nda', 75);
     await wait(380);
-    await ghost.waitFor({ state: 'visible' });
+    await waitForPreview(page, ghost);
     assert.equal(await ghost.textContent(), '本を読んだ');
     assert.equal(await documentText(), 'honwoyonda');
     if (!real) {
@@ -271,4 +271,10 @@ function recordTimeline() {
     if (Object.keys(changes).length) events.push({ ms: elapsed(), ...changes });
     previous = state;
   }).observe(editor, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-label'] });
+}
+
+async function waitForPreview(page, ghost) {
+  await ghost.waitFor({ state: 'attached' });
+  if (!real) await page.clock.runFor(40);
+  await ghost.waitFor({ state: 'visible' });
 }

@@ -848,7 +848,7 @@ export function useConversion({
         inputText: item.input, source: "history", retryOf: item.id, avoidOutputs,
         documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
       }) });
-      setStatus({ kind: "success", message: "別の表記です。Alt+Enter で確定できます。" });
+      setStatus({ kind: "success", message: "別の表記です。Tab で採用できます。" });
       return true;
     }
     if (conversionQueueRef.current.some(request => request.escapeRetry && request.retryOf === item.id &&
@@ -867,7 +867,7 @@ export function useConversion({
     return true;
   }, [candidateList]);
 
-  const selectListedCandidate = useCallback((id: string) => {
+  const selectListedCandidate = useCallback((id: string, accept = false) => {
     if (!candidateListIsCurrent() || !candidateList) return;
     const candidate = candidateList.session.candidates.find(candidate => candidate.id === id);
     if (!candidate) return;
@@ -875,8 +875,7 @@ export function useConversion({
     session.selectedId = id;
     const next = candidate.result;
     setCandidateList(null);
-    editorViewRef.current!.dispatch({
-      effects: showGhostSuggestion.of({
+    const suggestion: GhostConversionSuggestion = {
         ...candidateDetails(next), session,
         id: ghost?.id ?? (item.anchor?.exactOnly ? item.id : createId("conversion")),
         from: anchor.from,
@@ -888,11 +887,13 @@ export function useConversion({
         avoidOutputs: item.avoidOutputs,
         documentVocabulary: item.documentVocabulary,
         documentVocabularyRevision: item.documentVocabularyRevision
-      })
-    });
+    };
+    if (accept) {
+      if (commitConversion(editorViewRef.current!, suggestion, "explicit", "end")) finishConversion(suggestion, true);
+    } else editorViewRef.current!.dispatch({ effects: showGhostSuggestion.of(suggestion) });
     editorViewRef.current!.focus();
-    setStatus({ kind: "success", message: "選んだ候補を表示しました。" });
-  }, [candidateList, candidateListIsCurrent]);
+    if (!accept) setStatus({ kind: "success", message: "選んだ候補を表示しました。" });
+  }, [candidateList, candidateListIsCurrent, finishConversion]);
 
   const speculateFromCandidateList = useCallback(() => {
     if (!candidateListIsCurrent() || !candidateList) return;

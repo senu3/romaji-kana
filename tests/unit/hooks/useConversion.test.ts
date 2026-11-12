@@ -344,6 +344,20 @@ describe("conversion lifecycle", () => {
     expect(view.state.doc.toString()).toBe("kisha");
   });
 
+  it("adopts a listed candidate in one explicit action and records it once", () => {
+    const { hook, view, options } = harness("kisha");
+    const session = candidateSession();
+    const ghost = { id: "listed", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
+      reviewKana: "きしゃ", source: "editor" as const, session };
+    act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
+    act(() => { hook.current.selectListedCandidate("two", true); });
+    expect(view.state.doc.toString()).toBe("汽車");
+    expect(hook.current.candidateList).toBeNull();
+    expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
+    expect(hook.current.history).toHaveLength(1);
+    expect(options.saveCurrentDocumentSession).toHaveBeenCalledOnce();
+    expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
+  });
   it("previews a history candidate without overwriting the committed output or mutating the accepted session", () => {
     const { hook, view } = harness("記者");
     const session = candidateSession(); session.state = "accepted";
@@ -374,14 +388,14 @@ describe("conversion lifecycle", () => {
     expect(convertRomajiToJapaneseDetailed).not.toHaveBeenCalled();
   });
 
-  it("rejects a list selection after the target document has changed", () => {
+  it.each([false, true])("rejects a list action after the target document has changed (accept=%s)", accept => {
     const { hook, view } = harness("kisha");
     const ghost = {
       id: "normal", from: 0, to: 5, originalText: "kisha", inputText: "kisha", convertedText: "記者",
       reviewKana: "きしゃ", source: "editor" as const, session: candidateSession()
     };
     act(() => { view.dispatch({ effects: showGhostSuggestion.of(ghost) }); hook.current.openGhostCandidates(ghost); });
-    act(() => { view.dispatch({ changes: { from: 0, to: 5, insert: "changed" } }); hook.current.selectListedCandidate("two"); });
+    act(() => { view.dispatch({ changes: { from: 0, to: 5, insert: "changed" } }); hook.current.selectListedCandidate("two", accept); });
     expect(hook.current.candidateList).toBeNull();
     expect(view.state.field(ghostSuggestionField).suggestion).toBeNull();
     expect(view.state.doc.toString()).toBe("changed");
