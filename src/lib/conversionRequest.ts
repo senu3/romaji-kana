@@ -55,7 +55,7 @@ export function prepareConversionRequest(input: string, settings: AppSettings, o
   };
   const sourceReading = parts.map((part, index) => part.type === "text" ? readings[index].kana : part.output).join("");
   return { originalInput: input, parts, readings, sourceReading, protection,
-    hasEditableInput: hasEditableRomaji(input), excludedInput: spans.some(isExcludedInput),
+    hasEditableInput: hasEditableRomaji(input) || spans.some(span => span.kind === "text" && /[ぁ-ゖ]/u.test(input.slice(span.from, span.to))), excludedInput: spans.some(isExcludedInput),
     learnedBonus: conversionLearningSnapshot(), documentVocabulary: options.documentVocabulary?.slice() };
 }
 

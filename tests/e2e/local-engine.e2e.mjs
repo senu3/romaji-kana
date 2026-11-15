@@ -12,7 +12,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, conversionMode: 'ghost' }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false, conversionMode: 'ghost' }));
   });
   const page = await context.newPage();
   let modelCalls = 0;

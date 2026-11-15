@@ -13,7 +13,9 @@ export const pauseConversion = StateField.define<{ from: number; to: number; ori
   },
 });
 
-export const resumePauseConversion = EditorState.transactionFilter.of(transaction => {
+
+export const resumePauseConversionWhen = (enabled: () => boolean) => EditorState.transactionFilter.of(transaction => {
+  if (!enabled()) return transaction;
   const previous = transaction.startState.field(pauseConversion, false);
   const selection = transaction.startState.selection.main;
   if (!previous || transaction.annotation(Transaction.userEvent) !== "input.type" || !selection.empty ||
@@ -36,3 +38,6 @@ export const resumePauseConversion = EditorState.transactionFilter.of(transactio
     sequential: true,
   }];
 });
+
+
+export const resumePauseConversion = resumePauseConversionWhen(() => true);

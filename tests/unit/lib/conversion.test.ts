@@ -300,7 +300,8 @@ describe("extractSelectedConversionRange", () => {
   it("allows Japanese-dominant selections containing protected Kanji and romaji", () => {
     const doc = "今日はいい tenki";
     expect(extractSelectedConversionRange(doc, 0, doc.length, "shortcut")?.text).toBe(doc);
-    expect(extractSelectedConversionRange("きょうは tenki", 0, 11, "shortcut")).toBeNull();
+    expect(extractSelectedConversionRange("きょうは tenki", 0, 11, "shortcut")?.text).toBe("きょうは tenki");
+    expect(extractSelectedConversionRange("かな", 0, 2, "shortcut")?.text).toBe("かな");
   });
 
   it("skips selections without romaji", () => {

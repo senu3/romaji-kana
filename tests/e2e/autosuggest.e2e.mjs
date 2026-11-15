@@ -11,7 +11,7 @@ try {
   async function scenario(settings, run) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     await context.addInitScript(settings => {
-      localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, autoSuggest: true, ...settings }));
+      localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false, autoSuggest: true, ...settings }));
       localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: '' }));
     }, settings);
     const page = await context.newPage();

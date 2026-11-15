@@ -13,7 +13,7 @@ try {
     if (localStorage.getItem('dictionary-test-seeded')) return;
     localStorage.setItem('dictionary-test-seeded', 'true');
     localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: '航海を記録する。' }));
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false }));
     localStorage.setItem('romaji-kana-conversion-learning-v1', JSON.stringify([
       { reading: 'こうかい', text: '後悔', count: 2, updated: Date.now() },
       { reading: 'こうかい', text: '航海', count: 1, updated: Date.now() },

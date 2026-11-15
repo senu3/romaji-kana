@@ -75,7 +75,7 @@ try {
 
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, conversionMode: 'ghost' }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false, conversionMode: 'ghost' }));
     localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: 'restored draft' }));
   });
   const page = await context.newPage();

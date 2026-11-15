@@ -15,7 +15,8 @@ import { autoSuggestExtension } from "./autoSuggestExtension";
 import { speculationExtension } from "./speculationExtension";
 import { commitConversion } from "../lib/conversionCommit";
 import { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
-import { pauseConversion, resumePauseConversion } from "../lib/pauseConversion";
+import { liveKanaInput } from "../lib/liveKanaInput";
+import { pauseConversion, resumePauseConversionWhen } from "../lib/pauseConversion";
 export { addLoadingDecoration, removeLoadingDecoration, showGhostSuggestion, clearGhostSuggestion } from "../lib/editorConversionEffects";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import {
@@ -748,7 +749,8 @@ export function MarkdownEditor({
           } };
         }, true),
         pauseConversion,
-        resumePauseConversion,
+        liveKanaInput(() => settingsRef.current.inputMode !== "romaji"),
+        resumePauseConversionWhen(() => settingsRef.current.inputMode === "romaji"),
         speculationExtension(state => state.field(ghostSuggestionField).suggestion, {
           accept: (view, suggestion) => {
             if (suggestion.session) {

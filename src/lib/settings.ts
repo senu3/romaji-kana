@@ -14,6 +14,7 @@ export const defaultSettings: AppSettings = {
   ollamaApiUrl: "http://localhost:11434",
   lmStudioApiUrl: "http://localhost:1234",
   modelName: "gemma3",
+  inputMode: "kana",
   autoConvert: true,
   autoSuggest: true,
   autoSpeculation: false,
@@ -58,6 +59,7 @@ export function saveSettings(settings: AppSettings): void {
 
 export function sharedConversionSettings(settings: AppSettings): SharedConversionSettings {
   return {
+    inputMode: settings.inputMode ?? "kana",
     autoConvert: settings.autoConvert,
     autoSuggest: settings.autoSuggest,
     autoSpeculation: settings.autoSpeculation,
@@ -94,6 +96,7 @@ function mergeSettings(settings: Partial<AppSettings>): AppSettings {
   return {
     ...defaultSettings, ...picked,
     conversionPrompt: settings.conversionPrompt || defaultConversionPrompt,
+    inputMode: settings.inputMode === "romaji" ? "romaji" : "kana",
     think: settings.think === true,
     autoSuggest: settings.autoSuggest !== false,
     autoSpeculation: settings.autoSpeculation === true,

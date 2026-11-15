@@ -1,3 +1,4 @@
+import { liveKanaRange } from "./liveKanaState";
 import { isSentenceBoundary } from "./conversionBoundaries";
 import { StateEffect, StateField, Transaction, type EditorState } from "@codemirror/state";
 import { extractConversionRange, isInsideExcludedMarkdown } from "./conversion";
@@ -50,6 +51,8 @@ export function retainedConversionRange(
   cursor: number,
   trigger: ConversionTrigger,
 ): ConversionRange | null {
+  const live = liveKanaRange(state, cursor, trigger);
+  if (live) return live;
   const doc = state.doc.toString();
   const position = Math.max(0, Math.min(cursor, doc.length));
   if (isInsideExcludedMarkdown(doc, position)) return null;

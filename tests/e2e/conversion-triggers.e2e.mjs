@@ -13,7 +13,7 @@ try {
     const context = await browser.newContext();
     await context.addInitScript(settings => {
       localStorage.clear();
-      localStorage.setItem('romaji-kana-settings', JSON.stringify({
+      localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji',
         conversionMode: 'ghost', inputPauseTiming: 'early', autoSuggest: false, ...settings,
       }));
     }, settings);

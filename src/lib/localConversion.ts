@@ -43,7 +43,7 @@ export async function convertLocally(input: string, settings: AppSettings, trans
     const part = originalPart.type === "text" && plan?.correction?.partIndex === partIndex
       ? { ...originalPart, value: plan.correction.value } : originalPart;
     throwIfConversionAborted(options.signal);
-    if (part.type !== "text" || !hasConvertibleRomaji(part.value)) {
+    if (part.type !== "text" || (!hasConvertibleRomaji(part.value) && !/[ぁ-ゖ]/u.test(part.value))) {
       const literal = part.type === "text" ? part.value : part.output;
       combined = combined.map(c => appendLiteral(c, literal));
       continue;

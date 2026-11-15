@@ -132,7 +132,7 @@ export function extractSelectedConversionRange(
   const to = safeTo - trailingWhitespace;
   const text = doc.slice(from, to);
 
-  if (from >= to || !text.trim() || !hasEditableRomaji(text) || (isJapaneseDominant(text) && !isKanjiMixedRomajiInput(text))) {
+  if (from >= to || !text.trim() || (!hasEditableRomaji(text) && !/[ぁ-ゖ]/u.test(text))) {
     return null;
   }
 
@@ -186,7 +186,7 @@ function getLineAt(doc: string, position: number): { from: number; to: number; t
   return { from, to, text: doc.slice(from, to) };
 }
 
-function getMarkdownLineBoundary(line: string): number {
+export function getMarkdownLineBoundary(line: string): number {
   const heading = /^(#{1,6}\s+)/.exec(line);
   if (heading) {
     return heading[1].length;

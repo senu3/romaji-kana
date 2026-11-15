@@ -48,6 +48,21 @@ function chooseNext({ hook, view }: Pick<ReturnType<typeof harness>, "hook" | "v
 }
 
 describe("conversion lifecycle", () => {
+  it.each(["typing", "shortcut"] as const)("uses source keys while anchoring the visible kana for %s", async trigger => {
+    vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん" });
+    const { hook, view, options } = harness("ほん");
+    options.settingsRef.current.conversionMode = "ghost";
+    await act(async () => { hook.current.handleConvert({ ...range("ほん", trigger), inputText: "hon" }); });
+    expect(vi.mocked(convertRomajiToJapaneseDetailed).mock.calls[0][0]).toBe("hon");
+    const suggestion = view.state.field(ghostSuggestionField).suggestion!;
+    expect(suggestion).toMatchObject({ originalText: "ほん", inputText: "hon", from: 0, to: 2 });
+    act(() => {
+      expect(commitConversion(view, suggestion, "explicit")).toBe(true);
+      hook.current.handleAcceptGhost(suggestion);
+    });
+    expect(view.state.doc.toString()).toBe("本");
+    expect(hook.current.history[0].input).toBe("hon");
+  });
   it("passes the automatic speculation preference at a boundary and keeps the result provisional", async () => {
     vi.mocked(convertRomajiToJapaneseDetailed).mockResolvedValue({ text: "本", reviewKana: "ほん", conversionStrategy: "speculative", changes: {
       ...classifyConversionChanges("ほん", "ほん", "dictionary-path"),

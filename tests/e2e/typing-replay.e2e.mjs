@@ -159,7 +159,7 @@ async function scenario(name, settings, run, { holdOriginal = false } = {}) {
   const pendingOriginal = new Promise(resolve => { releaseOriginal = resolve; });
   const originalSettled = new Promise(resolve => { finishOriginal = resolve; });
   await context.addInitScript(settings => {
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji',
       autoConvert: true, autoSuggest: true, conversionMode: 'ghost', inputPauseTiming: 'auto',
       triggers: { typing: true }, ...settings,
     }));

@@ -16,7 +16,7 @@ try {
   async function scenario(run, candidates = responses, options = {}) {
     const context = await browser.newContext({ viewport: options.viewport ?? { width: 1280, height: 900 } });
     await context.addInitScript(() => {
-      localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, autoSuggest: true, conversionMode: 'ghost' }));
+      localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false, autoSuggest: true, conversionMode: 'ghost' }));
       localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: '' }));
     });
     const page = await context.newPage(), errors = [], speculativeRequests = [];

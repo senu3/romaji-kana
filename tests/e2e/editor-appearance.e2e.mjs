@@ -10,7 +10,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => {
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false }));
     localStorage.setItem('romaji-kana-document-session', JSON.stringify({ kind: 'new', content: '日本語とABC 123' }));
   });
   const page = await context.newPage();

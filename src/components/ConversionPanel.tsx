@@ -114,6 +114,8 @@ export function ConversionPanel({
       <div className="conversion-panel-content">
         <section className="settings-group conversion-result-settings" aria-labelledby={resultHeadingId}>
           <h3 id={resultHeadingId}>変換の適用</h3>
+          <CheckRow label="入力中からひらがなで表示" checked={settings.inputMode !== "romaji"}
+            onChange={checked => update({ inputMode: checked ? "kana" : "romaji" })} />
           <div className="segmented-control" role="group" aria-label="変換結果の適用方法">
             <button className={!previewMode ? "selected" : ""} type="button"
               aria-pressed={!previewMode} onClick={() => update({ conversionMode: "replace" })}>

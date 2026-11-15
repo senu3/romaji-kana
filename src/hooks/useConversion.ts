@@ -484,7 +484,7 @@ export function useConversion({
       }
       const accepted: GhostConversionSuggestion = {
         ...candidateDetails(conversion), id: request.id, from: latest.from, to: latest.to,
-        originalText: latest.matchedText, inputText: historical ? request.originalText : latest.matchedText,
+        originalText: latest.matchedText, inputText: request.originalText,
         source: request.source, retryOf: request.retryOf, avoidOutputs: request.avoidOutputs,
         documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
       };
@@ -511,7 +511,7 @@ export function useConversion({
       retainBoundaryHistory({ ...original, session }, latest);
     };
     const conversion = await convertRomajiToJapaneseDetailed(
-      historical ? request.originalText : resolved!.matchedText, settings, undefined, {
+      request.originalText, settings, undefined, {
         kanaEngine: defaultKanaEngine, signal: requestsRef.current.get(request.id)?.controller.signal,
         anchor, deferRanking: deferRanking(request.id, request),
         onLocalCandidates: boundary ? undefined : applyConversion, onRankedCandidates: applyConversion,
@@ -995,7 +995,7 @@ export function useConversion({
               !selection.main.empty || selection.main.head !== request.range.to) return;
             const accepted: GhostConversionSuggestion = {
               ...candidateDetails(conversion), id: request.id, from: request.range.from, to: request.range.to,
-              originalText: request.range.text, inputText: request.range.text, source: "editor", trigger: "typing",
+              originalText: request.range.text, inputText: request.range.inputText ?? request.range.text, source: "editor", trigger: "typing",
               documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
             };
             if (commitConversion(currentView, accepted, "automatic")) {
@@ -1006,7 +1006,7 @@ export function useConversion({
           }
           if (!showConversionPreview(conversion, {
             id: request.id, from: request.range.from, to: request.range.to,
-            originalText: request.range.text, inputText: request.range.text, trigger: request.range.trigger,
+            originalText: request.range.text, inputText: request.range.inputText ?? request.range.text, trigger: request.range.trigger,
             documentVocabulary: request.documentVocabulary, documentVocabularyRevision: request.documentVocabularyRevision,
             source: "editor",
           })) return;
@@ -1016,7 +1016,7 @@ export function useConversion({
           });
         };
         const conversion = await convertRomajiToJapaneseDetailed(
-          request.range.text,
+          request.range.inputText ?? request.range.text,
           request.settings,
           undefined,
           {
@@ -1128,7 +1128,7 @@ export function useConversion({
         originalText: range.text,
         docVersion: docVersionRef.current,
       },
-      originalText: range.text,
+      originalText: range.inputText ?? range.text,
       createdAt,
       docVersion: docVersionRef.current,
       source: "editor",

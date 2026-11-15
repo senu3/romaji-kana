@@ -11,7 +11,7 @@ try {
   const context = await browser.newContext();
   await context.addInitScript(() => {
     localStorage.clear();
-    localStorage.setItem('romaji-kana-settings', JSON.stringify({ autoConvert: false, autoSuggest: false, conversionMode: 'ghost' }));
+    localStorage.setItem('romaji-kana-settings', JSON.stringify({ inputMode: 'romaji', autoConvert: false, autoSuggest: false, conversionMode: 'ghost' }));
   });
   const page = await context.newPage();
   await page.route('**/api/tags', route => route.fulfill({ json: { models: [{ name: 'gemma3' }] } }));

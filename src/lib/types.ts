@@ -17,6 +17,7 @@ export interface AppSettings {
   ollamaApiUrl: string;
   lmStudioApiUrl: string;
   modelName: string;
+  inputMode?: "kana" | "romaji";
   autoConvert: boolean;
   autoSuggest: boolean;
   autoSpeculation: boolean;
@@ -44,6 +45,7 @@ export interface AppSettings {
 
 export type SharedConversionSettings = Pick<
   AppSettings,
+  | "inputMode"
   | "autoConvert"
   | "autoSuggest"
   | "autoSpeculation"
@@ -57,6 +59,8 @@ export type SharedConversionSettings = Pick<
 >;
 
 export interface ConversionRange {
+  /** Source keys for conversion; text always matches the actual document. */
+  inputText?: string;
   from: number;
   to: number;
   text: string;
