@@ -18,13 +18,14 @@ const commands = {
   "e2e:settings": [process.execPath, "tests/e2e/settings-layout.e2e.mjs"],
   "e2e:dictionary": [process.execPath, "tests/e2e/dictionary.e2e.mjs"],
   "e2e:autosuggest": [process.execPath, "tests/e2e/autosuggest.e2e.mjs"],
+  "e2e:kana": [process.execPath, "tests/e2e/live-kana.e2e.mjs"],
   "e2e:speculation": [process.execPath, "tests/e2e/speculation-menu.e2e.mjs"],
   engine: ["cargo", "test", "--manifest-path", "src-engine/Cargo.toml", "--lib"],
   companion: ["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "--lib", "companion::tests"],
 };
 const groups = {
   check: ["unit", "evaluation"],
-  e2e: ["e2e:app", "e2e:appearance", "e2e:local", "e2e:input", "e2e:triggers", "e2e:settings", "e2e:dictionary", "e2e:autosuggest", "e2e:speculation"],
+  e2e: ["e2e:app", "e2e:appearance", "e2e:local", "e2e:input", "e2e:triggers", "e2e:settings", "e2e:dictionary", "e2e:autosuggest", "e2e:kana", "e2e:speculation"],
 };
 if (suite === "e2e" && args.length) {
   if (args.length !== 1 || !groups.e2e.includes(`e2e:${args[0]}`)) throw new Error("Choose one E2E: app, appearance, local, input, triggers, settings, dictionary, autosuggest, speculation");

@@ -1,10 +1,11 @@
+import { liveKanaSource } from "../lib/liveKanaState";
 import { Prec, StateEffect, StateField } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, type ViewUpdate } from "@codemirror/view";
 import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, rankSuggestions, suggestTarget, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, rankSuggestions, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
@@ -52,7 +53,8 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       tr.state.selection.main.empty && tr.state.selection.main.head === tr.changes.mapPos(value.target.to, 1)) {
       const to = tr.state.selection.main.head;
       const original = tr.state.doc.sliceString(value.target.from, to);
-      const target = suggestTarget(tr.state.doc.toString(), to);
+      const target = suggestTargets(tr.state.doc.toString(), to, tr.state.field(liveKanaSource, false)?.from)
+        .find(target => target.from === value!.target.from);
       // Retain a candidate only while the updated reading still supports it.
       if (!/^[A-Za-zぁ-ゖァ-ヶー]+$/u.test(original) || (target && target.from !== value.target.from)) value = null;
       else {
@@ -131,8 +133,9 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       if (!allowed(this.view) || configChanged) queueMicrotask(() => { if (!this.destroyed && revision === this.revision && this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) }); });
       if (!allowed(this.view) || update.transactions.some(t => t.isUserEvent("input.autosuggest") || t.isUserEvent("undo") || t.isUserEvent("redo"))) return;
       if (nextConverting) return;
-      const target = this.view.state.field(convertedTarget) ?? suggestTarget(this.view.state.doc.toString(), this.view.state.selection.main.head);
-      if (!target) {
+      const committedTarget = this.view.state.field(convertedTarget);
+      const targets = committedTarget ? [committedTarget] : suggestTargets(this.view.state.doc.toString(), this.view.state.selection.main.head, this.view.state.field(liveKanaSource, false)?.from);
+      if (!targets.length) {
         this.timer = setTimeout(() => { if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) }); }, 350);
         return;
       }
@@ -140,21 +143,26 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
         this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
         try {
-          let candidates = this.cache.get(target.reading);
-          if (!candidates) {
-            candidates = await suggestWords(target.reading, settings().personalDictionary ?? [], controller.signal);
-            if (this.destroyed || revision !== this.revision) return;
-            if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
-            this.cache.set(target.reading, candidates);
+          for (const target of targets) {
+            let candidates = this.cache.get(target.reading);
+            if (!candidates) {
+              candidates = await suggestWords(target.reading, settings().personalDictionary ?? [], controller.signal);
+              if (this.destroyed || revision !== this.revision) return;
+              if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
+              this.cache.set(target.reading, candidates);
+            }
+            if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
+            const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices())
+              .filter(candidate => candidate.text + (target.suffix ?? "") !== target.original);
+            if (!ranked.length) continue;
+            const previous = this.view.state.field(field);
+            const retained = previous?.target.from === target.from
+              ? ranked.find(candidate => candidate.text === previous.candidates[0].text) : undefined;
+            const ordered = retained ? [retained, ...ranked.filter(candidate => candidate !== retained)] : ranked;
+            this.view.dispatch({ effects: setMenu.of({ target, candidates: ordered }) });
+            return;
           }
-          if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
-          const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices())
-            .filter(candidate => candidate.text + (target.suffix ?? "") !== target.original);
-          const previous = this.view.state.field(field);
-          const retained = previous?.target.from === target.from
-            ? ranked.find(candidate => candidate.text === previous.candidates[0].text) : undefined;
-          const ordered = retained ? [retained, ...ranked.filter(candidate => candidate !== retained)] : ranked;
-          this.view.dispatch({ effects: setMenu.of(ordered.length ? { target, candidates: ordered } : null) });
+          this.view.dispatch({ effects: setMenu.of(null) });
         } catch {
           if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) });
         }

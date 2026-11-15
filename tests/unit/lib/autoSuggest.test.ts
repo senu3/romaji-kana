@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertedSuggestTarget, rankSuggestions, suggestTarget } from "../../../src/lib/autoSuggest";
+import { convertedSuggestTarget, rankSuggestions, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
 import type { WordSuggestion } from "../../../src/lib/kanaEngine";
 
 describe("independent word suggestions", () => {
@@ -11,7 +11,7 @@ describe("independent word suggestions", () => {
     expect(suggestTarget("コウカ", 3)?.reading).toBe("こうか");
     expect(suggestTarget("こうか", 3)?.reading).toBe("こうか");
   });
-  it.each(["a", "kouk", "`kouka`", "https://kouka", "```\nkouka", "foo_kouka", "42kouka", "航海", "a".repeat(81)])("does not complete excluded input: %s", text => {
+  it.each(["a", "kouk", "`kouka`", "https://kouka", "```\nkouka", "foo_kouka", "42kouka", "航海"])("does not complete excluded input: %s", text => {
     expect(suggestTarget(text, text.length)).toBeNull();
   });
   it("does not replace a prefix in the middle of a token", () => {
@@ -22,6 +22,13 @@ describe("independent word suggestions", () => {
     const doc = before + "watasiha";
     expect(suggestTarget(doc, doc.length)).toEqual({ from: before.length, to: doc.length, original: "watasiha", reading: "わたしは" });
     expect(suggestTarget(before + "watasih", before.length + 7)).toBeNull();
+  });
+  it("finds bounded suffixes after a long phrase without replacing its prefix", () => {
+    const text = "kana".repeat(100) + "kouka";
+    const targets = suggestTargets(text, text.length);
+    expect(targets.length).toBeLessThanOrEqual(12);
+    expect(targets).toContainEqual({ from: 400, to: 405, original: "kouka", reading: "こうか" });
+    expect(targets.every(target => target.reading.length <= 80)).toBe(true);
   });
   const item = (text: string, reading = "こうかい", cost = 10, source: WordSuggestion["source"] = "mozc"): WordSuggestion => ({ text, reading, cost, source });
   it("reuses learning and personal vocabulary, removes duplicates, and limits to five", () => {
