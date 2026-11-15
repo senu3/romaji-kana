@@ -14,6 +14,18 @@ import { romajiToKana } from "./romajiKana";
 import type { AppSettings } from "./types";
 
 const MAX_CANDIDATES = 24;
+const MAX_ENGINE_READING = 160;
+function boundedReadingChunks(reading: string): string[] {
+  return reading.split(/([A-Za-z0-9][A-Za-z0-9._:/-]*|\r\n|[。、!?！？\r\n])/gu).filter(Boolean).flatMap(chunk => {
+    if (/^[A-Za-z0-9]/u.test(chunk)) return [chunk];
+    const characters = Array.from(chunk);
+    const chunks: string[] = [];
+    for (let from = 0; from < characters.length; from += MAX_ENGINE_READING) {
+      chunks.push(characters.slice(from, from + MAX_ENGINE_READING).join(""));
+    }
+    return chunks;
+  });
+}
 interface Combined { text: string; reading: string; cost: number; tokens: EngineToken[] }
 function appendLiteral(candidate: Combined, literal: string): Combined {
   const from = Array.from(candidate.reading).length;
@@ -52,9 +64,8 @@ export async function convertLocally(input: string, settings: AppSettings, trans
     if (kana.lowConfidenceSpans.length) return unavailable("unresolved-reading");
     reliable &&= kana.lowConfidenceSpans.length === 0;
     // Sentence boundaries keep search bounded; punctuation remains an exact literal.
-    const chunks = kana.kana.split(/([A-Za-z0-9][A-Za-z0-9._:/-]*|\r\n|[。、!?！？\r\n])/gu).filter(Boolean);
+    const chunks = boundedReadingChunks(kana.kana);
     for (const chunk of chunks) {
-      if (Array.from(chunk).length > 160) throw new Error("変換範囲が長すぎます。160文字以内に分けて変換してください。");
       if (/^(?:\r\n|[。、!?！？\r\n])$/u.test(chunk) || /^[A-Za-z0-9]/u.test(chunk)) {
         combined = combined.map(c => appendLiteral(c, chunk));
         continue;

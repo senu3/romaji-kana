@@ -23,6 +23,17 @@ function harness() {
   return { engine, search, generate, transport: { models: vi.fn(), generate } };
 }
 describe("local faithful conversion", () => {
+  it("converts kana directly and partitions long readings without losing text or token offsets", async () => {
+    const h = harness();
+    h.search.mockImplementation(async (reading: string) => ({ candidates: [candidate(reading, reading)], truncated: false, dictionaryRevision: "test" }));
+    const input = "かな".repeat(201);
+    const result = await convertRomajiToJapaneseDetailed(input, defaultSettings, h.transport, { kanaEngine: h.engine, rerank: false, autoRescue: false });
+    expect(result.text).toBe(input);
+    expect(h.search.mock.calls.every(([reading]) => reading.length <= 160)).toBe(true);
+    expect(h.search.mock.calls.map(([reading]) => reading.length)).toEqual([160, 82]);
+    const tokens = result.session?.candidates[0].tokens;
+    expect(tokens?.[tokens.length - 1]?.to).toBe(input.length);
+  });
   it("keeps the dictionary's first spelling for nanode in the candidate list", async () => {
     const h = harness();
     h.search.mockResolvedValue({ candidates: [candidate("なので", "なので", 3988), candidate("無ので", "なので", 6922)],
