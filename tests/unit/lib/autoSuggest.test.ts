@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertedSuggestTarget, rankSuggestions, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
 import type { WordSuggestion } from "../../../src/lib/kanaEngine";
 
 describe("independent word suggestions", () => {
@@ -18,6 +18,30 @@ describe("independent word suggestions", () => {
     expect(suggestTarget("koukai", 5)).toBeNull();
     expect(suggestTarget("kouka1", 5)).toBeNull();
   });
+  it.each([
+    ["arig", "ありがと", true],
+    ["arig", "ありさま", false],
+    ["densh", "でんしゃ", true],
+    ["densh", "でんせん", false],
+    ["gakukk", "がくっこう", true],
+    ["gakukk", "がくこう", false],
+    ["hiran", "ひらなか", true],
+    ["hiran", "ひらんだ", true],
+    ["hiran", "ひらがな", false],
+    ["arizg", "ありがと", false],
+  ])("matches %s against %s: %s", (text, candidate, expected) => {
+    const targets = suggestTargets(text, text.length, { retainedFrom: 0 });
+    expect(targets.some(({ reading, pendingRomaji }) => matchesSuggestionReading(reading, candidate, pendingRomaji))).toBe(expected);
+  });
+  it.each([
+    ["ありg", "arig", "あり", "g"],
+    ["ひらん", "hiran", "ひら", "n"],
+  ])("keeps unfinished live kana within the current input run: %s", (text, source, reading, pendingRomaji) => {
+    const doc = "確定したかな" + text;
+    const from = doc.length - text.length;
+    expect(suggestTargets(doc, doc.length, { liveInput: { from, to: doc.length, source }, retainedFrom: from }))
+      .toContainEqual({ from, to: doc.length, original: text, reading, pendingRomaji });
+  });
   it.each(["もしかして", "モシカシテ", "確定した文"])('isolates romaji after committed Japanese: %s', before => {
     const doc = before + "watasiha";
     expect(suggestTarget(doc, doc.length)).toEqual({ from: before.length, to: doc.length, original: "watasiha", reading: "わたしは" });
@@ -29,6 +53,14 @@ describe("independent word suggestions", () => {
     expect(targets.length).toBeLessThanOrEqual(12);
     expect(targets).toContainEqual({ from: 400, to: 405, original: "kouka", reading: "こうか" });
     expect(targets.every(target => target.reading.length <= 80)).toBe(true);
+  });
+  it("keeps a retained suffix eligible as it grows beyond the lookup limit", () => {
+    const doc = "かな".repeat(50);
+    const retainedFrom = 87;
+    expect(suggestTargets(doc, doc.length).some(target => target.from === retainedFrom)).toBe(false);
+    expect(suggestTargets(doc, doc.length, { retainedFrom })).toEqual([
+      { from: retainedFrom, to: doc.length, original: doc.slice(retainedFrom), reading: doc.slice(retainedFrom) },
+    ]);
   });
   const item = (text: string, reading = "こうかい", cost = 10, source: WordSuggestion["source"] = "mozc"): WordSuggestion => ({ text, reading, cost, source });
   it("reuses learning and personal vocabulary, removes duplicates, and limits to five", () => {

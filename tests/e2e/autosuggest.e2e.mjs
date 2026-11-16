@@ -100,16 +100,43 @@ try {
     await page.keyboard.press('Enter');
     assert.equal((await editor.locator('.cm-line').allTextContents()).join('\n'), 'kouka\n', 'Enter stays a newline');
   });
-  await scenario({}, async (page, editor) => {
+  for (const inputMode of ['romaji', 'kana']) await scenario({ inputMode }, async (page, editor, requests) => {
     await page.keyboard.type('kou');
-    await page.locator('.cm-autosuggest-ghost:visible').waitFor();
-    const panel = await page.locator('.cm-autosuggest-ghost:visible').elementHandle();
+    const ghost = page.getByRole('button', { name: '航海 を補完' });
+    await ghost.waitFor();
+    const panel = await ghost.elementHandle();
+    const initialRequests = requests.length;
     await page.keyboard.type('k');
+    await ghost.waitFor({ timeout: 300 });
+    assert.equal(requests.length, initialRequests, 'Unfinished keys retain the candidate without a fresh lookup');
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '航海', 'Tab replaces the entire reading including unfinished keys');
+
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('kou');
+    await ghost.waitFor();
+    await page.keyboard.type('k');
+    await ghost.waitFor({ timeout: 300 });
     await page.keyboard.type('a');
-    await page.getByRole('button', { name: '航海 を補完' }).waitFor();
-    assert.ok(await panel.evaluate(el => el === document.querySelector('.cm-autosuggest-ghost')), 'Typing and response updates reuse the same ghost');
+    await ghost.waitFor({ timeout: 300 });
+    assert.ok(await panel.evaluate(el => el === document.querySelector('.cm-autosuggest-ghost')), 'Typing updates reuse the same ghost');
     await page.keyboard.press('Tab');
     assert.equal(await editor.innerText(), '航海', 'Retained suggestion replaces the entire current token');
+
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('kou');
+    await ghost.waitFor();
+    await page.keyboard.type('s');
+    await ghost.waitFor({ state: 'hidden', timeout: 300 });
+    assert.equal(await editor.innerText(), inputMode === 'kana' ? 'こうs' : 'kous', 'Incompatible keys dismiss the candidate and remain in the editor');
+
+    await page.keyboard.press('Control+a');
+    await page.keyboard.type('kou');
+    await ghost.waitFor();
+    await page.keyboard.type('k');
+    await ghost.waitFor({ timeout: 300 });
+    await page.keyboard.press('ArrowLeft');
+    await ghost.waitFor({ state: 'hidden', timeout: 300 });
   });
   for (const [key, suffix, preview] of [[',', '、', true], ['.', '。', true], ['Enter', '\n', false]]) {
     await scenario({ autoConvert: true, conversionMode: preview ? 'ghost' : 'replace', inputPauseTiming: 'early', triggers: { enter: true } }, async (page, editor) => {

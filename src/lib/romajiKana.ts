@@ -150,6 +150,17 @@ export function romajiSpellingsForKana(kana: string): string[] {
   return romanKeys.filter(key => kanaMap[key] === kana).reverse();
 }
 
+/** Whether unfinished keys can start the remaining kana in a reading. */
+export function romajiPrefixMatchesReading(keys: string, reading: string): boolean {
+  const prefix = keys.toLowerCase();
+  return romanKeys.some(romaji => {
+    const kana = kanaMap[romaji];
+    if (reading.startsWith(kana) && romaji.startsWith(prefix)) return true;
+    return reading.startsWith(`っ${kana}`) && canDouble(romaji[0]) &&
+      (romaji[0] + romaji).startsWith(prefix);
+  });
+}
+
 export function romajiToKana(input: string): RomajiKanaResult {
   const lower = input.toLowerCase();
   const tokens: RomajiKanaToken[] = [];
@@ -317,7 +328,7 @@ function pushToken(
 
 function matchSokuon(lower: string, index: number): { kana: string; inputTo: number } | null {
   const char = lower[index];
-  if (char !== lower[index + 1] || !consonants.has(char) || char === "n") {
+  if (char !== lower[index + 1] || !canDouble(char)) {
     return null;
   }
 
@@ -330,6 +341,10 @@ function matchSokuon(lower: string, index: number): { kana: string; inputTo: num
     kana: matched.kana,
     inputTo: index + 1 + matched.romaji.length,
   };
+}
+
+function canDouble(char: string): boolean {
+  return consonants.has(char) && char !== "n";
 }
 
 function matchKana(input: string, index: number): { romaji: string; kana: string } | null {

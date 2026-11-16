@@ -1,11 +1,11 @@
 import { liveKanaSource } from "../lib/liveKanaState";
-import { Prec, StateEffect, StateField } from "@codemirror/state";
+import { Prec, StateEffect, StateField, type EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, type ViewUpdate } from "@codemirror/view";
 import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, rankSuggestions, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
@@ -13,7 +13,13 @@ import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } fr
 interface Menu { target: SuggestTarget; candidates: WordSuggestion[] }
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
-// Conversion supplies the known reading; no reverse lookup or model call is needed.
+
+function targetsAtCursor(state: EditorState, retainedFrom?: number): SuggestTarget[] {
+  return suggestTargets(state.doc.toString(), state.selection.main.head, {
+    liveInput: state.field(liveKanaSource, false) ?? undefined,
+    retainedFrom,
+  });
+}
 
 export function autoSuggestExtension(settings: () => AppSettings, converting: (view: EditorView) => boolean, blocked: (view: EditorView) => boolean, retryConversion: (view: EditorView) => boolean) {
   const setMenu = StateEffect.define<Menu | null>();
@@ -51,16 +57,13 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   const field = StateField.define<Menu | null>({ create: () => null, update(value, tr) {
     if (tr.docChanged && value && (tr.isUserEvent("input.type") || tr.isUserEvent("delete")) &&
       tr.state.selection.main.empty && tr.state.selection.main.head === tr.changes.mapPos(value.target.to, 1)) {
-      const to = tr.state.selection.main.head;
-      const original = tr.state.doc.sliceString(value.target.from, to);
-      const target = suggestTargets(tr.state.doc.toString(), to, tr.state.field(liveKanaSource, false)?.from)
-        .find(target => target.from === value!.target.from);
-      // Retain a candidate only while the updated reading still supports it.
-      if (!/^[A-Za-zぁ-ゖァ-ヶー]+$/u.test(original) || (target && target.from !== value.target.from)) value = null;
-      else {
-        const candidates = target ? value.candidates.filter(c => c.reading.startsWith(target.reading) && c.reading.length > target.reading.length) : [];
-        value = target && candidates.length ? { target, candidates } : null;
-      }
+      const targets = targetsAtCursor(tr.state, value.target.from);
+      const matches = value.candidates.flatMap(candidate => {
+        const target = targets.find(({ reading, pendingRomaji, original }) =>
+          candidate.text !== original && matchesSuggestionReading(reading, candidate.reading, pendingRomaji));
+        return target ? [{ candidate, target }] : [];
+      });
+      value = matches.length ? { target: matches[0].target, candidates: matches.map(match => match.candidate) } : null;
     } else if (tr.docChanged || tr.selection) value = null;
     for (const effect of tr.effects) if (effect.is(setMenu)) value = effect.value;
     return value;
@@ -112,8 +115,8 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
         hint.innerHTML = '採用 <kbd>Tab</kbd>';
         this.ghost.replaceChildren(text, hint);
         this.ghost.setAttribute("aria-label", `${candidate.text} を補完 (Tabで採用)`);
+        if (this.ghost.hidden) this.ghost.style.visibility = "hidden";
         this.ghost.hidden = false;
-        this.ghost.style.visibility = "hidden";
       }
       if (update.viewportChanged || update.geometryChanged || update.focusChanged ||
         completion !== update.startState.field(field)) this.view.requestMeasure(this.measureGhost);
@@ -133,12 +136,11 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       if (!allowed(this.view) || configChanged) queueMicrotask(() => { if (!this.destroyed && revision === this.revision && this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) }); });
       if (!allowed(this.view) || update.transactions.some(t => t.isUserEvent("input.autosuggest") || t.isUserEvent("undo") || t.isUserEvent("redo"))) return;
       if (nextConverting) return;
+      // Keep the current candidate while it is valid. Search again when it stops matching.
+      if (completion && !configChanged) return;
       const committedTarget = this.view.state.field(convertedTarget);
-      const targets = committedTarget ? [committedTarget] : suggestTargets(this.view.state.doc.toString(), this.view.state.selection.main.head, this.view.state.field(liveKanaSource, false)?.from);
-      if (!targets.length) {
-        this.timer = setTimeout(() => { if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) }); }, 350);
-        return;
-      }
+      const targets = committedTarget ? [committedTarget] : targetsAtCursor(this.view.state);
+      if (!targets.length) return;
       this.timer = setTimeout(async () => {
         this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
@@ -155,11 +157,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
             const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices())
               .filter(candidate => candidate.text + (target.suffix ?? "") !== target.original);
             if (!ranked.length) continue;
-            const previous = this.view.state.field(field);
-            const retained = previous?.target.from === target.from
-              ? ranked.find(candidate => candidate.text === previous.candidates[0].text) : undefined;
-            const ordered = retained ? [retained, ...ranked.filter(candidate => candidate !== retained)] : ranked;
-            this.view.dispatch({ effects: setMenu.of({ target, candidates: ordered }) });
+            this.view.dispatch({ effects: setMenu.of({ target, candidates: ranked }) });
             return;
           }
           this.view.dispatch({ effects: setMenu.of(null) });

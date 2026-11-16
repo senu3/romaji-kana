@@ -9,7 +9,8 @@ export function existingJapanesePrefixLength(text: string): number {
 
 /** Completion is word-based; conversion may keep spaces and inline Japanese.
  * Both must leave the existing Japanese prefix outside the replacement range. */
-export function trailingReadingToken(text: string): string | undefined {
+export function trailingReadingToken(text: string, liveKana = false): string | undefined {
+  if (liveKana) return /[A-Za-zぁ-ゖァ-ヶー]+$/u.exec(text)?.[0];
   const input = text.slice(existingJapanesePrefixLength(text));
   return /(?:[A-Za-z]+|[ぁ-ゖァ-ヶー]+)$/u.exec(input)?.[0];
 }
