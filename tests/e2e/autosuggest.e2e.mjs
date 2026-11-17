@@ -160,6 +160,46 @@ try {
     assert.equal(requests.length, 0);
     assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0);
   });
+  for (const [conversionMode, hasWordCandidate] of [['replace', false], ['replace', true], ['ghost', false]]) await scenario({ autoConvert: true, conversionMode, inputPauseTiming: 'early' }, async (page, editor, _requests, calls) => {
+    await page.route('**/api/kana-engine', route => {
+      const { operation } = route.request().postDataJSON();
+      if (operation === 'suggest' && !hasWordCandidate) return route.fulfill({ json: { candidates: [] } });
+      if (operation === 'verify') return route.fulfill({ json: { status: 'verified' } });
+      return route.fallback();
+    });
+    const previous = '効果が確認できました。\n';
+    const complete = page.getByRole('button', { name: 'が確認できました。 を挿入' });
+    await page.keyboard.insertText(previous);
+    await page.keyboard.type('kouka');
+    if (conversionMode === 'ghost') {
+      await page.locator('.cm-ghost-text-suggestion:visible').waitFor();
+      await page.keyboard.press('Alt+Enter');
+      await page.waitForTimeout(250);
+      assert.equal(await complete.count(), 0, 'Accepting a conversion preview does not trigger a document continuation');
+      assert.equal(await editor.innerText(), previous + '効果');
+      return;
+    }
+    if (hasWordCandidate) {
+      await page.waitForFunction(text => document.querySelector('.cm-content').innerText === text, previous + '効果');
+      await page.getByRole('button', { name: '航海 を補完' }).waitFor();
+      assert.equal(await complete.count(), 0, 'A dictionary candidate takes priority over the document continuation');
+      return;
+    }
+    await complete.waitFor();
+    assert.equal(await editor.innerText(), previous + '効果');
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), previous + '効果が確認できました。');
+    await page.keyboard.press('Control+z');
+    assert.equal(await editor.innerText(), previous + '効果');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Shift+End');
+    await page.keyboard.type('kouka');
+    await complete.waitFor();
+    await page.keyboard.press('Escape');
+    await complete.waitFor({ state: 'hidden' });
+    assert.equal(await editor.innerText(), previous + '効果');
+    assert.equal(calls(), 0, 'Document continuations do not call an LLM');
+  });
   await scenario({ autoConvert: true, conversionMode: 'ghost', inputPauseTiming: 'early' }, async (page) => {
     await page.keyboard.type('kouka');
     await page.locator('.cm-ghost-text-suggestion').waitFor();

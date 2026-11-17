@@ -5,12 +5,14 @@ import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
 
-interface Menu { target: SuggestTarget; candidates: WordSuggestion[] }
+type Menu =
+  | { kind: "word"; target: SuggestTarget; candidates: WordSuggestion[] }
+  | { kind: "continuation"; target: SuggestTarget; text: string };
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
 
@@ -38,7 +40,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       value = convertedSuggestTarget(value.from, tr.state.doc.sliceString(value.from, cursor), value.reading);
     }
     if (value && (!tr.state.selection.main.empty || tr.state.selection.main.head !== value.to ||
-      tr.state.doc.sliceString(value.from, value.to) !== value.original || !/^[ぁ-ゖー]{2,80}$/u.test(value.reading))) return null;
+      tr.state.doc.sliceString(value.from, value.to) !== value.original)) return null;
     return value;
   } });
   const accept = (view: EditorView) => {
@@ -47,15 +49,16 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       pluginValue(view)?.ghost.style.visibility !== "visible") return false;
     const { target } = menu;
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
-    const candidate = menu.candidates[0];
-    const insert = candidate.text + (target.suffix ?? "");
-    if (!commitEditorText(view, { from: target.from, to: target.to, original: target.original, text: insert,
+    const insert = menu.kind === "continuation"
+      ? { from: target.to, original: "", text: menu.text }
+      : { from: target.from, original: target.original, text: menu.candidates[0].text + (target.suffix ?? "") };
+    if (!commitEditorText(view, { ...insert, to: target.to,
       cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest" })) return false;
     view.focus();
     return true;
   };
   const field = StateField.define<Menu | null>({ create: () => null, update(value, tr) {
-    if (tr.docChanged && value && (tr.isUserEvent("input.type") || tr.isUserEvent("delete")) &&
+    if (tr.docChanged && value?.kind === "word" && (tr.isUserEvent("input.type") || tr.isUserEvent("delete")) &&
       tr.state.selection.main.empty && tr.state.selection.main.head === tr.changes.mapPos(value.target.to, 1)) {
       const targets = targetsAtCursor(tr.state, value.target.from);
       const matches = value.candidates.flatMap(candidate => {
@@ -63,7 +66,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
           candidate.text !== original && matchesSuggestionReading(reading, candidate.reading, pendingRomaji));
         return target ? [{ candidate, target }] : [];
       });
-      value = matches.length ? { target: matches[0].target, candidates: matches.map(match => match.candidate) } : null;
+      value = matches.length ? { kind: "word", target: matches[0].target, candidates: matches.map(match => match.candidate) } : null;
     } else if (tr.docChanged || tr.selection) value = null;
     for (const effect of tr.effects) if (effect.is(setMenu)) value = effect.value;
     return value;
@@ -106,15 +109,19 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       const completion = update.state.field(field);
       if (!completion || !allowed(this.view)) this.ghost.hidden = true;
       else if (completion !== update.startState.field(field) || this.ghost.hidden) {
-        const { target } = completion, candidate = completion.candidates[0];
-        const prefix = target.suffix ? target.original.slice(0, -target.suffix.length) : target.original;
-        const continuation = !target.suffix && candidate.text.startsWith(prefix);
         const text = document.createElement("span"); text.className = "candidate-completion-text";
-        text.textContent = continuation ? candidate.text.slice(prefix.length) : ` → ${candidate.text}`;
+        if (completion.kind === "continuation") {
+          text.textContent = completion.text;
+          this.ghost.setAttribute("aria-label", `${completion.text} を挿入 (Tabで採用)`);
+        } else {
+          const { target } = completion, candidate = completion.candidates[0];
+          const continuation = !target.suffix && candidate.text.startsWith(target.original);
+          text.textContent = continuation ? candidate.text.slice(target.original.length) : ` → ${candidate.text}`;
+          this.ghost.setAttribute("aria-label", `${candidate.text} を補完 (Tabで採用)`);
+        }
         const hint = document.createElement("span"); hint.className = "candidate-accept-hint";
         hint.innerHTML = '採用 <kbd>Tab</kbd>';
         this.ghost.replaceChildren(text, hint);
-        this.ghost.setAttribute("aria-label", `${candidate.text} を補完 (Tabで採用)`);
         if (this.ghost.hidden) this.ghost.style.visibility = "hidden";
         this.ghost.hidden = false;
       }
@@ -139,9 +146,13 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       // Keep the current candidate while it is valid. Search again when it stops matching.
       if (completion && !configChanged) return;
       const committedTarget = this.view.state.field(convertedTarget);
-      const targets = committedTarget ? [committedTarget] : targetsAtCursor(this.view.state);
-      if (!targets.length) return;
+      const targets = committedTarget && /^[ぁ-ゖー]{2,80}$/u.test(committedTarget.reading)
+        ? [committedTarget] : targetsAtCursor(this.view.state);
+      const continuationTarget = this.view.state.selection.ranges.length === 1 && update.transactions.some(tr => tr.docChanged &&
+        tr.isUserEvent("input.convert") && tr.effects.some(effect => effect.is(suggestAfterConversion))) ? committedTarget : null;
+      if (!targets.length && !continuationTarget) return;
       this.timer = setTimeout(async () => {
+        if (!allowed(this.view)) return;
         this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
         try {
@@ -157,8 +168,15 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
             const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices())
               .filter(candidate => candidate.text + (target.suffix ?? "") !== target.original);
             if (!ranked.length) continue;
-            this.view.dispatch({ effects: setMenu.of({ target, candidates: ranked }) });
+            this.view.dispatch({ effects: setMenu.of({ kind: "word", target, candidates: ranked }) });
             return;
+          }
+          if (continuationTarget) {
+            const text = suggestDocumentContinuation(this.view.state.doc.toString(), continuationTarget.to);
+            if (text) {
+              this.view.dispatch({ effects: setMenu.of({ kind: "continuation", target: continuationTarget, text }) });
+              return;
+            }
           }
           this.view.dispatch({ effects: setMenu.of(null) });
         } catch {
@@ -194,6 +212,10 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
   return [field, convertedTarget, plugin, Prec.highest(keymap.of(candidateBindings({
     accept,
     dismiss: view => {
+      if (view.state.field(field)?.kind === "continuation") {
+        pluginValue(view)?.dismiss();
+        return true;
+      }
       const retry = retryConversion(view);
       if (!retry && !view.state.field(field)) return false;
       pluginValue(view)?.dismiss();

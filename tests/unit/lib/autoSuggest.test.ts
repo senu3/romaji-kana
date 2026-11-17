@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
 import type { WordSuggestion } from "../../../src/lib/kanaEngine";
 
 describe("independent word suggestions", () => {
@@ -75,5 +75,33 @@ describe("independent word suggestions", () => {
   });
   it("only returns longer prefix matches within bounded length", () => {
     expect(rankSuggestions("こうか", [item("効果", "こうか"), item("効果、", "こうか、"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
+  });
+});
+
+describe("document continuations", () => {
+  it("returns only the suffix of the most recent sentence with the same beginning", () => {
+    const doc = "効果を確認します。効果が確認できました。\n効果";
+    expect(suggestDocumentContinuation(doc, doc.length)).toBe("が確認できました。");
+  });
+  it("supports a comma in the existing text", () => {
+    const doc = "詳細は、後ほどお知らせします。\n詳細は、";
+    expect(suggestDocumentContinuation(doc, doc.length)).toBe("後ほどお知らせします。");
+  });
+  it.each([
+    "検証の効果が確認できました。\n効果",
+    "効果。\n効果",
+    "効果が確認できました。\n効果。",
+    "```\n効果が確認できました。\n```\n効果",
+    "効果を`確認`しました。\n効果",
+    "効果が確認できました。\n```\n効果",
+    "効果" + "が".repeat(33) + "。\n効果",
+  ])("has no eligible earlier continuation for %s", doc => {
+    expect(suggestDocumentContinuation(doc, doc.length)).toBeNull();
+  });
+  it("only offers a continuation at the end of the line and uses earlier text", () => {
+    const doc = "効果がありました。\n効果を確認\n効果が残っています。";
+    expect(suggestDocumentContinuation(doc, doc.indexOf("を"))).toBeNull();
+    const lineEnd = "効果がありました。\n効果";
+    expect(suggestDocumentContinuation(`${lineEnd}\n効果が残っています。`, lineEnd.length)).toBe("がありました。");
   });
 });

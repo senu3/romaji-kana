@@ -8,6 +8,10 @@ import { analyzeInput } from "./inputAnalysis";
 
 export interface SuggestTarget { from: number; to: number; original: string; reading: string; pendingRomaji?: string; suffix?: string }
 interface LiveReading { from: number; to: number; source: string }
+const sentenceSegmenter = new Intl.Segmenter("ja", { granularity: "sentence" });
+const MAX_CONTINUATION_CONTEXT = 8_192;
+const MAX_CONTINUATION_LENGTH = 32;
+const JAPANESE_PROSE = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々、。！？]+$/u;
 
 export function convertedSuggestTarget(from: number, original: string, reading: string): SuggestTarget {
   const suffix = /[、。，．,.\s]+$/u.exec(original)?.[0] ?? "";
@@ -15,6 +19,34 @@ export function convertedSuggestTarget(from: number, original: string, reading: 
 }
 export function suggestTarget(doc: string, cursor: number): SuggestTarget | null {
   return suggestTargets(doc, cursor)[0] ?? null;
+}
+
+/** Reuse a short continuation from the most recent matching sentence in this document. */
+export function suggestDocumentContinuation(doc: string, cursor: number): string | null {
+  if (cursor === 0 || (cursor !== doc.length && doc[cursor] !== "\n")) return null;
+  const lineStart = doc.lastIndexOf("\n", cursor - 1) + 1;
+  const line = doc.slice(lineStart, cursor);
+  const prefix = sentenceSegmenter.segment(line).containing(line.length - 1)?.segment.trimStart();
+  if (!prefix || prefix.length < 2 || !JAPANESE_PROSE.test(prefix) || /[。！？]$/u.test(prefix)) return null;
+
+  const prefixFrom = cursor - prefix.length;
+  const spans = analyzeInput(doc);
+  const isProse = (from: number, to: number) => spans.some(span => span.kind === "text" && span.from <= from && span.to >= to);
+  if (!isProse(prefixFrom, cursor)) return null;
+
+  const start = Math.max(0, prefixFrom - MAX_CONTINUATION_CONTEXT);
+  const history = doc.slice(start, prefixFrom);
+  let continuation: string | null = null;
+  for (const { segment, index } of sentenceSegmenter.segment(history)) {
+    if (start > 0 && index === 0 && doc[start - 1] !== "\n") continue;
+    const sentence = segment.trim();
+    if (!sentence.startsWith(prefix)) continue;
+    const tail = sentence.slice(prefix.length);
+    if (tail.length > MAX_CONTINUATION_LENGTH || !JAPANESE_PROSE.test(tail) || !/\p{Letter}/u.test(tail)) continue;
+    const from = start + index + segment.length - segment.trimStart().length;
+    if (isProse(from, from + sentence.length)) continuation = tail;
+  }
+  return continuation;
 }
 
 export function suggestTargets(doc: string, cursor: number, { liveInput, retainedFrom }: {
