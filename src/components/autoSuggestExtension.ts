@@ -5,7 +5,7 @@ import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
@@ -62,8 +62,8 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       tr.state.selection.main.empty && tr.state.selection.main.head === tr.changes.mapPos(value.target.to, 1)) {
       const targets = targetsAtCursor(tr.state, value.target.from);
       const matches = value.candidates.flatMap(candidate => {
-        const target = targets.find(({ reading, pendingRomaji, original }) =>
-          candidate.text !== original && matchesSuggestionReading(reading, candidate.reading, pendingRomaji));
+        const target = targets.find(target => matchesSuggestionReading(target.reading, candidate.reading, target.pendingRomaji) &&
+          wordSuggestionLabel(target, candidate.text) !== null);
         return target ? [{ candidate, target }] : [];
       });
       value = matches.length ? { kind: "word", target: matches[0].target, candidates: matches.map(match => match.candidate) } : null;
@@ -115,8 +115,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
           this.ghost.setAttribute("aria-label", `${completion.text} を挿入 (Tabで採用)`);
         } else {
           const { target } = completion, candidate = completion.candidates[0];
-          const continuation = !target.suffix && candidate.text.startsWith(target.original);
-          text.textContent = continuation ? candidate.text.slice(target.original.length) : ` → ${candidate.text}`;
+          text.textContent = wordSuggestionLabel(target, candidate.text);
           this.ghost.setAttribute("aria-label", `${candidate.text} を補完 (Tabで採用)`);
         }
         const hint = document.createElement("span"); hint.className = "candidate-accept-hint";
@@ -165,8 +164,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
               this.cache.set(target.reading, candidates);
             }
             if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
-            const ranked = rankSuggestions(target.reading, candidates, conversionLearningChoices())
-              .filter(candidate => candidate.text + (target.suffix ?? "") !== target.original);
+            const ranked = rankSuggestions(target, candidates, conversionLearningChoices());
             if (!ranked.length) continue;
             this.view.dispatch({ effects: setMenu.of({ kind: "word", target, candidates: ranked }) });
             return;

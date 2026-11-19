@@ -100,6 +100,19 @@ try {
     await page.keyboard.press('Enter');
     assert.equal((await editor.locator('.cm-line').allTextContents()).join('\n'), 'kouka\n', 'Enter stays a newline');
   });
+  await scenario({ inputMode: 'kana' }, async (page, editor) => {
+    await page.route('**/api/kana-engine', route => route.fulfill({ json: { candidates: [
+      { text: 'たべる', reading: 'たべる', cost: 0, source: 'mozc' },
+      { text: 'たべられる', reading: 'たべられる', cost: 100, source: 'mozc' },
+    ] } }));
+    await page.keyboard.type('tabe');
+    const completion = page.getByRole('button', { name: 'たべられる を補完' });
+    await completion.waitFor();
+    assert.equal(await completion.locator('.candidate-completion-text').textContent(), 'られる');
+    await page.keyboard.type('ra');
+    await completion.waitFor({ state: 'hidden' });
+    assert.equal(await editor.innerText(), 'たべら');
+  });
   for (const inputMode of ['romaji', 'kana']) await scenario({ inputMode }, async (page, editor, requests) => {
     await page.keyboard.type('kou');
     const ghost = page.getByRole('button', { name: '航海 を補完' });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, suggestTarget } from "../../../src/lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, suggestTarget, wordSuggestionLabel } from "../../../src/lib/autoSuggest";
 import type { WordSuggestion } from "../../../src/lib/kanaEngine";
 
 describe("independent word suggestions", () => {
@@ -72,7 +72,7 @@ describe("independent word suggestions", () => {
   it("reuses learning and personal vocabulary, removes duplicates, and limits to five", () => {
     const choices = [{ text: "航海", reading: "こうかい", count: 2, updated: 1 }];
     const candidates = [item("公開"), item("航海"), item("個人語", "こうかいご", 100, "user"), ...Array.from({ length: 8 }, (_, i) => item(`候補${i}`))];
-    const ranked = rankSuggestions("こうか", candidates, choices);
+    const ranked = rankSuggestions(convertedSuggestTarget(0, "効果", "こうか"), candidates, choices);
     expect(ranked).toHaveLength(5);
     expect(ranked.slice(0, 2).map(c => c.text)).toEqual(["航海", "個人語"]);
     expect(ranked.filter(c => c.text === "航海")).toHaveLength(1);
@@ -80,7 +80,16 @@ describe("independent word suggestions", () => {
     expect(candidates).toHaveLength(11);
   });
   it("only returns longer prefix matches within bounded length", () => {
-    expect(rankSuggestions("こうか", [item("効果", "こうか"), item("効果、", "こうか、"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
+    expect(rankSuggestions(convertedSuggestTarget(0, "効果", "こうか"), [item("効果", "こうか"), item("効果、", "こうか、"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
+  });
+  it("skips short visible additions before taking the top five and keeps whole-word replacements", () => {
+    const target = convertedSuggestTarget(0, "たべ", "たべ");
+    const short = ["る", "た", "て", "ない", "ます"].map(tail => item(`たべ${tail}`, `たべ${tail}`, 0));
+    const longer = item("たべられる", "たべられる", 100);
+    const replacement = item("食べる", "たべる", 100);
+    expect(rankSuggestions(target, [...short, longer, replacement], [])).toEqual([replacement, longer]);
+    expect(wordSuggestionLabel(target, longer.text)).toBe("られる");
+    expect(wordSuggestionLabel(convertedSuggestTarget(0, "たべら", "たべら"), longer.text)).toBeNull();
   });
 });
 
@@ -92,6 +101,12 @@ describe("document continuations", () => {
   it("supports a comma in the existing text", () => {
     const doc = "詳細は、後ほどお知らせします。\n詳細は、";
     expect(suggestDocumentContinuation(doc, doc.length)).toBe("後ほどお知らせします。");
+  });
+  it("skips a more recent short ending in favor of a longer continuation", () => {
+    const doc = "食べる前に手を洗います。食べる。\n食べ";
+    expect(suggestDocumentContinuation(doc, doc.length)).toBe("る前に手を洗います。");
+    const shortOnly = "食べる。\n食べ";
+    expect(suggestDocumentContinuation(shortOnly, shortOnly.length)).toBeNull();
   });
   it.each([
     "検証の効果が確認できました。\n効果",

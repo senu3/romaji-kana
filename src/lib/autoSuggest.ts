@@ -12,7 +12,12 @@ const sentenceSegmenter = new Intl.Segmenter("ja", { granularity: "sentence" });
 const wordSegmenter = new Intl.Segmenter("ja", { granularity: "word" });
 const MAX_CONTINUATION_CONTEXT = 8_192;
 const MAX_CONTINUATION_LENGTH = 32;
+const MIN_CONTINUATION_LENGTH = 3;
 const JAPANESE_PROSE = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々、。！？]+$/u;
+
+function hasEnoughContinuation(text: string): boolean {
+  return (text.match(/[\p{L}\p{N}]/gu)?.length ?? 0) >= MIN_CONTINUATION_LENGTH;
+}
 
 export function convertedSuggestTarget(from: number, original: string, reading: string): SuggestTarget {
   const suffix = /[、。，．,.\s]+$/u.exec(original)?.[0] ?? "";
@@ -43,7 +48,7 @@ export function suggestDocumentContinuation(doc: string, cursor: number): string
     const sentence = segment.trim();
     if (!sentence.startsWith(prefix)) continue;
     const tail = sentence.slice(prefix.length);
-    if (tail.length > MAX_CONTINUATION_LENGTH || !JAPANESE_PROSE.test(tail) || !/\p{Letter}/u.test(tail)) continue;
+    if (tail.length > MAX_CONTINUATION_LENGTH || !JAPANESE_PROSE.test(tail) || !hasEnoughContinuation(tail)) continue;
     const from = start + index + segment.length - segment.trimStart().length;
     if (isProse(from, from + sentence.length)) continuation = tail;
   }
@@ -103,12 +108,22 @@ export function matchesSuggestionReading(reading: string, candidateReading: stri
     (!pendingRomaji || romajiPrefixMatchesReading(pendingRomaji, candidateReading.slice(reading.length)));
 }
 
-export function rankSuggestions(reading: string, candidates: WordSuggestion[], choices: Choice[]): WordSuggestion[] {
+/** Display the added text for an extension and the full word for a replacement. */
+export function wordSuggestionLabel(target: SuggestTarget, text: string): string | null {
+  if (text + (target.suffix ?? "") === target.original) return null;
+  if (target.suffix || !text.startsWith(target.original)) return ` → ${text}`;
+  const continuation = text.slice(target.original.length);
+  return hasEnoughContinuation(continuation) ? continuation : null;
+}
+
+export function rankSuggestions(target: SuggestTarget, candidates: WordSuggestion[], choices: Choice[]): WordSuggestion[] {
+  const { reading } = target;
   const counts = new Map(choices.map(c => [JSON.stringify([c.reading, c.text]), c.count]));
   const learned = choices.map(c => ({ reading: c.reading, text: c.text, source: "learning" as const, cost: 0 }));
   const seen = new Set<string>();
   return [...learned, ...candidates].filter(c => matchesSuggestionReading(reading, c.reading) &&
-    c.reading.length <= reading.length + 12 && /^[ぁ-ゖー]+$/u.test(c.reading) && c.text.length <= 80 && c.text.length > 0 && !/[\r\n]/u.test(c.text))
+    c.reading.length <= reading.length + 12 && /^[ぁ-ゖー]+$/u.test(c.reading) && c.text.length <= 80 && c.text.length > 0 &&
+    !/[\r\n]/u.test(c.text) && wordSuggestionLabel(target, c.text) !== null)
     .sort((a, b) => (counts.get(JSON.stringify([b.reading, b.text])) ?? 0) - (counts.get(JSON.stringify([a.reading, a.text])) ?? 0) ||
       Number(b.source === "user") - Number(a.source === "user") || a.cost - b.cost || a.reading.length - b.reading.length || a.text.localeCompare(b.text, "ja"))
     .filter(c => !seen.has(c.text) && Boolean(seen.add(c.text))).slice(0, 5);
