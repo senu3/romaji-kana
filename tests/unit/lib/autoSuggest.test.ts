@@ -54,6 +54,12 @@ describe("independent word suggestions", () => {
     expect(targets).toContainEqual({ from: 400, to: 405, original: "kouka", reading: "こうか" });
     expect(targets.every(target => target.reading.length <= 80)).toBe(true);
   });
+  it.each(["どうすれば", "dousureba"])("does not look up a suffix from inside %s", text => {
+    expect(suggestTargets(text, text.length).map(target => target.reading)).toEqual(["どうすれば"]);
+  });
+  it.each(["これはこうか", "korehakouka"])("looks up the whole reading and the final word of %s", text => {
+    expect(suggestTargets(text, text.length).map(target => target.reading)).toEqual(["これはこうか", "こうか"]);
+  });
   it("keeps a retained suffix eligible as it grows beyond the lookup limit", () => {
     const doc = "かな".repeat(50);
     const retainedFrom = 87;

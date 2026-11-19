@@ -9,6 +9,7 @@ import { analyzeInput } from "./inputAnalysis";
 export interface SuggestTarget { from: number; to: number; original: string; reading: string; pendingRomaji?: string; suffix?: string }
 interface LiveReading { from: number; to: number; source: string }
 const sentenceSegmenter = new Intl.Segmenter("ja", { granularity: "sentence" });
+const wordSegmenter = new Intl.Segmenter("ja", { granularity: "word" });
 const MAX_CONTINUATION_CONTEXT = 8_192;
 const MAX_CONTINUATION_LENGTH = 32;
 const JAPANESE_PROSE = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー々、。！？]+$/u;
@@ -70,19 +71,24 @@ export function suggestTargets(doc: string, cursor: number, { liveInput, retaine
     ? romajiToKana(liveInput.source).tokens : converted.tokens;
   const last = sourceTokens[sourceTokens.length - 1];
   const ambiguousN = last?.kind === "n" && last.romaji.toLowerCase() === "n";
+  const finalWord = retainedFrom === undefined
+    ? wordSegmenter.segment(converted.kana).containing(readingEnd - 1)
+    : undefined;
   const targets: SuggestTarget[] = [];
   const append = (token: (typeof converted.tokens)[number], end: number, pendingRomaji?: string) => {
-    if (retainedFrom === undefined && end - token.kanaFrom > (targets.length ? 12 : 80)) return;
+    if (retainedFrom === undefined && end - token.kanaFrom > (token.kanaFrom === 0 ? 80 : 12)) return;
     const reading = converted.kana.slice(token.kanaFrom, end);
     if (!/^[ぁ-ゖー]{2,}$/u.test(reading) || /^[ゃゅょぁぃぅぇぉっー]/u.test(reading)) return;
     targets.push({ from: from + token.inputFrom, to: cursor, original: original.slice(token.inputFrom), reading,
       ...(pendingRomaji ? { pendingRomaji } : {}) });
   };
-  // Only split at transliteration token boundaries, never inside sha/kya etc.
-  // Try the longest available prefix first, then bounded word-sized suffixes.
+  // Look up the whole reading and the final word. A suffix must also start
+  // at a transliteration boundary so accepting it can replace whole key sequences.
   for (const token of converted.tokens) {
     if (token.kanaFrom >= readingEnd) break;
-    if (retainedFrom !== undefined && from + token.inputFrom !== retainedFrom) continue;
+    if (retainedFrom !== undefined) {
+      if (from + token.inputFrom !== retainedFrom) continue;
+    } else if (token.kanaFrom !== 0 && !(finalWord?.isWordLike && token.kanaFrom === finalWord.index)) continue;
     append(token, readingEnd, trailingUnknown?.romaji);
     if (retainedFrom !== undefined) {
       if (ambiguousN) append(token, readingEnd - 1, "n");
