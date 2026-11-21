@@ -118,6 +118,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
     speculateFromCandidateList,
     retryRecentConversion,
     retryAutomaticConversion,
+    cycleCommittedConversion,
     history,
     recentRetryItem,
     dismissRecentRetryChip,
@@ -314,6 +315,7 @@ function EditorApp({ remoteMode }: { remoteMode: boolean }) {
         onRetryGhost={openGhostCandidates}
         onRetryRecent={retryRecentConversion}
         onRetryAutomatic={retryAutomaticConversion}
+        onCycleCommitted={cycleCommittedConversion}
         registerView={registerView}
       />
       <AppRail

@@ -15,7 +15,9 @@ import {
 import { formatConversionError } from "../lib/appErrors";
 import type { ActivePanel } from "../lib/appTypes";
 import { recordConversionChoice } from "../lib/conversionLearning";
+import { moveCandidateIndex } from "../lib/candidateInteraction";
 import { ConversionRequests, rangesOverlap } from "../lib/conversionRequests";
+import { prepareConversionRequest } from "../lib/conversionRequest";
 import { BOUNDARY_DECISION_MS } from "../lib/conversionBudget";
 import { dismissConversionSession, lockConversionSession, createConversionSession, sessionResult, type ConversionSession } from "../lib/conversionSession";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
@@ -158,7 +160,7 @@ export function useConversion({
 
   const [history, setHistory] = useState<ConversionHistoryItem[]>([]);
 
-  const lastAutomaticConversion = useRef<ConversionHistoryItem | null>(null);
+  const lastCommittedConversion = useRef<{ item: ConversionHistoryItem; automatic: boolean } | null>(null);
   const [recentRetryItem, setRecentRetryItem] = useState<ConversionHistoryItem | null>(null);
   const [candidateList, setCandidateList] = useState<CandidateListTarget | null>(null);
   const closeCandidateList = useCallback(() => setCandidateList(null), []);
@@ -364,7 +366,7 @@ export function useConversion({
     setHistory((items) =>
       upsertConversionHistory(items, historyItem),
     );
-    lastAutomaticConversion.current = !explicit && suggestion.source === "editor" ? historyItem : null;
+    lastCommittedConversion.current = { item: historyItem, automatic: !explicit && suggestion.source === "editor" };
     setRecentRetryItem(historyItem);
     setStatus({
       kind: "success",
@@ -454,7 +456,8 @@ export function useConversion({
         skipQueuedConversion(request, "適用前に元のテキストが変わったため、変換をスキップしました。");
         return;
       }
-      if (request.escapeRetry && (!current.hasFocus || !current.state.selection.main.empty ||
+      if ((request.escapeRetry || (request.userRequestedSpeculation && request.range?.trigger === "space")) &&
+        (!current.hasFocus || current.composing || current.state.selection.ranges.length !== 1 || !current.state.selection.main.empty ||
         current.state.selection.main.head !== latest.to || request.docVersion !== docVersionRef.current)) return;
       if (request.userRequestedSpeculation ||
         !canApplyConversionAutomatically(current, conversion, settingsRef.current.conversionMode, request.range?.trigger)) {
@@ -496,7 +499,7 @@ export function useConversion({
       finishConversion(accepted, false, settings.modelName);
       setStatus({ kind: "success", message: historical
         ? "履歴の変換を適用しました。Ctrl/Cmd+/ で候補一覧を開けます。"
-        : "変換しました。Esc で見直せます。" });
+        : "変換しました。Space で別候補を表示できます。" });
     };
     const retainLateCandidate = (result: JapaneseConversionResult) => {
       const current = editorViewRef.current;
@@ -650,7 +653,18 @@ export function useConversion({
   }, [finishConversion]);
 
   const handleDismissGhost = useCallback((suggestion?: GhostConversionSuggestion) => {
-    suggestion ??= editorViewRef.current?.state.field(ghostSuggestionField).suggestion ?? undefined;
+    const view = editorViewRef.current;
+    suggestion ??= view?.state.field(ghostSuggestionField).suggestion ?? undefined;
+    if (!suggestion && view) {
+      const caret = view.state.selection.main.head;
+      const pendingSpeculation = conversionQueueRef.current.find(request =>
+        request.userRequestedSpeculation && request.range?.trigger === "space" && request.range.to === caret &&
+        request.docVersion === docVersionRef.current && requestsRef.current.valid(request.id));
+      if (pendingSpeculation) {
+        requestsRef.current.cancel(pendingSpeculation.id);
+        view.dispatch({ effects: removeLoadingDecoration.of(pendingSpeculation.id) });
+      }
+    }
     if (suggestion) requestsRef.current.cancel(suggestion.id);
     syncPending();
     const session = suggestion?.session ?? editorViewRef.current?.state.field(ghostSuggestionField).suggestion?.session;
@@ -661,7 +675,7 @@ export function useConversion({
       kind: "idle",
       message: "候補を閉じました。",
     });
-  }, [invalidatePredictiveSuggestions]);
+  }, [docVersionRef, invalidatePredictiveSuggestions, syncPending]);
 
   const previewHistoryGhost = useCallback((item: ConversionHistoryItem) => {
     if (!item.output || !item.anchor) {
@@ -830,7 +844,8 @@ export function useConversion({
   }, [enqueueConversion, invalidatePredictiveSuggestions]);
 
   const retryAutomaticConversion = useCallback((view: EditorView) => {
-    const item = lastAutomaticConversion.current;
+    const committed = lastCommittedConversion.current;
+    const item = committed?.automatic ? committed.item : undefined;
     const anchor = item?.anchor;
     if (activePanel || candidateList || settingsRef.current.conversionMode !== "replace" ||
       view.state.field(ghostSuggestionField).suggestion || !item || !anchor ||
@@ -855,6 +870,41 @@ export function useConversion({
       requestsRef.current.valid(request.id))) return true;
     return handleSpeculateHistory(item, true);
   }, [activePanel, candidateList, docVersionRef, handleSpeculateHistory, settingsRef, setStatus]);
+
+  const cycleCommittedConversion = useCallback((view: EditorView) => {
+    const item = lastCommittedConversion.current?.item;
+    const anchor = item?.anchor;
+    const stored = item?.session;
+    const visible = view.state.field(ghostSuggestionField).suggestion;
+    if (activePanel || candidateList || !item?.output || !anchor || !stored || visible?.previewOnly ||
+      (visible && visible.retryOf !== item.id) || anchor.docVersion !== docVersionRef.current ||
+      view.state.selection.main.head !== anchor.to || view.state.doc.sliceString(anchor.from, anchor.to) !== item.output) return false;
+
+    const selected = stored.candidates.find(candidate => candidate.id === stored.selectedId);
+    if (!selected || !item.output.startsWith(selected.result.text)) return false;
+    // Punctuation typed to accept the preview belongs to the committed span.
+    const suffix = item.output.slice(selected.result.text.length);
+    const reading = normalizeReading(selected.result.changes?.resultReading ?? selected.result.reviewKana);
+    const candidates = stored.candidates.filter(({ result }) => !result.suggestionRejected && result.text.trim() &&
+      (item.conversionStrategy === "speculative" || normalizeReading(result.changes?.resultReading ?? result.reviewKana) === reading));
+    if (candidates.length < 2) return false;
+    const session = visible?.session ?? createConversionSession(item.input, candidates.map(candidate => ({
+      ...candidate, result: { ...candidate.result, text: candidate.result.text + suffix },
+    })));
+    const index = session.candidates.findIndex(candidate => visible
+      ? candidate.result.text === visible.convertedText : candidate.id === stored.selectedId);
+    session.selectedId = session.candidates[moveCandidateIndex(index, session.candidates.length, 1)].id;
+    lockConversionSession(session);
+    if (!visible) invalidatePredictiveSuggestions(false);
+    view.dispatch({ effects: showGhostSuggestion.of({
+      ...candidateDetails(sessionResult(session)),
+      id: visible?.id ?? createId("conversion"), from: anchor.from, to: anchor.to, originalText: item.output,
+      inputText: item.input, source: "history", retryOf: item.id, avoidOutputs: item.avoidOutputs,
+      documentVocabulary: item.documentVocabulary, documentVocabularyRevision: item.documentVocabularyRevision,
+    }) });
+    setStatus({ kind: "success", message: "Space で次の候補、Tab で確定、Esc で閉じます。" });
+    return true;
+  }, [activePanel, candidateList, docVersionRef, invalidatePredictiveSuggestions, setStatus]);
 
   const candidateListIsCurrent = useCallback(() => {
     const view = editorViewRef.current;
@@ -1000,7 +1050,7 @@ export function useConversion({
             };
             if (commitConversion(currentView, accepted, "automatic")) {
               finishConversion(accepted, false, request.settings.modelName);
-              setStatus({ kind: "success", message: "変換しました。Esc で見直せます。" });
+              setStatus({ kind: "success", message: "変換しました。Space で別候補を表示できます。" });
             }
             return;
           }
@@ -1101,19 +1151,25 @@ export function useConversion({
     [processPredictiveSuggestionQueue],
   );
 
-  const handleConvert = useCallback((range: ConversionRange) => {
+  const handleConvert = useCallback((range: ConversionRange, speculateIncompleteReading = false) => {
     const createdAt = Date.now();
     const view = editorViewRef.current;
     if (!view) {
       return false;
     }
 
-    if (isPredictiveSuggestionTrigger(range.trigger)) {
+    const originalText = range.inputText ?? range.text;
+    if (speculateIncompleteReading) {
+      const prepared = prepareConversionRequest(originalText, settingsRef.current, {});
+      if (!prepared.hasEditableInput || prepared.excludedInput ||
+        !prepared.parts.some((part, index) => part.type === "text" && prepared.readings[index].lowConfidenceSpans.length > 0)) return false;
+      if (view.state.doc.sliceString(range.from, range.to) !== range.text) return false;
+    } else if (isPredictiveSuggestionTrigger(range.trigger)) {
       return enqueuePredictiveSuggestion(range);
     }
 
     if (hasMatchingPendingEditorConversion(conversionQueueRef.current.filter(request => requestsRef.current.valid(request.id)), range)) {
-      return false;
+      return speculateIncompleteReading;
     }
 
     const vocabularyProfile = settingsRef.current.useDocumentVocabulary
@@ -1127,12 +1183,14 @@ export function useConversion({
         to: range.to,
         originalText: range.text,
         docVersion: docVersionRef.current,
+        ...(speculateIncompleteReading ? { exactOnly: true } : {}),
       },
-      originalText: range.inputText ?? range.text,
+      originalText,
       createdAt,
       docVersion: docVersionRef.current,
       source: "editor",
       status: "queued",
+      ...(speculateIncompleteReading ? { userRequestedSpeculation: true } : {}),
 
       documentVocabulary: vocabularyProfile?.terms.length
         ? [...vocabularyProfile.terms]
@@ -1180,6 +1238,7 @@ export function useConversion({
     handleSpeculateHistory,
     retryRecentConversion,
     retryAutomaticConversion,
+    cycleCommittedConversion,
     history,
     recentRetryItem,
     dismissRecentRetryChip,

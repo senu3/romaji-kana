@@ -93,7 +93,7 @@ interface MarkdownEditorProps {
   remoteMode?: boolean;
   onSettingsChange: (settings: AppSettings) => void;
   onOpenModelSettings: () => void;
-  onConvert: (range: ConversionRange) => boolean;
+  onConvert: (range: ConversionRange, speculateIncompleteReading?: boolean) => boolean;
   onDocumentChanged: (documentText: string, changes: ChangeDesc) => void;
   onEditorStatusChange: (status: EditorDocumentStatus) => void;
   onNewFile: () => void;
@@ -105,6 +105,7 @@ interface MarkdownEditorProps {
   onRetryGhost: (suggestion: GhostConversionSuggestion) => void;
   onRetryRecent: () => boolean;
   onRetryAutomatic?: (view: EditorView) => boolean;
+  onCycleCommitted?: (view: EditorView) => boolean;
   registerView: (view: EditorView | null) => void;
 }
 
@@ -468,6 +469,7 @@ export function MarkdownEditor({
   onRetryGhost,
   onRetryRecent,
   onRetryAutomatic,
+  onCycleCommitted,
   registerView,
 }: MarkdownEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -481,6 +483,7 @@ export function MarkdownEditor({
   const onRetryGhostRef = useRef(onRetryGhost);
   const onRetryRecentRef = useRef(onRetryRecent);
   const onRetryAutomaticRef = useRef(onRetryAutomatic);
+  const onCycleCommittedRef = useRef(onCycleCommitted);
   const onCloseCandidateListRef = useRef(onCloseCandidateList);
   onCloseCandidateListRef.current = onCloseCandidateList;
   const initialDocumentRef = useRef(initialDocument);
@@ -695,6 +698,7 @@ export function MarkdownEditor({
     onRetryGhostRef.current = onRetryGhost;
     onRetryRecentRef.current = onRetryRecent;
     onRetryAutomaticRef.current = onRetryAutomatic;
+    onCycleCommittedRef.current = onCycleCommitted;
     settingsRef.current = settings;
   }, [
     onAcceptGhost,
@@ -705,6 +709,7 @@ export function MarkdownEditor({
     onRetryGhost,
     onRetryRecent,
     onRetryAutomatic,
+    onCycleCommitted,
     settings,
   ]);
 
@@ -765,6 +770,7 @@ export function MarkdownEditor({
           view => view.state.field(loadingDecorations).size > 0 || Boolean(view.state.field(ghostSuggestionField).suggestion),
           view => view.state.field(candidatePanelOpen) || Boolean(view.state.field(ghostSuggestionField).suggestion),
           view => onRetryAutomaticRef.current?.(view) ?? false),
+        Prec.highest(keymap.of([{ key: "Space", run: runSpaceConversion }])),
         inlineGhostActions.of({
           accept: acceptGhostSuggestion,
           open: suggestion => {
@@ -905,6 +911,24 @@ export function MarkdownEditor({
       ),
     });
   }, [settings.triggers.manualShortcut, shortcutCompartment]);
+
+  function runSpaceConversion(view: EditorView) {
+    const { main, ranges } = view.state.selection;
+    const settings = settingsRef.current;
+    if (!settings.triggers.space || view.composing || composingRef.current ||
+      Date.now() - lastCompositionEndAtRef.current < COMPOSITION_END_GRACE_MS ||
+      !main.empty || ranges.length !== 1 || view.state.field(candidatePanelOpen)) return false;
+
+    if (onCycleCommittedRef.current?.(view)) {
+      clearPredictiveSuggestionTimer();
+      return true;
+    }
+    if (!settings.autoConvert || view.state.field(ghostSuggestionField).suggestion || isSelectingCompletion(view.state)) return false;
+    const range = retainedConversionRange(view.state, main.head, "space");
+    if (!range || range.to !== main.head || !onConvertRef.current(range, true)) return false;
+    clearPredictiveSuggestionTimer();
+    return true;
+  }
 
   function runEnterConversion(view: EditorView) {
     if (!settingsRef.current.autoConvert || !settingsRef.current.triggers.enter) {
