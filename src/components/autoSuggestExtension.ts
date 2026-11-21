@@ -5,14 +5,13 @@ import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
 import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
 
-type Menu =
-  | { kind: "word"; target: SuggestTarget; candidates: WordSuggestion[] }
-  | { kind: "continuation"; target: SuggestTarget; text: string };
+import { resolveCompletion, type Completion as Menu } from "../lib/completionResolver";
+
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
 
@@ -51,7 +50,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const insert = menu.kind === "continuation"
       ? { from: target.to, original: "", text: menu.text }
-      : { from: target.from, original: target.original, text: menu.candidates[0].text + (target.suffix ?? "") };
+      : { from: target.from, original: target.original, text: menu.candidates[0].text + (menu.target.suffix ?? "") };
     if (!commitEditorText(view, { ...insert, to: target.to,
       cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest" })) return false;
     view.focus();
@@ -147,36 +146,31 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       const committedTarget = this.view.state.field(convertedTarget);
       const targets = committedTarget && /^[ぁ-ゖー]{2,80}$/u.test(committedTarget.reading)
         ? [committedTarget] : targetsAtCursor(this.view.state);
-      const continuationTarget = this.view.state.selection.ranges.length === 1 && update.transactions.some(tr => tr.docChanged &&
-        tr.isUserEvent("input.convert") && tr.effects.some(effect => effect.is(suggestAfterConversion))) ? committedTarget : null;
-      if (!targets.length && !continuationTarget) return;
+      const ime = update.transactions.some(t => t.effects.some(e => e.is(refresh)));
+      const committed = update.transactions.some(t => t.isUserEvent("input.convert") && t.effects.some(e => e.is(suggestAfterConversion)));
+      if (!targets.length && !ime && !committed) return;
       this.timer = setTimeout(async () => {
         if (!allowed(this.view)) return;
         this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
         try {
-          for (const target of targets) {
-            let candidates = this.cache.get(target.reading);
-            if (!candidates) {
-              candidates = await suggestWords(target.reading, settings().personalDictionary ?? [], controller.signal);
-              if (this.destroyed || revision !== this.revision) return;
-              if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
-              this.cache.set(target.reading, candidates);
-            }
-            if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
-            const ranked = rankSuggestions(target, candidates, conversionLearningChoices());
-            if (!ranked.length) continue;
-            this.view.dispatch({ effects: setMenu.of({ kind: "word", target, candidates: ranked }) });
-            return;
-          }
-          if (continuationTarget) {
-            const text = suggestDocumentContinuation(this.view.state.doc.toString(), continuationTarget.to);
-            if (text) {
-              this.view.dispatch({ effects: setMenu.of({ kind: "continuation", target: continuationTarget, text }) });
-              return;
-            }
-          }
-          this.view.dispatch({ effects: setMenu.of(null) });
+          const personal = settings().personalDictionary ?? [];
+          const result = await resolveCompletion({
+            doc: this.view.state.doc.toString(), cursor: this.view.state.selection.main.head,
+            targets, ime, committed, personal, choices: conversionLearningChoices(), signal: controller.signal,
+            lookup: async reading => {
+              const cached = this.cache.get(reading);
+              if (cached) return cached;
+              const words = await suggestWords(reading, personal, controller.signal);
+              if (!controller.signal.aborted) {
+                if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
+                this.cache.set(reading, words);
+              }
+              return words;
+            },
+          });
+          if (!this.destroyed && revision === this.revision && allowed(this.view))
+            this.view.dispatch({ effects: setMenu.of(result) });
         } catch {
           if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) });
         }

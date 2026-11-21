@@ -37,6 +37,19 @@ try {
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    const ime = await page.context().newCDPSession(page);
+    await page.keyboard.insertText('設計書を確認する。');
+    await page.keyboard.press('Enter');
+    await ime.send('Input.imeSetComposition', { text: 'せっけい', selectionStart: 4, selectionEnd: 4 });
+    assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0);
+    await ime.send('Input.insertText', { text: '設計' });
+    await page.getByRole('button', { name: '書 を挿入' }).waitFor({ timeout: 5000 });
+    await page.keyboard.press('Tab');
+    assert.ok((await editor.innerText()).endsWith('設計書'));
+    await page.keyboard.press('Control+z');
+    assert.ok((await editor.innerText()).endsWith('設計'));
+  });
   for (const autoConvert of [false, true]) await scenario({ autoConvert, conversionMode: 'ghost' }, async (page, editor) => {
     const readings = [];
     await page.route('**/api/kana-engine', route => {
