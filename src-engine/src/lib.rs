@@ -72,7 +72,14 @@ pub struct SearchResult {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Suggestion { pub text: String, pub reading: String, pub source: String, pub cost: i32 }
+pub struct Suggestion { pub text: String, pub reading: String, pub source: String, pub cost: i32, pub lexical: bool }
+
+fn preferred_word(entry: &Entry) -> bool {
+    // Standalone noun classes in the bundled Mozc id.def (exclude affixes and dependent nouns).
+    static COMPOUND: OnceLock<Regex> = OnceLock::new();
+    matches!(entry.lid, 1841..=1898 | 1909..=1918 | 1920..=1935)
+        || COMPOUND.get_or_init(|| Regex::new(r"^[\p{Han}々]{2,}$").unwrap()).is_match(&entry.text)
+}
 
 #[derive(Clone)]
 struct Entry {
@@ -469,11 +476,11 @@ impl Engine {
         let matches = |key: &str| key.starts_with(reading) && key.chars().count() > prefix.len() && key.chars().count() <= prefix.len() + 12;
         let mut found: Vec<Suggestion> = self.trie.completions(&prefix).into_iter().filter_map(|index| {
             let entry = &self.entries[index];
-            matches(&entry.reading).then(|| Suggestion { text: entry.text.clone(), reading: entry.reading.clone(), source: "mozc".into(), cost: entry.cost })
+            matches(&entry.reading).then(|| Suggestion { text: entry.text.clone(), reading: entry.reading.clone(), source: "mozc".into(), cost: entry.cost, lexical: preferred_word(entry) })
         }).collect();
         found.extend(words.iter().filter(|w| matches(&w.reading) && !w.text.is_empty() && w.text.chars().count() <= 80).map(|w|
-            Suggestion { text: w.text.clone(), reading: w.reading.clone(), source: "user".into(), cost: 3000 }));
-        found.sort_by(|a, b| (a.source != "user").cmp(&(b.source != "user")).then(a.cost.cmp(&b.cost)).then(a.reading.len().cmp(&b.reading.len())).then(a.text.cmp(&b.text)));
+            Suggestion { text: w.text.clone(), reading: w.reading.clone(), source: "user".into(), cost: 3000, lexical: true }));
+        found.sort_by(|a, b| (a.source != "user").cmp(&(b.source != "user")).then(b.lexical.cmp(&a.lexical)).then(a.cost.cmp(&b.cost)).then(a.reading.len().cmp(&b.reading.len())).then(a.text.cmp(&b.text)));
         let mut seen = HashSet::new();
         found.into_iter().filter(|s| seen.insert((s.reading.clone(), s.text.clone()))).take(20).collect()
     }

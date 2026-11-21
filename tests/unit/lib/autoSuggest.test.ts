@@ -82,6 +82,13 @@ describe("independent word suggestions", () => {
   it("only returns longer prefix matches within bounded length", () => {
     expect(rankSuggestions(convertedSuggestTarget(0, "効果", "こうか"), [item("効果", "こうか"), item("効果、", "こうか、"), item("海", "かい"), item("長すぎ", "こうか" + "い".repeat(13)), item("改\n行"), item("航海")], []).map(c => c.text)).toEqual(["航海"]);
   });
+  it("prefers a short noun completion over a lower-cost long continuation", () => {
+    const target = convertedSuggestTarget(0, "すい", "すい");
+    const noun = { ...item("すいか", "すいか", 100), lexical: true };
+    const phrase = item("すいません", "すいません", 0);
+    expect(rankSuggestions(target, [phrase, noun], [])).toEqual([noun, phrase]);
+    expect(wordSuggestionLabel(target, noun.text, noun.lexical)).toBe("か");
+  });
   it("skips short visible additions before taking the top five and keeps whole-word replacements", () => {
     const target = convertedSuggestTarget(0, "たべ", "たべ");
     const short = ["る", "た", "て", "ない", "ます"].map(tail => item(`たべ${tail}`, `たべ${tail}`, 0));

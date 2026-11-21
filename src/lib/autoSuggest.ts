@@ -109,22 +109,22 @@ export function matchesSuggestionReading(reading: string, candidateReading: stri
 }
 
 /** Display the added text for an extension and the full word for a replacement. */
-export function wordSuggestionLabel(target: SuggestTarget, text: string): string | null {
+export function wordSuggestionLabel(target: SuggestTarget, text: string, lexical = false): string | null {
   if (text + (target.suffix ?? "") === target.original) return null;
   if (target.suffix || !text.startsWith(target.original)) return ` → ${text}`;
   const continuation = text.slice(target.original.length);
-  return hasEnoughContinuation(continuation) ? continuation : null;
+  return lexical || hasEnoughContinuation(continuation) ? continuation : null;
 }
 
 export function rankSuggestions(target: SuggestTarget, candidates: WordSuggestion[], choices: Choice[]): WordSuggestion[] {
   const { reading } = target;
   const counts = new Map(choices.map(c => [JSON.stringify([c.reading, c.text]), c.count]));
-  const learned = choices.map(c => ({ reading: c.reading, text: c.text, source: "learning" as const, cost: 0 }));
+  const learned = choices.map(c => ({ reading: c.reading, text: c.text, source: "learning" as const, lexical: true, cost: 0 }));
   const seen = new Set<string>();
   return [...learned, ...candidates].filter(c => matchesSuggestionReading(reading, c.reading) &&
     c.reading.length <= reading.length + 12 && /^[ぁ-ゖー]+$/u.test(c.reading) && c.text.length <= 80 && c.text.length > 0 &&
-    !/[\r\n]/u.test(c.text) && wordSuggestionLabel(target, c.text) !== null)
+    !/[\r\n]/u.test(c.text) && wordSuggestionLabel(target, c.text, c.lexical) !== null)
     .sort((a, b) => (counts.get(JSON.stringify([b.reading, b.text])) ?? 0) - (counts.get(JSON.stringify([a.reading, a.text])) ?? 0) ||
-      Number(b.source === "user") - Number(a.source === "user") || a.cost - b.cost || a.reading.length - b.reading.length || a.text.localeCompare(b.text, "ja"))
+      Number(b.source === "user") - Number(a.source === "user") || Number(!!b.lexical) - Number(!!a.lexical) || a.cost - b.cost || a.reading.length - b.reading.length || a.text.localeCompare(b.text, "ja"))
     .filter(c => !seen.has(c.text) && Boolean(seen.add(c.text))).slice(0, 5);
 }
