@@ -14,6 +14,7 @@ const MAX_NODES: usize = 30_000;
 const MAX_EXPANSIONS: usize = 10_000;
 const MAX_AGENDA: usize = 50_000;
 const NOUN: u16 = 1851;
+const ORIGINAL_STATE_PHRASE_BONUS: i64 = 800;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,6 +138,23 @@ pub struct Engine {
     trie: Trie,
     matrix: Vec<i32>,
     size: usize,
+}
+
+fn original_state_phrase_bonus(tokens: &[Token]) -> i64 {
+    let matches = tokens.windows(2).enumerate().filter(|&(index, pair)| {
+        let noun = &pair[0];
+        let next = &pair[1];
+        if noun.reading != "もと" || noun.text != "元" {
+            return false;
+        }
+        // The dictionary can attach に to the verb or give it a separate token.
+        (next.reading.starts_with("にもど") && next.text.starts_with("に戻"))
+            || (next.reading == "に" && next.text == "に"
+                && tokens.get(index + 2).is_some_and(|verb| {
+                    verb.reading.starts_with("もど") && verb.text.starts_with("戻")
+                }))
+    });
+    matches.count() as i64 * ORIGINAL_STATE_PHRASE_BONUS
 }
 
 fn unzip(bytes: &[u8]) -> Result<String, String> {
@@ -394,6 +412,13 @@ impl Engine {
                 });
             }
         }
+        // Score conventional spellings in the bounded pool before choosing
+        // which candidates to return for each segmentation.
+        for candidate in &mut candidates {
+            candidate.cost -= original_state_phrase_bonus(&candidate.tokens);
+        }
+        candidates.sort_by_key(|c| c.cost);
+
         // Reserve space for distinct boundary patterns before filling by cost.
         // Surface variants of one segmentation must not exhaust the whole pool.
         let mut boundary_counts = BTreeMap::<Vec<usize>, usize>::new();

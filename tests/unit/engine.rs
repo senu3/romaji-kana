@@ -7,6 +7,40 @@ fn production_rejects_retired_completion_requests() {
 }
 use super::*;
 #[test]
+fn returning_to_an_original_state_prefers_the_conventional_spelling() {
+    let engine = engine().unwrap();
+    for (reading, expected, alternative) in [
+        (
+            "やっぱりもとにもどしてみた",
+            "やっぱり元に戻してみた",
+            "やっぱり下に戻してみた",
+        ),
+        ("もとにもどす", "元に戻す", "下に戻す"),
+        ("もとにもどる", "元に戻る", "下に戻る"),
+    ] {
+        let candidates = engine
+            .search(&SearchRequest {
+                reading: reading.into(),
+                words: vec![],
+                limit: 24,
+            })
+            .unwrap()
+            .candidates;
+        assert_eq!(candidates.first().map(|c| c.text.as_str()), Some(expected));
+        assert!(candidates.iter().any(|c| c.text == alternative));
+    }
+    let candidates = engine
+        .search(&SearchRequest {
+            reading: "したにもどす".into(),
+            words: vec![],
+            limit: 24,
+        })
+        .unwrap()
+        .candidates;
+    assert_eq!(candidates.first().map(|c| c.text.as_str()), Some("下に戻す"));
+}
+
+#[test]
 fn independent_suggestions_extend_prefix_and_include_personal_words() {
     let words = vec![UserWord { id: "word".into(), reading: "てすとしゃ".into(), text: "試験社".into(), pos: "organization".into() }];
     let results = engine().unwrap().suggest("てすとし", &words);
