@@ -15,7 +15,11 @@ export function missingLetterReadings(value: string) {
     const end = start + run[0].length;
     if (/[A-Za-z_:/.-]/.test(value[start - 1] ?? "") || /[A-Za-z_:/-]/.test(value[end] ?? "")) continue;
     // Appending a suffix is completion, not missing-letter correction.
-    for (let offset = start;offset < end;offset++) for (const inserted of ALPHABET) {
+    // A vowel after a stranded consonant is internal to a mixed-script word.
+    const betweenKana = /^[bcdfghjklmpqrstvwxyz]$/u.test(run[0]) &&
+      /[ぁ-ゖ]/u.test(value[start - 1] ?? "") && /[ぁ-ゖ]/u.test(value[end] ?? "");
+    const limit = betweenKana ? end + 1 : end;
+    for (let offset = start; offset < limit; offset++) for (const inserted of offset === end ? "aiueo" : ALPHABET) {
       const repaired = value.slice(0, offset) + inserted + value.slice(offset);
       const kana = romajiToKana(repaired);
       if (kana.lowConfidenceSpans.length || kana.kana === original.kana || markers(original.kana) !== markers(kana.kana)) continue;

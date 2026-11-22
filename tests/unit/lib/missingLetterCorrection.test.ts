@@ -91,6 +91,7 @@ describe("single romaji edit correction", () => {
   });
   it("can explore already interpretable kana but excludes suffix completion and negation changes", () => {
     expect(missingLetterReadings("kakuniwoshite").plans.some(p => p.reading === "かくにんをして")).toBe(true);
+    expect(missingLetterReadings("くdさい").plans.some(p => p.reading === "ください")).toBe(true);
     expect(missingLetterReadings("ikima").plans.some(p => p.value === "ikimas")).toBe(false);
     expect(missingLetterReadings("ikanai").plans.every(p => p.reading.includes("ない"))).toBe(true);
     expect(missingLetterReadings("a".repeat(97)).truncated).toBe(true);
