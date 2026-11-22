@@ -50,6 +50,28 @@ try {
     await page.keyboard.press('Control+z');
     assert.ok((await editor.innerText()).endsWith('設計'));
   });
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    await page.unroute('**/api/kana-engine');
+    const ime = await page.context().newCDPSession(page);
+    await ime.send('Input.imeSetComposition', { text: 'せっけい', selectionStart: 4, selectionEnd: 4 });
+    await ime.send('Input.insertText', { text: '設計' });
+    const addition = page.getByRole('button', { name: /を挿入/ });
+    await addition.waitFor({ timeout: 120000 });
+    const suffix = await addition.locator('.candidate-completion-text').innerText();
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '設計' + suffix);
+  });
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    await page.unroute('**/api/kana-engine');
+    const ime = await page.context().newCDPSession(page);
+    await ime.send('Input.imeSetComposition', { text: '控えてくdさい', selectionStart: 7, selectionEnd: 7 });
+    await ime.send('Input.insertText', { text: '控えてくdさい' });
+    await page.getByRole('button', { name: 'ください に訂正' }).waitFor({ timeout: 120000 });
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '控えてください');
+    await page.keyboard.press('Control+z');
+    assert.equal(await editor.innerText(), '控えてくdさい');
+  });
   for (const autoConvert of [false, true]) await scenario({ autoConvert, conversionMode: 'ghost' }, async (page, editor) => {
     const readings = [];
     await page.route('**/api/kana-engine', route => {

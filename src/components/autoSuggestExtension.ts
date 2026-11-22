@@ -3,7 +3,7 @@ import { Prec, StateEffect, StateField, type EditorState } from "@codemirror/sta
 import { EditorView, ViewPlugin, keymap, type ViewUpdate } from "@codemirror/view";
 import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
-import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
+import { suggestSurface, suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
 import { convertedSuggestTarget, matchesSuggestionReading, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
@@ -50,6 +50,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const insert = menu.kind === "continuation"
       ? { from: target.to, original: "", text: menu.text }
+      : menu.kind === "correction" ? { from: target.from, original: target.original, text: menu.text }
       : { from: target.from, original: target.original, text: menu.candidates[0].text + (menu.target.suffix ?? "") };
     if (!commitEditorText(view, { ...insert, to: target.to,
       cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest" })) return false;
@@ -109,7 +110,10 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       if (!completion || !allowed(this.view)) this.ghost.hidden = true;
       else if (completion !== update.startState.field(field) || this.ghost.hidden) {
         const text = document.createElement("span"); text.className = "candidate-completion-text";
-        if (completion.kind === "continuation") {
+        if (completion.kind === "correction") {
+          text.textContent = " → " + completion.text;
+          this.ghost.setAttribute("aria-label", completion.text + " に訂正 (Tabで採用)");
+        } else if (completion.kind === "continuation") {
           text.textContent = completion.text;
           this.ghost.setAttribute("aria-label", `${completion.text} を挿入 (Tabで採用)`);
         } else {
@@ -146,7 +150,11 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       const committedTarget = this.view.state.field(convertedTarget);
       const targets = committedTarget && /^[ぁ-ゖー]{2,80}$/u.test(committedTarget.reading)
         ? [committedTarget] : targetsAtCursor(this.view.state);
-      const ime = update.transactions.some(t => t.effects.some(e => e.is(refresh)));
+      // Some IMEs deliver the final text transaction after compositionend.
+      const japaneseCommit = update.transactions.some(tr => (tr.isUserEvent("input.type") || tr.isUserEvent("input.paste")) &&
+        !tr.state.field(liveKanaSource, false) && tr.newSelection.main.empty &&
+        /[ぁ-ゖァ-ヶ一-龯々ー]$/u.test(tr.newDoc.sliceString(Math.max(0, tr.newSelection.main.head - 1), tr.newSelection.main.head)));
+      const ime = japaneseCommit || update.transactions.some(t => t.effects.some(e => e.is(refresh)));
       const committed = update.transactions.some(t => t.isUserEvent("input.convert") && t.effects.some(e => e.is(suggestAfterConversion)));
       if (!targets.length && !ime && !committed) return;
       this.timer = setTimeout(async () => {
@@ -157,7 +165,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
           const personal = settings().personalDictionary ?? [];
           const result = await resolveCompletion({
             doc: this.view.state.doc.toString(), cursor: this.view.state.selection.main.head,
-            targets, ime, committed, personal, choices: conversionLearningChoices(), signal: controller.signal,
+            targets, ime, committed, personal, lookupSurface: suggestSurface, choices: conversionLearningChoices(), signal: controller.signal,
             lookup: async reading => {
               const cached = this.cache.get(reading);
               if (cached) return cached;

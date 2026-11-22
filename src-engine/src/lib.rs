@@ -141,6 +141,7 @@ impl Trie {
 }
 
 pub struct Engine {
+    surface_index: OnceLock<Vec<usize>>,
     entries: Vec<Entry>,
     trie: Trie,
     matrix: Vec<i32>,
@@ -252,6 +253,7 @@ impl Engine {
             }
         }
         Ok(Self {
+            surface_index: OnceLock::new(),
             entries,
             trie,
             matrix,
@@ -467,6 +469,21 @@ impl Engine {
         })
     }
 
+    fn suggest_surface(&self, prefix: &str) -> Option<&str> {
+        if !(2..=24).contains(&prefix.chars().count()) { return None; }
+        let index = self.surface_index.get_or_init(|| {
+            let mut indices: Vec<_> = (0..self.entries.len()).collect();
+            indices.sort_unstable_by(|&a, &b| self.entries[a].text.cmp(&self.entries[b].text));
+            indices
+        });
+        let first = index.partition_point(|&i| self.entries[i].text.as_str() <= prefix);
+        index[first..].iter().map(|&i| &self.entries[i])
+            .take_while(|entry| entry.text.starts_with(prefix))
+            .filter(|entry| preferred_word(entry))
+            .min_by_key(|entry| (entry.cost, entry.text.len(), &entry.text))
+            .map(|entry| entry.text.as_str())
+    }
+
     /// Independent, bounded word suggestions. No lattice search or model ranking.
     pub fn suggest(&self, reading: &str, words: &[UserWord]) -> Vec<Suggestion> {
         let prefix: Vec<char> = reading.chars().collect();
@@ -564,6 +581,8 @@ impl PartialOrd for Path {
 #[serde(tag = "operation", rename_all = "camelCase")]
 pub enum Request {
     Notices,
+    SuggestSurface { prefix: String },
+    KanaWordCosts { readings: Vec<String> },
     Suggest { reading: String, #[serde(default)] words: Vec<UserWord> },
     Search {
         #[serde(flatten)]
@@ -582,6 +601,20 @@ pub fn execute(request: Request) -> Result<serde_json::Value, String> {
             if words.len() > 500 { return Err("Too many personal words".into()); }
             Ok(serde_json::json!({ "candidates": engine()?.suggest(&reading, &words) }))
         }
+        Request::KanaWordCosts { readings } => {
+            if readings.len() > 80 || readings.iter().any(|r| r.chars().count() > 32) {
+                return Err("Too many repair candidates".into());
+            }
+            let engine = engine()?;
+            let costs: Vec<_> = readings.iter().map(|reading| {
+                let chars: Vec<_> = reading.chars().collect();
+                engine.trie.matches(&chars, 0).into_iter()
+                    .filter(|&(end, i)| end == chars.len() && engine.entries[i].text == *reading)
+                    .map(|(_, i)| engine.entries[i].cost).min()
+            }).collect();
+            Ok(serde_json::json!({ "costs": costs }))
+        }
+        Request::SuggestSurface { prefix } => Ok(serde_json::json!({ "text": engine()?.suggest_surface(&prefix) })),
         Request::Notices => Ok(serde_json::json!({
             "revision": "0136c35782536cb43d710575c311cd4185982738",
             "notice": include_str!("../data/NOTICE.txt"),

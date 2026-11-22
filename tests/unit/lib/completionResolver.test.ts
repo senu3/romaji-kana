@@ -4,7 +4,7 @@ import { resolveCompletion } from "../../../src/lib/completionResolver";
 function afterIme(doc: string) {
   return {
     doc, cursor: doc.length, ime: true, committed: false, targets: [],
-    choices: [], personal: [], lookup: vi.fn(), signal: new AbortController().signal,
+    choices: [], personal: [], lookup: vi.fn(), lookupSurface: vi.fn(), signal: new AbortController().signal,
   };
 }
 
