@@ -3,15 +3,47 @@ import { keymap, showTooltip, type Tooltip } from "@codemirror/view";
 import { buildDocumentVocabularyProfile } from "../lib/documentVocabulary";
 import { analyzeInput } from "../lib/inputAnalysis";
 
-function nextQuestion(line: string, document: string): string {
+import { commitEditorText } from "../lib/editorCommit";
+import { generatedText, stripThinkBlock } from "../lib/generationUtils";
+import { currentProviderBaseUrl } from "../lib/modelProvider";
+import { defaultOllamaTransport } from "../lib/ollamaProxy";
+import { loadSettings } from "../lib/settings";
+
+function writingPrompt(line: string, terms: string[]) {
   const sentence = line.trimEnd().slice(0, -1).split(/[。！？]/u).pop() ?? "";
-  const topic = buildDocumentVocabularyProfile(document).terms.find(term => sentence.includes(term));
-  if (/延期|見送|中止/u.test(sentence)) return "判断の決め手は何だった？";
-  if (/減っ|増え|改善|短縮|速く|遅く/u.test(sentence)) return "どの場面で差がいちばん出た？";
-  if (/困っ|問題|失敗|できなかった/u.test(sentence)) return "どんなときに起きた？";
-  if (/予定|つもり|したい/u.test(sentence)) return "まず何から始める？";
-  if (topic) return `「${topic}」について、具体例を一つ挙げると？`;
-  return "たとえば、どんな場面だった？";
+  const comma = /[、，,]$/u.test(line);
+  const topic = terms.find(term => sentence.includes(term));
+  if (/延期|見送|中止/u.test(sentence)) return {
+    question: "判断の決め手は何だった？",
+    continuation: comma ? "残った作業を洗い出してから、新しい日程を決めることにした。" : "次の日程を決める前に、何を終える必要があるか整理しておきたい。",
+  };
+  if (/減っ|増え|改善|短縮|速く|遅く/u.test(sentence)) return {
+    question: "どの場面で差がいちばん出た？",
+    continuation: comma ? "同じ操作を繰り返したときにも差が出るか確かめたい。" : "次は条件をそろえて試し、どの場面で差が大きくなるかを比べたい。",
+  };
+  if (/困っ|問題|失敗|できなかった/u.test(sentence)) return {
+    question: "どんなときに起きた？",
+    continuation: comma ? "直前の操作を一つずつたどって、同じことが起きるか試した。" : "まず直前の状態を記録し、条件を一つずつ変えて原因を絞りたい。",
+  };
+  if (/予定|つもり|したい/u.test(sentence)) return {
+    question: "まず何から始める？", continuation: "まず小さく試し、その結果を見て次に取り組む範囲を決めたい。",
+  };
+  return {
+    question: topic ? `「${topic}」について、具体例を一つ挙げると？` : "たとえば、どんな場面だった？",
+    continuation: topic ? `${topic}を実際に使う場面を一つ選んで、どこで役立つか確かめたい。`
+      : "まず印象に残った場面を振り返り、そのとき何が起きたか順に書いてみようと思う。",
+  };
+}
+
+async function predictContinuation(line: string, terms: string[], signal: AbortSignal) {
+  const settings = loadSettings();
+  const response = await defaultOllamaTransport.generate(settings.modelProvider, currentProviderBaseUrl(settings), {
+    model: settings.modelName, stream: false, think: false,
+    system: "日本語原稿の続きを執筆する。末尾が読点なら同じ文の後半から、句点なら次の文から始める。直前の内容と文体を引き継いで一〜二文を最後まで書く。入力の繰り返し、見出し、助言は不要。未提示の数値や人名を作らない。本文だけ返す。",
+    prompt: JSON.stringify({ line: line.slice(-1500), vocabulary: terms }), options: { temperature: 0.55 },
+  }, 12000, signal);
+  const text = stripThinkBlock(generatedText(response)).trim();
+  return text.length >= 8 && text.length <= 240 && /[。！？][」』）]?$/u.test(text) ? text : "";
 }
 
 const dismiss = StateEffect.define<void>();
@@ -33,14 +65,38 @@ const question = StateField.define<Tooltip | null>({
     if (!context.slice(0, -1).trim() || /[0-9][.,]$/u.test(context)) return null;
     const document = tr.newDoc.toString();
     if (!analyzeInput(document).some(s => s.kind === "text" && s.from < cursor && cursor <= s.to)) return null;
-    const text = nextQuestion(context, document);
-    return { pos: cursor, above: false, create() {
+    const terms = buildDocumentVocabularyProfile(document).terms;
+    const prompt = writingPrompt(context, terms);
+    const tooltip: Tooltip = { pos: cursor, above: false, create(view) {
       const dom = window.document.createElement("aside");
       dom.className = "writing-question";
-      dom.setAttribute("role", "status");
-      dom.textContent = text;
-      return { dom };
+      const hint = window.document.createElement("div");
+      hint.setAttribute("role", "status");
+      hint.textContent = prompt.question;
+      dom.append(hint);
+      function addCandidate(text: string) {
+        const button = window.document.createElement("button");
+        button.type = "button";
+        button.textContent = text;
+        button.title = "クリックして続きを挿入";
+        button.onmousedown = event => event.preventDefault();
+        button.onclick = () => {
+          if (view.composing || view.state.field(question) !== tooltip || view.state.selection.main.head !== cursor) return;
+          commitEditorText(view, { from: cursor, to: cursor, original: "", text, cursor: "end", userEvent: "input.autosuggest" });
+          view.focus();
+        };
+        dom.append(button);
+      }
+      addCandidate(prompt.continuation);
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        void predictContinuation(context, terms, controller.signal).then(text => {
+          if (!controller.signal.aborted && text && text !== prompt.continuation) addCandidate(text);
+        }).catch(() => { /* The local example remains usable offline. */ });
+      }, 350);
+      return { dom, destroy() { clearTimeout(timer); controller.abort(); } };
     } };
+    return tooltip;
   },
   provide: field => showTooltip.from(field),
 });

@@ -4033,4 +4033,7 @@ button.model-chip:hover {
 .status-bar.error .status-main::before { background: var(--theme-danger, #b91c1c); }
 .status-bar.warning .status-main::before, .status-bar.loading .status-main::before { background: var(--theme-warning, #9a4d09); }
 
-.editor-host .cm-tooltip.writing-question { max-width: min(32em, 85vw); padding: 6px 10px; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 0.85em; pointer-events: none; }
+.editor-host .cm-tooltip.writing-question { max-width: min(32em, 85vw); padding: 6px 10px; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 0.85em; pointer-events: auto; }
+
+.writing-question button { display: block; width: 100%; margin-top: 5px; padding: 5px 7px; text-align: left; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.writing-question button:hover, .writing-question button:focus-visible { border-color: var(--ink-muted); }
