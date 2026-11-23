@@ -1,10 +1,13 @@
 import { localCorrectionRule, faithfulConversionRule } from "./conversionRules";
 import { romajiToKana } from "./romajiKana";
 
+import { normalizeRepairLetters, strandedConsonant } from "./mixedKanaRepair";
+
 const ALPHABET = "naeioubcdfghjklmpqrstvwxyz";
 const MAX_ROMAJI = 96;
 
 export function missingLetterReadings(value: string) {
+  value = normalizeRepairLetters(value);
   const original = romajiToKana(value);
   const plans: Array<{ value: string; reading: string; offset: number; inserted: string; distance: number }> = [];
   if (value.length > MAX_ROMAJI) return { plans, truncated: true };
@@ -16,9 +19,7 @@ export function missingLetterReadings(value: string) {
     if (/[A-Za-z_:/.-]/.test(value[start - 1] ?? "") || /[A-Za-z_:/-]/.test(value[end] ?? "")) continue;
     // Appending a suffix is completion, not missing-letter correction.
     // A vowel after a stranded consonant is internal to a mixed-script word.
-    const betweenKana = /^[bcdfghjklmpqrstvwxyz]$/u.test(run[0]) &&
-      /[ぁ-ゖ]/u.test(value[start - 1] ?? "") && /[ぁ-ゖ]/u.test(value[end] ?? "");
-    const limit = betweenKana ? end + 1 : end;
+    const limit = run[0].length === 1 && strandedConsonant(value, start) ? end + 1 : end;
     for (let offset = start; offset < limit; offset++) for (const inserted of offset === end ? "aiueo" : ALPHABET) {
       const repaired = value.slice(0, offset) + inserted + value.slice(offset);
       const kana = romajiToKana(repaired);

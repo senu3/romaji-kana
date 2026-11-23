@@ -602,7 +602,7 @@ pub fn execute(request: Request) -> Result<serde_json::Value, String> {
             Ok(serde_json::json!({ "candidates": engine()?.suggest(&reading, &words) }))
         }
         Request::KanaWordCosts { readings } => {
-            if readings.len() > 80 || readings.iter().any(|r| r.chars().count() > 32) {
+            if readings.len() > 780 || readings.iter().any(|r| r.chars().count() > 32) {
                 return Err("Too many repair candidates".into());
             }
             let engine = engine()?;

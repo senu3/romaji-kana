@@ -1,3 +1,4 @@
+import { mixedKanaTarget } from "../lib/mixedKanaRepair";
 import { isSelectingCompletion } from "../lib/completionSelection";
 import { candidateBindings, candidateAcceptLabel } from "../lib/candidateInteraction";
 import { candidateSurface, candidatePanelOpen, setCandidatePanelOpen } from "./candidateSurface";
@@ -561,6 +562,9 @@ export function MarkdownEditor({
     }
 
     const cursor = view.state.selection.main.head;
+    // A reading-only pause conversion can replace the suffix while the typo
+    // dictionary is still loading. Keep explicit conversion available.
+    if (reason === "pause" && settingsRef.current.autoSuggest && mixedKanaTarget(view.state.doc.toString(), cursor)) return false;
     const range = retainedConversionRange(view.state, cursor, trigger);
     if (!range) {
       return false;
