@@ -4032,3 +4032,5 @@ button.model-chip:hover {
 
 .status-bar.error .status-main::before { background: var(--theme-danger, #b91c1c); }
 .status-bar.warning .status-main::before, .status-bar.loading .status-main::before { background: var(--theme-warning, #9a4d09); }
+
+.editor-host .cm-tooltip.writing-question { max-width: min(32em, 85vw); padding: 6px 10px; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 0.85em; pointer-events: none; }

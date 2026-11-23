@@ -65,6 +65,7 @@ import {
   MIN_TYPING_INTERVAL_MS,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
+import { writingQuestion } from "./writingQuestion";
 import { EDITOR_APPEARANCE_EVENT } from "../lib/editorAppearance";
 import { candidatePresentation } from "../lib/candidatePresentation";
 import { requiresExplicitAcceptance } from "../lib/readingAssessment";
@@ -735,6 +736,7 @@ export function MarkdownEditor({
         history(),
         markdown(),
         editorPhrases,
+        writingQuestion,
         search({ top: true }),
         lineNumbers(),
         loadingDecorations,
