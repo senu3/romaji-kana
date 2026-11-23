@@ -20,21 +20,20 @@ const question = StateField.define<Tooltip | null>({
   update(value, tr) {
     if (tr.effects.some(effect => effect.is(dismiss))) return null;
     if (!tr.docChanged) return tr.selection ? null : value;
-    if (!tr.isUserEvent("input") || tr.isUserEvent("input.paste") || !tr.newSelection.main.empty) return null;
+    const typing = tr.isUserEvent("input.type") || tr.isUserEvent("input.convert") || tr.isUserEvent("input.ghostAccept");
+    if (!typing || !tr.newSelection.main.empty) return null;
     const cursor = tr.newSelection.main.head;
-    const line = tr.newDoc.lineAt(cursor);
-    if (line.number < 2 || line.text.trim() || cursor !== line.to) return null;
-    let newline = false;
-    tr.changes.iterChanges((_a, _b, _c, end, inserted) => {
-      if (end === cursor && /^\n[ \t]*$/u.test(inserted.toString())) newline = true;
+    let punctuationInserted = false;
+    tr.changes.iterChanges((_from, _to, _newFrom, end, inserted) => {
+      if (end === cursor && /[。、．，.,]$/u.test(inserted.toString())) punctuationInserted = true;
     });
-    if (!newline) return null;
-    const previous = tr.newDoc.line(line.number - 1);
-    if (!previous.text.trimEnd().endsWith("。")) return null;
+    if (!punctuationInserted) return null;
+    const line = tr.newDoc.lineAt(cursor);
+    const context = tr.newDoc.sliceString(line.from, cursor);
+    if (!context.slice(0, -1).trim() || /[0-9][.,]$/u.test(context)) return null;
     const document = tr.newDoc.toString();
-    const period = previous.from + previous.text.trimEnd().length - 1;
-    if (!analyzeInput(document).some(s => s.kind === "text" && s.from <= period && period < s.to)) return null;
-    const text = nextQuestion(previous.text, document);
+    if (!analyzeInput(document).some(s => s.kind === "text" && s.from < cursor && cursor <= s.to)) return null;
+    const text = nextQuestion(context, document);
     return { pos: cursor, above: false, create() {
       const dom = window.document.createElement("aside");
       dom.className = "writing-question";
