@@ -47,6 +47,17 @@ try {
   await hint.waitFor();
   await page.keyboard.press('Enter');
   await hint.waitFor({ state: 'hidden' });
+  await page.keyboard.insertText('今のピアノ強弱判定が、どのような仕組みか教えてください');
+  await page.keyboard.insertText('.');
+  await hint.getByRole('button', { name: '内部の動作が知りたいです。' }).click();
+  assert.ok((await editor.innerText()).endsWith('教えてください.内部の動作が知りたいです。'));
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('何を書いても、');
+  await hint.getByRole('button', { name: '結局、同じ結論にたどり着く。' }).waitFor();
+  assert.doesNotMatch(await hint.textContent(), /どんな場面/);
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('それでも、');
+  assert.equal(await hint.count(), 0);
   console.log('Writing question E2E passed.');
 } finally {
   await browser?.close();

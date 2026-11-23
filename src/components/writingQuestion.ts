@@ -10,9 +10,30 @@ import { defaultOllamaTransport } from "../lib/ollamaProxy";
 import { loadSettings } from "../lib/settings";
 
 function writingPrompt(line: string, terms: string[]) {
-  const sentence = line.trimEnd().slice(0, -1).split(/[。！？]/u).pop() ?? "";
+  const sentence = line.trimEnd().slice(0, -1).split(/[。！？!?．.]/u).pop() ?? "";
   const comma = /[、，,]$/u.test(line);
   const topic = terms.find(term => sentence.includes(term));
+  // The closing predicate determines the writer's intent even when the
+  // subject includes a word like 改善 or 延期.
+  if (/(?:教えて(?:ください|ほしい|欲しい)?|知りたい(?:です)?|説明して(?:ください|ほしい)?|ですか|ますか)$/u.test(sentence.trim())) {
+    if (/仕組み|しくみ|内部|どのように動|どう動/u.test(sentence)) return {
+      question: "特に知りたいのは、内部のどの部分？",
+      continuation: "内部の動作が知りたいです。",
+    };
+    if (/なぜ|理由|原因|どうして/u.test(sentence)) return {
+      question: "理由のどこを詳しく聞きたい？", continuation: "特に、何がいちばん大きく影響しているのか知りたいです。",
+    };
+    if (/手順|方法|やり方|使い方/u.test(sentence)) return {
+      question: "どの手順から説明してほしい？", continuation: "最初に何をすればよいか、順を追って説明してほしいです。",
+    };
+    return null;
+  }
+  // A concessive clause leaves the outcome open. Offer alternative endings.
+  if (/何を(?:書|か)いても$/u.test(sentence.trim())) return {
+    question: "書く内容が変わっても、同じなのは何？",
+    continuation: "結局、同じ結論にたどり着く。",
+    alternative: "本当に伝えたいことだけが抜け落ちてしまう。",
+  };
   if (/延期|見送|中止/u.test(sentence)) return {
     question: "判断の決め手は何だった？",
     continuation: comma ? "残った作業を洗い出してから、新しい日程を決めることにした。" : "次の日程を決める前に、何を終える必要があるか整理しておきたい。",
@@ -28,18 +49,18 @@ function writingPrompt(line: string, terms: string[]) {
   if (/予定|つもり|したい/u.test(sentence)) return {
     question: "まず何から始める？", continuation: "まず小さく試し、その結果を見て次に取り組む範囲を決めたい。",
   };
-  return {
-    question: topic ? `「${topic}」について、具体例を一つ挙げると？` : "たとえば、どんな場面だった？",
-    continuation: topic ? `${topic}を実際に使う場面を一つ選んで、どこで役立つか確かめたい。`
-      : "まず印象に残った場面を振り返り、そのとき何が起きたか順に書いてみようと思う。",
+  if (topic && /試した|使ってみた/u.test(sentence)) return {
+    question: `「${topic}」を試して気づいたことは？`,
+    continuation: `次は普段の作業でも${topic}を使って、使い勝手を確かめたい。`,
   };
+  return null;
 }
 
 async function predictContinuation(line: string, terms: string[], signal: AbortSignal) {
   const settings = loadSettings();
   const response = await defaultOllamaTransport.generate(settings.modelProvider, currentProviderBaseUrl(settings), {
     model: settings.modelName, stream: false, think: false,
-    system: "日本語原稿の続きを執筆する。末尾が読点なら同じ文の後半から、句点なら次の文から始める。直前の内容と文体を引き継いで一〜二文を最後まで書く。入力の繰り返し、見出し、助言は不要。未提示の数値や人名を作らない。本文だけ返す。",
+    system: "日本語原稿の続きを執筆する。末尾が読点なら同じ文の後半から、句点なら次の文から始める。直前の内容と文体を引き継いで一〜二文を最後まで書く。入力の繰り返し、見出し、助言は不要。未提示の数値や人名を作らない。書き手が説明を求めている場合は、その人が知りたい範囲を同じ視点で補う。相手として回答したり例を要求したりしない。本文だけ返す。",
     prompt: JSON.stringify({ line: line.slice(-1500), vocabulary: terms }), options: { temperature: 0.55 },
   }, 12000, signal);
   const text = stripThinkBlock(generatedText(response)).trim();
@@ -67,6 +88,7 @@ const question = StateField.define<Tooltip | null>({
     if (!analyzeInput(document).some(s => s.kind === "text" && s.from < cursor && cursor <= s.to)) return null;
     const terms = buildDocumentVocabularyProfile(document).terms;
     const prompt = writingPrompt(context, terms);
+    if (!prompt) return null;
     const tooltip: Tooltip = { pos: cursor, above: false, create(view) {
       const dom = window.document.createElement("aside");
       dom.className = "writing-question";
@@ -88,6 +110,7 @@ const question = StateField.define<Tooltip | null>({
         dom.append(button);
       }
       addCandidate(prompt.continuation);
+      if (prompt.alternative) addCandidate(prompt.alternative);
       const controller = new AbortController();
       const timer = setTimeout(() => {
         void predictContinuation(context, terms, controller.signal).then(text => {
