@@ -1,10 +1,5 @@
 import { StateField, type EditorState } from "@codemirror/state";
 import { analyzeInput } from "./inputAnalysis";
-import { defaultKanaEngine } from "./kanaEngine";
-import { convertLocally } from "./localConversion";
-import { defaultOllamaTransport } from "./ollamaProxy";
-import type { AppSettings } from "./types";
-
 /** Only consecutive edits in the current input run can supply a prefix. */
 export const completionInputRun = StateField.define<{ from: number; to: number } | null>({
   create: () => null,
@@ -31,11 +26,4 @@ export function prefixBeforeCompletion(state: EditorState, from: number) {
   const before = doc.slice(Math.max(run.from, span.from), from);
   // A kana ending attached to existing kanji may be okurigana.
   return /(?:^|[\s。、！？!?，,「」『』])([ぁ-ゖーa-z]+)$/u.exec(before)?.[1] ?? "";
-}
-
-export async function convertCompletionPrefix(prefix: string, settings: AppSettings) {
-  const result = await convertLocally(prefix, settings, defaultOllamaTransport, {
-    purpose: "normal", kanaEngine: defaultKanaEngine, rerank: false,
-  });
-  return result.suggestionRejected || !result.text ? prefix : result.text;
 }

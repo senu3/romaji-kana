@@ -1,4 +1,5 @@
-import { completionInputRun, convertCompletionPrefix, prefixBeforeCompletion } from "../lib/completionPrefix";
+import { predictLocalSpelling } from "../lib/predictLocalSpelling";
+import { completionInputRun, prefixBeforeCompletion } from "../lib/completionPrefix";
 import { mixedKanaTarget } from "../lib/mixedKanaRepair";
 import { liveKanaSource } from "../lib/liveKanaState";
 import { Prec, StateEffect, StateField, type EditorState } from "@codemirror/state";
@@ -64,7 +65,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
         if (pluginValue(view) && allowed(view) && view.state.doc === doc && view.state.field(field) === menu)
           commit(insert.from - prefix.length, prefix + insert.original, converted + insert.text);
       };
-      void convertCompletionPrefix(prefix, settings()).then(finish, () => finish(prefix));
+      void predictLocalSpelling(prefix, settings()).then(finish, () => finish(prefix));
     } else if (!commit(insert.from, insert.original, insert.text)) return false;
     view.focus();
     return true;
