@@ -58,6 +58,15 @@ try {
   await page.keyboard.press('Enter');
   await page.keyboard.insertText('それでも、');
   assert.equal(await hint.count(), 0);
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('新しい資料を読み終えた。');
+  await hint.getByRole('button', { name: generated }).waitFor({ timeout: 5000 });
+  assert.equal(await hint.getByRole('status').count(), 0);
+  await page.keyboard.press('Escape');
+  await page.route('**/api/generate', route => route.abort('connectionrefused'));
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('公開を延期した。');
+  await hint.getByRole('button').first().waitFor();
   console.log('Writing question E2E passed.');
 } finally {
   await browser?.close();

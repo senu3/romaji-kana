@@ -72,7 +72,7 @@ const question = StateField.define<Tooltip | null>({
   create: () => null,
   update(value, tr) {
     if (tr.effects.some(effect => effect.is(dismiss))) return null;
-    if (!tr.docChanged) return tr.selection ? null : value;
+    if (!tr.docChanged) return tr.selection && !tr.selection.eq(tr.startState.selection) ? null : value;
     const typing = tr.isUserEvent("input.type") || tr.isUserEvent("input.convert") || tr.isUserEvent("input.ghostAccept");
     if (!typing || !tr.newSelection.main.empty) return null;
     const cursor = tr.newSelection.main.head;
@@ -88,14 +88,18 @@ const question = StateField.define<Tooltip | null>({
     if (!analyzeInput(document).some(s => s.kind === "text" && s.from < cursor && cursor <= s.to)) return null;
     const terms = buildDocumentVocabularyProfile(document).terms;
     const prompt = writingPrompt(context, terms);
-    if (!prompt) return null;
+    // A short connective alone provides too little context for either source.
+    // Otherwise the model can propose a continuation independently of templates.
+    if (!prompt && (context.slice(0, -1).split(/[。！？!?．.]/u).pop() ?? "").trim().length < 5) return null;
     const tooltip: Tooltip = { pos: cursor, above: false, create(view) {
       const dom = window.document.createElement("aside");
       dom.className = "writing-question";
-      const hint = window.document.createElement("div");
-      hint.setAttribute("role", "status");
-      hint.textContent = prompt.question;
-      dom.append(hint);
+      if (prompt) {
+        const hint = window.document.createElement("div");
+        hint.setAttribute("role", "status");
+        hint.textContent = prompt.question;
+        dom.append(hint);
+      }
       function addCandidate(text: string) {
         const button = window.document.createElement("button");
         button.type = "button";
@@ -109,12 +113,15 @@ const question = StateField.define<Tooltip | null>({
         };
         dom.append(button);
       }
-      addCandidate(prompt.continuation);
-      if (prompt.alternative) addCandidate(prompt.alternative);
+      if (prompt) addCandidate(prompt.continuation);
+      if (prompt?.alternative) addCandidate(prompt.alternative);
       const controller = new AbortController();
       const timer = setTimeout(() => {
         void predictContinuation(context, terms, controller.signal).then(text => {
-          if (!controller.signal.aborted && text && text !== prompt.continuation) addCandidate(text);
+          if (!controller.signal.aborted && text && text !== prompt?.continuation && text !== prompt?.alternative) {
+            addCandidate(text);
+            view.requestMeasure();
+          }
         }).catch(() => { /* The local example remains usable offline. */ });
       }, 350);
       return { dom, destroy() { clearTimeout(timer); controller.abort(); } };
