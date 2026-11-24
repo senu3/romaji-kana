@@ -1,18 +1,19 @@
+import { completionInputRun, convertCompletionPrefix, prefixBeforeCompletion } from "../lib/completionPrefix";
+import { mixedKanaTarget } from "../lib/mixedKanaRepair";
 import { liveKanaSource } from "../lib/liveKanaState";
 import { Prec, StateEffect, StateField, type EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, type ViewUpdate } from "@codemirror/view";
 import { commitEditorText } from "../lib/editorCommit";
 import { suggestAfterConversion } from "../lib/editorConversionEffects";
-import { suggestWords, type WordSuggestion } from "../lib/kanaEngine";
+import { suggestSurface, suggestWords, type WordSuggestion } from "../lib/kanaEngine";
 import { conversionLearningChoices } from "../lib/conversionLearning";
-import { convertedSuggestTarget, matchesSuggestionReading, rankSuggestions, suggestDocumentContinuation, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
+import { convertedSuggestTarget, matchesSuggestionReading, suggestTargets, wordSuggestionLabel, type SuggestTarget } from "../lib/autoSuggest";
 import type { AppSettings } from "../lib/types";
 import { candidateBindings } from "../lib/candidateInteraction";
 import { applyCandidatePlacement, measureCandidate, type CandidatePlacement } from "../lib/candidatePlacement";
 
-type Menu =
-  | { kind: "word"; target: SuggestTarget; candidates: WordSuggestion[] }
-  | { kind: "continuation"; target: SuggestTarget; text: string };
+import { resolveCompletion, type Completion as Menu } from "../lib/completionResolver";
+
 const REFRESH_CHARACTER_COUNT = 3;
 const IDLE_REFRESH_MS = 500;
 
@@ -43,7 +44,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       tr.state.doc.sliceString(value.from, value.to) !== value.original)) return null;
     return value;
   } });
-  const accept = (view: EditorView) => {
+  const accept = (view: EditorView, convertPrefix = false) => {
     const menu = view.state.field(field);
     if (!menu || !allowed(view) || pluginValue(view)?.ghost.hidden !== false ||
       pluginValue(view)?.ghost.style.visibility !== "visible") return false;
@@ -51,9 +52,20 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     if (view.state.selection.main.head !== target.to || view.state.doc.sliceString(target.from, target.to) !== target.original) return false;
     const insert = menu.kind === "continuation"
       ? { from: target.to, original: "", text: menu.text }
-      : { from: target.from, original: target.original, text: menu.candidates[0].text + (target.suffix ?? "") };
-    if (!commitEditorText(view, { ...insert, to: target.to,
-      cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest" })) return false;
+      : menu.kind === "correction" ? { from: target.from, original: target.original, text: menu.text }
+      : { from: target.from, original: target.original, text: menu.candidates[0].text + (menu.target.suffix ?? "") };
+    const commit = (from: number, original: string, text: string) => commitEditorText(view, {
+      from, original, text, to: target.to, cursor: "end", effects: [setMenu.of(null)], userEvent: "input.autosuggest",
+    });
+    const prefix = convertPrefix && menu.kind !== "continuation" ? prefixBeforeCompletion(view.state, insert.from) : "";
+    if (prefix) {
+      const doc = view.state.doc;
+      const finish = (converted: string) => {
+        if (pluginValue(view) && allowed(view) && view.state.doc === doc && view.state.field(field) === menu)
+          commit(insert.from - prefix.length, prefix + insert.original, converted + insert.text);
+      };
+      void convertCompletionPrefix(prefix, settings()).then(finish, () => finish(prefix));
+    } else if (!commit(insert.from, insert.original, insert.text)) return false;
     view.focus();
     return true;
   };
@@ -76,6 +88,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     revision = 0; destroyed = false; controller?: AbortController;
     cache = new Map<string, WordSuggestion[]>();
     typedSinceRequest = 0; hasRequested = false;
+    pendingIme = false;
     config = ""; wasConverting = false;
     ghost = document.createElement("button");
     observer?: ResizeObserver;
@@ -110,7 +123,10 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       if (!completion || !allowed(this.view)) this.ghost.hidden = true;
       else if (completion !== update.startState.field(field) || this.ghost.hidden) {
         const text = document.createElement("span"); text.className = "candidate-completion-text";
-        if (completion.kind === "continuation") {
+        if (completion.kind === "correction") {
+          text.textContent = " → " + completion.text;
+          this.ghost.setAttribute("aria-label", completion.text + " に訂正 (Tabで採用)");
+        } else if (completion.kind === "continuation") {
           text.textContent = completion.text;
           this.ghost.setAttribute("aria-label", `${completion.text} を挿入 (Tabで採用)`);
         } else {
@@ -138,51 +154,56 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       else if (update.docChanged || update.selectionSet || configChanged) { this.typedSinceRequest = 0; this.hasRequested = false; }
       const revision = ++this.revision;
       clearTimeout(this.timer); this.controller?.abort();
+      // Some IMEs deliver the final text transaction after compositionend.
+      const japaneseCommit = update.transactions.some(tr => (tr.isUserEvent("input.type") || tr.isUserEvent("input.paste")) &&
+        !tr.state.field(liveKanaSource, false) && tr.newSelection.main.empty &&
+        /[ぁ-ゖァ-ヶ一-龯々ー\p{P}\p{Zs}]$/u.test(tr.newDoc.sliceString(Math.max(0, tr.newSelection.main.head - 1), tr.newSelection.main.head)));
+      if (update.docChanged || update.selectionSet || !this.view.hasFocus) this.pendingIme = false;
+      this.pendingIme ||= japaneseCommit || update.transactions.some(t => t.effects.some(e => e.is(refresh)));
+      const ime = this.pendingIme;
       // Keep a valid ghost visible while normal conversion is running.
       if (!allowed(this.view) || configChanged) queueMicrotask(() => { if (!this.destroyed && revision === this.revision && this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) }); });
       if (!allowed(this.view) || update.transactions.some(t => t.isUserEvent("input.autosuggest") || t.isUserEvent("undo") || t.isUserEvent("redo"))) return;
       if (nextConverting) return;
       // Keep the current candidate while it is valid. Search again when it stops matching.
-      if (completion && !configChanged) return;
+      const mixed = mixedKanaTarget(update.state.doc.toString(), update.state.selection.main.head);
+      if (completion && !configChanged && !(completion.kind === "word" && mixed)) return;
       const committedTarget = this.view.state.field(convertedTarget);
       const targets = committedTarget && /^[ぁ-ゖー]{2,80}$/u.test(committedTarget.reading)
         ? [committedTarget] : targetsAtCursor(this.view.state);
-      const continuationTarget = this.view.state.selection.ranges.length === 1 && update.transactions.some(tr => tr.docChanged &&
-        tr.isUserEvent("input.convert") && tr.effects.some(effect => effect.is(suggestAfterConversion))) ? committedTarget : null;
-      if (!targets.length && !continuationTarget) return;
+      const committed = update.transactions.some(t => t.isUserEvent("input.convert") && t.effects.some(e => e.is(suggestAfterConversion)));
+      if (!targets.length && !ime && !committed && !mixed) return;
       this.timer = setTimeout(async () => {
         if (!allowed(this.view)) return;
         this.typedSinceRequest = 0; this.hasRequested = true;
         const controller = new AbortController(); this.controller = controller;
         try {
-          for (const target of targets) {
-            let candidates = this.cache.get(target.reading);
-            if (!candidates) {
-              candidates = await suggestWords(target.reading, settings().personalDictionary ?? [], controller.signal);
-              if (this.destroyed || revision !== this.revision) return;
-              if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
-              this.cache.set(target.reading, candidates);
-            }
-            if (this.destroyed || revision !== this.revision || !allowed(this.view)) return;
-            const ranked = rankSuggestions(target, candidates, conversionLearningChoices());
-            if (!ranked.length) continue;
-            this.view.dispatch({ effects: setMenu.of({ kind: "word", target, candidates: ranked }) });
-            return;
+          const personal = settings().personalDictionary ?? [];
+          const result = await resolveCompletion({
+            doc: this.view.state.doc.toString(), cursor: this.view.state.selection.main.head,
+            targets, ime, committed, personal, lookupSurface: suggestSurface, choices: conversionLearningChoices(), signal: controller.signal,
+            lookup: async reading => {
+              const cached = this.cache.get(reading);
+              if (cached) return cached;
+              const words = await suggestWords(reading, personal, controller.signal);
+              if (!controller.signal.aborted) {
+                if (this.cache.size >= 32) this.cache.delete(this.cache.keys().next().value!);
+                this.cache.set(reading, words);
+              }
+              return words;
+            },
+          });
+          if (!this.destroyed && revision === this.revision && allowed(this.view)) {
+            this.pendingIme = false;
+            this.view.dispatch({ effects: setMenu.of(result) });
           }
-          if (continuationTarget) {
-            const text = suggestDocumentContinuation(this.view.state.doc.toString(), continuationTarget.to);
-            if (text) {
-              this.view.dispatch({ effects: setMenu.of({ kind: "continuation", target: continuationTarget, text }) });
-              return;
-            }
-          }
-          this.view.dispatch({ effects: setMenu.of(null) });
         } catch {
           if (!this.destroyed && revision === this.revision) this.view.dispatch({ effects: setMenu.of(null) });
         }
       }, typing && this.hasRequested ? (this.typedSinceRequest >= REFRESH_CHARACTER_COUNT ? 0 : IDLE_REFRESH_MS) : 120);
     }
     dismiss() {
+      this.pendingIme = false;
       ++this.revision;
       clearTimeout(this.timer);
       this.controller?.abort();
@@ -199,6 +220,7 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
       window.visualViewport?.removeEventListener("scroll", this.requestPlacement);
     }
   }, { eventHandlers: { scroll() { this.view.requestMeasure(this.measureGhost); }, compositionstart() {
+    this.pendingIme = false;
     ++this.revision; clearTimeout(this.timer); this.controller?.abort();
     if (this.view.state.field(field)) this.view.dispatch({ effects: setMenu.of(null) });
     return false;
@@ -207,8 +229,9 @@ export function autoSuggestExtension(settings: () => AppSettings, converting: (v
     return false;
   } } });
   const pluginValue = (view: EditorView) => view.plugin(plugin);
-  return [field, convertedTarget, plugin, Prec.highest(keymap.of(candidateBindings({
+  return [completionInputRun, field, convertedTarget, plugin, Prec.highest(keymap.of(candidateBindings({
     accept,
+    acceptTab: view => accept(view, true),
     dismiss: view => {
       if (view.state.field(field)?.kind === "continuation") {
         pluginValue(view)?.dismiss();

@@ -26,6 +26,12 @@ export interface WordSuggestion { text: string; reading: string; source: "mozc" 
 export async function suggestWords(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<WordSuggestion[]> {
   return (await request<{ candidates: WordSuggestion[] }>({ operation: "suggest", reading, words: words.filter(w => w.enabled) }, signal)).candidates;
 }
+export async function suggestSurface(prefix: string, signal: AbortSignal): Promise<string | null> {
+  return (await request<{ text: string | null }>({ operation: "suggestSurface", prefix }, signal)).text;
+}
+export async function kanaWordCosts(readings: string[], signal: AbortSignal): Promise<(number | null)[]> {
+  return (await request<{ costs: (number | null)[] }>({ operation: "kanaWordCosts", readings }, signal)).costs;
+}
 export interface KanaEngine {
   search(reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<EngineSearchResult>;
   verify(text: string, reading: string, words: readonly PersonalWord[], signal?: AbortSignal): Promise<"verified" | "unverified" | "contradicted">;

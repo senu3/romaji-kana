@@ -197,10 +197,12 @@ try {
       else if (trigger !== 'pause') await page.keyboard.type(trigger);
       await page.waitForTimeout(700);
       try {
-        const suffix = trigger === 'pause' ? '' : trigger === 'Enter' ? '\n' : trigger;
+        const suffix = trigger === 'pause' || trigger === ' ' ? '' : trigger === 'Enter' ? '\n' : trigger;
         const text = (await editor.locator('.cm-line').allTextContents()).join('\n');
         assert.equal(text, `さあ船出のときだ、航海のときだ${suffix}`);
-        assert.equal(await page.locator('.cm-ghost-text-suggestion').count(), 0);
+        const preview = page.locator('.cm-ghost-text-suggestion');
+        if (trigger === ' ') assert.equal(await preview.textContent({ timeout: 3000 }), '公開のときだ');
+        else assert.equal(await preview.count(), 0);
         assert.equal(searches.length, previousSearches, 'Adoption must not start another conversion');
       } catch (error) { selectedCandidateFailures.push(`${entry}/${JSON.stringify(trigger)}: ${error.message}`); }
     });
@@ -222,6 +224,65 @@ try {
     await page.locator('.cm-ghost-text-suggestion').waitFor();
     assert.equal(searches.length, 1, 'Space works independently of pause');
   });
+  for (const conversionMode of ['replace', 'ghost']) {
+    await scenario({ conversionMode }, async (page, editor, searches) => {
+      const preview = page.locator('.cm-ghost-text-suggestion');
+      await page.keyboard.type('hon');
+      if (conversionMode === 'ghost') {
+        await preview.waitFor();
+        await page.keyboard.press('Tab');
+      }
+      await page.waitForFunction(() => document.querySelector('.cm-content').textContent === 'ほん');
+      const searchCount = searches.length;
+
+      await page.keyboard.press('Space');
+      await preview.waitFor();
+      assert.equal(await preview.textContent(), '候補');
+      assert.equal(await editor.innerText(), 'ほん');
+      await page.keyboard.press('Space');
+      assert.equal(await preview.textContent(), 'ほん', 'Space wraps through the original candidate');
+      await page.keyboard.press('Escape');
+      assert.equal(await preview.count(), 0);
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Tab');
+      assert.equal(await editor.innerText(), '候補');
+      assert.equal(searches.length, searchCount, 'Browsing committed candidates reuses the stored session');
+
+      await page.keyboard.press('Home');
+      await page.keyboard.press('Space');
+      assert.equal(await editor.textContent(), ' 候補', 'Space away from the latest conversion inserts a space');
+    });
+  }
+  for (const inputMode of ['romaji', 'kana']) {
+    await scenario({ inputMode, conversionMode: 'replace', triggers: { typing: false, space: true } }, async (page, editor, searches) => {
+      const input = 'kaiginojkanwokaenaidekudasai';
+      const text = '会議の時間を変えないでください';
+      let proposals = 0;
+      await page.route('**/api/generate', route => {
+        const body = route.request().postDataJSON();
+        if (body.prompt === 'ok') return route.fulfill({ json: { response: 'ok' } });
+        assert.deepEqual(body.format.required, ['candidates']);
+        proposals++;
+        return route.fulfill({ json: { response: JSON.stringify({ candidates: [
+          { convertedText: text, completedKana: 'かいぎのじかんをかえないでください' },
+        ] }) } });
+      });
+      await page.route('**/api/kana-engine', route => {
+        const body = route.request().postDataJSON();
+        if (body.operation !== 'verify') return route.fallback();
+        return route.fulfill({ json: { status: 'verified' } });
+      });
+      await page.keyboard.type(input);
+      const original = await editor.textContent();
+      await page.keyboard.press('Space');
+      await page.getByRole('button', { name: `${text} を採用`, exact: true }).waitFor();
+      assert.equal(await editor.textContent(), original);
+      await page.keyboard.press('Tab');
+      assert.equal(await editor.innerText(), text);
+      assert.equal(proposals, 1);
+      assert.deepEqual(searches, [], 'Incomplete mechanical reading goes directly to speculation');
+    });
+  }
   for (const entry of ['ghost', 'recent', 'history']) {
     await scenario({ autoConvert: false, conversionMode: entry === 'ghost' ? 'ghost' : 'replace' }, async (page, editor) => {
       await page.route('**/api/kana-engine', route => {
@@ -255,7 +316,7 @@ try {
       if (entry === 'ghost') await page.locator('.cm-ghost-text-suggestion').waitFor();
       else {
         await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '資料を角煮してください。');
-        await page.getByText('変換しました。Esc で見直せます。', { exact: true }).waitFor();
+        await page.getByText('変換しました。Space で別候補を表示できます。', { exact: true }).waitFor();
       }
       assert.equal(proposals, 0, 'A valid ordinary conversion must not automatically speculate');
       if (entry === 'history') await page.getByRole('button', { name: /履歴を開く/ }).click();

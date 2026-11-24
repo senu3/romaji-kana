@@ -22,7 +22,8 @@ export function speculationExtension(getSuggestion: (state: EditorState) => Ghos
     const choices = (suggestion.session?.candidates.map(c => ({ ...suggestion, ...candidateDetails(c.result), session: suggestion.session })) ?? [suggestion])
       .filter(c => { const key = c.convertedText.normalize("NFKC").replace(/[\s。、,.!?！？]+/gu, ""); if (!key || seen.has(key)) return false; seen.add(key); return true; }).slice(0, 3);
     if (!choices.length) return null;
-    let selected = previous?.suggestion === suggestion ? previous.selected : 0;
+    let selected = previous?.suggestion === suggestion ? previous.selected
+      : Math.max(0, choices.findIndex(choice => choice.convertedText === suggestion.convertedText));
     for (const effect of tr.effects) if (effect.is(select)) selected = effect.value;
     return { suggestion, choices, selected: selected < choices.length ? selected : -1 };
   }, provide: field => completionSelection.from(field, menu => Boolean(menu)) });

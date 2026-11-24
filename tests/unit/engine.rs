@@ -158,6 +158,7 @@ fn astar_matches_exhaustive_paths_in_a_tiny_dictionary() {
         trie.insert(&e.reading, i);
     }
     let engine = Engine {
+        surface_index: OnceLock::new(),
         entries,
         trie,
         matrix: vec![0; size * size],

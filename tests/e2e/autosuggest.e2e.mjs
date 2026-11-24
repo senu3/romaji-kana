@@ -37,6 +37,73 @@ try {
       assert.deepEqual(errors, []);
     } finally { await context.close(); }
   }
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    const ime = await page.context().newCDPSession(page);
+    await page.keyboard.insertText('設計書を確認する。');
+    await page.keyboard.press('Enter');
+    await ime.send('Input.imeSetComposition', { text: 'せっけい', selectionStart: 4, selectionEnd: 4 });
+    assert.equal(await page.locator('.cm-autosuggest-ghost:visible').count(), 0);
+    await ime.send('Input.insertText', { text: '設計' });
+    await page.getByRole('button', { name: '書 を挿入' }).waitFor({ timeout: 5000 });
+    await page.keyboard.press('Tab');
+    assert.ok((await editor.innerText()).endsWith('設計書'));
+    await page.keyboard.press('Control+z');
+    assert.ok((await editor.innerText()).endsWith('設計'));
+  });
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    await page.unroute('**/api/kana-engine');
+    const ime = await page.context().newCDPSession(page);
+    await ime.send('Input.imeSetComposition', { text: 'せっけい', selectionStart: 4, selectionEnd: 4 });
+    await ime.send('Input.insertText', { text: '設計' });
+    const addition = page.getByRole('button', { name: /を挿入/ });
+    await addition.waitFor({ timeout: 120000 });
+    const suffix = await addition.locator('.candidate-completion-text').innerText();
+    await page.keyboard.press('Tab');
+    assert.equal(await editor.innerText(), '設計' + suffix);
+  });
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    await page.unroute('**/api/kana-engine');
+    const ime = await page.context().newCDPSession(page);
+    for (const [input, expected] of [
+      ['ひかえてくdさい', '控えてください'],
+      ['控えてくdさい', '控えてください'],
+      ['控えてくｄさいね。', '控えてくださいね。'],
+      ['dんわ', 'でんわ'],
+    ]) {
+      await page.keyboard.press('Control+a');
+      await ime.send('Input.imeSetComposition', { text: input, selectionStart: input.length, selectionEnd: input.length });
+      await ime.send('Input.insertText', { text: input });
+      await page.getByRole('button', { name: /に訂正/ }).waitFor({ timeout: 120000 });
+      await page.keyboard.press('Tab');
+      await page.waitForFunction(text => document.querySelector('.cm-content').textContent === text, expected);
+      await page.keyboard.press('Control+z');
+      assert.equal(await editor.innerText(), input);
+    }
+    // Hold the actual conversion-loading state across a commit, then release it
+    // without typing again. The final document and cursor must still be used.
+    await page.keyboard.press('Control+a');
+    await page.keyboard.insertText('先。');
+    await editor.evaluate(async el => {
+      const { addLoadingDecoration } = await import('/src/lib/editorConversionEffects.ts');
+      el.cmTile.root.view.dispatch({ effects: addLoadingDecoration.of({ id: 'busy', from: 0, to: 1 }) });
+    });
+    await ime.send('Input.imeSetComposition', { text: 'くdさい。', selectionStart: 5, selectionEnd: 5 });
+    await ime.send('Input.insertText', { text: 'くdさい。' });
+    assert.equal(await page.getByRole('button', { name: /に訂正/ }).count(), 0);
+    await editor.evaluate(async el => {
+      const { removeLoadingDecoration } = await import('/src/lib/editorConversionEffects.ts');
+      el.cmTile.root.view.dispatch({ effects: removeLoadingDecoration.of('busy') });
+    });
+    await page.getByRole('button', { name: /ください。 に訂正/ }).waitFor({ timeout: 5000 });
+  });
+  await scenario({ inputMode: 'kana', autoConvert: true }, async (page, editor) => {
+    await page.unroute('**/api/kana-engine');
+    await page.keyboard.type('hikaetekudsai');
+    await page.getByRole('button', { name: /ください に訂正/ }).waitFor({ timeout: 8000 });
+    await page.waitForTimeout(900);
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(() => document.querySelector('.cm-content').textContent === '控えてください');
+  });
   for (const autoConvert of [false, true]) await scenario({ autoConvert, conversionMode: 'ghost' }, async (page, editor) => {
     const readings = [];
     await page.route('**/api/kana-engine', route => {
