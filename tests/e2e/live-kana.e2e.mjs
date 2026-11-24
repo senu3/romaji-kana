@@ -23,7 +23,7 @@ try {
       if (body.operation === 'suggest') return route.fulfill({ json: { candidates: body.reading === 'こうか'
         ? [{ text: '航海', reading: 'こうかい', cost: 0, source: 'mozc' }] : [] } });
       const reading = body.reading;
-      const text = ({ 'ほん': '本', 'ほんとう': '本当', 'かな': '仮名' })[reading] ?? reading;
+      const text = ({ 'ほん': '本', 'ほんとう': '本当', 'かな': '仮名', 'こうか': '効果' })[reading] ?? reading;
       return route.fulfill({ json: { candidates: [{ text, reading, cost: 0, tokens: [{ text, reading, from: 0, to: reading.length, source: 'mozc', entryId: 'test', lid: 0, rid: 0, wordCost: 0 }] }], dictionaryRevision: 'test', truncated: false } });
     });
     try {
@@ -54,10 +54,29 @@ try {
   });
   await scenario({ autoSuggest: false }, async (page, editor, requests) => {
     await page.keyboard.type('hon');
-    await page.waitForFunction(() => document.querySelector('.cm-content').innerText === '本');
-    await page.keyboard.type('tou');
+    await page.locator('.live-spelling-preview').filter({ hasText: /^本$/u }).waitFor();
+    const placement = await editor.evaluate(el => {
+      const view = el.cmTile.root.view;
+      const start = view.coordsAtPos(0);
+      const panel = view.dom.querySelector('.live-spelling-preview').getBoundingClientRect();
+      return { gap: panel.top - start.bottom, offset: panel.left - start.left, left: panel.left, top: panel.top };
+    });
+    assert.ok(placement.gap >= 0 && placement.gap <= 10 && Math.abs(placement.offset) <= 2);
+    assert.equal(await editor.innerText(), 'ほん');
+    await page.keyboard.type('t');
+    const panel = page.locator('.live-spelling-preview');
+    assert.ok(await panel.isVisible());
+    assert.equal(await panel.textContent(), '本');
+    await page.keyboard.type('ou');
+    assert.ok(await panel.isVisible());
     assert.equal(await editor.innerText(), 'ほんとう');
-    await page.waitForFunction(() => document.querySelector('.cm-content').innerText === '本当');
+    await page.locator('.live-spelling-preview').filter({ hasText: /^本当$/u }).waitFor();
+    const finalPosition = await panel.boundingBox();
+    assert.ok(Math.abs(finalPosition.x - placement.left) <= 1 && Math.abs(finalPosition.y - placement.top) <= 1);
+    assert.equal(await editor.innerText(), 'ほんとう');
+    assert.equal(await editor.evaluate(el => el.cmTile.root.view.state.selection.main.head), 4);
+    await page.keyboard.press('ArrowLeft');
+    await page.locator('.live-spelling-preview').waitFor({ state: 'hidden' });
     assert.ok(requests.some(request => request.reading === 'ほんとう'));
   });
   await scenario({ autoConvert: false, autoSuggest: false, conversionMode: 'ghost' }, async (page, editor) => {
@@ -77,7 +96,7 @@ try {
     await page.keyboard.type('kana'.repeat(90) + 'kouka');
     await page.locator('.cm-autosuggest-ghost:visible').waitFor();
     await page.keyboard.press('Tab');
-    assert.equal(await editor.innerText(), 'かな'.repeat(90) + '航海');
+    await page.waitForFunction(expected => document.querySelector('.cm-content').textContent === expected, 'かな'.repeat(90) + '航海');
     assert.ok(requests.filter(request => request.operation === 'suggest').every(request => request.reading.length <= 80));
     await page.keyboard.press('Control+z');
     assert.equal(await editor.innerText(), 'かな'.repeat(90) + 'こうか');
@@ -91,6 +110,20 @@ try {
     assert.ok(searches.length >= 2, 'Long input reaches the engine as bounded segments');
     assert.ok(searches.every(request => request.reading.length <= 160));
     assert.equal(await editor.innerText(), 'かな'.repeat(90));
+  });
+  await scenario({ autoConvert: false, autoSuggest: true }, async (page, editor) => {
+    await page.setViewportSize({ width: 390, height: 720 });
+    await page.keyboard.insertText('前'.repeat(12));
+    await page.keyboard.type('kouka');
+    await page.locator('.live-spelling-preview').filter({ hasText: /^効果$/u }).waitFor();
+    await page.locator('.cm-autosuggest-ghost:visible').waitFor();
+    await page.waitForFunction(() => {
+      const preview = document.querySelector('.live-spelling-preview').getBoundingClientRect();
+      const menu = document.querySelector('.cm-autosuggest-ghost').getBoundingClientRect();
+      return preview.left >= 0 && preview.right <= innerWidth && preview.bottom <= innerHeight &&
+        (preview.top >= menu.bottom || preview.bottom <= menu.top || preview.right <= menu.left || preview.left >= menu.right);
+    });
+    assert.equal(await editor.innerText(), '前'.repeat(12) + 'こうか');
   });
   console.log('Live kana input and long suggestions passed');
 } finally { await browser?.close(); await server.close(); }

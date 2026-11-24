@@ -4039,3 +4039,21 @@ button.model-chip:hover {
 .writing-question button:hover, .writing-question button:focus-visible { border-color: var(--ink-muted); }
 
 .editor-host .cm-tooltip.writing-question:empty { visibility: hidden; }
+
+.editor-host .live-spelling-preview {
+  position: fixed;
+  z-index: 38;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 4px 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}

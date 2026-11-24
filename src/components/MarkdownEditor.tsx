@@ -66,6 +66,8 @@ import {
   MIN_TYPING_INTERVAL_MS,
   TYPING_SPEED_SAMPLE_SIZE,
 } from "../lib/predictiveSuggestions";
+import { liveSpellingPreview } from "./liveSpellingPreview";
+import { liveKanaSource } from "../lib/liveKanaState";
 import { writingQuestion } from "./writingQuestion";
 import { EDITOR_APPEARANCE_EVENT } from "../lib/editorAppearance";
 import { candidatePresentation } from "../lib/candidatePresentation";
@@ -564,6 +566,7 @@ export function MarkdownEditor({
     const cursor = view.state.selection.main.head;
     // A reading-only pause conversion can replace the suffix while the typo
     // dictionary is still loading. Keep explicit conversion available.
+    if (reason === "pause" && settingsRef.current.conversionMode === "replace" && view.state.field(liveKanaSource, false)) return false;
     if (reason === "pause" && settingsRef.current.autoSuggest && mixedKanaTarget(view.state.doc.toString(), cursor)) return false;
     const range = retainedConversionRange(view.state, cursor, trigger);
     if (!range) {
@@ -741,6 +744,7 @@ export function MarkdownEditor({
         markdown(),
         editorPhrases,
         writingQuestion,
+        liveSpellingPreview(() => settingsRef.current, state => Boolean(state.field(ghostSuggestionField).suggestion) || state.field(candidatePanelOpen)),
         search({ top: true }),
         lineNumbers(),
         loadingDecorations,

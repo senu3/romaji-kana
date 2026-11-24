@@ -23,7 +23,7 @@ export function placeCandidate(anchor: Rect, bounds: Rect, size: { width: number
     maxWidth, maxHeight, inline: false };
 }
 
-export function measureCandidate(view: EditorView, position: number, element: HTMLElement, inline = false) {
+export function measureCandidate(view: EditorView, position: number, element: HTMLElement, inline = false, avoid?: DOMRect) {
   const anchor = view.coordsAtPos(Math.min(position, view.state.doc.length), 1);
   if (!anchor) return null;
   const editor = view.scrollDOM.getBoundingClientRect();
@@ -31,7 +31,12 @@ export function measureCandidate(view: EditorView, position: number, element: HT
   const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0;
   const bounds = { left: Math.max(left + 8, editor.left), right: Math.min(left + (viewport?.width ?? innerWidth) - 8, editor.right),
     top: Math.max(top + 8, editor.top), bottom: Math.min(top + (viewport?.height ?? innerHeight) - 8, editor.bottom) };
-  return placeCandidate(anchor, bounds, { width: element.getBoundingClientRect().width, height: element.scrollHeight }, inline);
+  const size = { width: element.getBoundingClientRect().width, height: element.scrollHeight };
+  const placement = placeCandidate(anchor, bounds, size, inline);
+  if (!placement || !avoid || placement.left >= avoid.right || placement.left + size.width <= avoid.left ||
+      placement.top >= avoid.bottom || placement.top + size.height <= avoid.top) return placement;
+  // Reserve the completion menu as part of the anchor so neither surface covers the other.
+  return placeCandidate({ ...anchor, top: Math.min(anchor.top, avoid.top), bottom: Math.max(anchor.bottom, avoid.bottom) }, bounds, size);
 }
 
 export function applyCandidatePlacement(element: HTMLElement, placement: CandidatePlacement | null) {
